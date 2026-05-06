@@ -134,7 +134,7 @@
         <Style x:Key="StyledComboBox" TargetType="ComboBox">
             <Setter Property="Height" Value="28"/>
             <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
@@ -155,10 +155,10 @@
             <Setter Property="FontSize" Value="12"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#D6EAF8"/>
+                    <Setter Property="Background" Value="#DBEAFE"/>
                 </Trigger>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#EBF5FB"/>
+                    <Setter Property="Background" Value="#F0F9FF"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -178,6 +178,8 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <!-- Left accent strip -->
+            <Border Width="3" HorizontalAlignment="Left" Background="#3498DB" Grid.ColumnSpan="2"/>
 
             <StackPanel Grid.Column="0" Orientation="Vertical" Margin="16,0,0,0" VerticalAlignment="Center"
                         WindowChrome.IsHitTestVisibleInChrome="True">
@@ -187,7 +189,7 @@
                     <TextBlock Text="Auto Join" FontSize="18" FontWeight="Bold"
                                Foreground="#2C3E50"/>
                 </StackPanel>
-                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <Separator Height="1" Background="#E2E8F0" Margin="0,2,0,2"/>
                 <TextBlock x:Name="doc_name" Text="Automatically join intersecting elements"
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
@@ -220,7 +222,7 @@
         </Grid>
 
         <!-- SEPARATOR -->
-        <Rectangle Grid.Row="1" Fill="#BDC3C7"/>
+        <Rectangle Grid.Row="1" Fill="#E2E8F0"/>
 
         <!-- ============ CONTENT ============ -->
         <Grid Grid.Row="2" Margin="16,12,16,8">
@@ -234,7 +236,7 @@
             </Grid.RowDefinitions>
 
             <!-- SCOPE SELECTION -->
-            <Border Grid.Row="0" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4" Padding="12,8">
+            <Border Grid.Row="0" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4" Padding="12,8">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -266,7 +268,7 @@
             </Border>
 
             <!-- JOIN RULES DATAGRID -->
-            <Border Grid.Row="2" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4"
+            <Border Grid.Row="2" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4"
                     Padding="0" ClipToBounds="True">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -275,8 +277,8 @@
                     </Grid.RowDefinitions>
 
                     <!-- Rules header -->
-                    <DockPanel Grid.Row="0" Background="#F8F9FA" LastChildFill="True">
-                        <TextBlock Text="Join Rules" FontWeight="SemiBold" Foreground="#2C3E50"
+                    <DockPanel Grid.Row="0" Background="#F8FAFC" LastChildFill="True">
+                        <TextBlock Text="Join Rules" FontWeight="SemiBold" Foreground="#1E293B"
                                    FontSize="12" Margin="12,6,0,6" VerticalAlignment="Center"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                                     Margin="0,4,8,4">
@@ -297,7 +299,7 @@
                               SelectionMode="Single"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
-                              HorizontalGridLinesBrush="#ECF0F1"
+                              HorizontalGridLinesBrush="#F1F5F9"
                               BorderThickness="0"
                               Background="White"
                               RowStyle="{StaticResource RuleRow}"
@@ -307,7 +309,7 @@
                                                 Width="30" IsReadOnly="True">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="#95A5A6"/>
+                                        <Setter Property="Foreground" Value="#94A3B8"/>
                                         <Setter Property="HorizontalAlignment" Value="Center"/>
                                         <Setter Property="VerticalAlignment" Value="Center"/>
                                     </Style>
@@ -317,7 +319,7 @@
                                                 Width="*" IsReadOnly="True">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="#E67E22"/>
+                                        <Setter Property="Foreground" Value="#7C3AED"/>
                                         <Setter Property="FontWeight" Value="SemiBold"/>
                                         <Setter Property="VerticalAlignment" Value="Center"/>
                                         <Setter Property="Padding" Value="4,0"/>
@@ -328,7 +330,7 @@
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value="→"/>
-                                        <Setter Property="Foreground" Value="#BDC3C7"/>
+                                        <Setter Property="Foreground" Value="#94A3B8"/>
                                         <Setter Property="HorizontalAlignment" Value="Center"/>
                                         <Setter Property="VerticalAlignment" Value="Center"/>
                                         <Setter Property="FontSize" Value="14"/>
@@ -339,7 +341,7 @@
                                                 Width="*" IsReadOnly="True">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="#2980B9"/>
+                                        <Setter Property="Foreground" Value="#0EA5E9"/>
                                         <Setter Property="FontWeight" Value="SemiBold"/>
                                         <Setter Property="VerticalAlignment" Value="Center"/>
                                         <Setter Property="Padding" Value="4,0"/>
@@ -352,7 +354,7 @@
             </Border>
 
             <!-- OPTIONS -->
-            <Border Grid.Row="3" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4"
+            <Border Grid.Row="3" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4"
                     Padding="12,6" Margin="0,8,0,0">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
@@ -383,13 +385,13 @@
         </Grid>
 
         <!-- ============ STATUS BAR ============ -->
-        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
+        <Border Grid.Row="3" Background="#FAFAFA" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0"
                 Padding="16,6">
             <DockPanel>
                 <TextBlock x:Name="progress_text" Text="No rules defined" Foreground="#7F8C8D"
                            FontSize="11" VerticalAlignment="Center"/>
                 <ProgressBar x:Name="progress_bar" Height="4" Minimum="0" Maximum="100" Value="0"
-                             Foreground="#3498DB" Background="#ECF0F1" BorderThickness="0"
+                             Foreground="#2563EB" Background="#ECF0F1" BorderThickness="0"
                              HorizontalAlignment="Right" Width="160" Margin="12,0,0,0"
                              Visibility="Collapsed"/>
             </DockPanel>

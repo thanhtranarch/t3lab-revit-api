@@ -291,6 +291,7 @@ class AutoJoinWindow(forms.WPFWindow):
 
     def __init__(self):
         forms.WPFWindow.__init__(self, XAML_FILE)
+        self._load_logo()
         self._rules = []
 
         try:
@@ -305,6 +306,226 @@ class AutoJoinWindow(forms.WPFWindow):
             self._rules.append(r)
 
         self._refresh_rules()
+
+    def _load_logo(self):
+        try:
+            logo_path = os.path.join(EXT_DIR, 'lib', 'GUI', 'T3Lab_logo.png')
+            if os.path.exists(logo_path):
+                bitmap = BitmapImage()
+                bitmap.BeginInit()
+                bitmap.UriSource = Uri(logo_path, UriKind.Absolute)
+                bitmap.EndInit()
+                self.Icon = bitmap
+        except Exception as icon_ex:
+            logger.warning("Could not set window icon: {}".format(icon_ex))
+
+    # --------------------------------------------------
+    # Grid helpers
+    # --------------------------------------------------
+
+    def _refresh_rules(self):
+        items = [
+            RuleItem(i + 1, r["priority"], r["join_with"])
+            for i, r in enumerate(self._rules)
+        ]
+        self.rules_grid.ItemsSource = None
+        self.rules_grid.ItemsSource = items
+        self.progress_text.Text = "{} rule(s) defined".format(len(self._rules))
+
+    # --------------------------------------------------
+    # Window chrome handlers
+    # --------------------------------------------------
+
+    def minimize_button_clicked(self, sender, e):
+        self.WindowState = WindowState.Minimized
+
+    def maximize_button_clicked(self, sender, e):
+        if self.WindowState == WindowState.Maximized:
+            self.WindowState = WindowState.Normal
+        else:
+            self.WindowState = WindowState.Maximized
+
+    def close_button_clicked(self, sender, e):
+        self.Close()
+
+    # --------------------------------------------------
+    # Rule management handlers
+    # --------------------------------------------------
+
+    def btn_add_rule_click(self, sender, args):
+        priority = forms.SelectFromList.show(
+            CATEGORY_NAMES,
+            title="Select Priority Category (Cuts other)",
+            button_name="Select Priority",
+            multiselect=False,
+        )
+        if not priority:
+            return
+
+        joinwith_options = [c for c in CATEGORY_NAMES if c != priority]
+        join_with = forms.SelectFromList.show(
+            joinwith_options,
+            title="Select Join-with Category (Cut by '{}')".format(priority),
+            button_name="Select Join-with",
+            multiselect=False,
+        )
+        if not join_with:
+            return
+
+        for r in self._rules:
+            if r["priority"] == priority and r["join_with"] == join_with:
+                forms.alert(
+                    "Rule already exists:\n{} → {}".format(priority, join_with),
+                    title="Duplicate Rule"
+                )
+                return
+
+        self._rules.append({"priority": priority, "join_with": join_with})
+        self._refresh_rules()
+
+    def btn_remove_rule_click(self, sender, args):
+        selected = self.rules_grid.SelectedItem
+        if not selected:
+            forms.alert("Select a rule to remove.", title="Remove Rule")
+            return
+
+        idx = selected.Number - 1
+        if 0 <= idx < len(self._rules):
+            self._rules.pop(idx)
+            self._refresh_rules()
+
+    def btn_switch_order_click(self, sender, args):
+        selected = self.rules_grid.SelectedItem
+        if not selected:
+            forms.alert("Select a rule to switch.", title="Switch Order")
+            return
+
+        idx = selected.Number - 1
+        if 0 <= idx < len(self._rules):
+            rule = self._rules[idx]
+            rule["priority"], rule["join_with"] = rule["join_with"], rule["priority"]
+            self._refresh_rules()
+
+    # --------------------------------------------------
+    # Save / Load handlers
+    # --------------------------------------------------
+
+    def btn_save_rules_click(self, sender, args):
+        if not self._rules:
+            forms.alert("No rules to save.", title="Save Rules")
+            return
+
+        filepath = forms.save_file(
+            file_ext="json",
+            default_name="join_rules",
+        )
+        if filepath:
+            save_rules_to_file(self._rules, filepath)
+            forms.alert(
+                "Saved {} rule(s) to:\n{}".format(len(self._rules), filepath),
+                title="Rules Saved"
+            )
+
+    def btn_load_rules_click(self, sender, args):
+        filepath = forms.pick_file(file_ext="json")
+        if filepath:
+            try:
+                loaded = load_rules_from_file(filepath)
+                if loaded:
+                    self._rules = loaded
+                    self._refresh_rules()
+                    forms.alert(
+                        "Loaded {} rule(s).".format(len(loaded)),
+                        title="Rules Loaded"
+                    )
+                else:
+                    forms.alert("No valid rules found in file.", title="Load Rules")
+            except Exception as e:
+                forms.alert("Error loading file:\n{}".format(e), title="Load Error")
+
+    # --------------------------------------------------
+    # Run handler
+    # --------------------------------------------------
+
+    def btn_run_click(self, sender, args):
+        if not self._rules:
+            forms.alert("Please add at least one join rule.", title="Auto Join")
+            return
+
+        scope_item = self.cb_scope.SelectedItem
+        scope = scope_item.Content if scope_item else "Entire Project"
+
+        mode_item = self.cb_mode.SelectedItem
+        mode = mode_item.Content if mode_item else "Join"
+
+        switch_order = self.chk_switch_order.IsChecked
+
+        msg = (
+            "Run Auto {} with {} rule(s)?\n\n"
+            "Scope: {}\n"
+            "Switch join order: {}\n\n"
+            "Rules:\n{}"
+        ).format(
+            mode, len(self._rules), scope,
+            "Yes" if switch_order else "No",
+            "\n".join(
+                "  {} → {}".format(r["priority"], r["join_with"])
+                for r in self._rules
+            )
+        )
+
+        td = TaskDialog("Confirm Auto {}".format(mode))
+        td.MainContent = msg
+        td.CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
+        if td.Show() != TaskDialogResult.Yes:
+            return
+
+        self.btn_run.IsEnabled = False
+        self.status_text.Text = "Running..."
+        self.progress_bar.Visibility = Visibility.Visible
+        self.progress_bar.Value = 0
+
+        def progress_cb(current, total, message):
+            if total > 0:
+                pct = int(float(current) / float(total) * 100)
+                self.progress_bar.Value = pct
+            self.progress_text.Text = message
+
+        start = time.time()
+        joined, skipped, errors, err_msg = run_join(
+            self._rules, scope, mode, switch_order, progress_cb
+        )
+        elapsed = time.time() - start
+
+        save_rules_to_file(self._rules)
+
+        self.btn_run.IsEnabled = True
+        self.progress_bar.Visibility = Visibility.Collapsed
+
+        result_msg = (
+            "Auto {} completed in {:.1f}s\n\n"
+            "✓ {}ed: {}\n"
+            "⊘ Already {}ed (skipped): {}\n"
+            "✗ Errors: {}"
+        ).format(
+            mode, elapsed,
+            mode, joined,
+            mode.lower(), skipped,
+            errors
+        )
+
+        if err_msg:
+            result_msg += "\n\n⚠ {}".format(err_msg)
+
+        self.status_text.Text = "Done – {}ed {} element pair(s)".format(
+            mode.lower(), joined
+        )
+        self.progress_text.Text = "{} rule(s) | Last run: {} {}ed".format(
+            len(self._rules), joined, mode.lower()
+        )
+
+        forms.alert(result_msg, title="Auto {} Results".format(mode))
+
 
 # ==================================================
 # QUICK JOIN (Shift+Click)
