@@ -842,155 +842,137 @@
             </TabItem>
 
             <!-- Queue Tab -->
+            <!-- Queue + Settings (combined) -->
             <TabItem Header="Queue" Style="{StaticResource TabItemStyle}">
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Export Preview -->
-                    <StackPanel Grid.Row="0" Margin="0,0,0,0">
-                        <TextBlock Text="Export Preview" Style="{StaticResource SectionHeader}"/>
-                    </StackPanel>
-
-                    <!-- Preview List -->
-                    <Border Grid.Row="1" BorderBrush="#BDC3C7" BorderThickness="1" Margin="0,5" CornerRadius="3">
-                        <ListView x:Name="export_preview_list"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
-                            <ListView.View>
-                                <GridView>
-                                    <GridViewColumn Header="Sheet Number" Width="300"
-                                                    DisplayMemberBinding="{Binding SheetNumber}"/>
-                                    <GridViewColumn Header="Sheet Name" Width="300"
-                                                    DisplayMemberBinding="{Binding SheetName}"/>
-                                    <GridViewColumn Header="Format" Width="100"
-                                                    DisplayMemberBinding="{Binding Format}"/>
-                                    <GridViewColumn Header="Size" Width="80"
-                                                    DisplayMemberBinding="{Binding Size}"/>
-                                    <GridViewColumn Header="Orientation" Width="100"
-                                                    DisplayMemberBinding="{Binding Orientation}"/>
-                                    <GridViewColumn Header="Progress" Width="300">
-                                        <GridViewColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <Grid>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                    </Grid.RowDefinitions>
-                                                    <ProgressBar Grid.Row="0" Value="{Binding Progress}" Height="18" Minimum="0" Maximum="100" Margin="0,0,0,2">
-                                                        <ProgressBar.Style>
-                                                            <Style TargetType="ProgressBar">
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding Progress}" Value="100">
-                                                                        <Setter Property="Foreground" Value="#27AE60"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </ProgressBar.Style>
-                                                    </ProgressBar>
-                                                    <TextBlock Grid.Row="1" Text="{Binding Status}" FontSize="11" Foreground="#27AE60" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,2,0,0">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding Status}" Value="">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </GridViewColumn.CellTemplate>
-                                    </GridViewColumn>
-                                </GridView>
-                            </ListView.View>
-                        </ListView>
-                    </Border>
-
-                    <!-- Progress Info -->
-                    <StackPanel Grid.Row="2" Margin="0,10,0,0">
-                        <TextBlock x:Name="progress_text" Text="Ready to export" FontSize="12" Foreground="#7F8C8D"/>
-                        <ProgressBar x:Name="overall_progress" Height="25" Minimum="0" Maximum="100" Value="0" Margin="0,5"/>
-                    </StackPanel>
-                </Grid>
-            </TabItem>
-                </TabControl>
-
-                <!-- Settings View (Not in TabControl) -->
-                <Grid x:Name="settings_view" Visibility="Collapsed" Background="White">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <Grid Margin="10">
+                    <!-- ── SETTINGS CARD ── -->
+                    <Border Grid.Row="0" BorderBrush="#BDC3C7" BorderThickness="1"
+                            Padding="12,10" Background="#F8F9FA" CornerRadius="3" Margin="0,0,0,10">
+                        <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="Export Rules &amp; Settings" Style="{StaticResource SectionHeader}"/>
+                            <!-- Output Folder -->
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Output Folder:" VerticalAlignment="Center"
+                                           FontWeight="Medium" FontSize="12"/>
+                                <TextBox x:Name="output_folder" Grid.Column="1" Height="26"
+                                         VerticalContentAlignment="Center" Margin="5,0" Background="White"/>
+                                <Button Grid.Column="2" Content="Browse..." Height="26"
+                                        Style="{StaticResource SecondaryButton}" Click="browse_output_folder"/>
+                            </Grid>
 
-                            <Border Grid.Row="1" BorderBrush="#BDC3C7" BorderThickness="1" Padding="15" Background="#F8F9FA" CornerRadius="3" Margin="0,10,0,0">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                            <!-- Organize + Reverse on one row -->
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
 
-                                    <!-- Output Folder -->
-                                    <Grid Grid.Row="0" Margin="0,5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Output Folder:" VerticalAlignment="Center" FontWeight="Medium"/>
-                                        <TextBox x:Name="output_folder" Grid.Column="1" Height="28"
-                                                 VerticalContentAlignment="Center" Margin="5,0"
-                                                 IsReadOnly="True" Background="White"/>
-                                        <Button Grid.Column="2" Content="Browse..."
-                                                Style="{StaticResource SecondaryButton}"
-                                                Click="browse_output_folder"/>
-                                    </Grid>
+                                <TextBlock Grid.Column="0" Text="Organize:" VerticalAlignment="Center"
+                                           FontWeight="Medium" FontSize="12" Margin="0,0,8,0"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <RadioButton x:Name="save_same_folder" Content="Same folder"
+                                                 GroupName="organization" IsChecked="True" Margin="0,0,12,0"/>
+                                    <RadioButton x:Name="save_split_by_format" Content="Split by format"
+                                                 GroupName="organization"/>
+                                </StackPanel>
 
-                                    <!-- File Organization -->
-                                    <StackPanel Grid.Row="1" Margin="0,15,0,0">
-                                        <TextBlock Text="File Organization:" FontWeight="Medium" Margin="0,0,0,5"/>
-                                        <RadioButton x:Name="save_same_folder" Content="Save all files in the same folder location"
-                                                     GroupName="organization" IsChecked="True" Margin="0,3"/>
-                                        <RadioButton x:Name="save_split_by_format" Content="Save and split files by file format"
-                                                     GroupName="organization" Margin="0,3"/>
-                                    </StackPanel>
-
-                                    <!-- Additional Options -->
-                                    <StackPanel Grid.Row="2" Margin="0,15,0,0">
-                                        <CheckBox x:Name="reverse_order" Content="Reverse sheet order"
-                                                  Checked="reverse_order_changed" Unchecked="reverse_order_changed"/>
-                                    </StackPanel>
-
-                                    <Separator Grid.Row="3" Margin="0,15" Background="#BDC3C7"/>
-                                </Grid>
-                            </Border>
-
-                            <StackPanel Grid.Row="2" Margin="0,20,0,0">
-                                <TextBlock Text="Export Naming Pattern" FontWeight="Bold" Margin="0,0,0,10"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="naming_pattern_settings" Grid.Column="0" Height="28" VerticalContentAlignment="Center"/>
-                                    <Button Grid.Column="1" Content="Edit Pattern..." Margin="10,0,0,0" Padding="10,0" Click="button_custom_parameters"/>
-                                </Grid>
-                                <TextBlock Text="Note: This naming pattern applies to all exported files." FontSize="11" Foreground="#7F8C8D" Margin="0,5,0,0" FontStyle="Italic"/>
-                            </StackPanel>
+                                <CheckBox x:Name="reverse_order" Grid.Column="3" Content="Reverse order"
+                                          VerticalAlignment="Center"
+                                          Checked="reverse_order_changed" Unchecked="reverse_order_changed"/>
+                            </Grid>
                         </Grid>
-                    </ScrollViewer>
+                    </Border>
+
+                    <!-- ── QUEUE SECTION ── -->
+                    <Grid Grid.Row="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Export Queue" Style="{StaticResource SectionHeader}"/>
+
+                        <Border Grid.Row="1" BorderBrush="#BDC3C7" BorderThickness="1" Margin="0,5" CornerRadius="3">
+                            <ListView x:Name="export_preview_list"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Sheet Number" Width="250"
+                                                        DisplayMemberBinding="{Binding SheetNumber}"/>
+                                        <GridViewColumn Header="Sheet Name" Width="280"
+                                                        DisplayMemberBinding="{Binding SheetName}"/>
+                                        <GridViewColumn Header="Format" Width="80"
+                                                        DisplayMemberBinding="{Binding Format}"/>
+                                        <GridViewColumn Header="Size" Width="80"
+                                                        DisplayMemberBinding="{Binding Size}"/>
+                                        <GridViewColumn Header="Orientation" Width="90"
+                                                        DisplayMemberBinding="{Binding Orientation}"/>
+                                        <GridViewColumn Header="Progress" Width="240">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto"/>
+                                                            <RowDefinition Height="Auto"/>
+                                                        </Grid.RowDefinitions>
+                                                        <ProgressBar Grid.Row="0" Value="{Binding Progress}" Height="18" Minimum="0" Maximum="100" Margin="0,0,0,2">
+                                                            <ProgressBar.Style>
+                                                                <Style TargetType="ProgressBar">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding Progress}" Value="100">
+                                                                            <Setter Property="Foreground" Value="#27AE60"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </ProgressBar.Style>
+                                                        </ProgressBar>
+                                                        <TextBlock Grid.Row="1" Text="{Binding Status}" FontSize="11" Foreground="#27AE60" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,2,0,0">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding Status}" Value="">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                        </Border>
+
+                        <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                            <TextBlock x:Name="progress_text" Text="Ready to export"
+                                       FontSize="12" Foreground="#7F8C8D"/>
+                            <ProgressBar x:Name="overall_progress" Height="20" Minimum="0" Maximum="100"
+                                         Value="0" Margin="0,5"/>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
+            </TabItem>
+                </TabControl>
             </Grid>
 
         </Grid>
@@ -1037,7 +1019,6 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- 1. Selection -->
@@ -1056,19 +1037,11 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 3. Queue -->
+                <!-- 3. Queue + Settings -->
                 <Border x:Name="nav_border_queue" Grid.Column="2" Background="Transparent" Margin="0" Cursor="Hand" MouseLeftButtonDown="nav_item_clicked">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock x:Name="nav_icon_queue" Text="&#xE914;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#7F8C8D" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                         <TextBlock x:Name="nav_text_queue" Text="Queue" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- 4. Settings -->
-                <Border x:Name="nav_border_settings" Grid.Column="3" Background="Transparent" Margin="0" Cursor="Hand" MouseLeftButtonDown="nav_item_clicked">
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <TextBlock x:Name="nav_icon_settings" Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#7F8C8D" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                        <TextBlock x:Name="nav_text_settings" Text="Settings" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Border>
             </Grid>

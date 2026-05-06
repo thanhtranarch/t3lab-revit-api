@@ -17,7 +17,7 @@ Mail: trantienthanh909@gmail.com
 --------------------------------------------------------
 """
 
-__title__   = "Revit Beam\nFrom CAD"
+__title__   = "Beam"
 __author__  = "Tran Tien Thanh"
 __version__ = "2.0.0"
 

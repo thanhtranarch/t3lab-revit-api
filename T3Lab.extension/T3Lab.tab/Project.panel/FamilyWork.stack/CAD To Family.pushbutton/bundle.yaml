@@ -1,4 +1,4 @@
-﻿# BulkFamilyExport pushbutton configuration
+# BulkFamilyExport pushbutton configuration
 
 title: Bulk Family Export
 tooltip: Export CAD blocks from imported DWG/DXF files as individual Revit families

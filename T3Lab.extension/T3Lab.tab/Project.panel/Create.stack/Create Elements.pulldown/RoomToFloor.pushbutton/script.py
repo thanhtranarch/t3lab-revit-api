@@ -8,7 +8,7 @@ Author: Tran Tien Thanh
 Mail: trantienthanh909@gmail.com
 """
 
-__title__   = "Room To\nFloor"
+__title__   = "Room To Floor"
 __author__  = "Tran Tien Thanh"
 __version__ = "1.0.0"
 
@@ -37,6 +37,12 @@ from Autodesk.Revit.DB import (
     SpatialElementBoundaryOptions,
     SpatialElementBoundaryLocation,
     CurveLoop,
+    CurveArray,
+    IFailuresPreprocessor,
+    FailureProcessingResult,
+    BuiltInParameter,
+    Floor,
+    ElementId
 )
 from Autodesk.Revit.UI import TaskDialog
 from pyrevit import forms, script
@@ -54,11 +60,18 @@ XAML_FILE  = os.path.join(EXT_DIR, 'lib', 'GUI', 'Tools', 'RoomToFloor.xaml')
 # ==============================================================================
 logger        = script.get_logger()
 doc           = revit.doc
+uidoc         = revit.uidoc
 REVIT_VERSION = int(doc.Application.VersionNumber)
-
 
 # CLASS/FUNCTIONS
 # ==============================================================================
+
+class FloorsCreationWarningSwallower(IFailuresPreprocessor):
+    def PreprocessFailures(self, failuresAccessor):
+        failList = failuresAccessor.GetFailureMessages()
+        for failure in failList:
+            failuresAccessor.DeleteWarning(failure)
+        return FailureProcessingResult.Continue
 
 class FloorGenerator:
     def __init__(self, doc):
@@ -68,12 +81,18 @@ class FloorGenerator:
         offset_ft = offset_mm / 304.8
         created_count = 0
         error_count = 0
+        new_floors = []
 
         with Transaction(self.doc, "T3Lab: Room to Floor") as t:
             t.Start()
+            failOpt = t.GetFailureHandlingOptions()
+            failOpt.SetFailuresPreprocessor(FloorsCreationWarningSwallower())
+            t.SetFailureHandlingOptions(failOpt)
+
             for room in room_elements:
                 try:
                     level_id = room.LevelId
+                    level = self.doc.GetElement(level_id)
                     
                     # Boundary options
                     opt = SpatialElementBoundaryOptions()
@@ -82,43 +101,59 @@ class FloorGenerator:
                         else SpatialElementBoundaryLocation.Center
                     )
                     
-                    loops = room.GetBoundarySegments(opt)
-                    if not loops:
+                    room_boundaries = room.GetBoundarySegments(opt)
+                    if not room_boundaries:
                         error_count += 1
                         continue
 
-                    # Create CurveLoops for floor profile
-                    profile = List[CurveLoop]()
-                    for loop in loops:
-                        curve_loop = CurveLoop()
-                        for seg in loop:
-                            curve = seg.GetCurve()
-                            curve_loop.Append(curve)
-                        profile.Add(curve_loop)
+                    new_floor = None
 
-                    # Create Floor
                     if REVIT_VERSION >= 2022:
-                        floor = DB.Floor.Create(self.doc, profile, floor_type.Id, level_id)
+                        profile = List[CurveLoop]()
+                        for loop in room_boundaries:
+                            curve_loop = CurveLoop()
+                            for seg in loop:
+                                curve_loop.Append(seg.GetCurve())
+                            profile.Add(curve_loop)
+
+                        new_floor = Floor.Create(self.doc, profile, floor_type.Id, level_id)
                     else:
-                        # Fallback for older versions if needed
-                        floor = DB.Floor.Create(self.doc, profile, floor_type.Id, level_id)
+                        floor_shape = room_boundaries[0]
+                        openings = list(room_boundaries)[1:] if len(room_boundaries) > 1 else []
 
-                    # Set parameters
-                    if abs(offset_ft) > 0.0001:
-                        param = floor.get_Parameter(DB.BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)
-                        if param: param.Set(offset_ft)
-                    
-                    if is_structural:
-                        struct_param = floor.get_Parameter(DB.BuiltInParameter.FLOOR_PARAM_IS_STRUCTURAL)
-                        if struct_param: struct_param.Set(1)
+                        curve_array = CurveArray()
+                        for seg in floor_shape:
+                            curve_array.Append(seg.GetCurve())
+                        
+                        new_floor = self.doc.Create.NewFloor(curve_array, floor_type, level, is_structural)
+                        
+                        # Create Floor Openings separately for older versions
+                        if new_floor and openings:
+                            for opening in openings:
+                                opening_curve = CurveArray()
+                                for seg in opening:
+                                    opening_curve.Append(seg.GetCurve())
+                                self.doc.Create.NewOpening(new_floor, opening_curve, True)
 
-                    created_count += 1
+                    if new_floor:
+                        if abs(offset_ft) > 0.0001:
+                            param = new_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)
+                            if param: param.Set(offset_ft)
+                        
+                        # Set structural parameter if API is >= 2022 (older uses parameter in NewFloor)
+                        if is_structural and REVIT_VERSION >= 2022:
+                            struct_param = new_floor.get_Parameter(BuiltInParameter.FLOOR_PARAM_IS_STRUCTURAL)
+                            if struct_param: struct_param.Set(1)
+
+                        new_floors.append(new_floor)
+                        created_count += 1
                 except Exception as ex:
                     logger.debug("Error creating floor for room: {}".format(ex))
                     error_count += 1
             
             t.Commit()
-        return created_count, error_count
+            
+        return new_floors, created_count, error_count
 
 
 class RoomItem(object):
@@ -141,23 +176,10 @@ class RoomToFloorWindow(forms.WPFWindow):
     def __init__(self):
         forms.WPFWindow.__init__(self, XAML_FILE)
         self.generator = FloorGenerator(doc)
-        self._load_logo()
         self._all_rooms = []
         self._load_rooms()
         self._load_floor_types()
         self._update_status()
-
-    def _load_logo(self):
-        try:
-            logo_path = os.path.join(EXT_DIR, 'lib', 'GUI', 'T3Lab_logo.png')
-            if os.path.exists(logo_path):
-                bitmap = BitmapImage()
-                bitmap.BeginInit()
-                bitmap.UriSource = Uri(logo_path, UriKind.Absolute)
-                bitmap.EndInit()
-                self.Icon = bitmap
-        except Exception:
-            pass
 
     def _load_rooms(self):
         room_elements = FilteredElementCollector(doc) \
@@ -248,13 +270,19 @@ class RoomToFloorWindow(forms.WPFWindow):
         is_structural = self.chk_structural.IsChecked
         use_finish = self.chk_room_finish.IsChecked
 
-        created, errors = self.generator.generate_floors(
+        new_floors, created, errors = self.generator.generate_floors(
             [r.Element for r in selected_rooms],
             floor_type,
             offset_mm,
             is_structural,
             use_finish
         )
+        
+        if new_floors:
+            try:
+                uidoc.Selection.SetElementIds(List[ElementId]([f.Id for f in new_floors if f.IsValidObject]))
+            except Exception as e:
+                logger.debug("Failed to select created floors: {}".format(e))
 
         msg = "Successfully created {} floors.".format(created)
         if errors > 0:
@@ -275,10 +303,10 @@ def run_headless(args_json):
         structural = data.get("structural", False)
         use_finish = data.get("use_finish", True)
         
-        rooms = [doc.GetElement(DB.ElementId(int(rid))) for rid in room_ids]
-        floor_type = doc.GetElement(DB.ElementId(int(type_id)))
+        rooms = [doc.GetElement(ElementId(int(rid))) for rid in room_ids]
+        floor_type = doc.GetElement(ElementId(int(type_id)))
         
-        created, errors = gen.generate_floors(rooms, floor_type, offset, structural, use_finish)
+        new_floors, created, errors = gen.generate_floors(rooms, floor_type, offset, structural, use_finish)
         print(json.dumps({"status": "success", "created": created, "errors": errors}))
     except Exception as ex:
         print(json.dumps({"status": "error", "message": str(ex)}))

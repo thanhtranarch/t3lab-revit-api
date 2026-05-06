@@ -1,5 +1,4 @@
 layout:
-  - RoomToFloor
-  - Beam
   - Create Room Plan
   - PropertyLine
+  - Create Elements

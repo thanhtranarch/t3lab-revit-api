@@ -1485,7 +1485,6 @@ class TileLayoutWindow(forms.WPFWindow):
         self._applied = False
         self.wants_repick = False   # set to True to re-pick after Close()
 
-        self._load_logo()
 
         if preselected_floors:
             self._extract_boundaries(preselected_floors)
@@ -1493,21 +1492,6 @@ class TileLayoutWindow(forms.WPFWindow):
         self._refresh_step_ui()
 
     # ── logo ──────────────────────────────────────────────────────────────────
-    def _load_logo(self):
-        logo_path = os.path.join(EXT_DIR, 'lib', 'GUI', 'T3Lab_logo.png')
-        if not os.path.exists(logo_path):
-            return
-        try:
-            from System.Windows.Media.Imaging import BitmapImage
-            from System import Uri, UriKind
-            bitmap = BitmapImage()
-            bitmap.BeginInit()
-            bitmap.UriSource = Uri(logo_path, UriKind.Absolute)
-            bitmap.EndInit()
-            self.Icon = bitmap
-        except Exception:
-            pass
-
     # ── chrome ────────────────────────────────────────────────────────────────
     def minimize_button_clicked(self, sender, args):
         self.WindowState = WindowState.Minimized

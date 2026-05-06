@@ -355,24 +355,9 @@ class ExportManagerWindow(forms.WPFWindow):
             self._titleblock_size_cache = {}  # Sheet ID -> (width_mm, height_mm)
             self._paper_size_cache = {}  # Sheet ID -> (size_name, orientation)
 
-            # Link naming pattern to the new UI control in Settings tab
-            self.naming_pattern = self.naming_pattern_settings
-            self.naming_pattern.Text = "{SheetNumber}-{SheetName}"
+            # naming pattern stored as plain object; default = sheet number only
+            self.naming_pattern = type('_NP', (), {'Text': '{SheetNumber}'})()
 
-            # Set window icon and title bar logo
-            try:
-                logo_path = os.path.join(extension_dir, 'lib', 'GUI', 'T3Lab_logo.png')
-                if os.path.exists(logo_path):
-                    bitmap = BitmapImage()
-                    bitmap.BeginInit()
-                    bitmap.UriSource = Uri(logo_path, UriKind.Absolute)
-                    bitmap.EndInit()
-                    # Set window icon
-                    self.Icon = bitmap
-                    # Set title bar logo
-                    self.logo_image.Source = bitmap
-            except Exception as icon_ex:
-                logger.warning("Could not set window icon: {}".format(icon_ex))
 
             # Initialize Smart API Adapter for self-learning capability
             if HAS_API_LEARNER:
@@ -1234,9 +1219,8 @@ class ExportManagerWindow(forms.WPFWindow):
             forms.alert("Error loading sheets: {}".format(ex), exitscript=True)
 
     def _lazy_load_init(self):
-        """Pre-load titleblock cache (one query) then kick off chunked sheet loading."""
+        """Kick off chunked Revision loading — no titleblock queries at startup."""
         try:
-            self._batch_load_titleblock_sizes()
             self._lazy_load_index = 0
             self.Dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
@@ -1246,20 +1230,19 @@ class ExportManagerWindow(forms.WPFWindow):
             logger.debug("Error in lazy load init: {}".format(ex))
 
     def _lazy_load_chunk(self):
-        """Load extra data for a small batch of sheets, then schedule the next batch.
+        """Load Revision for a batch of sheets, then schedule the next batch.
 
-        By processing CHUNK_SIZE sheets per dispatcher slot the UI thread stays
-        responsive – users can scroll, select and interact while loading continues
-        in the background.
+        Only loads the Revision column (1 param/sheet). Size/Orientation are
+        deferred to Queue build time so startup never triggers titleblock
+        queries or view-scope FilteredElementCollector calls.
         """
-        CHUNK_SIZE = 30  # sheets per dispatcher turn
+        CHUNK_SIZE = 80
 
         try:
             start = self._lazy_load_index
             chunk = self.all_sheets[start:start + CHUNK_SIZE]
 
             if not chunk:
-                # All done – final refresh and status update
                 if hasattr(self, 'sheets_listview') and self.sheets_listview:
                     self.sheets_listview.Items.Refresh()
                 self.status_text.Text = "Ready | {} sheets | Revit {}".format(
@@ -1268,23 +1251,12 @@ class ExportManagerWindow(forms.WPFWindow):
 
             for sheet_item in chunk:
                 sheet_item._load_revision_params()
-                size, orientation = self.get_sheet_paper_size_and_orientation(sheet_item.Sheet)
-                sheet_item.Size = size
-                sheet_item.Orientation = orientation
 
             self._lazy_load_index = start + len(chunk)
 
-            # Refresh the visible rows to show newly loaded data
             if hasattr(self, 'sheets_listview') and self.sheets_listview:
                 self.sheets_listview.Items.Refresh()
 
-            # Update status to show progress
-            total = len(self.all_sheets)
-            loaded = self._lazy_load_index
-            self.status_text.Text = "Loading sheet data... {}/{} | Revit {}".format(
-                loaded, total, REVIT_VERSION)
-
-            # Schedule the next chunk at Background priority so UI events are processed first
             self.Dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
                 Action(self._lazy_load_chunk)
@@ -1292,6 +1264,11 @@ class ExportManagerWindow(forms.WPFWindow):
 
         except Exception as ex:
             logger.debug("Error loading sheet chunk: {}".format(ex))
+
+    def _ensure_titleblock_cache(self):
+        """Populate titleblock size cache on first call (deferred from startup)."""
+        if not self._titleblock_size_cache:
+            self._batch_load_titleblock_sizes()
 
     def _load_extra_sheet_data(self):
         """Legacy helper kept for compatibility – now delegates to chunked loader."""
@@ -1337,7 +1314,7 @@ class ExportManagerWindow(forms.WPFWindow):
 
     def _lazy_view_load_chunk(self):
         """Load Phase/ViewTemplate for a batch of views, then schedule the next batch."""
-        CHUNK_SIZE = 30
+        CHUNK_SIZE = 80
         try:
             start = self._lazy_view_load_index
             chunk = self.all_views[start:start + CHUNK_SIZE]
@@ -1356,11 +1333,6 @@ class ExportManagerWindow(forms.WPFWindow):
 
             if hasattr(self, 'sheets_listview') and self.sheets_listview:
                 self.sheets_listview.Items.Refresh()
-
-            loaded = self._lazy_view_load_index
-            total = len(self.all_views)
-            self.status_text.Text = "Loading view data... {}/{} | Revit {}".format(
-                loaded, total, REVIT_VERSION)
 
             self.Dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
@@ -2102,50 +2074,35 @@ class ExportManagerWindow(forms.WPFWindow):
             if sender.Name == "nav_border_selection": target_index = 0
             elif sender.Name == "nav_border_format": target_index = 1
             elif sender.Name == "nav_border_queue": target_index = 2
-            elif sender.Name == "nav_border_settings": target_index = 3
-            
             if target_index != -1:
                 self.switch_to_view(target_index)
         except Exception as ex:
             logger.debug("Error in nav_item_clicked: {}".format(ex))
 
     def switch_to_view(self, index):
-        """Switch between wizard tabs and the standalone settings view."""
+        """Switch to the given wizard tab (0=Selection, 1=Format, 2=Queue+Settings)."""
         try:
-            # Handle Settings View (index 3) vs Wizard Tabs (0-2)
-            if index == 3:
-                self.main_tabs.Visibility = Visibility.Collapsed
-                self.settings_view.Visibility = Visibility.Visible
-                self.sync_navigation_footer(3)
-                self.update_navigation_buttons(3)
-            else:
-                self.settings_view.Visibility = Visibility.Collapsed
-                self.main_tabs.Visibility = Visibility.Visible
-                self.main_tabs.SelectedIndex = index
-                # sync_navigation_footer and update_navigation_buttons 
-                # are called by tab_changed event
+            self.main_tabs.SelectedIndex = index
+            self.update_navigation_buttons(index)
         except Exception as ex:
             logger.debug("Error in switch_to_view: {}".format(ex))
 
     def sync_navigation_footer(self, index=None):
-        """Update the visual state of the bottom navigation bar."""
+        """Update the visual state of the 3-item bottom navigation bar."""
         try:
             if index is None:
-                index = 3 if self.settings_view.Visibility == Visibility.Visible else self.main_tabs.SelectedIndex
-                
+                index = self.main_tabs.SelectedIndex
+
             from System.Windows.Media import SolidColorBrush, Color
-            # Helper for creating brushes
             active_bg = SolidColorBrush(Color.FromRgb(0xF0, 0xF8, 0xFF))
             active_fg = SolidColorBrush(Color.FromRgb(0x00, 0x5B, 0x82))
             inactive_bg = SolidColorBrush(Color.FromArgb(0, 255, 255, 255))
             inactive_fg = SolidColorBrush(Color.FromRgb(0x7F, 0x8C, 0x8D))
 
-            # Update all items
-            for idx, name in enumerate(['selection', 'format', 'queue', 'settings']):
+            for idx, name in enumerate(['selection', 'format', 'queue']):
                 border = getattr(self, 'nav_border_' + name)
                 icon = getattr(self, 'nav_icon_' + name)
                 text = getattr(self, 'nav_text_' + name)
-
                 if idx == index:
                     border.Background = active_bg
                     icon.Foreground = active_fg
@@ -2160,39 +2117,37 @@ class ExportManagerWindow(forms.WPFWindow):
             logger.debug("Error syncing navigation footer: {}".format(ex))
 
     def update_navigation_buttons(self, index=None):
-        """Update navigation button visibility and text based on current view."""
+        """Update action bar buttons and footer highlight for the current tab."""
         if index is None:
-            index = 3 if self.settings_view.Visibility == Visibility.Visible else self.main_tabs.SelectedIndex
+            index = self.main_tabs.SelectedIndex
 
-        # Back button visibility
         self.back_button.Visibility = Visibility.Collapsed if index == 0 else Visibility.Visible
 
-        # Next button text
-        if index == 3:  # Settings view
-            self.next_button_text.Text = "Create"
+        # Last tab (Queue+Settings) → Export; all others → Next
+        if index == 2:
+            self.next_button_text.Text = "Export"
+            self.next_button_icon.Text = ""
         else:
             self.next_button_text.Text = "Next"
+            self.next_button_icon.Text = "→"
 
-        # Sync footer visual state
         self.sync_navigation_footer(index)
 
     def tab_changed(self, sender, e):
-        """Handle tab change event to update export preview and sync navigation."""
+        """Sync nav footer and trigger Queue preview when tab changes via keyboard/programmatic switch."""
         try:
-            if e.Source != self.main_tabs:
+            from System.Windows.Controls import TabControl as _TC
+            if not isinstance(e.Source, _TC):
                 return
-
-            current_tab_index = self.main_tabs.SelectedIndex
-            
-            if current_tab_index == 2:
+            idx = self.main_tabs.SelectedIndex
+            self.update_navigation_buttons(idx)
+            if idx == 2:
                 self.update_export_preview_if_needed()
-            
-            self.update_navigation_buttons(current_tab_index)
         except Exception as ex:
             logger.debug("Error handling tab change: {}".format(ex))
 
     def update_export_preview_if_needed(self):
-        """Update export preview if currently on Create tab."""
+        """Refresh the Queue preview list when on tab 2."""
         try:
             if self.main_tabs.SelectedIndex == 2:
                 if self.selection_mode == "sheets":
@@ -2210,30 +2165,32 @@ class ExportManagerWindow(forms.WPFWindow):
             logger.debug("Error updating export preview: {}".format(ex))
 
     def go_back(self, sender, e):
-        """Navigate to previous step."""
-        current_index = 3 if self.settings_view.Visibility == Visibility.Visible else self.main_tabs.SelectedIndex
-        if current_index > 0:
-            self.switch_to_view(current_index - 1)
+        """Navigate to previous tab."""
+        idx = self.main_tabs.SelectedIndex
+        if idx > 0:
+            self.switch_to_view(idx - 1)
 
     def go_next(self, sender, e):
-        """Navigate to next step or start export."""
-        current_index = 3 if self.settings_view.Visibility == Visibility.Visible else self.main_tabs.SelectedIndex
-
-        if current_index == 0:  # Selection tab
+        """Advance to next tab or start export on the final tab."""
+        idx = self.main_tabs.SelectedIndex
+        if idx == 0:
             if self.selection_mode == "sheets":
                 selected_items = [s for s in self.all_sheets if s.IsSelected]
                 if not selected_items:
                     forms.alert("Please select at least one sheet to export.", title="No Sheets Selected")
                     return
             self.switch_to_view(1)
-        elif current_index < 3:
-            self.switch_to_view(current_index + 1)
+        elif idx == 1:
+            self.switch_to_view(2)
         else:
-            # On final (Settings) view, start export
             self.start_export()
 
     def build_export_preview(self):
         """Build the export preview list."""
+        # Ensure titleblock cache is populated before size detection runs.
+        # This is deferred from startup to avoid triggering Revit graphic regeneration.
+        self._ensure_titleblock_cache()
+
         # Get selected items based on mode
         if self.selection_mode == "sheets":
             selected_items = [s for s in self.all_sheets if s.IsSelected]
@@ -2485,6 +2442,8 @@ class ExportManagerWindow(forms.WPFWindow):
     def start_export(self):
         """Start the export process."""
         try:
+            self._ensure_titleblock_cache()
+
             # Get selected items based on mode
             if self.selection_mode == "sheets":
                 selected_items = [s for s in self.all_sheets if s.IsSelected]

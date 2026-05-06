@@ -16,7 +16,7 @@ Linkedin: linkedin.com/in/sunarch7899/
 --------------------------------------------------------
 """
 __author__  = "Tran Tien Thanh"
-__title__   = "Bulk Family Export"
+__title__   = "CAD To Family"
 __version__ = "2.0.0"
 
 # IMPORT LIBRARIES
@@ -625,26 +625,12 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         self._filter_text   = ""   # current search string
         self._filter_cat    = ""   # current suggested-category filter ("" = All)
 
-        self._load_logo()
         self._init_cad_files()
         self._init_disciplines()
         self._init_categories()
         self._init_filter_bar()
         self._update_status("Ready")
 
-    # Logo
-    def _load_logo(self):
-        """Load T3Lab logo into title bar and window icon."""
-        try:
-            logo_path = os.path.join(self._ext_dir, 'lib', 'GUI', 'T3Lab_logo.png')
-            if os.path.exists(logo_path):
-                bitmap = BitmapImage()
-                bitmap.BeginInit()
-                bitmap.UriSource = Uri(logo_path, UriKind.Absolute)
-                bitmap.EndInit()
-                self.Icon = bitmap
-        except Exception as icon_ex:
-            logger.warning("Could not set window icon: {}".format(icon_ex))
 
     # Initialisation
     def _init_cad_files(self):
