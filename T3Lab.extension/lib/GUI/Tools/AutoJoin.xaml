@@ -1,0 +1,381 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+    Title="Auto Join"
+    Height="620" Width="560"
+    MinWidth="520" MinHeight="540"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="CanResizeWithGrip"
+    Background="White"
+    FontFamily="Segoe UI">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="64" UseAeroCaptionButtons="False" ResizeBorderThickness="5"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <!-- Window control button -->
+        <Style x:Key="WinCtrlButton" TargetType="Button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#7F8C8D"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#D5DBDB"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Close button -->
+        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WinCtrlButton}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E74C3C"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Primary button -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="20,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#2980B9"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bd" Property="Background" Value="#BDC3C7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Secondary button -->
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#ECF0F1"/>
+            <Setter Property="Foreground" Value="#2C3E50"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                CornerRadius="3" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#D5DBDB"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Danger button -->
+        <Style x:Key="DangerButton" TargetType="Button">
+            <Setter Property="Background" Value="#E74C3C"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                CornerRadius="3" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#C0392B"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ComboBox style -->
+        <Style x:Key="StyledComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#2C3E50"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <!-- CheckBox style -->
+        <Style x:Key="StyledCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#2C3E50"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <!-- DataGrid row style -->
+        <Style x:Key="RuleRow" TargetType="DataGridRow">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#D6EAF8"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EBF5FB"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="64"/>
+            <RowDefinition Height="1"/>
+            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ============ TITLE BAR ============ -->
+        <Grid Grid.Row="0" Background="White">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Vertical" Margin="16,0,0,0" VerticalAlignment="Center"
+                        WindowChrome.IsHitTestVisibleInChrome="True">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
+                               Foreground="#3498DB" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                    <TextBlock Text="Auto Join" FontSize="18" FontWeight="Bold"
+                               Foreground="#2C3E50"/>
+                </StackPanel>
+                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <TextBlock x:Name="doc_name" Text="Automatically join intersecting elements"
+                           FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button x:Name="btn_minimize" Content="&#x2212;" Style="{StaticResource WinCtrlButton}"
+                        Click="minimize_button_clicked"/>
+                <Button x:Name="btn_maximize" Content="&#x25A1;" Style="{StaticResource WinCtrlButton}"
+                        Click="maximize_button_clicked"/>
+                <Button x:Name="btn_close" Content="&#x2715;" Style="{StaticResource CloseButton}"
+                        Click="close_button_clicked"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- SEPARATOR -->
+        <Rectangle Grid.Row="1" Fill="#BDC3C7"/>
+
+        <!-- ============ CONTENT ============ -->
+        <Grid Grid.Row="2" Margin="16,12,16,8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="8"/>
+                <RowDefinition/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- SCOPE SELECTION -->
+            <Border Grid.Row="0" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4" Padding="12,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="Scope:" Foreground="#2C3E50"
+                               FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="cb_scope" Grid.Column="2" Style="{StaticResource StyledComboBox}"
+                              SelectedIndex="0">
+                        <ComboBoxItem Content="Entire Project"/>
+                        <ComboBoxItem Content="Active View"/>
+                        <ComboBoxItem Content="Selected Elements"/>
+                    </ComboBox>
+
+                    <TextBlock Grid.Column="4" Text="Mode:" Foreground="#2C3E50"
+                               FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="cb_mode" Grid.Column="6" Style="{StaticResource StyledComboBox}"
+                              Width="110" SelectedIndex="0">
+                        <ComboBoxItem Content="Join"/>
+                        <ComboBoxItem Content="Unjoin"/>
+                    </ComboBox>
+                </Grid>
+            </Border>
+
+            <!-- JOIN RULES DATAGRID -->
+            <Border Grid.Row="2" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4"
+                    Padding="0" ClipToBounds="True">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Rules header -->
+                    <DockPanel Grid.Row="0" Background="#F8F9FA" LastChildFill="True">
+                        <TextBlock Text="Join Rules" FontWeight="SemiBold" Foreground="#2C3E50"
+                                   FontSize="12" Margin="12,6,0,6" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                    Margin="0,4,8,4">
+                            <Button x:Name="btn_add_rule" Content="＋ Add" Style="{StaticResource SecondaryButton}"
+                                    Click="btn_add_rule_click" Margin="0,0,4,0"/>
+                            <Button x:Name="btn_remove_rule" Content="✕ Remove" Style="{StaticResource DangerButton}"
+                                    Click="btn_remove_rule_click" Margin="0,0,4,0"/>
+                            <Button x:Name="btn_switch_order" Content="⇄ Switch" Style="{StaticResource SecondaryButton}"
+                                    Click="btn_switch_order_click" ToolTip="Swap priority and join-with categories"/>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- Rules list -->
+                    <DataGrid x:Name="rules_grid" Grid.Row="1"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              SelectionMode="Single"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="#ECF0F1"
+                              BorderThickness="0"
+                              Background="White"
+                              RowStyle="{StaticResource RuleRow}"
+                              RowHeaderWidth="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="#" Binding="{Binding Number}"
+                                                Width="30" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#95A5A6"/>
+                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Priority Category (Cuts)" Binding="{Binding PriorityName}"
+                                                Width="*" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#E67E22"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="4,0"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="→" Width="24" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="→"/>
+                                        <Setter Property="Foreground" Value="#BDC3C7"/>
+                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="FontSize" Value="14"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Join-with Category (Cut by)" Binding="{Binding JoinWithName}"
+                                                Width="*" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#2980B9"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="4,0"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <!-- OPTIONS -->
+            <Border Grid.Row="3" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4"
+                    Padding="12,6" Margin="0,8,0,0">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <CheckBox x:Name="chk_switch_order" Style="{StaticResource StyledCheckBox}"
+                                  Content="Switch join order (priority category cuts the other)"
+                                  IsChecked="True"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- SAVE / LOAD RULES -->
+            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,0">
+                <Button x:Name="btn_save_rules" Content="💾 Save Rules" Style="{StaticResource SecondaryButton}"
+                        Click="btn_save_rules_click" Margin="0,0,6,0"/>
+                <Button x:Name="btn_load_rules" Content="📂 Load Rules" Style="{StaticResource SecondaryButton}"
+                        Click="btn_load_rules_click"/>
+            </StackPanel>
+
+            <!-- RUN BUTTON -->
+            <DockPanel Grid.Row="5" Margin="0,12,0,0" LastChildFill="True">
+                <Button x:Name="btn_run" Content="▶  Run Auto Join" Style="{StaticResource PrimaryButton}"
+                        Click="btn_run_click" DockPanel.Dock="Left"/>
+                <TextBlock x:Name="status_text" Text="Ready"
+                           Foreground="#7F8C8D" FontSize="11" FontStyle="Italic"
+                           VerticalAlignment="Center" Margin="16,0,0,0"
+                           DockPanel.Dock="Left"/>
+            </DockPanel>
+        </Grid>
+
+        <!-- ============ STATUS BAR ============ -->
+        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
+                Padding="16,6">
+            <DockPanel>
+                <TextBlock x:Name="progress_text" Text="No rules defined" Foreground="#7F8C8D"
+                           FontSize="11" VerticalAlignment="Center"/>
+                <ProgressBar x:Name="progress_bar" Height="4" Minimum="0" Maximum="100" Value="0"
+                             Foreground="#3498DB" Background="#ECF0F1" BorderThickness="0"
+                             HorizontalAlignment="Right" Width="160" Margin="12,0,0,0"
+                             Visibility="Collapsed"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

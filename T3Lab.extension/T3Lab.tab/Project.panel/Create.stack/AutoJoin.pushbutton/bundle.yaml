@@ -1,0 +1,11 @@
+title: Auto Join
+tooltip: Automatically join intersecting elements by category rules
+description: |
+  Opens a WPF dialog to define join rules between element categories.
+  Joins or unjoins intersecting elements based on priority rules,
+  similar to Alpha BIM Auto Join. Supports saving/loading rule presets.
+  - Click       : Open Auto Join Manager
+  - Shift+Click : Quick join with default rules (Walls vs Floors/Columns)
+
+author: Tran Tien Thanh
+version: 1.0.0
