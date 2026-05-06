@@ -32,7 +32,7 @@
         </Grid.RowDefinitions>
 
         <!-- Cloud Source Info Bar -->
-        <Border Grid.Row="0" Background="#FAFAFA" Padding="10" BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
+        <Border Grid.Row="0" Background="#F8F9FA" Padding="10" BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0">
                     <TextBlock Text="☁️ Cloud Mode"
@@ -86,7 +86,7 @@
                     Width="250"
                     BorderBrush="#BDC3C7"
                     BorderThickness="0,0,1,0"
-                    Background="#FAFAFA">
+                    Background="#F8F9FA">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top"
                                Text="Categories"
@@ -184,7 +184,7 @@
 
         <!-- Action Buttons at Bottom -->
         <Border Grid.Row="3"
-                Background="#FAFAFA"
+                Background="#F8F9FA"
                 Padding="15"
                 BorderBrush="#BDC3C7"
                 BorderThickness="0,1,0,0">

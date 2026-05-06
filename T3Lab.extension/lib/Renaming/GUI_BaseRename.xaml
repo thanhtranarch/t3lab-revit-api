@@ -205,8 +205,7 @@
                         Grid.ColumnSpan="2"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Left">
-                                    <Image Width="20" Height="20" Margin="5,0,5,0"
-                                           Source="../GUI/Resources/T3Lab_logo.png" />
+                                    
 
                                     <TextBlock>
                     <Hyperlink  RequestNavigate="Hyperlink_RequestNavigate"

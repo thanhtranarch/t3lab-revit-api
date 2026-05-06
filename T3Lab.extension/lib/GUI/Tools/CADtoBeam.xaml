@@ -92,9 +92,20 @@
                 <TextBlock Text="Auto-pairing parallel lines and type creation" FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button x:Name="btn_close" Style="{StaticResource WinCtrlButton}" Click="close_button_clicked">
-                    <TextBlock Text="✕" FontSize="12" Foreground="#7F8C8D"/>
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Button>
             </StackPanel>
             <Border Height="1" VerticalAlignment="Bottom" Background="#BDC3C7"/>

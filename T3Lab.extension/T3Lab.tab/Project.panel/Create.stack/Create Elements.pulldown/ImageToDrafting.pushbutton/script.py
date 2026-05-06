@@ -57,6 +57,20 @@ class ImageToDraftingWindow(forms.WPFWindow):
         self.temp_files = []
         self.potrace_path = os.path.join(os.path.dirname(__file__), "potrace.exe")
         
+    def minimize_button_clicked(self, sender, e):
+        from System.Windows import WindowState
+        self.WindowState = WindowState.Minimized
+
+    def maximize_button_clicked(self, sender, e):
+        from System.Windows import WindowState
+        if self.WindowState == WindowState.Maximized:
+            self.WindowState = WindowState.Normal
+        else:
+            self.WindowState = WindowState.Maximized
+
+    def close_button_clicked(self, sender, e):
+        self.Close()
+
     def Window_KeyDown(self, sender, args):
         if str(args.Key) == "V" and str(args.KeyboardDevice.Modifiers) == "Control":
             self.load_from_clipboard()

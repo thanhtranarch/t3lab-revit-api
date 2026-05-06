@@ -49,6 +49,37 @@
                 </Setter.Value>
             </Setter>
         </Style>
+62: 
+63:         <!-- ── Send button style (pill corner radius matching input) ── -->
+64:         <Style x:Key="SendButtonStyle" TargetType="Button">
+65:             <Setter Property="Background"      Value="#3498DB"/>
+66:             <Setter Property="Foreground"      Value="White"/>
+67:             <Setter Property="Padding"         Value="18,0"/>
+68:             <Setter Property="FontSize"        Value="13"/>
+69:             <Setter Property="FontWeight"      Value="SemiBold"/>
+70:             <Setter Property="BorderThickness" Value="0"/>
+71:             <Setter Property="Cursor"          Value="Hand"/>
+72:             <Setter Property="Template">
+73:                 <Setter.Value>
+74:                     <ControlTemplate TargetType="Button">
+75:                         <Border Background="{TemplateBinding Background}"
+76:                                 CornerRadius="0,20,20,0"
+77:                                 Padding="{TemplateBinding Padding}">
+78:                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+79:                         </Border>
+80:                         <ControlTemplate.Triggers>
+81:                             <Trigger Property="IsMouseOver" Value="True">
+82:                                 <Setter Property="Background" Value="#2980B9"/>
+83:                             </Trigger>
+84:                             <Trigger Property="IsEnabled" Value="False">
+85:                                 <Setter Property="Background" Value="#BDC3C7"/>
+86:                                 <Setter Property="Cursor"     Value="Arrow"/>
+87:                             </Trigger>
+88:                         </ControlTemplate.Triggers>
+89:                     </ControlTemplate>
+90:                 </Setter.Value>
+91:             </Setter>
+92:         </Style>
 
         <!-- ── Window control buttons ── -->
         <Style x:Key="WindowControlButton" TargetType="Button">
@@ -89,7 +120,7 @@
             <Setter Property="Padding"         Value="8,3"/>
             <Setter Property="FontSize"        Value="11"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush"     Value="#AED6F1"/>
+            <Setter Property="BorderBrush"     Value="#E8F4F8"/>
             <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="Margin"          Value="0,0,5,0"/>
             <Setter Property="Template">
@@ -105,10 +136,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background"  Value="#AED6F1"/>
+                                <Setter TargetName="bd" Property="Background"  Value="#E8F4F8"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#85C1E9"/>
+                                <Setter TargetName="bd" Property="Background" Value="#3498DB"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -212,14 +243,13 @@
                 <Button x:Name="btn_minimize"
                         Style="{StaticResource WindowControlButton}"
                         ToolTip="Minimize" Click="minimize_clicked">
-                    <TextBlock Text="—" FontSize="14" FontWeight="Bold"
-                               Foreground="#7F8C8D" Margin="0,-8,0,0"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
                 <!-- Close -->
                 <Button x:Name="btn_close"
                         Style="{StaticResource CloseButton}"
                         ToolTip="Close" Click="close_clicked">
-                    <TextBlock Text="✕" FontSize="13" Foreground="#7F8C8D">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -243,7 +273,7 @@
         <ScrollViewer Grid.Row="2" x:Name="chat_scroll"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
-                      Background="#F4F6F8"
+                      Background="#F4F6F7"
                       Padding="14,12,14,8">
             <StackPanel x:Name="chat_history_panel" Margin="0,0,0,4">
 
@@ -266,7 +296,7 @@
                     <Border Grid.Column="1" Background="White"
                             CornerRadius="3,10,10,10"
                             Padding="14,10"
-                            BorderBrush="#DFE6E9" BorderThickness="1">
+                            BorderBrush="#ECF0F1" BorderThickness="1">
                         <StackPanel>
                             <TextBlock Text="T3Lab Assistant" FontSize="10" FontWeight="Bold"
                                        Foreground="#3498DB" Margin="0,0,0,5"/>
@@ -274,13 +304,13 @@
                                        LineHeight="20"
                                        Text="Xin chào! Tôi là T3Lab Assistant. Tôi có thể:"/>
                             <StackPanel Margin="0,6,0,0">
-                                <TextBlock FontSize="12" Foreground="#636E72"
+                                <TextBlock FontSize="12" Foreground="#7F8C8D"
                                            Text="• Mở BatchOut và xuất sheet PDF/DWG/DWF..."/>
-                                <TextBlock FontSize="12" Foreground="#636E72" Margin="0,3,0,0"
+                                <TextBlock FontSize="12" Foreground="#7F8C8D" Margin="0,3,0,0"
                                            Text="• Chạy ParaSync, Load Family, và các công cụ khác"/>
-                                <TextBlock FontSize="12" Foreground="#636E72" Margin="0,3,0,0"
+                                <TextBlock FontSize="12" Foreground="#7F8C8D" Margin="0,3,0,0"
                                            Text="• Phân tích tài liệu PDF và hình ảnh đính kèm (RAG)"/>
-                                <TextBlock FontSize="12" Foreground="#636E72" Margin="0,3,0,0"
+                                <TextBlock FontSize="12" Foreground="#7F8C8D" Margin="0,3,0,0"
                                            Text="• Trả lời câu hỏi về T3Lab và Revit"/>
                             </StackPanel>
                             <Separator Height="1" Background="#ECF0F1" Margin="0,8,0,6"/>
@@ -297,7 +327,7 @@
              INPUT BAR & ACTION CENTER
         ═══════════════════════════════════════════════════════════ -->
         <Border Grid.Row="3" Background="White"
-                BorderBrush="#DFE6E9" BorderThickness="0,1,0,0"
+                BorderBrush="#ECF0F1" BorderThickness="0,1,0,0"
                 Padding="14,8,14,10">
             <StackPanel>
                 
@@ -314,7 +344,7 @@
                 <Border x:Name="attachment_preview_border"
                         Visibility="Collapsed"
                         Background="#F0F8FF"
-                        BorderBrush="#AED6F1" BorderThickness="1"
+                        BorderBrush="#E8F4F8" BorderThickness="1"
                         CornerRadius="6"
                         Padding="8,6"
                         Margin="0,0,0,6">
@@ -373,17 +403,17 @@
                     <!-- Send button -->
                     <Button Grid.Column="2" x:Name="send_button"
                              Height="38"
-                             Style="{StaticResource PrimaryButton}"
+                             Style="{StaticResource SendButtonStyle}"
                              Padding="18,0"
                              Click="send_clicked"
                              ToolTip="Gửi (Enter)">
-                        <Border CornerRadius="0,20,20,0" Background="Transparent">
+
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Gửi" VerticalAlignment="Center" FontSize="13"/>
                                 <TextBlock Text=" ➤" FontSize="11" VerticalAlignment="Center"
                                             Margin="2,0,0,0"/>
                             </StackPanel>
-                        </Border>
+
                     </Button>
                 </Grid>
 

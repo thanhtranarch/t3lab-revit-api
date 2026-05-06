@@ -107,7 +107,7 @@
                         Click="minimize_button_clicked"/>
                 <Button x:Name="btn_maximize" Content="&#x25A1;" Style="{StaticResource WinCtrlButton}"
                         Click="maximize_button_clicked"/>
-                <Button x:Name="btn_close" Content="&#x2715;" Style="{StaticResource CloseButton}"
+                <Button x:Name="btn_close" Content="&#xE8BB;" Style="{StaticResource CloseButton}"
                         Click="button_close"/>
             </StackPanel>
         </Grid>
@@ -183,7 +183,7 @@
         </StackPanel>
 
         <!-- FOOTER -->
-        <Border Grid.Row="6" Background="#FAFAFA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0">
+        <Border Grid.Row="6" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0">
             <TextBlock x:Name="footer_version" Text="T3Lab"
                        FontSize="10" Foreground="#7F8C8D"
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>

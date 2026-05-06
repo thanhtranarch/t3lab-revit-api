@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Annotation Manager
 ------------------
@@ -53,6 +53,8 @@ if lib_dir not in sys.path:
 # ==================================================
 logger = script.get_logger()
 output = script.get_output()
+doc    = revit.doc
+uidoc  = revit.uidoc
 REVIT_VERSION = int(revit.doc.Application.VersionNumber)
 
 # CLASS/FUNCTIONS
@@ -179,7 +181,6 @@ _GUI_DIR = os.path.join(
     'lib', 'GUI'
 )
 _XAML_PATH = os.path.join(_GUI_DIR, 'Tools', 'AnnotationManager.xaml')
-_LOGO_PATH = os.path.join(_GUI_DIR, 'T3Lab_logo.png')
 
 
 # ============================================================
@@ -211,11 +212,12 @@ class AnnotationManagerWindow(forms.WPFWindow):
 
             # Load logo
             try:
-                bitmap = BitmapImage()
-                bitmap.BeginInit()
-                bitmap.UriSource = Uri(_LOGO_PATH, UriKind.Absolute)
-                bitmap.EndInit()
-                self.Icon = bitmap
+                if os.path.exists(_LOGO_PATH):
+                    bitmap = BitmapImage()
+                    bitmap.BeginInit()
+                    bitmap.UriSource = Uri(_LOGO_PATH, UriKind.Absolute)
+                    bitmap.EndInit()
+                    self.Icon = bitmap
             except Exception as icon_ex:
                 logger.warning("Could not set window icon: {}".format(icon_ex))
 

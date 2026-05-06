@@ -33,7 +33,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#D5DBDB"/>
+                                <Setter TargetName="bd" Property="Background" Value="#F1F5F9"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -53,7 +53,7 @@
 
         <!-- Primary button -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Background" Value="#2563EB"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="20,8"/>
@@ -64,12 +64,12 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bd" Background="{TemplateBinding Background}"
-                                CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#2980B9"/>
+                                <Setter TargetName="bd" Property="Background" Value="#1D4ED8"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="bd" Property="Background" Value="#BDC3C7"/>
@@ -82,8 +82,8 @@
 
         <!-- Secondary button -->
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#ECF0F1"/>
-            <Setter Property="Foreground" Value="#2C3E50"/>
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="Foreground" Value="#334155"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="14,6"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -92,12 +92,12 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bd" Background="{TemplateBinding Background}"
-                                CornerRadius="3" Padding="{TemplateBinding Padding}">
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#D5DBDB"/>
+                                <Setter TargetName="bd" Property="Background" Value="#E2E8F0"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -117,7 +117,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bd" Background="{TemplateBinding Background}"
-                                CornerRadius="3" Padding="{TemplateBinding Padding}">
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -192,13 +192,30 @@
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-                <Button x:Name="btn_minimize" Content="&#x2212;" Style="{StaticResource WinCtrlButton}"
-                        Click="minimize_button_clicked"/>
-                <Button x:Name="btn_maximize" Content="&#x25A1;" Style="{StaticResource WinCtrlButton}"
-                        Click="maximize_button_clicked"/>
-                <Button x:Name="btn_close" Content="&#x2715;" Style="{StaticResource CloseButton}"
-                        Click="close_button_clicked"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,0,5,0"
+                        WindowChrome.IsHitTestVisibleInChrome="True">
+                <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}"
+                        ToolTip="Minimize" Click="minimize_button_clicked">
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                </Button>
+                <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
+                        ToolTip="Maximize" Click="maximize_button_clicked">
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                </Button>
+                <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
+                        ToolTip="Close" Click="close_button_clicked">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Button>
             </StackPanel>
         </Grid>
 

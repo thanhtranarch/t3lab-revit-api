@@ -1,4 +1,4 @@
-﻿<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="T3Lab - Bulk Family Export"
         Width="1100" Height="680"
@@ -139,7 +139,7 @@
             <RowDefinition Height="Auto"/>     <!-- Status bar -->
         </Grid.RowDefinitions>
 
-        <!-- â•â•â• TITLE BAR â•â•â• -->
+        <!-- ═══ TITLE BAR ═══ -->
         <Grid Grid.Row="0" Height="64" Background="White">
             <StackPanel Orientation="Vertical" Margin="16,0,0,0" VerticalAlignment="Center"
                         WindowChrome.IsHitTestVisibleInChrome="True">
@@ -158,7 +158,7 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}"
                         Click="minimize_button_clicked" ToolTip="Minimize">
-                    <TextBlock Text="&#x2500;" FontSize="12" Foreground="#7F8C8D"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
                 <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
                         Click="maximize_button_clicked" ToolTip="Maximize">
@@ -166,14 +166,14 @@
                 </Button>
                 <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
                         Click="close_button_clicked" ToolTip="Close">
-                    <TextBlock Text="&#x2715;" FontSize="12" Foreground="#7F8C8D"/>
+                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
             </StackPanel>
 
             <Border Height="1" VerticalAlignment="Bottom" Background="#BDC3C7"/>
         </Grid>
 
-        <!-- â•â•â• CONFIGURATION â•â•â• -->
+        <!-- ═══ CONFIGURATION ═══ -->
         <Border Grid.Row="1" Background="White" BorderBrush="#BDC3C7" BorderThickness="0,0,0,1"
                 Padding="16,12">
             <Grid>
@@ -229,14 +229,14 @@
                            VerticalAlignment="Center" Foreground="#2C3E50" FontSize="12"/>
                 <TextBox x:Name="output_path" Grid.Row="8" Grid.Column="1"
                          IsReadOnly="True" FontFamily="Segoe UI" FontSize="12"
-                         Padding="6,4" Margin="0,0,8,0" Background="#FAFAFA"
+                         Padding="6,4" Margin="0,0,8,0" Background="#F8F9FA"
                          BorderBrush="#BDC3C7"/>
                 <Button Content="Browse..." Grid.Row="8" Grid.Column="2"
                         Style="{StaticResource SecondaryButton}" Click="browse_folder_clicked"/>
             </Grid>
         </Border>
 
-        <!-- â•â•â• INFO TIP â•â•â• -->
+        <!-- ═══ INFO TIP ═══ -->
         <Border Grid.Row="2" Margin="16,10,16,0" BorderBrush="#3498DB" BorderThickness="1"
                 Background="#E8F4F8" CornerRadius="2" Padding="10">
             <StackPanel Orientation="Horizontal">
@@ -246,9 +246,9 @@
             </StackPanel>
         </Border>
 
-        <!-- â•â•â• DATAGRID â•â•â• -->
+        <!-- ═══ DATAGRID ═══ -->
         <!-- FILTER BAR -->
-        <Border Grid.Row="3" Background="#F8FAFB" BorderBrush="#BDC3C7"
+        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#BDC3C7"
                 BorderThickness="0,0,0,1" Padding="16,8">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -278,12 +278,12 @@
                                  TextChanged="search_text_changed"/>
                         <TextBlock x:Name="txt_search_placeholder"
                                    Grid.Column="1" IsHitTestVisible="False"
-                                   Text="Search block name or layer…"
+                                   Text="Search block name or layer�"
                                    FontFamily="Segoe UI" FontSize="12"
                                    Foreground="#BDC3C7" VerticalAlignment="Center"
                                    Padding="2,5"/>
                         <Button x:Name="btn_clear_search" Grid.Column="2"
-                                Content="&#x2715;" Width="24" Height="24"
+                                Content="&#xE8BB;" Width="24" Height="24"
                                 Foreground="#7F8C8D" Background="Transparent"
                                 BorderThickness="0" Cursor="Hand"
                                 VerticalAlignment="Center" Margin="2,0"
@@ -313,7 +313,7 @@
         <DataGrid x:Name="blocks_grid" Grid.Row="4" Margin="16,6,16,0"
                   AutoGenerateColumns="False" CanUserAddRows="False"
                   Background="White" BorderBrush="#BDC3C7" BorderThickness="1"
-                  AlternatingRowBackground="#FAFAFA" FontFamily="Segoe UI" FontSize="12"
+                  AlternatingRowBackground="#F8F9FA" FontFamily="Segoe UI" FontSize="12"
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                   HorizontalGridLinesBrush="#ECF0F1" SelectionMode="Single"
                   VerticalScrollBarVisibility="Auto">
@@ -406,7 +406,7 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- â•â•â• ACTION BAR â•â•â• -->
+        <!-- ═══ ACTION BAR ═══ -->
         <Border Grid.Row="5" Background="White" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
                 Padding="16,10">
             <Grid>
@@ -436,7 +436,7 @@
                                 <Setter Property="Background" Value="#E67E22"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#CA6F1E"/>
+                                        <Setter Property="Background" Value="#E67E22"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -452,7 +452,7 @@
                                 <Setter Property="Background" Value="#2980B9"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#1F618D"/>
+                                        <Setter Property="Background" Value="#2980B9"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -465,8 +465,8 @@
             </Grid>
         </Border>
 
-        <!-- â•â•â• STATUS BAR â•â•â• -->
-        <Border Grid.Row="6" Background="#FAFAFA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
+        <!-- ═══ STATUS BAR ═══ -->
+        <Border Grid.Row="6" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
                 Padding="14,6">
             <Grid>
                 <Grid.ColumnDefinitions>

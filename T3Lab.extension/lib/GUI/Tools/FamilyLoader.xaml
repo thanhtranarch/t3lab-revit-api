@@ -20,7 +20,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#EFEFEF"/>
+                                <Setter TargetName="bd" Property="Background" Value="#ECF0F1"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -45,7 +45,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#FFECEC"/>
+                                <Setter TargetName="bd" Property="Background" Value="#E74C3C"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -76,7 +76,7 @@
                                 <Setter TargetName="bd" Property="Background" Value="#2980B9"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Background" Value="#C8D6DF"/>
+                                <Setter TargetName="bd" Property="Background" Value="#BDC3C7"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -86,10 +86,10 @@
 
         <!-- Secondary small button (Select None / grey) -->
         <Style x:Key="SmallBtnGrey" TargetType="Button" BasedOn="{StaticResource SmallBtn}">
-            <Setter Property="Background" Value="#6C757D"/>
+            <Setter Property="Background" Value="#7F8C8D"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#565E64"/>
+                    <Setter Property="Background" Value="#2C3E50"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -101,7 +101,7 @@
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#2980B9"/>
+            <Setter Property="Background" Value="#3498DB"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
@@ -114,10 +114,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#1A6FA3"/>
+                                <Setter TargetName="bd" Property="Background" Value="#2980B9"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Background" Value="#B0C4CF"/>
+                                <Setter TargetName="bd" Property="Background" Value="#BDC3C7"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -138,13 +138,13 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bd" CornerRadius="6"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="#CED4DA" BorderThickness="1">
+                                BorderBrush="#BDC3C7" BorderThickness="1">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#F0F2F4"/>
+                                <Setter TargetName="bd" Property="Background" Value="#ECF0F1"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -204,17 +204,14 @@
                     <Button x:Name="btn_minimize_fl"
                             Style="{StaticResource WinCtrlButton}"
                             ToolTip="Minimize">
-                        <TextBlock Text="&#8212;" FontSize="12" Foreground="#7F8C8D"
+                        <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"
                                    Margin="0,-1,0,0"/>
                     </Button>
                     <Button x:Name="btn_close_x_fl"
                             Style="{StaticResource CloseButton}"
                             ToolTip="Close">
                         <!-- X drawn as a Path so it scales cleanly -->
-                        <Path Stroke="#7F8C8D" StrokeThickness="1.6"
-                              Data="M2,2 L10,10 M10,2 L2,10"
-                              Width="12" Height="12" Stretch="None"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                     </Button>
                 </StackPanel>
             </Grid>
@@ -240,7 +237,7 @@
         </Border>
 
         <!-- ══ ROW 2 — FOLDER / SOURCE BAR ══════════ -->
-        <Border Grid.Row="2" Background="#F9FAFB" Padding="12,0"
+        <Border Grid.Row="2" Background="#F8F9FA" Padding="12,0"
                 BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
             <DockPanel VerticalAlignment="Center">
                 <!-- Source radio buttons on the right -->
@@ -278,9 +275,9 @@
             <!-- Left: Category tree (slim) -->
             <Border DockPanel.Dock="Left" Width="190"
                     BorderBrush="#BDC3C7" BorderThickness="0,0,1,0"
-                    Background="#FAFAFA">
+                    Background="#F8F9FA">
                 <DockPanel>
-                    <Border DockPanel.Dock="Top" Background="#F3F4F6"
+                    <Border DockPanel.Dock="Top" Background="#F4F6F7"
                             Padding="12,6" BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
                         <TextBlock Text="Categories" FontSize="11" FontWeight="SemiBold"
                                    Foreground="#2C3E50"/>
@@ -297,7 +294,7 @@
             <DockPanel>
                 <!-- Sub-header: count + select buttons -->
                 <Border DockPanel.Dock="Top" Padding="12,6"
-                        Background="#F9FAFB"
+                        Background="#F8F9FA"
                         BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
                     <DockPanel>
                         <TextBlock x:Name="txt_result_count"
@@ -348,7 +345,7 @@
                                                         <Setter Property="Background" Value="#F0F8FF"/>
                                                     </DataTrigger>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="BorderBrush" Value="#93C5FD"/>
+                                                        <Setter Property="BorderBrush" Value="#3498DB"/>
                                                     </Trigger>
                                                 </Style.Triggers>
                                             </Style>

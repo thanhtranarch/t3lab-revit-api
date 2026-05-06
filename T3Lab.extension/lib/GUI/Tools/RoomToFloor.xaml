@@ -174,20 +174,19 @@
                         Style="{StaticResource WindowControlButton}"
                         ToolTip="Minimize"
                         Click="minimize_button_clicked">
-                    <TextBlock Text="&#x2014;" FontSize="14" FontWeight="Bold"
-                               Foreground="#7F8C8D" Margin="0,-8,0,0"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
                 <Button x:Name="btn_maximize"
                         Style="{StaticResource WindowControlButton}"
                         ToolTip="Maximize"
                         Click="maximize_button_clicked">
-                    <Border BorderBrush="#7F8C8D" BorderThickness="2" Width="14" Height="14"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
                 <Button x:Name="btn_close"
                         Style="{StaticResource CloseButton}"
                         ToolTip="Close"
                         Click="close_button_clicked">
-                    <TextBlock Text="&#x2715;" FontSize="16" FontWeight="Bold" Foreground="#7F8C8D">
+                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -241,7 +240,7 @@
                       Background="White"
                       BorderBrush="#BDC3C7"
                       BorderThickness="1"
-                      AlternatingRowBackground="#FAFAFA"
+                      AlternatingRowBackground="#F8F9FA"
                       GridLinesVisibility="Horizontal"
                       HorizontalGridLinesBrush="#ECF0F1"
                       Margin="0,0,10,0">
@@ -339,7 +338,7 @@
         </Grid>
 
         <!-- ═══════════════════════════════ STATUS BAR ═══════════════════════════════ -->
-        <Border Grid.Row="3" Background="#FAFAFA" BorderBrush="#BDC3C7"
+        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#BDC3C7"
                 BorderThickness="0,1,0,0" Padding="14,6">
             <Grid>
                 <Grid.ColumnDefinitions>

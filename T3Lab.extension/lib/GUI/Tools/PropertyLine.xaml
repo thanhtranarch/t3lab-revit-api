@@ -41,7 +41,7 @@
                                 <Setter Property="Background" Value="#2980B9"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#1A6FA0"/>
+                                <Setter Property="Background" Value="#2980B9"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Background" Value="#BDC3C7"/>
@@ -100,7 +100,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#219A52"/>
+                                <Setter Property="Background" Value="#1E8449"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Background" Value="#BDC3C7"/>
@@ -239,8 +239,7 @@
                         Style="{StaticResource WindowControlButton}"
                         ToolTip="Minimize"
                         Click="btn_minimize_Click">
-                    <TextBlock Text="—" FontSize="14" FontWeight="Bold"
-                               Foreground="#7F8C8D" Margin="0,-8,0,0"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
 
                 <!-- Close -->
@@ -248,7 +247,7 @@
                         Style="{StaticResource CloseButton}"
                         ToolTip="Close"
                         Click="btn_close_Click">
-                    <TextBlock Text="✕" FontSize="16" FontWeight="Bold" Foreground="#7F8C8D">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -551,7 +550,7 @@
         </Border>
 
         <!-- ═══════════════════════════════════════════════════════════ ACTION BUTTONS -->
-        <Border Grid.Row="3" Background="#F0F0F0"
+        <Border Grid.Row="3" Background="#ECF0F1"
                 BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
                 Padding="16,12">
             <StackPanel>

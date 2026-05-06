@@ -487,16 +487,6 @@ class T3LabAssistantWindow(forms.WPFWindow):
         self._attached_files   = []             # list of file paths (images / PDFs)
 
         # ── Logo ──────────────────────────────────────────────────────────────
-        try:
-            logo_path = os.path.join(extension_dir, 'lib', 'GUI', 'T3Lab_logo.png')
-            if os.path.exists(logo_path):
-                bitmap = BitmapImage()
-                bitmap.BeginInit()
-                bitmap.UriSource = Uri(logo_path, UriKind.Absolute)
-                bitmap.EndInit()
-                self.Icon = bitmap
-        except Exception:
-            pass
 
         # ── Restore conversation from previous session ─────────────────────────
         self._restore_history()

@@ -72,6 +72,7 @@ uidoc  = revit.uidoc
 logger = script.get_logger()
 output = script.get_output()
 REVIT_VERSION = int(revit.doc.Application.VersionNumber)
+XAML_FILE = os.path.join(extension_dir, 'lib', 'GUI', 'Tools', 'AlignPositions.xaml')
 
 # CLASS/FUNCTIONS
 # ==================================================
@@ -321,26 +322,81 @@ class PositionAligner:
 
 class AlignPositionsWindow(forms.WPFWindow):
     def __init__(self):
-        forms.WPFWindow.__init__(self, _XAML)
+        forms.WPFWindow.__init__(self, XAML_FILE)
         self._aligner = None
-        # ... rest of init remains mostly same ...
         self._results = []
         self._dt = DataTable()
         self._dt.Columns.Add("Apply", Boolean)
         for col in ["Category", "Name", "ElementId", "StartPt", "EndPt", "LocDist", "AngleStr", "Correction"]:
             self._dt.Columns.Add(col)
         self.dg_elements.ItemsSource = self._dt.DefaultView
-        self._load_logo()
-        self._update_status("Ready")
+        self.btn_select.IsEnabled = False
+        self.btn_apply.IsEnabled = False
+        self._update_status("Ready — pick a reference element to begin")
 
-    def _update_status(self, text): self.status_text.Text = text
+    # ── Window chrome handlers ──────────────────────────
+    def minimize_button_clicked(self, sender, e):
+        self.WindowState = WindowState.Minimized
+
+    def maximize_button_clicked(self, sender, e):
+        if self.WindowState == WindowState.Maximized:
+            self.WindowState = WindowState.Normal
+        else:
+            self.WindowState = WindowState.Maximized
+
+    def close_button_clicked(self, sender, e):
+        self.Close()
+
+    # ── Reference picking ───────────────────────────────
+    def pick_reference_clicked(self, sender, e):
+        try:
+            self.Hide()
+            ref = uidoc.Selection.PickObject(
+                ObjectType.Element,
+                ReferenceFilter(),
+                "Pick a Grid, Wall, or Column as reference"
+            )
+            element = doc.GetElement(ref.ElementId)
+            self._set_reference(element)
+        except OperationCanceledException:
+            self._update_status("Reference pick cancelled")
+        except Exception as ex:
+            self._update_status("Error: {}".format(ex))
+        finally:
+            self.Show()
+
+    # ── Settings handlers ───────────────────────────────
+    def unit_changed(self, sender, e):
+        """Re-analyze when unit system changes."""
+        if self._aligner:
+            self._auto_find_elements()
+
+    def snap_changed(self, sender, e):
+        """Re-analyze when snap value changes."""
+        if self._aligner:
+            self._auto_find_elements()
+
+    # ── Element selection ───────────────────────────────
+    def select_elements_clicked(self, sender, e):
+        """Re-collect elements in active view and re-analyze."""
+        if not self._aligner:
+            self._update_status("Pick a reference element first")
+            return
+        self._auto_find_elements()
+
+    # ── Internal helpers ────────────────────────────────
+    def _update_status(self, text):
+        self.status_text.Text = text
+
     def _snap_feet(self):
         is_metric = getattr(self, 'rb_metric', None) and self.rb_metric.IsChecked
         if is_metric:
             if self.rb_snap1.IsChecked: return 5.0 / MM_PER_FOOT
             if self.rb_snap2.IsChecked: return 10.0 / MM_PER_FOOT
+            if getattr(self, 'rb_snap3', None) and self.rb_snap3.IsChecked: return 20.0 / MM_PER_FOOT
             return 5.0 / MM_PER_FOOT
-        return (1.0/8.0) / 12.0
+        # Imperial: 1/8 inch
+        return (1.0 / 8.0) / 12.0
 
     def _set_reference(self, element):
         self._aligner = PositionAligner(doc, element)
@@ -349,28 +405,57 @@ class AlignPositionsWindow(forms.WPFWindow):
         self._auto_find_elements()
 
     def _auto_find_elements(self):
-        if not self._aligner: return
+        if not self._aligner:
+            return
         walls = FilteredElementCollector(doc, doc.ActiveView.Id).OfClass(Wall).ToElements()
         grids = FilteredElementCollector(doc, doc.ActiveView.Id).OfClass(Grid).ToElements()
         elements = list(walls) + list(grids)
         self._analyze(elements)
 
     def _analyze(self, elements):
-        if not self._aligner: return
+        if not self._aligner:
+            return
         snap_f = self._snap_feet()
         self._results = self._aligner.analyze_elements(elements, snap_f)
         self._dt.Clear()
         for res in self._results:
+            elem = res["element"]
             row = self._dt.NewRow()
             row["Apply"] = True
-            row["ElementId"] = str(res["element"].Id)
-            row["Name"] = res["element"].Name
-            # Fill other columns with placeholder/info...
-            self._dt.Rows.Add(row)
-        self.btn_apply.IsEnabled = len(self._results) > 0
+            row["ElementId"] = str(elem.Id)
+            cat = elem.Category
+            row["Category"] = cat.Name if cat else ""
+            row["Name"] = elem.Name if hasattr(elem, 'Name') else ""
 
+            loc = res.get("origin")
+            if loc:
+                row["LocDist"] = "{:.1f} mm".format(feet_to_mm(
+                    XYZ(loc.X - self._aligner.ref_origin.X,
+                        loc.Y - self._aligner.ref_origin.Y, 0).GetLength()))
+
+            mv = res.get("move_vector")
+            if mv:
+                row["Correction"] = "Δ {:.1f} mm".format(feet_to_mm(mv.GetLength()))
+            else:
+                row["Correction"] = "—"
+
+            rot = res.get("rot_correction", 0.0)
+            if abs(rot) >= 0.001:
+                row["AngleStr"] = "{:.2f}°".format(math.degrees(rot))
+            else:
+                row["AngleStr"] = "—"
+
+            self._dt.Rows.Add(row)
+
+        count = len(self._results)
+        self.btn_apply.IsEnabled = count > 0
+        self.txt_element_count.Text = "{} element(s) need correction".format(count)
+        self._update_status("{} element(s) analyzed".format(len(elements)))
+
+    # ── Apply ───────────────────────────────────────────
     def apply_clicked(self, sender, e):
-        if not self._aligner: return
+        if not self._aligner:
+            return
         moved = self._aligner.apply_corrections(self._results)
         forms.alert("Moved {} elements".format(moved))
         self.Close()

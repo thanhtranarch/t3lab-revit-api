@@ -195,18 +195,17 @@
                 <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}"
                         Click="minimize_button_clicked" ToolTip="Minimize"
                         WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBlock Text="&#x2014;" FontSize="13" FontWeight="Bold"
-                               Foreground="#7F8C8D" Margin="0,-6,0,0"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
                 <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
                         Click="maximize_button_clicked" ToolTip="Maximize"
                         WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Border BorderBrush="#7F8C8D" BorderThickness="2" Width="13" Height="13"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
                 <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
                         Click="close_button_clicked" ToolTip="Close"
                         WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBlock Text="X" FontSize="12" FontWeight="Bold" Foreground="#7F8C8D">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -295,7 +294,7 @@
                   CanUserDeleteRows="False"
                   SelectionMode="Extended"
                   GridLinesVisibility="Horizontal"
-                  AlternatingRowBackground="#FAFAFA"
+                  AlternatingRowBackground="#F8F9FA"
                   Background="White"
                   BorderBrush="#BDC3C7"
                   BorderThickness="1"
@@ -415,7 +414,7 @@
         </DataGrid>
 
         <!-- ── STATUS BAR ──────────────────────────────── -->
-        <Border Grid.Row="3" Background="#FAFAFA"
+        <Border Grid.Row="3" Background="#F8F9FA"
                 BorderBrush="#BDC3C7" BorderThickness="0,1,0,0" Padding="14,6">
             <Grid>
                 <Grid.ColumnDefinitions>

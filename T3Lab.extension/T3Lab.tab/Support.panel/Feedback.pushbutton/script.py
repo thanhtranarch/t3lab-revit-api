@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Send Feedback
 
@@ -142,16 +142,6 @@ class FeedbackWindow(forms.WPFWindow):
         forms.WPFWindow.__init__(self, xaml_file_path)
         self.doc = revit.doc
 
-        try:
-            logo_path = os.path.join(extension_dir, 'lib', 'GUI', 'T3Lab_logo.png')
-            if os.path.exists(logo_path):
-                bitmap = BitmapImage()
-                bitmap.BeginInit()
-                bitmap.UriSource = Uri(logo_path, UriKind.Absolute)
-                bitmap.EndInit()
-                self.Icon = bitmap
-        except Exception as ex:
-            logger.warning("Could not load T3Lab logo: {}".format(ex))
 
     # -------- chrome / title bar --------
     def minimize_button_clicked(self, sender, e):

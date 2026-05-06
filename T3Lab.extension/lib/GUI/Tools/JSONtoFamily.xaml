@@ -187,7 +187,7 @@
                         Style="{StaticResource WindowControlButton}"
                         ToolTip="Minimize"
                         Click="minimize_button_clicked">
-                    <TextBlock Text="&#x2014;" FontSize="14" FontWeight="Bold" Foreground="#7F8C8D" Margin="0,-8,0,0"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
 
                 <!-- Maximize/Restore Button -->
@@ -195,7 +195,7 @@
                         Style="{StaticResource WindowControlButton}"
                         ToolTip="Maximize"
                         Click="maximize_button_clicked">
-                    <Border BorderBrush="#7F8C8D" BorderThickness="2" Width="14" Height="14"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
 
                 <!-- Close Button -->
@@ -203,7 +203,7 @@
                         Style="{StaticResource CloseButton}"
                         ToolTip="Close"
                         Click="close_button_clicked">
-                    <TextBlock Text="&#x2715;" FontSize="18" FontWeight="Bold" Foreground="#7F8C8D">
+                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>

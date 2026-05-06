@@ -112,7 +112,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#CA6F1E"/>
+                    <Setter Property="Background" Value="#E67E22"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Background" Value="#BDC3C7"/>
@@ -196,7 +196,7 @@
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="#D6EAF8"/>
-                    <Setter Property="Foreground" Value="#1A252F"/>
+                    <Setter Property="Foreground" Value="#2C3E50"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -245,15 +245,15 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button x:Name="btn_minimize" Style="{StaticResource WindowControlButton}"
                         ToolTip="Minimize" Click="minimize_button_clicked">
-                    <TextBlock Text="—" FontSize="14" FontWeight="Bold" Foreground="#7F8C8D" Margin="0,-8,0,0"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
                 <Button x:Name="btn_maximize" Style="{StaticResource WindowControlButton}"
                         ToolTip="Maximize" Click="maximize_button_clicked">
-                    <Border BorderBrush="#7F8C8D" BorderThickness="2" Width="14" Height="14"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
                 </Button>
                 <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
                         ToolTip="Close" Click="close_button_clicked">
-                    <TextBlock Text="✕" FontSize="18" FontWeight="Bold" Foreground="#7F8C8D">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>

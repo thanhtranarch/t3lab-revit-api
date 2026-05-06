@@ -10,14 +10,14 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
             <!-- Colors -->
-            <SolidColorBrush x:Key="bg_light" Color="#FAFAFA"/>
+            <SolidColorBrush x:Key="bg_light" Color="#F8F9FA"/>
             <SolidColorBrush x:Key="bg_white" Color="White"/>
-            <SolidColorBrush x:Key="border_gray" Color="#D0D0D0"/>
-            <SolidColorBrush x:Key="text_dark" Color="#333333"/>
-            <SolidColorBrush x:Key="text_gray" Color="#666666"/>
+            <SolidColorBrush x:Key="border_gray" Color="#BDC3C7"/>
+            <SolidColorBrush x:Key="text_dark" Color="#2C3E50"/>
+            <SolidColorBrush x:Key="text_gray" Color="#7F8C8D"/>
             <SolidColorBrush x:Key="accent_blue" Color="#3498DB"/>
-            <SolidColorBrush x:Key="button_bg" Color="#F0F0F0"/>
-            <SolidColorBrush x:Key="button_hover" Color="#E0E0E0"/>
+            <SolidColorBrush x:Key="button_bg" Color="#ECF0F1"/>
+            <SolidColorBrush x:Key="button_hover" Color="#D5DBDB"/>
 
             <!-- Button Style -->
             <Style TargetType="Button">
@@ -80,7 +80,7 @@
     </Grid.Resources>
 
     <Grid.Background>
-        <SolidColorBrush Color="#FAFAFA"/>
+        <SolidColorBrush Color="#F8F9FA"/>
     </Grid.Background>
 
     <Grid.RowDefinitions>
@@ -90,7 +90,7 @@
     </Grid.RowDefinitions>
 
     <!-- Title Bar -->
-    <Border Grid.Row="0" Background="#F0F0F0" BorderBrush="#D0D0D0" BorderThickness="0,0,0,1" Padding="10,8">
+    <Border Grid.Row="0" Background="#ECF0F1" BorderBrush="#BDC3C7" BorderThickness="0,0,0,1" Padding="10,8">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -98,7 +98,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="main_title" Text="Edit Filename Pattern"
                        FontSize="14" FontWeight="SemiBold"
-                       Foreground="#333333" VerticalAlignment="Center"/>
+                       Foreground="#2C3E50" VerticalAlignment="Center"/>
             <Button x:Name="button_close" Grid.Column="1" Content="X"
                     Width="24" Height="24" FontSize="11"
                     ToolTip="Close"/>
@@ -241,7 +241,7 @@
     </Grid>
 
     <!-- Bottom: Action Buttons -->
-    <Border Grid.Row="2" Background="#F0F0F0" BorderBrush="#D0D0D0" BorderThickness="0,1,0,0" Padding="15,10">
+    <Border Grid.Row="2" Background="#ECF0F1" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0" Padding="15,10">
         <StackPanel>
         <Grid>
             <Grid.ColumnDefinitions>
@@ -253,7 +253,7 @@
             <TextBlock x:Name="txt_preview" Grid.Column="0"
                        Text="Preview: (select parameters)"
                        VerticalAlignment="Center"
-                       Foreground="#666666" FontStyle="Italic"/>
+                       Foreground="#7F8C8D" FontStyle="Italic"/>
 
             <!-- Ok Button -->
             <Button x:Name="button_ok" Grid.Column="1" Content="Ok"
@@ -262,7 +262,7 @@
         </Grid>
         <!-- Copyright -->
         <TextBlock Text="© Copyright by T3Lab"
-                   FontSize="10" Foreground="#AAAAAA"
+                   FontSize="10" Foreground="#BDC3C7"
                    HorizontalAlignment="Center"
                    Margin="0,6,0,0"/>
         </StackPanel>

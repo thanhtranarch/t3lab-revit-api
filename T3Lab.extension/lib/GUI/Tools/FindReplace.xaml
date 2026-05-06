@@ -1,4 +1,4 @@
-<Window
+﻿<Window
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
@@ -111,7 +111,7 @@
                         Click="minimize_button_clicked"/>
                 <Button x:Name="btn_maximize" Content="&#x25A1;" Style="{StaticResource WinCtrlButton}"
                         Click="maximize_button_clicked"/>
-                <Button x:Name="btn_close" Content="&#x2715;" Style="{StaticResource CloseButton}"
+                <Button x:Name="btn_close" Content="&#xE8BB;" Style="{StaticResource CloseButton}"
                         Click="button_close"/>
             </StackPanel>
         </Grid>

@@ -1194,20 +1194,7 @@ class PropertyLineDialog(forms.WPFWindow):
         self._parcels = []
         self._zoning_data = None
 
-        # Load T3Lab logo (same pattern as BatchOut)
-        try:
-            from System.Windows.Media.Imaging import BitmapImage
-            from System import Uri, UriKind
-            logo_path = os.path.join(os.path.dirname(__file__), "T3Lab_logo.png")
-            if os.path.exists(logo_path):
-                bitmap = BitmapImage()
-                bitmap.BeginInit()
-                bitmap.UriSource = Uri(logo_path, UriKind.Absolute)
-                bitmap.EndInit()
-                self.Icon = bitmap
-                self.logo_image.Source = bitmap
-        except Exception:
-            pass
+
 
         # Load saved API key
         config = load_config()
