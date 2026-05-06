@@ -6,5 +6,4 @@ layout:
   - FamilyWork 
   - AlignPositions
   - CAD
-  - RoomsToFloors
-  - ImageToDrafting
+  - AutoJoin
