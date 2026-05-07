@@ -475,6 +475,14 @@ class FamilyLoaderWindow(Window):
             Window.__init__(self)
             logger.debug("DEBUG: Step 1 - COMPLETED")
 
+            # Initialize instance variables
+            self.config = load_config()
+            self.current_folder = None
+            self.all_families = []
+            self._scan_thread = None
+            self._cancel_requested = False
+            self._thumb_cancel = False
+
             # Set Window properties
             logger.debug("DEBUG: Step 2 - Setting window properties")
             self.Title = "Load Autodesk Family"
@@ -670,31 +678,40 @@ class FamilyLoaderWindow(Window):
                 forms.alert("Error wiring event handlers:\n{}".format(str(event_ex)), exitscript=True)
                 raise
 
-                    self.current_folder = None
-
-                    # FIXED: Don't auto-show modal dialog during window initialization
-                    # This was causing crashes due to modal dialog conflicts with window rendering
-                    logger.info("DEBUG: Setting informational text (NOT showing dialog to prevent crash)")
-                    self.txt_current_folder.Text = "Saved folder no longer exists. Click 'Update Folder' to select a new folder."
-            else:
-                # No saved folder
-                logger.info("DEBUG: No saved folder found")
-
-                # FIXED: Don't auto-show modal dialog during window initialization
-                # This prevents modal dialog issues during window initialization that cause crashes
-                logger.info("DEBUG: Setting informational text (NOT auto-showing dialog to prevent crash)")
-                self.txt_current_folder.Text = "Click 'Update Folder' to select a folder or switch to Cloud mode"
-
             logger.info("=" * 80)
-            logger.info("DEBUG: window_loaded event completed successfully")
+            logger.info("DEBUG: FamilyLoaderWindow initialization completed")
             logger.info("=" * 80)
 
         except Exception as ex:
             logger.error("=" * 80)
-            logger.error("DEBUG: ERROR in window_loaded: {}".format(ex))
+            logger.error("DEBUG: ERROR in __init__: {}".format(ex))
             logger.error("DEBUG: Full traceback:\n{}".format(traceback.format_exc()))
             logger.error("=" * 80)
             # Don't re-raise - allow window to continue loading
+
+    def window_loaded(self, sender, e):
+        """Handle Window.Loaded event - restore saved folder and initialize UI"""
+        try:
+            logger.info("=" * 80)
+            logger.info("DEBUG: window_loaded event fired")
+            saved_folder = self.config.get('last_folder', '')
+            if saved_folder:
+                if os.path.exists(saved_folder):
+                    self.current_folder = saved_folder
+                    self.txt_current_folder.Text = saved_folder
+                    logger.info("DEBUG: Restored saved folder: {}".format(saved_folder))
+                    self.scan_families()
+                else:
+                    self.current_folder = None
+                    self.txt_current_folder.Text = "Saved folder no longer exists. Click 'Update Folder' to select a new folder."
+                    logger.info("DEBUG: Saved folder no longer exists: {}".format(saved_folder))
+            else:
+                self.txt_current_folder.Text = "Click 'Update Folder' to select a folder or switch to Cloud mode"
+                logger.info("DEBUG: No saved folder found")
+            logger.info("=" * 80)
+        except Exception as ex:
+            logger.error("ERROR in window_loaded: {}".format(ex))
+            logger.error(traceback.format_exc())
 
     def data_source_changed(self, sender, e):
         """Handle data source toggle between Local and Cloud"""
