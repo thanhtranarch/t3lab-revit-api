@@ -39,6 +39,8 @@ clr.AddReference('System')
 # from __future__ import unicode_literals
 
 from System.Windows import WindowState, Visibility as System_Windows_Visibility
+from System.Windows.Controls import DataGridComboBoxColumn, DataGridLength
+from System.Windows.Data import Binding, BindingMode, UpdateSourceTrigger
 from System.Windows.Media.Imaging import BitmapImage
 from System import Uri, UriKind
 
@@ -523,11 +525,9 @@ def _suggest_category(name, arc_count, width_mm, depth_mm, layer=""):
 
     for cat, keywords in _CAT_HINTS:
         if any(k in combined for k in keywords):
-            return cat
+            return "Generic Model" if cat == "Door" else cat
 
     # Geometry fallback when no keyword matched
-    if arc_count >= 1:
-        return "Door"
     if arc_count == 0 and 0 < depth_mm < 350 and width_mm >= 400:
         return "Window"
     return "Generic Model"
@@ -607,6 +607,7 @@ class BlockItem(object):
 
         # layer_level = GraphicsStyleCategory name → used for keyword matching
         self.SuggestedCat = _suggest_category(name, arc_count, w, d, layer=layer_level)
+        self.Category     = self.SuggestedCat   # user-editable per-row category
 
 
 # Main Window
@@ -697,10 +698,21 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         self.discipline_combo.SelectedIndex = 6
 
     def _init_categories(self):
-        """Populate the category ComboBox."""
-        for name, _ in CATEGORY_TEMPLATES:
+        """Populate the category ComboBox and add per-row Category column to the DataGrid."""
+        cat_names = [name for name, _ in CATEGORY_TEMPLATES]
+        for name in cat_names:
             self.category_combo.Items.Add(name)
         self.category_combo.SelectedIndex = 0
+
+        col = DataGridComboBoxColumn()
+        col.Header = "Category"
+        col.Width = DataGridLength(140)
+        col.ItemsSource = cat_names
+        b = Binding("Category")
+        b.Mode = BindingMode.TwoWay
+        b.UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+        col.SelectedItemBinding = b
+        self.blocks_grid.Columns.Add(col)
 
     def _init_filter_bar(self):
         """Seed the Suggested filter ComboBox with 'All' as the only item at startup."""
@@ -722,8 +734,8 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         self.combo_filter_suggested.Items.Add("All Categories")
 
         cats = sorted(set(
-            item.SuggestedCat for item in self._block_items
-            if item.SuggestedCat))
+            item.Category for item in self._block_items
+            if item.Category))
         for c in cats:
             self.combo_filter_suggested.Items.Add(c)
 
@@ -751,8 +763,8 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                 if txt and txt not in item.BlockName.lower() \
                         and txt not in item.LayerLevel.lower():
                     continue
-                # Category: exact match on SuggestedCat
-                if cat and item.SuggestedCat != cat:
+                # Category: exact match on per-row Category
+                if cat and item.Category != cat:
                     continue
                 visible.append(item)
 
@@ -1165,25 +1177,11 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             forms.alert("No blocks selected for export.")
             return
 
-        cat_idx = self.category_combo.SelectedIndex
-        if cat_idx < 0:
-            forms.alert("Please select a family category.")
-            return
-
-        category_name = CATEGORY_TEMPLATES[cat_idx][0]
-
         disc_idx = self.discipline_combo.SelectedIndex
         if disc_idx < 0:
             forms.alert("Please select a discipline.")
             return
         discipline_name = DISCIPLINES[disc_idx]
-        template_path = self._find_template(cat_idx)
-        if not template_path:
-            forms.alert(
-                "Could not find family template for '{}'.\n\n"
-                "Please ensure Revit family templates are installed.".format(
-                    category_name))
-            return
 
         load_to_project = (self.chk_load_to_project.IsChecked == True)
 
@@ -1201,6 +1199,14 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         import System as _System
         for i, item in enumerate(selected):
             try:
+                category_name = item.Category or "Generic Model"
+                template_path = self._find_template_by_name(category_name)
+                if not template_path:
+                    write_log("No template for '{}', skipping '{}'".format(
+                        category_name, item.BlockName), "WARN")
+                    failed += 1
+                    continue
+
                 self._update_status(
                     "Exporting [{}/{}]: {}".format(i + 1, len(selected), item.BlockName))
                 save_path = self._export_block(
@@ -1276,6 +1282,11 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                 if os.path.isfile(fp):
                     return fp
         return None
+
+    def _find_template_by_name(self, cat_name):
+        """Locate the .rft template by category name string."""
+        idx = next((i for i, (n, _) in enumerate(CATEGORY_TEMPLATES) if n == cat_name), 0)
+        return self._find_template(idx)
 
     # Parametric reference planes (JSONtoFamily approach)
     def _find_family_views(self, fam_doc):
@@ -2465,21 +2476,8 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             forms.alert("No blocks selected.")
             return
 
-        cat_idx = self.category_combo.SelectedIndex
-        if cat_idx < 0:
-            forms.alert("Please select a family category.")
-            return
-        category_name = CATEGORY_TEMPLATES[cat_idx][0]
-
         disc_idx = self.discipline_combo.SelectedIndex
         discipline_name = DISCIPLINES[disc_idx] if disc_idx >= 0 else "General"
-
-        template_path = self._find_template(cat_idx)
-        if not template_path:
-            forms.alert(
-                "Could not find family template for '{}'.\n"
-                "Please install Revit family templates.".format(category_name))
-            return
 
         load_to_project = True   # placement always requires loading
 
@@ -2509,6 +2507,13 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             for item in selected:
                 self._update_status("Exporting & placing: {}".format(item.BlockName))
                 try:
+                    category_name = item.Category or "Generic Model"
+                    template_path = self._find_template_by_name(category_name)
+                    if not template_path:
+                        write_log("No template for '{}', skipping '{}'".format(
+                            category_name, item.BlockName), "WARN")
+                        failed += 1
+                        continue
                     save_path = self._export_block(
                         item, template_path, output_folder,
                         discipline_name, category_name,
