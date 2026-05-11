@@ -465,17 +465,103 @@
 
         <!-- ═══ STATUS BAR ═══ -->
         <Border Grid.Row="6" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
-                Padding="14,6">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Name="status_text" Grid.Column="0" FontSize="11"
-                           Foreground="#7F8C8D" Text="Ready"/>
-                <TextBlock x:Name="block_count_text" Grid.Column="1" FontSize="11"
-                           Foreground="#BDC3C7" Text="0 blocks found"/>
-            </Grid>
+                Padding="14,8">
+            <StackPanel>
+
+                <!-- Progress panel: bar + Pause + Stop (hidden when idle) -->
+                <Grid x:Name="progress_panel" Visibility="Collapsed" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="64"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="52"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ProgressBar x:Name="pb_export" Grid.Column="0"
+                                 Height="8" Minimum="0" Maximum="100" Value="0"
+                                 Foreground="#3498DB" Background="#DCE9F5"
+                                 BorderThickness="0" VerticalAlignment="Center"/>
+
+                    <!-- Pause / Resume -->
+                    <Button x:Name="btn_pause_export" Grid.Column="2"
+                            Content="⏸  Pause" Height="22" FontSize="10" FontFamily="Segoe UI"
+                            Click="pause_resume_clicked" Cursor="Hand"
+                            BorderThickness="1" BorderBrush="#BDC3C7"
+                            VerticalAlignment="Center">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#ECF0F1"/>
+                                <Setter Property="Foreground" Value="#2C3E50"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    CornerRadius="3" Padding="6,2">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#D5DBDB"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Foreground" Value="#BDC3C7"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <!-- Stop -->
+                    <Button x:Name="btn_stop_export" Grid.Column="4"
+                            Content="■  Stop" Height="22" FontSize="10" FontFamily="Segoe UI"
+                            Click="stop_export_clicked" Cursor="Hand"
+                            BorderThickness="0" VerticalAlignment="Center">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#E74C3C"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="3" Padding="6,2">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#C0392B"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Background" Value="#BDC3C7"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+
+                <!-- Status text row -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="status_text" Grid.Column="0" FontSize="11"
+                               Foreground="#7F8C8D" Text="Ready"/>
+                    <TextBlock x:Name="block_count_text" Grid.Column="1" FontSize="11"
+                               Foreground="#BDC3C7" Text="0 blocks found"/>
+                </Grid>
+
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

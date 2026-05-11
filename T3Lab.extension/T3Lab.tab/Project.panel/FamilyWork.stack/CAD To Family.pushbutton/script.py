@@ -626,6 +626,9 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         self._filter_text   = ""   # current search string
         self._filter_cat    = ""   # current suggested-category filter ("" = All)
 
+        self._cancel_requested = False
+        self._pause_requested  = False
+
         self._init_cad_files()
         self._init_disciplines()
         self._init_categories()
@@ -813,6 +816,82 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             self.status_text.Text = text
         except Exception:
             pass
+
+    # ── Progress bar + Stop / Pause helpers ──────────────────────────────
+
+    def _do_events(self):
+        """Pump the WPF dispatcher so the UI repaints and queued button clicks fire."""
+        try:
+            from System.Windows.Threading import DispatcherPriority, DispatcherFrame
+            import System
+            frame = DispatcherFrame()
+            def _stop(f=frame):
+                f.Continue = False
+            self.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                System.Action(_stop))
+            self.Dispatcher.PushFrame(frame)
+        except Exception:
+            pass
+
+    def _update_progress(self, value, maximum):
+        """Update the progress panel and pump the dispatcher.
+
+        If the user clicked Pause, spin here (pumping events) until Resume or Stop.
+        """
+        try:
+            from System.Windows import Visibility as WinVisibility
+            self.pb_export.Maximum = maximum
+            self.pb_export.Value   = value
+            self.progress_panel.Visibility = WinVisibility.Visible
+        except Exception:
+            pass
+
+        self._do_events()
+
+        # Cooperative pause: keep pumping events until resumed or cancelled
+        while self._pause_requested and not self._cancel_requested:
+            self._do_events()
+
+    def _hide_progress(self):
+        """Collapse the progress panel and reset all control state."""
+        try:
+            from System.Windows import Visibility as WinVisibility
+            self.progress_panel.Visibility = WinVisibility.Collapsed
+            self.pb_export.Value = 0
+            self._cancel_requested = False
+            self._pause_requested  = False
+            self.btn_pause_export.Content   = u"⏸  Pause"
+            self.btn_pause_export.IsEnabled = True
+            self.btn_stop_export.IsEnabled  = True
+        except Exception:
+            pass
+
+    def stop_export_clicked(self, sender, e):
+        """Signal the running export to abort after the current block."""
+        self._cancel_requested = True
+        self._pause_requested  = False   # unblock a paused loop immediately
+        try:
+            self.btn_stop_export.IsEnabled = False
+            self._update_status(u"Stopping… finishing current block")
+        except Exception:
+            pass
+
+    def pause_resume_clicked(self, sender, e):
+        """Toggle pause / resume of the running export."""
+        if self._pause_requested:
+            self._pause_requested = False
+            try:
+                self.btn_pause_export.Content = u"⏸  Pause"
+            except Exception:
+                pass
+        else:
+            self._pause_requested = True
+            try:
+                self.btn_pause_export.Content = u"▶  Resume"
+                self._update_status(u"Paused — click Resume to continue")
+            except Exception:
+                pass
 
     # Block Scanning
     def scan_blocks_clicked(self, sender, e):
@@ -1192,12 +1271,18 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         except Exception:
             pass
 
+        self._cancel_requested = False
+        self._pause_requested  = False
         self._update_status("Exporting {} block(s)...".format(len(selected)))
+        self._update_progress(0, len(selected))
         success, failed = 0, 0
         saved_paths = []   # collected for optional batch-load at the end
 
         import System as _System
         for i, item in enumerate(selected):
+            if self._cancel_requested:
+                break
+
             try:
                 category_name = item.Category or "Generic Model"
                 template_path = self._find_template_by_name(category_name)
@@ -1205,10 +1290,15 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                     write_log("No template for '{}', skipping '{}'".format(
                         category_name, item.BlockName), "WARN")
                     failed += 1
+                    self._update_progress(i + 1, len(selected))
                     continue
 
                 self._update_status(
                     "Exporting [{}/{}]: {}".format(i + 1, len(selected), item.BlockName))
+                self._update_progress(i, len(selected))
+                if self._cancel_requested:
+                    break
+
                 save_path = self._export_block(
                     item, template_path, output_folder,
                     discipline_name, category_name,
@@ -1224,6 +1314,8 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                     item.BlockName, traceback.format_exc()))
                 failed += 1
 
+            self._update_progress(i + 1, len(selected))
+
             # Release accumulated memory every 10 blocks
             if (i + 1) % 10 == 0:
                 try:
@@ -1232,22 +1324,31 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                 except Exception:
                     pass
 
+        was_cancelled = self._cancel_requested
+
         # Batch-load all exported families in one pass
         loaded_count = 0
-        if load_to_project and saved_paths:
+        if not was_cancelled and load_to_project and saved_paths:
             self._update_status("Loading {} families to project...".format(len(saved_paths)))
             loaded_count = self._batch_load_families(saved_paths)
 
-        self._update_status(
-            "Done: {} exported, {} failed".format(success, failed))
+        if was_cancelled:
+            self._update_status(
+                "Stopped: {} exported, {} failed".format(success, failed))
+        else:
+            self._update_status(
+                "Done: {} exported, {} failed".format(success, failed))
+        self._hide_progress()
 
         load_note = (
             "\nLoaded to project: {}".format(loaded_count)
             if load_to_project and saved_paths else "")
+        cancelled_note = "\n\nExport was stopped early by user." if was_cancelled else ""
         forms.alert(
             "Export complete!\n\n"
-            "Exported : {}\nFailed   : {}{}\n\n"
-            "Output folder:\n{}".format(success, failed, load_note, output_folder))
+            "Exported : {}\nFailed   : {}{}{}\n\n"
+            "Output folder:\n{}".format(
+                success, failed, load_note, cancelled_note, output_folder))
 
     # Template lookup
     def _find_template(self, cat_idx):
@@ -1927,9 +2028,13 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
             # Save .rfa to output folder
             safe_cad_name = block_item.BlockName.strip() or "Family"
-            base_name = "T3Lab_{}_{}".format(
+            w_str = getattr(block_item, 'WidthMM', '-')
+            d_str = getattr(block_item, 'DepthMM', '-')
+            dim_suffix = "_{}x{}".format(w_str, d_str) if (w_str != '-' and d_str != '-') else ""
+            base_name = "T3Lab_{}_{}{}" .format(
                 category_name.replace(" ", "_"),
-                safe_cad_name.replace(" ", "_"))
+                safe_cad_name.replace(" ", "_"),
+                dim_suffix)
             base_name = re.sub(r'[\\/*?:"<>|]', "", base_name)
 
             save_path = os.path.join(output_folder, "{}.rfa".format(base_name))
@@ -2015,8 +2120,16 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             return
 
         ok_count = fail_count = 0
-        for preset in selected:
-            self._update_status("Generating: " + preset[0])
+        self._cancel_requested = False
+        self._pause_requested  = False
+        self._update_progress(0, len(selected))
+        for i, preset in enumerate(selected):
+            if self._cancel_requested:
+                break
+            self._update_status("[{}/{}] Generating: {}".format(i + 1, len(selected), preset[0]))
+            self._update_progress(i, len(selected))
+            if self._cancel_requested:
+                break
             try:
                 if mode == "door":
                     success = self._generate_door_from_preset(
@@ -2035,8 +2148,14 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                 logger.error("Preset error: {}\n{}".format(
                     preset[0], traceback.format_exc()))
                 fail_count += 1
+            self._update_progress(i + 1, len(selected))
 
-        self._update_status("Done: {} ok, {} failed".format(ok_count, fail_count))
+        was_cancelled = self._cancel_requested
+        if was_cancelled:
+            self._update_status("Stopped: {} ok, {} failed".format(ok_count, fail_count))
+        else:
+            self._update_status("Done: {} ok, {} failed".format(ok_count, fail_count))
+        self._hide_progress()
         forms.alert(
             "{} Preset Export\n\n"
             "Generated: {}\nFailed: {}\n\n"
@@ -2501,11 +2620,20 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
         exported, placed_total, failed = 0, 0, 0
 
+        self._cancel_requested = False
+        self._pause_requested  = False
+        self._update_progress(0, len(selected))
         t_place = Transaction(doc, "T3Lab – Export & Place Families")
         t_place.Start()
         try:
-            for item in selected:
-                self._update_status("Exporting & placing: {}".format(item.BlockName))
+            for i, item in enumerate(selected):
+                if self._cancel_requested:
+                    break
+                self._update_status(
+                    "Exporting & placing [{}/{}]: {}".format(i + 1, len(selected), item.BlockName))
+                self._update_progress(i, len(selected))
+                if self._cancel_requested:
+                    break
                 try:
                     category_name = item.Category or "Generic Model"
                     template_path = self._find_template_by_name(category_name)
@@ -2513,6 +2641,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                         write_log("No template for '{}', skipping '{}'".format(
                             category_name, item.BlockName), "WARN")
                         failed += 1
+                        self._update_progress(i + 1, len(selected))
                         continue
                     save_path = self._export_block(
                         item, template_path, output_folder,
@@ -2521,6 +2650,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                         mode_2d_only=mode_2d)
                     if not save_path:
                         failed += 1
+                        self._update_progress(i + 1, len(selected))
                         continue
                     exported += 1
 
@@ -2531,20 +2661,30 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                         item.BlockName, traceback.format_exc()))
                     failed += 1
 
+                self._update_progress(i + 1, len(selected))
+
             t_place.Commit()
         except Exception:
             try:
                 t_place.RollBack()
             except Exception:
                 pass
+            self._hide_progress()
             logger.error("Export & Place transaction failed:\n{}".format(
                 traceback.format_exc()))
             forms.alert("Transaction failed – check the pyRevit log.")
             return
 
-        self._update_status(
-            "Done: {} exported, {} instances placed, {} failed".format(
-                exported, placed_total, failed))
+        was_cancelled = self._cancel_requested
+        if was_cancelled:
+            self._update_status(
+                "Stopped: {} exported, {} instances placed, {} failed".format(
+                    exported, placed_total, failed))
+        else:
+            self._update_status(
+                "Done: {} exported, {} instances placed, {} failed".format(
+                    exported, placed_total, failed))
+        self._hide_progress()
         forms.alert(
             "Export & Place complete!\n\n"
             "Families exported : {}\n"

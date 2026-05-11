@@ -5,7 +5,8 @@
       "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat \"{}\"')",
       "Bash(xargs grep *)",
       "Bash(cat)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(grep -E '\\\\.\\(panel|stack|pulldown|pushbutton\\)$')"
     ]
   }
 }
