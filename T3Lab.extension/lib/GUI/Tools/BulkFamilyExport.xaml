@@ -218,9 +218,11 @@
                 <TextBlock Grid.Row="6" Grid.Column="0" Text="Geometry:"
                            VerticalAlignment="Center" Foreground="#2C3E50" FontSize="12"/>
                 <StackPanel Orientation="Horizontal" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2">
-                    <RadioButton x:Name="rb_3d_solid" Content=" 3D Solid / Extrusion" IsChecked="True"
-                                 VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#2C3E50" FontFamily="Segoe UI" FontSize="12"/>
-                    <RadioButton x:Name="rb_2d_lines" Content=" 2D Model Lines Only"
+                    <RadioButton x:Name="rb_3d_solid" Content=" 3D Solid / Extrusion" IsChecked="False"
+                                 IsEnabled="False"
+                                 VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#BDC3C7" FontFamily="Segoe UI" FontSize="12"
+                                 ToolTip="3D Solid export — coming soon"/>
+                    <RadioButton x:Name="rb_2d_lines" Content=" 2D Model Lines Only" IsChecked="True"
                                  VerticalAlignment="Center" Foreground="#2C3E50" FontFamily="Segoe UI" FontSize="12"/>
                 </StackPanel>
 
@@ -242,7 +244,7 @@
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="Tip:" FontWeight="Bold" Foreground="#2980B9" Margin="0,0,5,0"/>
                 <TextBlock Foreground="#2C3E50" TextWrapping="Wrap"
-                           Text="CAD Mode: Select a CAD file and click 'Scan Blocks'. Door Preset Mode: Select output folder, then click 'Door Presets' to generate 3D door families without any CAD file."/>
+                           Text="CAD Mode: Select a CAD file and click 'Scan Blocks' — category is auto-detected per block and can be changed in the grid. Preset Mode: Select output folder and category, then click 'Presets' to generate families without any CAD file."/>
             </StackPanel>
         </Border>
 
@@ -278,7 +280,7 @@
                                  TextChanged="search_text_changed"/>
                         <TextBlock x:Name="txt_search_placeholder"
                                    Grid.Column="1" IsHitTestVisible="False"
-                                   Text="Search block name or layer�"
+                                   Text="Search block name or layer�"
                                    FontFamily="Segoe UI" FontSize="12"
                                    Foreground="#BDC3C7" VerticalAlignment="Center"
                                    Padding="2,5"/>
@@ -398,11 +400,6 @@
                         <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="Foreground" Value="#7F8C8D"/></Style>
                     </DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
-                <DataGridTextColumn Header="Suggested" Binding="{Binding SuggestedCat}" Width="120" IsReadOnly="True">
-                    <DataGridTextColumn.ElementStyle>
-                        <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#2980B9"/><Setter Property="FontStyle" Value="Italic"/><Setter Property="Padding" Value="4,0"/></Style>
-                    </DataGridTextColumn.ElementStyle>
-                </DataGridTextColumn>
             </DataGrid.Columns>
         </DataGrid>
 
@@ -428,9 +425,10 @@
                               ToolTip="After export, load each family into the current Revit project"/>
                     <Button x:Name="btn_presets" Content="&#x1F4E6; Presets"
                             Click="presets_clicked"
+                            IsEnabled="False"
                             Padding="16,8" FontSize="13" FontWeight="SemiBold"
                             Margin="0,0,8,0"
-                            ToolTip="Generate parametric families from preset sizes for the selected category (no CAD required)">
+                            ToolTip="Presets (3D) — coming soon">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
                                 <Setter Property="Background" Value="#E67E22"/>
