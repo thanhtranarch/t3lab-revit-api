@@ -1,0 +1,20 @@
+title: Auto Dimension
+tooltip: Auto-dimension walls, structural columns, architectural columns and grids in the current view
+description: |
+  Auto Dimension creates dimension strings for all selected element types
+  in the active view with a single click.
+
+  Supported element types:
+  - Walls (dimensioned from core layer faces, not finish faces)
+  - Structural Columns
+  - Architectural Columns
+  - Grids
+
+  Features:
+  - Choose horizontal, vertical, or both dimension directions
+  - Select any loaded Dimension Style from the document
+  - Configurable offset distance from elements
+  - Works in Plan, Section, Elevation, and Detail views
+
+author: Tran Tien Thanh
+version: 1.0.0
