@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Bulk Family Export
 
@@ -60,10 +60,25 @@ from Autodesk.Revit.DB import (
     SketchPlane, SaveAsOptions,
     Transaction, ElementId,
     View, ViewType, ReferencePlane, ReferenceArray,
-    PlanarFace, Solid,
+    PlanarFace, Solid, IFailuresPreprocessor, FailureProcessingResult, FailureSeverity,
 )
 
 from Utils.DWGFamilyHelpers import get_xy_bounds, _project_curve_to_z as _dwg_project_curve
+class WarningSwallower(IFailuresPreprocessor):
+    def PreprocessFailures(self, failuresAccessor):
+        fail_list = failuresAccessor.GetFailureMessages()
+        if fail_list.Count == 0:
+            return FailureProcessingResult.Continue
+        for failure in fail_list:
+            if failure.GetSeverity() == FailureSeverity.Warning:
+                failuresAccessor.DeleteWarning(failure)
+        return FailureProcessingResult.Continue
+
+def start_transaction(t):
+    options = t.GetFailureHandlingOptions()
+    options.SetFailuresPreprocessor(WarningSwallower())
+    t.SetFailureHandlingOptions(options)
+    return t.Start()
 
 # DEBUG LOGGING
 # ==================================================
@@ -351,7 +366,7 @@ SITE_PRESETS = [
     ("Light_Pole_D200x5000",      200,  200, 5000),
 ]
 
-# Unified Category → Preset mapping
+# Unified Category â†’ Preset mapping
 # mode: "door" | "window" | "generic"
 
 CATEGORY_PRESETS = {
@@ -467,7 +482,7 @@ _CAT_HINTS = [
     ("Columns", [
         # English
         "column", " col ", "pillar", "pier", "post",
-        # Structural / cấu kiện kết cấu
+        # Structural / cáº¥u kiá»‡n káº¿t cáº¥u
         "struc", "structural", "ket cau", "ketcau",
         "beam", "slab", "footing", "foundation",
         # Vietnamese no-diacritic
@@ -494,16 +509,16 @@ _CAT_HINTS = [
         # Layer prefixes
         "-entour", "a-entour",
     ]),
-    # ── Generic Model catch-all ──────────────────────────────────────────────
-    # Matched BEFORE the geometry heuristic (arc-count → Door/Window) so that
+    # â”€â”€ Generic Model catch-all â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # Matched BEFORE the geometry heuristic (arc-count â†’ Door/Window) so that
     # walls, glazing, title-block and annotation layers are never mis-suggested
     # as Door or Window based on curved lines alone.
     ("Generic Model", [
-        # Wall / tường (system families → closest loadable = Generic Model)
+        # Wall / tÆ°á»ng (system families â†’ closest loadable = Generic Model)
         "wall", "tuong", "a-wall", "kl-wall", "s-wall-",
         # Glass / curtain wall panels
         "glass", "glazing", "curtain", "kinh",
-        # Title block / khung tên / detail items
+        # Title block / khung tÃªn / detail items
         "title block", "titleblock", "title blk", "title-blk",
         "khung ten", "khungten", "khung-ten",
         "border", "sheet border", "annotation", "detailitem",
@@ -585,18 +600,18 @@ class BlockItem(object):
         self.InstanceCount = instance_count
         self.LayerLevel    = layer_level
         self._curves       = curves          # internal use only
-        # list of (XYZ centroid, float angle_rad) – one entry per CAD instance
+        # list of (XYZ centroid, float angle_rad) â€“ one entry per CAD instance
         self._placements   = placements if placements is not None else []
-        # source ImportInstance – used by _embed_dwg_into_family fallback
+        # source ImportInstance â€“ used by _embed_dwg_into_family fallback
         self._import_inst  = import_inst
 
-        # ── Geometry detail properties (shown in DataGrid) ──
+        # â”€â”€ Geometry detail properties (shown in DataGrid) â”€â”€
         arc_count = sum(1 for c in curves if isinstance(c, Arc))
         self.ArcCount = arc_count
 
         try:
             min_x, max_x, min_y, max_y = get_xy_bounds(curves)
-            w = (max_x - min_x) * 304.8   # feet → mm
+            w = (max_x - min_x) * 304.8   # feet â†’ mm
             d = (max_y - min_y) * 304.8
             self.WidthMM = "{:.0f}".format(w)
             self.DepthMM = "{:.0f}".format(d)
@@ -605,7 +620,7 @@ class BlockItem(object):
             self.WidthMM = "-"
             self.DepthMM = "-"
 
-        # layer_level = GraphicsStyleCategory name → used for keyword matching
+        # layer_level = GraphicsStyleCategory name â†’ used for keyword matching
         self.SuggestedCat = _suggest_category(name, arc_count, w, d, layer=layer_level)
         self.Category     = self.SuggestedCat   # user-editable per-row category
 
@@ -614,7 +629,7 @@ class BlockItem(object):
 class BulkFamilyExportWindow(forms.WPFWindow):
 
     def __init__(self):
-        # script.py → pushbutton → stack → panel → tab → extension (5 levels)
+        # script.py â†’ pushbutton â†’ stack â†’ panel â†’ tab â†’ extension (5 levels)
         ext_dir = os.path.dirname(os.path.dirname(os.path.dirname(
             os.path.dirname(os.path.dirname(__file__)))))
         xaml_path = os.path.join(ext_dir, 'lib', 'GUI', 'Tools', 'BulkFamilyExport.xaml')
@@ -658,7 +673,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
           3. Type element Name fallback
           4. inst.Name / 'Unknown'
         """
-        # 1 ── BuiltInParameter (most reliable, works Revit 2019-2025)
+        # 1 â”€â”€ BuiltInParameter (most reliable, works Revit 2019-2025)
         try:
             p = inst.get_Parameter(DB.BuiltInParameter.IMPORT_SYMBOL_NAME)
             if p and p.HasValue:
@@ -668,7 +683,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         except Exception:
             pass
 
-        # 2 ── Lookup by definition name "Name" (covers schema importSymbolName)
+        # 2 â”€â”€ Lookup by definition name "Name" (covers schema importSymbolName)
         try:
             for p in inst.Parameters:
                 if p.Definition.Name == "Name" and p.StorageType.ToString() == "String":
@@ -678,7 +693,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         except Exception:
             pass
 
-        # 3 ── Type element name
+        # 3 â”€â”€ Type element name
         try:
             type_id = inst.GetTypeId()
             if type_id and type_id != ElementId.InvalidElementId:
@@ -817,7 +832,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         except Exception:
             pass
 
-    # ── Progress bar + Stop / Pause helpers ──────────────────────────────
+    # â”€â”€ Progress bar + Stop / Pause helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def _do_events(self):
         """Pump the WPF dispatcher so the UI repaints and queued button clicks fire."""
@@ -861,7 +876,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             self.pb_export.Value = 0
             self._cancel_requested = False
             self._pause_requested  = False
-            self.btn_pause_export.Content   = u"⏸  Pause"
+            self.btn_pause_export.Content   = u"â¸  Pause"
             self.btn_pause_export.IsEnabled = True
             self.btn_stop_export.IsEnabled  = True
         except Exception:
@@ -873,7 +888,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         self._pause_requested  = False   # unblock a paused loop immediately
         try:
             self.btn_stop_export.IsEnabled = False
-            self._update_status(u"Stopping… finishing current block")
+            self._update_status(u"Stoppingâ€¦ finishing current block")
         except Exception:
             pass
 
@@ -882,14 +897,14 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         if self._pause_requested:
             self._pause_requested = False
             try:
-                self.btn_pause_export.Content = u"⏸  Pause"
+                self.btn_pause_export.Content = u"â¸  Pause"
             except Exception:
                 pass
         else:
             self._pause_requested = True
             try:
-                self.btn_pause_export.Content = u"▶  Resume"
-                self._update_status(u"Paused — click Resume to continue")
+                self.btn_pause_export.Content = u"â–¶  Resume"
+                self._update_status(u"Paused â€” click Resume to continue")
             except Exception:
                 pass
 
@@ -984,10 +999,10 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             for item in geo_elem:
                 if is_curve(item):
                     curves.append(item)
-                # BỔ SUNG 1: Lấy các curve không giới hạn (ví dụ: hình tròn hoàn chỉnh)
+                # Bá»” SUNG 1: Láº¥y cÃ¡c curve khÃ´ng giá»›i háº¡n (vÃ­ dá»¥: hÃ¬nh trÃ²n hoÃ n chá»‰nh)
                 elif isinstance(item, _Curve) and not item.IsBound:
                     curves.append(item)
-                # BỔ SUNG 2: Xử lý PolyLine từ CAD
+                # Bá»” SUNG 2: Xá»­ lÃ½ PolyLine tá»« CAD
                 elif isinstance(item, PolyLine):
                     pts = item.GetCoordinates()
                     for i in range(item.NumberOfCoordinates - 1):
@@ -1051,7 +1066,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
         min_len = getattr(app, 'ShortCurveTolerance', 0.00256)
         found   = {}      # fingerprint -> {name, curves, count}
-        counter = [0]     # mutable counter (IronPython 2 – no nonlocal)
+        counter = [0]     # mutable counter (IronPython 2 â€“ no nonlocal)
 
         # helpers
         def is_curve(item):
@@ -1067,9 +1082,9 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             """Recursively collect all valid curves from a geometry element.
 
             Handles:
-              • Direct Curve objects (Line, Arc, NurbSpline, Ellipse, …)
-              • Nested GeometryInstances (sub-blocks)
-              • Solid edges – extracts the edge curves for DWG imports
+              â€¢ Direct Curve objects (Line, Arc, NurbSpline, Ellipse, â€¦)
+              â€¢ Nested GeometryInstances (sub-blocks)
+              â€¢ Solid edges â€“ extracts the edge curves for DWG imports
                 that the API represents as thin solids instead of wires.
             """
             curves = []
@@ -1206,7 +1221,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                     continue
 
                 if depth == 0:
-                    # Top-level container (DWG model space) – dive in
+                    # Top-level container (DWG model space) â€“ dive in
                     walk(inst_geom, depth + 1)
                 else:
                     # Block reference at depth >= 1
@@ -1264,7 +1279,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
         load_to_project = (self.chk_load_to_project.IsChecked == True)
 
-        # Pre-read UI flag once — avoids COM/UI calls inside the tight loop
+        # Pre-read UI flag once â€” avoids COM/UI calls inside the tight loop
         mode_2d = False
         try:
             mode_2d = bool(getattr(self, 'rb_2d_lines', None) and self.rb_2d_lines.IsChecked)
@@ -1535,7 +1550,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         FRAME_W = max(min(half_w * 0.12, 0.1312), 0.0492)   # 12 % of half-width, ~15-40 mm
         half_d  = max(half_depth, 0.2461)                     # min ~75 mm (wall reveal)
 
-        # ── helper: closed rectangle as CurveArray in the Z=0 plane ──
+        # â”€â”€ helper: closed rectangle as CurveArray in the Z=0 plane â”€â”€
         def rect_loop(xmin, xmax, ymin, ymax):
             arr = CurveArray()
             pts = [XYZ(xmin, ymin, 0), XYZ(xmax, ymin, 0),
@@ -1546,7 +1561,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
         # Outer boundary
         outer = rect_loop(-half_w,           half_w,           -half_d, half_d)
-        # Inner boundary → punches hole through frame (JSONtoFamily inner_loops pattern)
+        # Inner boundary â†’ punches hole through frame (JSONtoFamily inner_loops pattern)
         inner = rect_loop(-(half_w - FRAME_W), (half_w - FRAME_W),
                           -(half_d - FRAME_W), (half_d - FRAME_W))
 
@@ -1571,12 +1586,12 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             pass
 
         # Glass pane: thin slab centred at depth mid-point
-        # Tiny Y extent (≈5 mm) in plan, extruded in Z from sill+FRAME_W to head-FRAME_W.
-        # Hidden in plan/ceiling views – model-only visibility (JSONtoFamily visible_param).
+        # Tiny Y extent (â‰ˆ5 mm) in plan, extruded in Z from sill+FRAME_W to head-FRAME_W.
+        # Hidden in plan/ceiling views â€“ model-only visibility (JSONtoFamily visible_param).
         glass_ext = None
         try:
             iw    = half_w - FRAME_W
-            GLASS = 0.0082   # ≈2.5 mm half-thickness → 5 mm total pane
+            GLASS = 0.0082   # â‰ˆ2.5 mm half-thickness â†’ 5 mm total pane
 
             glass_rect = rect_loop(-iw, iw, -GLASS, GLASS)
             glass_profile = CurveArrArray()
@@ -1611,7 +1626,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         if not curves:
             return None
 
-        # Create a fresh family document — assigned before try so finally can close it
+        # Create a fresh family document â€” assigned before try so finally can close it
         fam_doc = None
         fam_doc = app.NewFamilyDocument(template_path)
         try:
@@ -1656,7 +1671,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             half_h = max((max_y - min_y) / 2.0, 0.01)
 
             t = Transaction(fam_doc, 'Create Block Geometry')
-            t.Start()
+            start_transaction(t)
             try:
                 # Find or create a Z-up sketch plane
                 sketch_plane = None
@@ -1675,7 +1690,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                 from Autodesk.Revit.DB import Transform
 
                 if mode_2d_only:
-                    # ════════════════════════════════════════════════════════
+                    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
                     # 2-D Model-Curve export
                     #
                     # Strategy:
@@ -1683,17 +1698,17 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                     #      slightly tilted 2-D DWGs are correctly flattened.
                     #   2. Translate every curve by (-cx, -cy, -median_z).
                     #   3. Rebuild each curve with forced Z=0 endpoints:
-                    #        • Line  → Line.CreateBound with Z=0 pts
-                    #        • Arc   → Arc.Create(start, end, ON-ARC mid)
+                    #        â€¢ Line  â†’ Line.CreateBound with Z=0 pts
+                    #        â€¢ Arc   â†’ Arc.Create(start, end, ON-ARC mid)
                     #                  using Evaluate() for the true mid-point
-                    #        • All other types (NurbSpline, HermiteSpline,
-                    #          Ellipse, …) → tessellate → write as Line segs
+                    #        â€¢ All other types (NurbSpline, HermiteSpline,
+                    #          Ellipse, â€¦) â†’ tessellate â†’ write as Line segs
                     #   4. Any individual failure is logged at DEBUG and
                     #      skipped without aborting the whole block.
-                    # ════════════════════════════════════════════════════════
+                    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-                    # ── 1. Median Z across all endpoints (robust for DWGs
-                    #       with minor Z variation) ──────────────────────
+                    # â”€â”€ 1. Median Z across all endpoints (robust for DWGs
+                    #       with minor Z variation) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                     _zvals = []
                     for _c in curves:
                         try:
@@ -1711,7 +1726,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
                     translator = Transform.CreateTranslation(XYZ(-cx, -cy, -cz))
 
-                    # ── 2. Helper: write one projected line segment ────────
+                    # â”€â”€ 2. Helper: write one projected line segment â”€â”€â”€â”€â”€â”€â”€â”€
                     def _seg(pa, pb):
                         """Project pa/pb to Z=0, create Line, call NewModelCurve.
                         Returns True on success."""
@@ -1726,7 +1741,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                         except Exception:
                             return False
 
-                    # ── 3. Write each curve ────────────────────────────────
+                    # â”€â”€ 3. Write each curve â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                     ok_2d = fail_2d = 0
 
                     for curve in curves:
@@ -1734,7 +1749,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                             new_c = curve.CreateTransformed(translator)
 
                             if isinstance(new_c, Line):
-                                # Đoạn thẳng: vẽ trực tiếp
+                                # Äoáº¡n tháº³ng: váº½ trá»±c tiáº¿p
                                 p0 = new_c.GetEndPoint(0)
                                 p1 = new_c.GetEndPoint(1)
                                 if _seg(p0, p1):
@@ -1742,8 +1757,8 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                                 else:
                                     fail_2d += 1
                             else:
-                                # BỔ SUNG TỪ SCRIPT_TEST: 
-                                # Mọi đường cong phức tạp (Arc, Spline, Ellipse...) đều bẻ thành đoạn thẳng
+                                # Bá»” SUNG Tá»ª SCRIPT_TEST: 
+                                # Má»i Ä‘Æ°á»ng cong phá»©c táº¡p (Arc, Spline, Ellipse...) Ä‘á»u báº» thÃ nh Ä‘oáº¡n tháº³ng
                                 written = False
                                 pts = new_c.Tessellate()
                                 
@@ -1751,7 +1766,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                                     if _seg(pts[i], pts[i + 1]):
                                         written = True
                                 
-                                # QUAN TRỌNG: Nối điểm cuối với điểm đầu nếu là đường khép kín (như hình tròn)
+                                # QUAN TRá»ŒNG: Ná»‘i Ä‘iá»ƒm cuá»‘i vá»›i Ä‘iá»ƒm Ä‘áº§u náº¿u lÃ  Ä‘Æ°á»ng khÃ©p kÃ­n (nhÆ° hÃ¬nh trÃ²n)
                                 if not new_c.IsBound:
                                     if _seg(pts[-1], pts[0]):
                                         written = True
@@ -1773,7 +1788,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                         block_item.BlockName, ok_2d, fail_2d, cz))
                     if ok_2d == 0 and curves:
                         logger.warning(
-                            "2D '{}': ZERO curves written – all {} curves failed. "
+                            "2D '{}': ZERO curves written â€“ all {} curves failed. "
                             "cz={:.4f} ft. Check CAD import elevation.".format(
                                 block_item.BlockName, len(curves), cz))
                 else:
@@ -1783,11 +1798,11 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                     )
 
                     THICKNESS      = 0.1312
-                    HEIGHT         = 7.2178   # ≈2195 mm – default door height
-                    WINDOW_HEIGHT  = 4.9213   # ≈1500 mm – default window height
+                    HEIGHT         = 7.2178   # â‰ˆ2195 mm â€“ default door height
+                    WINDOW_HEIGHT  = 4.9213   # â‰ˆ1500 mm â€“ default window height
                     extrusion_depth = HEIGHT if is_door else (WINDOW_HEIGHT if is_window else 1.0)
 
-                    # ── Door subcategories ──
+                    # â”€â”€ Door subcategories â”€â”€
                     swing_gs = frame_gs = None
                     if is_door:
                         try:
@@ -1805,23 +1820,23 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                         except Exception:
                             pass
 
-                    # ── Family parameters ──
+                    # â”€â”€ Family parameters â”€â”€
                     param_height_fp = param_width_fp = param_material = None
                     try:
                         fam_mgr = fam_doc.FamilyManager
                         for param in fam_mgr.Parameters:
                             pname = param.Definition.Name.lower()
-                            if pname in ("height", "chiều cao"):
+                            if pname in ("height", "chiá»u cao"):
                                 fam_mgr.Set(param, extrusion_depth)
                                 param_height_fp = param
-                            elif pname in ("width", "chiều rộng"):
+                            elif pname in ("width", "chiá»u rá»™ng"):
                                 if door_width:
                                     fam_mgr.Set(param, door_width)
                                 param_width_fp = param
-                            elif pname in ("depth", "chiều sâu", "length", "chiều dài"):
+                            elif pname in ("depth", "chiá»u sÃ¢u", "length", "chiá»u dÃ i"):
                                 if not is_door and half_h * 2.0 > 0.01:
                                     fam_mgr.Set(param, half_h * 2.0)
-                            elif pname in ("material", "vật liệu"):
+                            elif pname in ("material", "váº­t liá»‡u"):
                                 param_material = param
                     except Exception:
                         pass
@@ -1873,10 +1888,10 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
                         # Model lines on top surface (DWGFamilyHelpers approach)
                         # Uses _dwg_project_curve() which:
-                        #   • Line  → rebuild endpoints at (X-cx, Y-cy, extrusion_depth)
-                        #   • Arc   → Arc.Create(center, r, t0, t1, BasisX, BasisY)
+                        #   â€¢ Line  â†’ rebuild endpoints at (X-cx, Y-cy, extrusion_depth)
+                        #   â€¢ Arc   â†’ Arc.Create(center, r, t0, t1, BasisX, BasisY)
                         #             always horizontal in family space, ignores world Z
-                        #   • Other → Line between translated endpoints (safe fallback)
+                        #   â€¢ Other â†’ Line between translated endpoints (safe fallback)
                         # This correctly handles DWG imports at any Level elevation
                         # without needing to compute or subtract a world-Z offset.
                         top_sp = SketchPlane.Create(
@@ -2053,7 +2068,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             if load_to_project:
                 try:
                     t_load = Transaction(doc, 'Load Family - {}'.format(safe_cad_name))
-                    t_load.Start()
+                    start_transaction(t_load)
                     try:
                         doc.LoadFamily(save_path)
                         t_load.Commit()
@@ -2171,7 +2186,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
         fam_doc = app.NewFamilyDocument(template_path)
         t = Transaction(fam_doc, "T3Lab Window \u2013 " + label)
-        t.Start()
+        start_transaction(t)
         try:
             # Find sketch plane (Z-up)
             sketch_plane = None
@@ -2246,7 +2261,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         if load_to_project:
             try:
                 t2 = Transaction(doc, "Load " + label)
-                t2.Start()
+                start_transaction(t2)
                 try: doc.LoadFamily(save_path); t2.Commit()
                 except Exception:
                     try: t2.RollBack()
@@ -2267,7 +2282,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
         fam_doc = app.NewFamilyDocument(template_path)
         t = Transaction(fam_doc, "T3Lab {} \u2013 {}".format(category_name, label))
-        t.Start()
+        start_transaction(t)
         try:
             # Sketch plane (Z-up)
             sketch_plane = None
@@ -2341,7 +2356,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         if load_to_project:
             try:
                 t2 = Transaction(doc, "Load " + label)
-                t2.Start()
+                start_transaction(t2)
                 try: doc.LoadFamily(save_path); t2.Commit()
                 except Exception:
                     try: t2.RollBack()
@@ -2423,7 +2438,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
         fam_doc = app.NewFamilyDocument(template_path)
         t = Transaction(fam_doc, "T3Lab Door - " + label)
-        t.Start()
+        start_transaction(t)
         try:
             # Find sketch planes from template
             plan_sp = elev_sp = None
@@ -2517,7 +2532,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
                     pass
                 return ext
 
-            # Frame pieces — 3 per side (left jamb, right jamb, top head)
+            # Frame pieces â€” 3 per side (left jamb, right jamb, top head)
             frame_pieces = [
                 (-half_fw, -half_w, 0.0, total_fh),   # left jamb (full height incl. head)
                 ( half_w,  half_fw, 0.0, total_fh),   # right jamb
@@ -2569,7 +2584,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         if load_to_project:
             try:
                 t2 = Transaction(doc, "Load " + label)
-                t2.Start()
+                start_transaction(t2)
                 try: doc.LoadFamily(save_path); t2.Commit()
                 except Exception:
                     try: t2.RollBack()
@@ -2600,7 +2615,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
 
         load_to_project = True   # placement always requires loading
 
-        # ── Resolve active level for placement ──
+        # â”€â”€ Resolve active level for placement â”€â”€
         place_level = None
         try:
             place_level = doc.GetElement(uidoc.ActiveView.GenLevel.Id)
@@ -2623,8 +2638,8 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         self._cancel_requested = False
         self._pause_requested  = False
         self._update_progress(0, len(selected))
-        t_place = Transaction(doc, "T3Lab – Export & Place Families")
-        t_place.Start()
+        t_place = Transaction(doc, "T3Lab â€“ Export & Place Families")
+        start_transaction(t_place)
         try:
             for i, item in enumerate(selected):
                 if self._cancel_requested:
@@ -2672,7 +2687,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             self._hide_progress()
             logger.error("Export & Place transaction failed:\n{}".format(
                 traceback.format_exc()))
-            forms.alert("Transaction failed – check the pyRevit log.")
+            forms.alert("Transaction failed â€“ check the pyRevit log.")
             return
 
         was_cancelled = self._cancel_requested
@@ -2767,7 +2782,7 @@ class BulkFamilyExportWindow(forms.WPFWindow):
         """Load a list of .rfa files into the project, one transaction each.
 
         Returns the count of successfully loaded families.
-        Individual failures are logged and skipped — one bad file
+        Individual failures are logged and skipped â€” one bad file
         will not abort the rest of the batch.
         """
         loaded = 0
@@ -2776,9 +2791,9 @@ class BulkFamilyExportWindow(forms.WPFWindow):
             self._update_status(
                 "Loading [{}/{}]: {}".format(i + 1, total, os.path.basename(path)))
             try:
-                t = Transaction(doc, "T3Lab – Load {}".format(
+                t = Transaction(doc, "T3Lab â€“ Load {}".format(
                     os.path.splitext(os.path.basename(path))[0]))
-                t.Start()
+                start_transaction(t)
                 try:
                     doc.LoadFamily(path)
                     t.Commit()

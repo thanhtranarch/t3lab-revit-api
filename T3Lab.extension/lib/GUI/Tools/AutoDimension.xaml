@@ -250,7 +250,7 @@
                                    Foreground="#2C3E50"/>
                     </StackPanel>
                     <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
-                    <TextBlock Text="Auto-dimension walls, columns &amp; grids in current view"
+                    <TextBlock Text="Auto-dimension walls, columns, doors, lifts &amp; grids in current view"
                                FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
                 </StackPanel>
             </StackPanel>
@@ -340,6 +340,12 @@
                                   Margin="0,4,0,4"/>
                         <CheckBox x:Name="chk_doors"
                                   Content="Doors (outer reference planes)"
+                                  IsChecked="True"
+                                  FontSize="13"
+                                  Foreground="#2C3E50"
+                                  Margin="0,4,0,4"/>
+                        <CheckBox x:Name="chk_lifts"
+                                  Content="Lifts / Mechanical Equipment"
                                   IsChecked="True"
                                   FontSize="13"
                                   Foreground="#2C3E50"

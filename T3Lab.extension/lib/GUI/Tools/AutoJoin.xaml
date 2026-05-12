@@ -374,27 +374,110 @@
             </StackPanel>
 
             <!-- RUN BUTTON -->
-            <DockPanel Grid.Row="5" Margin="0,12,0,0" LastChildFill="True">
-                <Button x:Name="btn_run" Content="▶  Run Auto Join" Style="{StaticResource PrimaryButton}"
-                        Click="btn_run_click" DockPanel.Dock="Left"/>
-                <TextBlock x:Name="status_text" Text="Ready"
-                           Foreground="#7F8C8D" FontSize="11" FontStyle="Italic"
-                           VerticalAlignment="Center" Margin="16,0,0,0"
-                           DockPanel.Dock="Left"/>
-            </DockPanel>
+            <Button Grid.Row="5" x:Name="btn_run" Content="▶  Run Auto Join"
+                    Style="{StaticResource PrimaryButton}"
+                    Click="btn_run_click" Margin="0,12,0,0"/>
         </Grid>
 
         <!-- ============ STATUS BAR ============ -->
-        <Border Grid.Row="3" Background="#FAFAFA" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0"
-                Padding="16,6">
-            <DockPanel>
-                <TextBlock x:Name="progress_text" Text="No rules defined" Foreground="#7F8C8D"
-                           FontSize="11" VerticalAlignment="Center"/>
-                <ProgressBar x:Name="progress_bar" Height="4" Minimum="0" Maximum="100" Value="0"
-                             Foreground="#2563EB" Background="#ECF0F1" BorderThickness="0"
-                             HorizontalAlignment="Right" Width="160" Margin="12,0,0,0"
-                             Visibility="Collapsed"/>
-            </DockPanel>
+        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
+                Padding="14,8">
+            <StackPanel>
+
+                <!-- Progress panel: bar + Pause + Stop (hidden when idle) -->
+                <Grid x:Name="progress_panel" Visibility="Collapsed" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="64"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="52"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ProgressBar x:Name="pb_run" Grid.Column="0"
+                                 Height="8" Minimum="0" Maximum="100" Value="0"
+                                 Foreground="#3498DB" Background="#DCE9F5"
+                                 BorderThickness="0" VerticalAlignment="Center"/>
+
+                    <!-- Pause / Resume -->
+                    <Button x:Name="btn_pause" Grid.Column="2"
+                            Content="⏸  Pause" Height="22" FontSize="10" FontFamily="Segoe UI"
+                            Click="pause_resume_clicked" Cursor="Hand"
+                            BorderThickness="1" BorderBrush="#BDC3C7"
+                            VerticalAlignment="Center">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#ECF0F1"/>
+                                <Setter Property="Foreground" Value="#2C3E50"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    CornerRadius="3" Padding="6,2">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#D5DBDB"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Foreground" Value="#BDC3C7"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <!-- Stop -->
+                    <Button x:Name="btn_stop" Grid.Column="4"
+                            Content="■  Stop" Height="22" FontSize="10" FontFamily="Segoe UI"
+                            Click="stop_clicked" Cursor="Hand"
+                            BorderThickness="0" VerticalAlignment="Center">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#E74C3C"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="3" Padding="6,2">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#C0392B"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Background" Value="#BDC3C7"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+
+                <!-- Status text row -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="status_text" Grid.Column="0" FontSize="11"
+                               Foreground="#7F8C8D" Text="Ready"/>
+                    <TextBlock x:Name="rule_count_text" Grid.Column="1" FontSize="11"
+                               Foreground="#BDC3C7" Text="0 rules defined"/>
+                </Grid>
+
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

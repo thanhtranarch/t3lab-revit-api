@@ -31,9 +31,10 @@ clr.AddReference('PresentationCore')
 clr.AddReference('WindowsBase')
 clr.AddReference('System')
 
-from System.Windows import WindowState, Visibility
-from System.Windows.Media.Imaging import BitmapImage
-from System import Uri, UriKind
+from System.Windows import WindowState, Visibility  # type: ignore
+from System.Windows.Media.Imaging import BitmapImage  # type: ignore
+from System.Windows.Threading import DispatcherPriority, DispatcherFrame  # type: ignore
+from System import Uri, UriKind, Action  # type: ignore
 
 from Autodesk.Revit.DB import (
     Transaction, FilteredElementCollector,
@@ -88,6 +89,7 @@ CATEGORY_NAMES = sorted(JOINABLE_CATEGORIES.keys())
 
 # Default rules for Shift+Click quick-join
 DEFAULT_RULES = [
+    {"priority": "Walls",               "join_with": "Walls"},
     {"priority": "Floors",              "join_with": "Walls"},
     {"priority": "Structural Columns",  "join_with": "Walls"},
     {"priority": "Structural Columns",  "join_with": "Floors"},
@@ -167,7 +169,7 @@ def _get_intersecting_elements(el, target_bic, scope, view_id=None):
         return []
 
 
-def run_join(rules, scope, mode, switch_order, progress_callback=None):
+def run_join(rules, scope, mode, switch_order, progress_callback=None, cancel_check=None):
     """
     Execute join/unjoin operations based on rules.
 
@@ -222,19 +224,34 @@ def run_join(rules, scope, mode, switch_order, progress_callback=None):
                 priority_bic, scope, view_id, selected_ids
             )
 
+            same_category = (int(priority_bic) == int(joinwith_bic))
+            processed_pairs = set()
+
             for el in priority_elements:
+                if cancel_check and cancel_check():
+                    break
+
                 # Find intersecting join-with elements
                 candidates = _get_intersecting_elements(
                     el, joinwith_bic, scope, view_id
                 )
 
                 for cand in candidates:
+                    if same_category:
+                        pair_key = (
+                            min(el.Id.IntegerValue, cand.Id.IntegerValue),
+                            max(el.Id.IntegerValue, cand.Id.IntegerValue),
+                        )
+                        if pair_key in processed_pairs:
+                            continue
+                        processed_pairs.add(pair_key)
+
                     try:
                         if mode == "Join":
                             if not JoinGeometryUtils.AreElementsJoined(doc, el, cand):
                                 JoinGeometryUtils.JoinGeometry(doc, el, cand)
                                 # Switch join order so priority element cuts the other
-                                if switch_order:
+                                if switch_order and not same_category:
                                     try:
                                         JoinGeometryUtils.SwitchJoinOrder(doc, el, cand)
                                     except Exception:
@@ -293,6 +310,8 @@ class AutoJoinWindow(forms.WPFWindow):
         forms.WPFWindow.__init__(self, XAML_FILE)
         self._load_logo()
         self._rules = []
+        self._cancel_requested = False
+        self._pause_requested  = False
 
         try:
             fname = os.path.basename(doc.PathName) if doc.PathName else "Unsaved Document"
@@ -330,7 +349,69 @@ class AutoJoinWindow(forms.WPFWindow):
         ]
         self.rules_grid.ItemsSource = None
         self.rules_grid.ItemsSource = items
-        self.progress_text.Text = "{} rule(s) defined".format(len(self._rules))
+        self.rule_count_text.Text = "{} rule(s) defined".format(len(self._rules))
+
+    # --------------------------------------------------
+    # Progress helpers
+    # --------------------------------------------------
+
+    def _do_events(self):
+        try:
+            frame = DispatcherFrame()
+            def _stop(f=frame):
+                f.Continue = False
+            self.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                Action(_stop))
+            self.Dispatcher.PushFrame(frame)
+        except Exception:
+            pass
+
+    def _update_progress(self, value, maximum):
+        try:
+            self.pb_run.Maximum = maximum
+            self.pb_run.Value   = value
+            self.progress_panel.Visibility = Visibility.Visible
+        except Exception:
+            pass
+        self._do_events()
+        while self._pause_requested and not self._cancel_requested:
+            self._do_events()
+
+    def _hide_progress(self):
+        try:
+            self.progress_panel.Visibility = Visibility.Collapsed
+            self.pb_run.Value = 0
+            self._cancel_requested = False
+            self._pause_requested  = False
+            self.btn_pause.Content   = u"⏸  Pause"
+            self.btn_pause.IsEnabled = True
+            self.btn_stop.IsEnabled  = True
+        except Exception:
+            pass
+
+    def stop_clicked(self, sender, e):
+        self._cancel_requested = True
+        self._pause_requested  = False
+        try:
+            self.btn_stop.IsEnabled = False
+            self.status_text.Text = u"Stopping… finishing current element"
+        except Exception:
+            pass
+
+    def pause_resume_clicked(self, sender, e):
+        if self._pause_requested:
+            self._pause_requested = False
+            try:
+                self.btn_pause.Content = u"⏸  Pause"
+            except Exception:
+                pass
+        else:
+            self._pause_requested = True
+            try:
+                self.btn_pause.Content = u"▶  Resume"
+            except Exception:
+                pass
 
     # --------------------------------------------------
     # Window chrome handlers
@@ -362,7 +443,7 @@ class AutoJoinWindow(forms.WPFWindow):
         if not priority:
             return
 
-        joinwith_options = [c for c in CATEGORY_NAMES if c != priority]
+        joinwith_options = CATEGORY_NAMES
         join_with = forms.SelectFromList.show(
             joinwith_options,
             title="Select Join-with Category (Cut by '{}')".format(priority),
@@ -480,33 +561,42 @@ class AutoJoinWindow(forms.WPFWindow):
         if td.Show() != TaskDialogResult.Yes:
             return
 
+        self._cancel_requested = False
+        self._pause_requested  = False
         self.btn_run.IsEnabled = False
-        self.status_text.Text = "Running..."
-        self.progress_bar.Visibility = Visibility.Visible
-        self.progress_bar.Value = 0
+        self._update_progress(0, 100)
+        self.status_text.Text = u"Running…"
 
         def progress_cb(current, total, message):
-            if total > 0:
-                pct = int(float(current) / float(total) * 100)
-                self.progress_bar.Value = pct
-            self.progress_text.Text = message
+            pct = int(float(current) / float(total) * 100) if total > 0 else 0
+            self._update_progress(pct, 100)
+            self.status_text.Text = message
 
         start = time.time()
         joined, skipped, errors, err_msg = run_join(
-            self._rules, scope, mode, switch_order, progress_cb
+            self._rules, scope, mode, switch_order, progress_cb,
+            cancel_check=lambda: self._cancel_requested
         )
         elapsed = time.time() - start
 
         save_rules_to_file(self._rules)
 
+        self._hide_progress()
         self.btn_run.IsEnabled = True
-        self.progress_bar.Visibility = Visibility.Collapsed
+
+        cancelled = self._cancel_requested
+        if cancelled:
+            self.status_text.Text = u"Cancelled – {}ed {} pair(s)".format(
+                mode.lower(), joined
+            )
+            self.rule_count_text.Text = "{} rule(s)".format(len(self._rules))
+            return
 
         result_msg = (
             "Auto {} completed in {:.1f}s\n\n"
-            "✓ {}ed: {}\n"
-            "⊘ Already {}ed (skipped): {}\n"
-            "✗ Errors: {}"
+            u"✓ {}ed: {}\n"
+            u"⊘ Already {}ed (skipped): {}\n"
+            u"✗ Errors: {}"
         ).format(
             mode, elapsed,
             mode, joined,
@@ -515,12 +605,12 @@ class AutoJoinWindow(forms.WPFWindow):
         )
 
         if err_msg:
-            result_msg += "\n\n⚠ {}".format(err_msg)
+            result_msg += u"\n\n⚠ {}".format(err_msg)
 
-        self.status_text.Text = "Done – {}ed {} element pair(s)".format(
+        self.status_text.Text = u"Done – {}ed {} element pair(s)".format(
             mode.lower(), joined
         )
-        self.progress_text.Text = "{} rule(s) | Last run: {} {}ed".format(
+        self.rule_count_text.Text = "{} rule(s) | Last run: {} {}ed".format(
             len(self._rules), joined, mode.lower()
         )
 

@@ -43,7 +43,7 @@ from pyrevit import forms, script
 
 # Path setup
 SCRIPT_DIR = os.path.dirname(__file__)
-EXT_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))))
+EXT_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR)))))
 lib_dir    = os.path.join(EXT_DIR, 'lib')
 if lib_dir not in sys.path:
     sys.path.append(lib_dir)

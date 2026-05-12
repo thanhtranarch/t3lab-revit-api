@@ -33,6 +33,7 @@ from System import Uri, UriKind
 from Autodesk.Revit.DB import (
     FilteredElementCollector,
     BuiltInCategory,
+    BuiltInParameter,
     DimensionType,
     DimensionStyleType,
     Transaction,
@@ -287,24 +288,59 @@ def _collect_door_refs(door):
     return refs
 
 
-def _collect_col_family_refs(col):
+def _group_elements_by_pos(elements, get_pos, tolerance):
+    """Group elements whose position key falls within tolerance of each other.
+    Returns list of (avg_pos, [elements]).
     """
-    Get all built-in reference planes from a column FamilyInstance.
-    Returns a flat list of Reference objects (may be empty).
+    groups = []
+    for elem in elements:
+        pos = get_pos(elem)
+        for grp in groups:
+            if abs(grp[0] - pos) <= tolerance:
+                grp[1].append(elem)
+                grp[0] = sum(get_pos(e) for e in grp[1]) / len(grp[1])
+                break
+        else:
+            groups.append([pos, [elem]])
+    return [(g[0], g[1]) for g in groups]
+
+
+def _col_ref_from_geom(col, view, axis):
+    """Last-resort: extract a planar face Reference from the column's instance geometry.
+    axis='X' → face with normal predominantly in X (left/right face).
+    axis='Y' → face with normal predominantly in Y (front/back face).
+    Uses GetInstanceGeometry() so the References are in project context.
     """
-    refs = []
-    for rt in (FamilyInstanceReferenceType.Left,
-               FamilyInstanceReferenceType.Right,
-               FamilyInstanceReferenceType.Front,
-               FamilyInstanceReferenceType.Back,
-               FamilyInstanceReferenceType.WeakReference,
-               FamilyInstanceReferenceType.StrongReference):
-        try:
-            for r in col.GetReferences(rt):
-                refs.append(r)
-        except Exception:
-            pass
-    return refs
+    try:
+        opt = Options()
+        opt.ComputeReferences = True
+        opt.View = view
+        geom = col.get_Geometry(opt)
+        if geom is None:
+            return None
+        for g_obj in geom:
+            try:
+                solids = list(g_obj.GetInstanceGeometry())
+            except AttributeError:
+                solids = [g_obj]
+            for solid in solids:
+                try:
+                    for face in solid.Faces:
+                        try:
+                            n = face.FaceNormal
+                            match = (axis == 'X' and abs(n.X) > 0.7) or \
+                                    (axis == 'Y' and abs(n.Y) > 0.7)
+                            if match:
+                                ref = face.Reference
+                                if ref is not None:
+                                    return ref
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return None
 
 
 # WINDOW CLASS
@@ -355,14 +391,24 @@ class AutoDimensionWindow(forms.WPFWindow):
                 .OfClass(DimensionType)\
                 .WhereElementIsElementType()\
                 .ToElements()
-            # Only Linear dimension types
-            self._dim_types = [
-                dt for dt in all_types
-                if dt.StyleType == DimensionStyleType.Linear
-            ]
+
+            self._dim_types = []
+            for dt in all_types:
+                try:
+                    if dt.StyleType == DimensionStyleType.Linear:
+                        self._dim_types.append(dt)
+                except Exception:
+                    pass
+
             self.cmb_dim_type.Items.Clear()
             for dt in self._dim_types:
-                self.cmb_dim_type.Items.Add(dt.Name)
+                try:
+                    param = dt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
+                    name = param.AsString() if param and param.AsString() else dt.Name
+                except Exception:
+                    name = "Type {}".format(dt.Id.IntegerValue)
+                self.cmb_dim_type.Items.Add(name)
+
             if self._dim_types:
                 self.cmb_dim_type.SelectedIndex = 0
                 self._set_status("Loaded {} linear dimension type(s).".format(
@@ -410,6 +456,7 @@ class AutoDimensionWindow(forms.WPFWindow):
         do_struct_cols = self.chk_struct_columns.IsChecked == True
         do_arch_cols   = self.chk_arch_columns.IsChecked == True
         do_doors       = self.chk_doors.IsChecked == True
+        do_lifts       = self.chk_lifts.IsChecked == True
 
         run_h = True  # always dim both directions
         run_v = True
@@ -471,6 +518,7 @@ class AutoDimensionWindow(forms.WPFWindow):
         struct_cols = _collect(BuiltInCategory.OST_StructuralColumns) if do_struct_cols else []
         arch_cols   = _collect(BuiltInCategory.OST_Columns)     if do_arch_cols   else []
         doors       = _collect(BuiltInCategory.OST_Doors)       if do_doors       else []
+        lifts       = _collect(BuiltInCategory.OST_MechanicalEquipment) if do_lifts else []
         all_cols    = struct_cols + arch_cols
 
         # ── Single transaction — skip failures silently ────────────────────
@@ -510,35 +558,103 @@ class AutoDimensionWindow(forms.WPFWindow):
                 except Exception as ex:
                     logger.warning("Wall dim skipped: {}".format(ex))
 
-            # ── COLUMNS: each column → nearest grid in X and/or Y ─────────
+            # ── COLUMNS: 1 face + nearest grid per direction ──────────────────
+            def _col_ref_one(col, axis, *primary_rtypes):
+                """Return one reference for the column in the given axis direction.
+                Tries four layers of fallback to maximise coverage:
+                  1. Named refs matching the direction (Left/Right or Front/Back)
+                  2. WeakReference / StrongReference
+                  3. All other FamilyInstanceReferenceType values (1–8)
+                  4. Geometry PlanarFace refs via _col_ref_from_geom
+                """
+                for rt in primary_rtypes:
+                    try:
+                        refs = list(col.GetReferences(rt))
+                        if refs:
+                            return refs[0]
+                    except Exception:
+                        pass
+                for rt in (FamilyInstanceReferenceType.WeakReference,
+                           FamilyInstanceReferenceType.StrongReference):
+                    try:
+                        refs = list(col.GetReferences(rt))
+                        if refs:
+                            return refs[0]
+                    except Exception:
+                        pass
+                # Exhaustive: try every FamilyInstanceReferenceType value (1–8)
+                for i in range(1, 9):
+                    try:
+                        rt = FamilyInstanceReferenceType(i)
+                        refs = list(col.GetReferences(rt))
+                        if refs:
+                            return refs[0]
+                    except Exception:
+                        pass
+                # Last resort: planar face from instance geometry
+                return _col_ref_from_geom(col, view, axis)
+
+            col_dims_expected = len(all_cols) * 2
+            col_dims_ok       = 0
+            col_missing_ids   = []
+
             for col in all_cols:
+                col_ok = 0
                 try:
-                    col_refs = _collect_col_family_refs(col)
-                    if not col_refs:
-                        continue
                     cx, cy = _elem_centroid(col, view)
 
-                    if run_h:
-                        g, gy = _nearest_grid(cx, cy, all_grids, 'Y')
-                        g_ref = _get_grid_reference(g, view) if g else None
-                        if g_ref:
-                            line = _aligned_dim_line(cy, gy, cx, 'Y', margin, dim_z)
-                            if _try_create_dim(self.doc, view,
-                                               [col_refs[0], g_ref],
-                                               line, dim_type):
-                                dims_created += 1
-
+                    # X direction: Left face → nearest vertical grid
                     if run_v:
-                        g, gx = _nearest_grid(cx, cy, all_grids, 'X')
-                        g_ref = _get_grid_reference(g, view) if g else None
-                        if g_ref:
-                            line = _aligned_dim_line(cx, gx, cy, 'X', margin, dim_z)
-                            if _try_create_dim(self.doc, view,
-                                               [col_refs[0], g_ref],
-                                               line, dim_type):
-                                dims_created += 1
+                        col_ref = _col_ref_one(col, 'X',
+                                               FamilyInstanceReferenceType.Left,
+                                               FamilyInstanceReferenceType.Right)
+                        if col_ref:
+                            g, gx = _nearest_grid(cx, cy, all_grids, 'X')
+                            gr = _get_grid_reference(g, view) if g else None
+                            if gr:
+                                line = _aligned_dim_line(cx, gx, cy, 'X', margin, dim_z)
+                                if _try_create_dim(self.doc, view,
+                                                   [col_ref, gr], line, dim_type):
+                                    dims_created += 1
+                                    col_ok += 1
+
+                    # Y direction: Front face → nearest horizontal grid
+                    if run_h:
+                        col_ref = _col_ref_one(col, 'Y',
+                                               FamilyInstanceReferenceType.Front,
+                                               FamilyInstanceReferenceType.Back)
+                        if col_ref:
+                            g, gy = _nearest_grid(cx, cy, all_grids, 'Y')
+                            gr = _get_grid_reference(g, view) if g else None
+                            if gr:
+                                line = _aligned_dim_line(cy, gy, cx, 'Y', margin, dim_z)
+                                if _try_create_dim(self.doc, view,
+                                                   [col_ref, gr], line, dim_type):
+                                    dims_created += 1
+                                    col_ok += 1
+
                 except Exception as ex:
                     logger.warning("Column dim skipped: {}".format(ex))
+
+                col_dims_ok += col_ok
+                if col_ok < 2:
+                    col_missing_ids.append(col.Id.IntegerValue)
+
+            if col_dims_ok < col_dims_expected:
+                msg = (
+                    "Column dims: expected {} — created {} — missing {}.\n"
+                    "Column IDs with incomplete dims: {}"
+                ).format(
+                    col_dims_expected,
+                    col_dims_ok,
+                    col_dims_expected - col_dims_ok,
+                    ", ".join(str(i) for i in col_missing_ids)
+                )
+                logger.warning(msg)
+                self._set_status(
+                    "WARNING: {}/{} column dims created. See output for details.".format(
+                        col_dims_ok, col_dims_expected)
+                )
 
             # ── DOORS: Left + Right refs + nearest perpendicular grid ──────
             for door in doors:
@@ -581,6 +697,42 @@ class AutoDimensionWindow(forms.WPFWindow):
                                 dims_created += 1
                 except Exception as ex:
                     logger.warning("Door dim skipped: {}".format(ex))
+
+            # ── LIFTS (Mechanical Equipment): Left/Right + Front/Back refs ──
+            for lift in lifts:
+                try:
+                    cx, cy = _elem_centroid(lift, view)
+
+                    # X direction: Left/Right face → nearest vertical grid
+                    if run_v:
+                        col_ref = _col_ref_one(lift, 'X',
+                                               FamilyInstanceReferenceType.Left,
+                                               FamilyInstanceReferenceType.Right)
+                        if col_ref:
+                            g, gx = _nearest_grid(cx, cy, all_grids, 'X')
+                            gr = _get_grid_reference(g, view) if g else None
+                            if gr:
+                                line = _aligned_dim_line(cx, gx, cy, 'X', margin, dim_z)
+                                if _try_create_dim(self.doc, view,
+                                                   [col_ref, gr], line, dim_type):
+                                    dims_created += 1
+
+                    # Y direction: Front/Back face → nearest horizontal grid
+                    if run_h:
+                        col_ref = _col_ref_one(lift, 'Y',
+                                               FamilyInstanceReferenceType.Front,
+                                               FamilyInstanceReferenceType.Back)
+                        if col_ref:
+                            g, gy = _nearest_grid(cx, cy, all_grids, 'Y')
+                            gr = _get_grid_reference(g, view) if g else None
+                            if gr:
+                                line = _aligned_dim_line(cy, gy, cx, 'Y', margin, dim_z)
+                                if _try_create_dim(self.doc, view,
+                                                   [col_ref, gr], line, dim_type):
+                                    dims_created += 1
+
+                except Exception as ex:
+                    logger.warning("Lift dim skipped: {}".format(ex))
 
             t.Commit()
 
