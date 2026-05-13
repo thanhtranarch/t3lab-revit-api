@@ -6,7 +6,8 @@
       "Bash(xargs grep *)",
       "Bash(cat)",
       "Read(//tmp/**)",
-      "Bash(grep -E '\\\\.\\(panel|stack|pulldown|pushbutton\\)$')"
+      "Bash(grep -E '\\\\.\\(panel|stack|pulldown|pushbutton\\)$')",
+      "WebFetch(domain:www.youtube.com)"
     ]
   }
 }

@@ -6,21 +6,21 @@
         <SolidColorBrush x:Key="bg_white" Color="White"/>
         <SolidColorBrush x:Key="bg_light" Color="#F4F6F7"/>
         <SolidColorBrush x:Key="bg_panel" Color="#F8F9FA"/>
-        <SolidColorBrush x:Key="border_gray" Color="#BDC3C7"/>
-        <SolidColorBrush x:Key="border_light" Color="#E0E0E0"/>
+        <SolidColorBrush x:Key="border_gray" Color="#546E7A"/>
+        <SolidColorBrush x:Key="border_light" Color="#546E7A"/>
         <SolidColorBrush x:Key="text_dark" Color="#2C3E50"/>
         <SolidColorBrush x:Key="text_gray" Color="#7F8C8D"/>
         <SolidColorBrush x:Key="accent_green" Color="#27AE60"/>
         <SolidColorBrush x:Key="accent_yellow" Color="#F39C12"/>
-        <SolidColorBrush x:Key="accent_red" Color="#E74C3C"/>
-        <SolidColorBrush x:Key="accent_blue" Color="#3498DB"/>
+        <SolidColorBrush x:Key="accent_red" Color="#D32F2F"/>
+        <SolidColorBrush x:Key="accent_blue" Color="#083D56"/>
         <SolidColorBrush x:Key="export_green" Color="#27AE60"/>
         <SolidColorBrush x:Key="import_orange" Color="#E67E22"/>
 
         <Style x:Key="SmallButton" TargetType="Button">
-            <Setter Property="Background" Value="#ECF0F1"/>
+            <Setter Property="Background" Value="#F8F9FA"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Padding" Value="6,3"/>
@@ -39,7 +39,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#D5DBDB"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.5"/>
@@ -77,8 +77,8 @@
         <Style x:Key="ArrowButton" TargetType="Button">
             <Setter Property="Width" Value="32"/>
             <Setter Property="Height" Value="32"/>
-            <Setter Property="Background" Value="#ECF0F1"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="Background" Value="#F8F9FA"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontSize" Value="14"/>
@@ -96,7 +96,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#D5DBDB"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -107,7 +107,7 @@
         </Style>
 
         <!-- Window Control Button Style (BatchOut style) -->
-        <Style x:Key="WindowControlButton" TargetType="Button">
+        <Style x:Key="WinCtrlButton" TargetType="Button">
             <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="32"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -121,7 +121,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#ECF0F1"/>
+                                <Setter TargetName="border" Property="Background" Value="#F8F9FA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -144,7 +144,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#E74C3C"/>
+                                <Setter TargetName="border" Property="Background" Value="#D32F2F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -173,11 +173,11 @@
         <StackPanel Grid.Column="0" Orientation="Vertical" Margin="16,0,0,0" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                           Foreground="#3498DB" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                           Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
                 <TextBlock Text="ParaSync" FontSize="18" FontWeight="Bold"
                            Foreground="#2C3E50"/>
             </StackPanel>
-            <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+            <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
             <TextBlock Text="Export/Import parameter data to Excel - SheetLink style"
                        FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
         </StackPanel>
@@ -186,36 +186,36 @@
         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,0,5,0">
             <!-- Profile Button -->
             <Button x:Name="btn_profile"
-                    Style="{StaticResource WindowControlButton}"
+                    Style="{StaticResource WinCtrlButton}"
                     ToolTip="Profiles">
                 <TextBlock Text="&#x1F464;" FontSize="18" Foreground="#7F8C8D"/>
             </Button>
 
             <!-- Minimize Button -->
             <Button x:Name="btn_minimize"
-                    Style="{StaticResource WindowControlButton}"
+                    Style="{StaticResource WinCtrlButton}"
                     ToolTip="Minimize">
-                <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
             </Button>
 
             <!-- Maximize/Restore Button -->
             <Button x:Name="btn_maximize"
-                    Style="{StaticResource WindowControlButton}"
+                    Style="{StaticResource WinCtrlButton}"
                     ToolTip="Maximize">
-                <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
             </Button>
 
             <!-- Close Button -->
             <Button x:Name="btn_close_window"
                     Style="{StaticResource CloseButton}"
                     ToolTip="Close">
-                <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
             </Button>
         </StackPanel>
     </Grid>
 
     <!-- Row 1: Sub-header with Profile + Progress -->
-    <Border Grid.Row="1" Background="#F8F9FA" BorderBrush="#E0E0E0" BorderThickness="0,1,0,1" Padding="15,6">
+    <Border Grid.Row="1" Background="#F8F9FA" BorderBrush="#546E7A" BorderThickness="0,1,0,1" Padding="15,6">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
@@ -285,7 +285,7 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Col 0: Select Categories -->
-                    <Border Grid.Column="0" BorderBrush="#BDC3C7" BorderThickness="1" Margin="0,0,4,0">
+                    <Border Grid.Column="0" BorderBrush="#546E7A" BorderThickness="1" Margin="0,0,4,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -294,7 +294,7 @@
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -323,7 +323,7 @@
                     </Border>
 
                     <!-- Col 1: Available Parameters -->
-                    <Border Grid.Column="1" BorderBrush="#BDC3C7" BorderThickness="1" Margin="4,0">
+                    <Border Grid.Column="1" BorderBrush="#546E7A" BorderThickness="1" Margin="4,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -331,7 +331,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <TextBlock Text="Available Parameters" FontWeight="SemiBold" FontSize="12"/>
                             </Border>
                             <ComboBox x:Name="mc_avail_param_filter" Grid.Row="1" Margin="4" Height="24" FontSize="11"/>
@@ -359,7 +359,7 @@
                     </StackPanel>
 
                     <!-- Col 3: Selected Parameters -->
-                    <Border Grid.Column="3" BorderBrush="#BDC3C7" BorderThickness="1" Margin="4,0,0,0">
+                    <Border Grid.Column="3" BorderBrush="#546E7A" BorderThickness="1" Margin="4,0,0,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -367,7 +367,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <TextBlock Text="Selected Parameters" FontWeight="SemiBold" FontSize="12"/>
                             </Border>
                             <ComboBox x:Name="mc_sel_param_filter" Grid.Row="1" Margin="4" Height="24" FontSize="11"/>
@@ -417,7 +417,7 @@
                         <ColumnDefinition Width="40"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" BorderBrush="#BDC3C7" BorderThickness="1" Margin="0,0,4,0">
+                    <Border Grid.Column="0" BorderBrush="#546E7A" BorderThickness="1" Margin="0,0,4,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -425,7 +425,7 @@
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -445,7 +445,7 @@
                                       Margin="6,4" FontSize="11"/>
                         </Grid>
                     </Border>
-                    <Border Grid.Column="1" BorderBrush="#BDC3C7" BorderThickness="1" Margin="4,0">
+                    <Border Grid.Column="1" BorderBrush="#546E7A" BorderThickness="1" Margin="4,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -453,7 +453,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <TextBlock Text="Available Parameters" FontWeight="SemiBold" FontSize="12"/>
                             </Border>
                             <ComboBox x:Name="ac_avail_param_filter" Grid.Row="1" Margin="4" Height="24" FontSize="11"/>
@@ -470,7 +470,7 @@
                         <Button x:Name="ac_btn_add_param" Content="&#x25B6;" Style="{StaticResource ArrowButton}" Margin="0,4"/>
                         <Button x:Name="ac_btn_remove_param" Content="&#x25C0;" Style="{StaticResource ArrowButton}" Margin="0,4"/>
                     </StackPanel>
-                    <Border Grid.Column="3" BorderBrush="#BDC3C7" BorderThickness="1" Margin="4,0,0,0">
+                    <Border Grid.Column="3" BorderBrush="#546E7A" BorderThickness="1" Margin="4,0,0,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -478,7 +478,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <TextBlock Text="Selected Parameters" FontWeight="SemiBold" FontSize="12"/>
                             </Border>
                             <ComboBox x:Name="ac_sel_param_filter" Grid.Row="1" Margin="4" Height="24" FontSize="11"/>
@@ -519,14 +519,14 @@
                         <ColumnDefinition Width="40"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" BorderBrush="#BDC3C7" BorderThickness="1" Margin="0,0,4,0">
+                    <Border Grid.Column="0" BorderBrush="#546E7A" BorderThickness="1" Margin="0,0,4,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -544,7 +544,7 @@
                                      ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                         </Grid>
                     </Border>
-                    <Border Grid.Column="1" BorderBrush="#BDC3C7" BorderThickness="1" Margin="4,0">
+                    <Border Grid.Column="1" BorderBrush="#546E7A" BorderThickness="1" Margin="4,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -552,7 +552,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <TextBlock Text="Available Parameters" FontWeight="SemiBold" FontSize="12"/>
                             </Border>
                             <ComboBox x:Name="el_avail_param_filter" Grid.Row="1" Margin="4" Height="24" FontSize="11"/>
@@ -569,7 +569,7 @@
                         <Button x:Name="el_btn_add_param" Content="&#x25B6;" Style="{StaticResource ArrowButton}" Margin="0,4"/>
                         <Button x:Name="el_btn_remove_param" Content="&#x25C0;" Style="{StaticResource ArrowButton}" Margin="0,4"/>
                     </StackPanel>
-                    <Border Grid.Column="3" BorderBrush="#BDC3C7" BorderThickness="1" Margin="4,0,0,0">
+                    <Border Grid.Column="3" BorderBrush="#546E7A" BorderThickness="1" Margin="4,0,0,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -577,7 +577,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <TextBlock Text="Selected Parameters" FontWeight="SemiBold" FontSize="12"/>
                             </Border>
                             <ComboBox x:Name="el_sel_param_filter" Grid.Row="1" Margin="4" Height="24" FontSize="11"/>
@@ -617,7 +617,7 @@
                              VerticalContentAlignment="Center" Padding="4,0"/>
                     <TextBlock Grid.Column="1" Text="&#x1F50D;" VerticalAlignment="Center" Margin="6,0,0,0" FontSize="12"/>
                 </Grid>
-                <Border Grid.Row="2" BorderBrush="#BDC3C7" BorderThickness="1">
+                <Border Grid.Row="2" BorderBrush="#546E7A" BorderThickness="1">
                     <ListBox x:Name="sc_schedule_list" BorderThickness="0"
                              SelectionMode="Extended"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"/>
@@ -645,14 +645,14 @@
                         <ColumnDefinition Width="40"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" BorderBrush="#BDC3C7" BorderThickness="1" Margin="0,0,4,0">
+                    <Border Grid.Column="0" BorderBrush="#546E7A" BorderThickness="1" Margin="0,0,4,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -670,14 +670,14 @@
                                      ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                         </Grid>
                     </Border>
-                    <Border Grid.Column="1" BorderBrush="#BDC3C7" BorderThickness="1" Margin="4,0">
+                    <Border Grid.Column="1" BorderBrush="#546E7A" BorderThickness="1" Margin="4,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <TextBlock Text="Available Parameters" FontWeight="SemiBold" FontSize="12"/>
                             </Border>
                             <Grid Grid.Row="1" Margin="4">
@@ -693,14 +693,14 @@
                         <Button x:Name="sp_btn_add_param" Content="&#x25B6;" Style="{StaticResource ArrowButton}" Margin="0,4"/>
                         <Button x:Name="sp_btn_remove_param" Content="&#x25C0;" Style="{StaticResource ArrowButton}" Margin="0,4"/>
                     </StackPanel>
-                    <Border Grid.Column="3" BorderBrush="#BDC3C7" BorderThickness="1" Margin="4,0,0,0">
+                    <Border Grid.Column="3" BorderBrush="#546E7A" BorderThickness="1" Margin="4,0,0,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="#ECF0F1" Padding="6,4">
+                            <Border Grid.Row="0" Background="#F8F9FA" Padding="6,4">
                                 <TextBlock Text="Selected Parameters" FontWeight="SemiBold" FontSize="12"/>
                             </Border>
                             <Grid Grid.Row="1" Margin="4">
@@ -729,13 +729,13 @@
                     <Button x:Name="btn_refresh_preview" Content="Refresh Preview"
                             Style="{StaticResource SmallButton}" Margin="16,0,0,0" Padding="10,4"/>
                 </StackPanel>
-                <Border Grid.Row="1" BorderBrush="#BDC3C7" BorderThickness="1">
+                <Border Grid.Row="1" BorderBrush="#546E7A" BorderThickness="1">
                     <DataGrid x:Name="preview_grid" AutoGenerateColumns="True"
                               CanUserAddRows="False" CanUserDeleteRows="False"
                               IsReadOnly="False"
                               GridLinesVisibility="All"
-                              HorizontalGridLinesBrush="#E0E0E0"
-                              VerticalGridLinesBrush="#E0E0E0"
+                              HorizontalGridLinesBrush="#546E7A"
+                              VerticalGridLinesBrush="#546E7A"
                               AlternatingRowBackground="#F8F9FA"
                               RowBackground="White"
                               Background="White"
@@ -748,7 +748,7 @@
     </TabControl>
 
     <!-- Row 3: Bottom options -->
-    <Border Grid.Row="3" Background="#F5F5F5" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0" Padding="10,6">
+    <Border Grid.Row="3" Background="#F5F5F5" BorderBrush="#546E7A" BorderThickness="0,1,0,0" Padding="10,6">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
@@ -795,7 +795,7 @@
     </Border>
 
     <!-- Row 4: Status bar + Action buttons -->
-    <Border Grid.Row="4" Background="White" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0" Padding="10,8">
+    <Border Grid.Row="4" Background="White" BorderBrush="#546E7A" BorderThickness="0,1,0,0" Padding="10,8">
         <StackPanel>
         <Grid>
             <Grid.ColumnDefinitions>
@@ -826,9 +826,10 @@
         </Grid>
         <!-- Copyright -->
         <TextBlock Text="© Copyright by T3Lab"
-                   FontSize="10" Foreground="#BDC3C7"
-                   HorizontalAlignment="Center"
-                   Margin="0,6,0,0"/>
+                   FontSize="11" Foreground="#3498DB"
+                   HorizontalAlignment="Right"
+                   Margin="0,6,14,0"
+                   IsHitTestVisible="False"/>
         </StackPanel>
     </Border>
 </Grid>

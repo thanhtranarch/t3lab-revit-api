@@ -7,7 +7,7 @@
        ResizeMode="CanResizeWithGrip"
        ShowInTaskbar="True"
        Background="White"
-       FontFamily="Segoe UI"
+       FontFamily="Inter"
        FontSize="12">
 
     <WindowChrome.WindowChrome>
@@ -22,7 +22,7 @@
 
         <!-- ── Primary button (blue, BatchOut style) ── -->
         <Style x:Key="PrimaryBtn" TargetType="Button">
-            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Background" Value="#083D56"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Padding" Value="14,8"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -38,13 +38,13 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#2980B9"/>
+                                <Setter Property="Background" Value="#062A3C"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#2980B9"/>
+                                <Setter Property="Background" Value="#062A3C"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#BDC3C7"/>
+                                <Setter Property="Background" Value="#546E7A"/>
                                 <Setter Property="Foreground" Value="#7F8C8D"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -55,11 +55,11 @@
 
         <!-- ── Secondary button (light gray) ── -->
         <Style x:Key="SecondaryBtn" TargetType="Button">
-            <Setter Property="Background" Value="#ECF0F1"/>
+            <Setter Property="Background" Value="#F8F9FA"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
             <Setter Property="Padding" Value="14,8"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -73,7 +73,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#D5DBDB"/>
+                                <Setter Property="Background" Value="#E2E6EA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -103,7 +103,7 @@
                                 <Setter Property="Background" Value="#1E8449"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#BDC3C7"/>
+                                <Setter Property="Background" Value="#546E7A"/>
                                 <Setter Property="Foreground" Value="#7F8C8D"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -116,7 +116,7 @@
         <Style x:Key="InputField" TargetType="TextBox">
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="Template">
@@ -130,7 +130,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsFocused" Value="True">
-                                <Setter Property="BorderBrush" Value="#3498DB"/>
+                                <Setter Property="BorderBrush" Value="#083D56"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -142,7 +142,7 @@
         <Style x:Key="PasswordField" TargetType="PasswordBox">
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,6"/>
         </Style>
@@ -166,7 +166,7 @@
         </Style>
 
         <!-- ── Window control button ── -->
-        <Style x:Key="WindowControlButton" TargetType="Button">
+        <Style x:Key="WinCtrlButton" TargetType="Button">
             <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="32"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -174,13 +174,13 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#ECF0F1"/>
+                    <Setter Property="Background" Value="#F8F9FA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <!-- ── Close button (red on hover) ── -->
-        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
+        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WinCtrlButton}">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -189,7 +189,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#E74C3C"/>
+                                <Setter TargetName="border" Property="Background" Value="#D32F2F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -220,11 +220,11 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                               Foreground="#3498DB" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                               Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
                     <TextBlock Text="Property Line Tool" FontSize="18" FontWeight="Bold"
                                Foreground="#2C3E50"/>
                 </StackPanel>
-                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
                 <TextBlock Text="Draw property boundaries from Lightbox RE API"
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
@@ -236,10 +236,10 @@
 
                 <!-- Minimize -->
                 <Button x:Name="btn_minimize"
-                        Style="{StaticResource WindowControlButton}"
+                        Style="{StaticResource WinCtrlButton}"
                         ToolTip="Minimize"
                         Click="btn_minimize_Click">
-                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
 
                 <!-- Close -->
@@ -247,7 +247,7 @@
                         Style="{StaticResource CloseButton}"
                         ToolTip="Close"
                         Click="btn_close_Click">
-                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -288,7 +288,7 @@
                         </Grid>
                         <TextBlock x:Name="txt_api_status"
                                    Text="No API key configured"
-                                   Foreground="#E74C3C"
+                                   Foreground="#D32F2F"
                                    FontSize="11"
                                    Margin="0,6,0,0"/>
                     </StackPanel>
@@ -353,10 +353,10 @@
                                     <Setter Property="Foreground" Value="#2C3E50"/>
                                     <Style.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="#EBF5FB"/>
+                                            <Setter Property="Background" Value="#F8F9FA"/>
                                         </Trigger>
                                         <Trigger Property="IsSelected" Value="True">
-                                            <Setter Property="Background" Value="#3498DB"/>
+                                            <Setter Property="Background" Value="#083D56"/>
                                             <Setter Property="Foreground" Value="White"/>
                                         </Trigger>
                                     </Style.Triggers>
@@ -498,7 +498,7 @@
                             <ComboBox x:Name="cmb_line_type"
                                       Background="White"
                                       Foreground="#2C3E50"
-                                      BorderBrush="#BDC3C7"
+                                      BorderBrush="#546E7A"
                                       Padding="6,5"
                                       ToolTip="Note: Revit API does not support direct PropertyLine creation. All options create Model/Detail lines; use Revit's Pick Lines to convert to native PropertyLine.">
                                 <ComboBoxItem Content="Model Lines" IsSelected="True"/>
@@ -511,7 +511,7 @@
                             <ComboBox x:Name="cmb_origin"
                                       Background="White"
                                       Foreground="#2C3E50"
-                                      BorderBrush="#BDC3C7"
+                                      BorderBrush="#546E7A"
                                       Padding="6,5">
                                 <ComboBoxItem Content="Project Base Point" IsSelected="True"/>
                                 <ComboBoxItem Content="Survey Point"/>
@@ -526,7 +526,7 @@
 
         <!-- ═══════════════════════════════════════════════════════════ STATUS BAR -->
         <Border Grid.Row="2" Background="#F8F9FA"
-                BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
+                BorderBrush="#546E7A" BorderThickness="0,1,0,0"
                 Padding="16,8">
             <DockPanel>
                 <TextBlock x:Name="txt_status"
@@ -537,7 +537,7 @@
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <Ellipse x:Name="dot_status"
                              Width="8" Height="8"
-                             Fill="#BDC3C7"
+                             Fill="#546E7A"
                              VerticalAlignment="Center"
                              Margin="0,0,6,0"/>
                     <TextBlock x:Name="txt_status_label"
@@ -550,8 +550,8 @@
         </Border>
 
         <!-- ═══════════════════════════════════════════════════════════ ACTION BUTTONS -->
-        <Border Grid.Row="3" Background="#ECF0F1"
-                BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
+        <Border Grid.Row="3" Background="#F8F9FA"
+                BorderBrush="#546E7A" BorderThickness="0,1,0,0"
                 Padding="16,12">
             <StackPanel>
                 <DockPanel>
@@ -570,9 +570,10 @@
                 </DockPanel>
                 <!-- Copyright -->
                 <TextBlock Text="© Copyright by T3Lab"
-                           FontSize="10" Foreground="#7F8C8D"
-                           HorizontalAlignment="Center"
-                           Margin="0,8,0,0"/>
+                           FontSize="11" Foreground="#3498DB"
+                           HorizontalAlignment="Right"
+                           Margin="0,8,14,0"
+                           IsHitTestVisible="False"/>
             </StackPanel>
         </Border>
 

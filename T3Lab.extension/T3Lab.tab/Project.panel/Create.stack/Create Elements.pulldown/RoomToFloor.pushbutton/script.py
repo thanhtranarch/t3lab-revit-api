@@ -31,6 +31,7 @@ from System.Collections.Generic import List
 from rpw import revit, DB
 from Autodesk.Revit.DB import (
     Transaction,
+    TransactionGroup,
     FilteredElementCollector,
     BuiltInCategory,
     FloorType,
@@ -79,81 +80,127 @@ class FloorGenerator:
 
     def generate_floors(self, room_elements, floor_type, offset_mm=0.0, is_structural=False, use_finish=True):
         offset_ft = offset_mm / 304.8
+        is_structural_bool = bool(is_structural) if is_structural is not None else False
         created_count = 0
         error_count = 0
         new_floors = []
 
-        with Transaction(self.doc, "T3Lab: Room to Floor") as t:
-            t.Start()
-            failOpt = t.GetFailureHandlingOptions()
-            failOpt.SetFailuresPreprocessor(FloorsCreationWarningSwallower())
-            t.SetFailureHandlingOptions(failOpt)
-
+        with TransactionGroup(self.doc, "T3Lab: Room to Floor") as tg:
+            tg.Start()
             for room in room_elements:
-                try:
-                    level_id = room.LevelId
-                    level = self.doc.GetElement(level_id)
-                    
-                    # Boundary options
-                    opt = SpatialElementBoundaryOptions()
-                    opt.SpatialElementBoundaryLocation = (
-                        SpatialElementBoundaryLocation.Finish if use_finish 
-                        else SpatialElementBoundaryLocation.Center
-                    )
-                    
-                    room_boundaries = room.GetBoundarySegments(opt)
-                    if not room_boundaries:
-                        error_count += 1
-                        continue
+                floor = self._create_one_floor(room, floor_type, offset_ft, is_structural_bool, use_finish)
+                if floor:
+                    new_floors.append(floor)
+                    created_count += 1
+                else:
+                    error_count += 1
+            tg.Assimilate()
 
-                    new_floor = None
+        return new_floors, created_count, error_count
 
-                    if REVIT_VERSION >= 2022:
-                        profile = List[CurveLoop]()
-                        for loop in room_boundaries:
-                            curve_loop = CurveLoop()
-                            for seg in loop:
-                                curve_loop.Append(seg.GetCurve())
+    def _create_one_floor(self, room, floor_type, offset_ft, is_structural_bool, use_finish):
+        """Create a floor for a single room in its own Transaction. Returns floor or None."""
+        try:
+            # Skip rooms with no area (unplaced rooms)
+            area_param = room.get_Parameter(BuiltInParameter.ROOM_AREA)
+            if not area_param or not area_param.AsDouble():
+                return None
+
+            level_id = room.LevelId
+            level = self.doc.GetElement(level_id)
+            if not level:
+                return None
+
+            opt = SpatialElementBoundaryOptions()
+            opt.SpatialElementBoundaryLocation = (
+                SpatialElementBoundaryLocation.Finish if use_finish
+                else SpatialElementBoundaryLocation.Center
+            )
+
+            room_boundaries = room.GetBoundarySegments(opt)
+            if not room_boundaries:
+                return None
+
+            new_floor = None
+
+            if REVIT_VERSION >= 2022:
+                with Transaction(self.doc, "T3Lab: Create Floor") as t:
+                    t.Start()
+                    profile = List[CurveLoop]()
+                    for loop in room_boundaries:
+                        curve_loop = CurveLoop()
+                        for seg in loop:
+                            curve = seg.GetCurve()
+                            if curve:
+                                curve_loop.Append(curve)
+                        if not curve_loop.IsOpen():
                             profile.Add(curve_loop)
 
-                        new_floor = Floor.Create(self.doc, profile, floor_type.Id, level_id)
-                    else:
-                        floor_shape = room_boundaries[0]
-                        openings = list(room_boundaries)[1:] if len(room_boundaries) > 1 else []
+                    if not profile.Count:
+                        return None  # exits with block → Dispose() auto-rollbacks
 
-                        curve_array = CurveArray()
-                        for seg in floor_shape:
-                            curve_array.Append(seg.GetCurve())
-                        
-                        new_floor = self.doc.Create.NewFloor(curve_array, floor_type, level, is_structural)
-                        
-                        # Create Floor Openings separately for older versions
-                        if new_floor and openings:
-                            for opening in openings:
-                                opening_curve = CurveArray()
-                                for seg in opening:
-                                    opening_curve.Append(seg.GetCurve())
-                                self.doc.Create.NewOpening(new_floor, opening_curve, True)
+                    new_floor = Floor.Create(self.doc, profile, floor_type.Id, level_id)
 
                     if new_floor:
                         if abs(offset_ft) > 0.0001:
                             param = new_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)
-                            if param: param.Set(offset_ft)
-                        
-                        # Set structural parameter if API is >= 2022 (older uses parameter in NewFloor)
-                        if is_structural and REVIT_VERSION >= 2022:
+                            if param:
+                                param.Set(offset_ft)
+                        if is_structural_bool:
                             struct_param = new_floor.get_Parameter(BuiltInParameter.FLOOR_PARAM_IS_STRUCTURAL)
-                            if struct_param: struct_param.Set(1)
+                            if struct_param:
+                                struct_param.Set(1)
 
-                        new_floors.append(new_floor)
-                        created_count += 1
-                except Exception as ex:
-                    logger.debug("Error creating floor for room: {}".format(ex))
-                    error_count += 1
-            
-            t.Commit()
-            
-        return new_floors, created_count, error_count
+                    failOpt = t.GetFailureHandlingOptions()
+                    failOpt.SetFailuresPreprocessor(FloorsCreationWarningSwallower())
+                    t.SetFailureHandlingOptions(failOpt)
+                    t.Commit()
+
+            else:
+                floor_shape = room_boundaries[0]
+                openings = list(room_boundaries)[1:] if len(room_boundaries) > 1 else []
+
+                with Transaction(self.doc, "T3Lab: Create Floor") as t:
+                    t.Start()
+                    curve_array = CurveArray()
+                    for seg in floor_shape:
+                        curve = seg.GetCurve()
+                        if curve:
+                            curve_array.Append(curve)
+
+                    new_floor = self.doc.Create.NewFloor(curve_array, floor_type, level, is_structural_bool)
+
+                    if new_floor and abs(offset_ft) > 0.0001:
+                        param = new_floor.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)
+                        if param:
+                            param.Set(offset_ft)
+
+                    failOpt = t.GetFailureHandlingOptions()
+                    failOpt.SetFailuresPreprocessor(FloorsCreationWarningSwallower())
+                    t.SetFailureHandlingOptions(failOpt)
+                    t.Commit()
+
+                # Openings must be a separate transaction for pre-2022 API
+                if new_floor and openings:
+                    with Transaction(self.doc, "T3Lab: Create Floor Openings") as t2:
+                        t2.Start()
+                        for opening in openings:
+                            try:
+                                opening_curve = CurveArray()
+                                for seg in opening:
+                                    curve = seg.GetCurve()
+                                    if curve:
+                                        opening_curve.Append(curve)
+                                self.doc.Create.NewOpening(new_floor, opening_curve, True)
+                            except Exception:
+                                pass
+                        t2.Commit()
+
+            return new_floor
+
+        except Exception as ex:
+            logger.debug("Error creating floor for room: {}".format(ex))
+            return None
 
 
 class RoomItem(object):
@@ -161,8 +208,10 @@ class RoomItem(object):
     def __init__(self, room_element):
         self.Element = room_element
         self.IsSelected = False
-        self.Number = room_element.LookupParameter("Number").AsString() or ""
-        self.Name = room_element.LookupParameter("Name").AsString() or ""
+        p_num = room_element.LookupParameter("Number")
+        self.Number = p_num.AsString() if p_num else ""
+        p_name = room_element.LookupParameter("Name")
+        self.Name = p_name.AsString() if p_name else ""
         try:
             level = doc.GetElement(room_element.LevelId)
             self.Level = level.Name if level else ""
@@ -200,8 +249,16 @@ class RoomToFloorWindow(forms.WPFWindow):
             .OfClass(FloorType) \
             .ToElements()
         
-        self._floor_type_map = { "{}: {}".format(t.FamilyName, t.LookupParameter("Type Name").AsString()): t for t in floor_types }
-        
+        self._floor_type_map = {}
+        for t in floor_types:
+            try:
+                type_name = t.LookupParameter("Type Name").AsString() if t.LookupParameter("Type Name") else t.Name
+            except:
+                type_name = t.Name
+            if not type_name:
+                type_name = ""
+            fam_name = t.FamilyName if t.FamilyName else ""
+            self._floor_type_map["{}: {}".format(fam_name, type_name)] = t        
         sorted_names = sorted(self._floor_type_map.keys())
         for name in sorted_names:
             self.cmb_floor_type.Items.Add(name)

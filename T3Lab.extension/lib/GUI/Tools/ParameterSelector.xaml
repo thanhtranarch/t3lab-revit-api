@@ -12,12 +12,12 @@
             <!-- Colors -->
             <SolidColorBrush x:Key="bg_light" Color="#F8F9FA"/>
             <SolidColorBrush x:Key="bg_white" Color="White"/>
-            <SolidColorBrush x:Key="border_gray" Color="#BDC3C7"/>
+            <SolidColorBrush x:Key="border_gray" Color="#546E7A"/>
             <SolidColorBrush x:Key="text_dark" Color="#2C3E50"/>
             <SolidColorBrush x:Key="text_gray" Color="#7F8C8D"/>
-            <SolidColorBrush x:Key="accent_blue" Color="#3498DB"/>
-            <SolidColorBrush x:Key="button_bg" Color="#ECF0F1"/>
-            <SolidColorBrush x:Key="button_hover" Color="#D5DBDB"/>
+            <SolidColorBrush x:Key="accent_blue" Color="#083D56"/>
+            <SolidColorBrush x:Key="button_bg" Color="#F8F9FA"/>
+            <SolidColorBrush x:Key="button_hover" Color="#E2E6EA"/>
 
             <!-- Button Style -->
             <Style TargetType="Button">
@@ -90,7 +90,7 @@
     </Grid.RowDefinitions>
 
     <!-- Title Bar -->
-    <Border Grid.Row="0" Background="#ECF0F1" BorderBrush="#BDC3C7" BorderThickness="0,0,0,1" Padding="10,8">
+    <Border Grid.Row="0" Background="#F8F9FA" BorderBrush="#546E7A" BorderThickness="0,0,0,1" Padding="10,8">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -241,7 +241,7 @@
     </Grid>
 
     <!-- Bottom: Action Buttons -->
-    <Border Grid.Row="2" Background="#ECF0F1" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0" Padding="15,10">
+    <Border Grid.Row="2" Background="#F8F9FA" BorderBrush="#546E7A" BorderThickness="0,1,0,0" Padding="15,10">
         <StackPanel>
         <Grid>
             <Grid.ColumnDefinitions>
@@ -258,13 +258,14 @@
             <!-- Ok Button -->
             <Button x:Name="button_ok" Grid.Column="1" Content="Ok"
                     Width="80" Height="30" FontWeight="SemiBold"
-                    Background="#3498DB" Foreground="White" BorderThickness="0"/>
+                    Background="#083D56" Foreground="White" BorderThickness="0"/>
         </Grid>
         <!-- Copyright -->
         <TextBlock Text="© Copyright by T3Lab"
-                   FontSize="10" Foreground="#BDC3C7"
-                   HorizontalAlignment="Center"
-                   Margin="0,6,0,0"/>
+                   FontSize="11" Foreground="#3498DB"
+                   HorizontalAlignment="Right"
+                   Margin="0,6,14,0"
+                   IsHitTestVisible="False"/>
         </StackPanel>
     </Border>
 </Grid>

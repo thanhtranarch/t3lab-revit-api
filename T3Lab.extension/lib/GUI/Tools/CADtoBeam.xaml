@@ -3,6 +3,7 @@
         Title="Revit Beam From CAD"
         Width="450" Height="580"
         Background="White"
+        FontFamily="Inter"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen">
 
@@ -21,17 +22,17 @@
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="#7F8C8D"/>
             <Setter Property="Margin"     Value="0,14,0,6"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontFamily" Value="Inter"/>
         </Style>
 
         <!-- Primary Button -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background"      Value="#3498DB"/>
+            <Setter Property="Background"      Value="#083D56"/>
             <Setter Property="Foreground"      Value="White"/>
             <Setter Property="Padding"         Value="12,8"/>
             <Setter Property="FontSize"        Value="13"/>
             <Setter Property="FontWeight"      Value="SemiBold"/>
-            <Setter Property="FontFamily"      Value="Segoe UI"/>
+            <Setter Property="FontFamily"      Value="Inter"/>
             <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
@@ -46,7 +47,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2980B9"/>
+                    <Setter Property="Background" Value="#062A3C"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -69,7 +70,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E74C3C"/>
+                    <Setter Property="Background" Value="#D32F2F"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -83,10 +84,11 @@
         </Grid.RowDefinitions>
 
         <!-- Title Bar -->
-        <Grid Grid.Row="0" Background="White">
+        <Grid Grid.Row="0" Background="White"
+        FontFamily="Inter">
             <StackPanel Orientation="Vertical" Margin="20,0,0,0" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold" Foreground="#3498DB" Margin="0,0,6,0"/>
+                    <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold" Foreground="#083D56" Margin="0,0,6,0"/>
                     <TextBlock Text="Beam From CAD" FontSize="18" FontWeight="Bold" Foreground="#2C3E50"/>
                 </StackPanel>
                 <TextBlock Text="Auto-pairing parallel lines and type creation" FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
@@ -95,7 +97,7 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button x:Name="btn_close" Style="{StaticResource WinCtrlButton}" Click="close_button_clicked">
-                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -108,7 +110,7 @@
                     </TextBlock>
                 </Button>
             </StackPanel>
-            <Border Height="1" VerticalAlignment="Bottom" Background="#BDC3C7"/>
+            <Border Height="1" VerticalAlignment="Bottom" Background="#546E7A"/>
         </Grid>
 
         <!-- Content -->
@@ -160,5 +162,8 @@
         <Border Grid.Row="2" Padding="20,0,20,20">
             <Button x:Name="btn_generate" Content="START MODELING BEAMS" Style="{StaticResource PrimaryButton}" Click="generate_clicked"/>
         </Border>
+    
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>

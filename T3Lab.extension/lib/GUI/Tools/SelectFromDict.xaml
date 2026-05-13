@@ -7,7 +7,7 @@
     WindowStartupLocation="CenterScreen"
     ResizeMode="CanResizeWithGrip"
     Background="White"
-    FontFamily="Segoe UI">
+    FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="64" UseAeroCaptionButtons="False" ResizeBorderThickness="5"/>
@@ -15,7 +15,7 @@
 
     <Window.Resources>
         <Style x:Key="WinCtrlButton" TargetType="Button">
-            <Setter Property="Width" Value="46"/>
+            <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="32"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -31,7 +31,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#D5DBDB"/>
+                                <Setter TargetName="bd" Property="Background" Value="#E2E6EA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -42,14 +42,14 @@
         <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WinCtrlButton}">
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E74C3C"/>
+                    <Setter Property="Background" Value="#D32F2F"/>
                     <Setter Property="Foreground" Value="White"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#ECF0F1"/>
+            <Setter Property="Background" Value="#F8F9FA"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="12,5"/>
@@ -63,7 +63,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#D5DBDB"/>
+                                <Setter TargetName="bd" Property="Background" Value="#E2E6EA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -72,7 +72,7 @@
         </Style>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Background" Value="#083D56"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="16,6"/>
@@ -87,7 +87,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#2980B9"/>
+                                <Setter TargetName="bd" Property="Background" Value="#062A3C"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -116,11 +116,11 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                               Foreground="#3498DB" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                               Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
                     <TextBlock Text="Select" FontSize="18" FontWeight="Bold"
                                Foreground="#2C3E50"/>
                 </StackPanel>
-                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
                 <TextBlock Text="Choose items from list"
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
@@ -135,7 +135,7 @@
         </Grid>
 
         <!-- SEPARATOR -->
-        <Rectangle Grid.Row="1" Fill="#BDC3C7"/>
+        <Rectangle Grid.Row="1" Fill="#546E7A"/>
 
         <!-- FILTER -->
         <DockPanel Grid.Row="2" Margin="12,8,12,0">
@@ -143,7 +143,7 @@
                        VerticalAlignment="Center" Margin="0,0,6,0"/>
             <TextBox x:Name="textbox_filter" Height="26" VerticalAlignment="Center"
                      Foreground="#2C3E50" Background="White"
-                     BorderBrush="#BDC3C7" BorderThickness="1" Padding="6,3"
+                     BorderBrush="#546E7A" BorderThickness="1" Padding="6,3"
                      TextChanged="text_filter_updated"/>
         </DockPanel>
 
@@ -157,7 +157,7 @@
                    Foreground="#7F8C8D" Padding="0,0,0,2"/>
             <ListBox Grid.Row="1" x:Name="main_ListBox"
                      Background="White" SelectionMode="Single"
-                     BorderBrush="#BDC3C7" BorderThickness="1"
+                     BorderBrush="#546E7A" BorderThickness="1"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListBox.ItemTemplate>
@@ -173,10 +173,10 @@
                         <Setter Property="Padding" Value="4,3"/>
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#EBF5FB"/>
+                                <Setter Property="Background" Value="#F8F9FA"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#D6EAF8"/>
+                                <Setter Property="Background" Value="#E2E6EA"/>
                             </Trigger>
                         </Style.Triggers>
                     </Style>
@@ -199,10 +199,13 @@
         </StackPanel>
 
         <!-- FOOTER -->
-        <Border Grid.Row="5" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0">
+        <Border Grid.Row="5" Background="#F8F9FA" BorderBrush="#546E7A" BorderThickness="0,1,0,0">
             <TextBlock x:Name="footer_version" Text="T3Lab"
                        FontSize="10" Foreground="#7F8C8D"
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
+    
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>

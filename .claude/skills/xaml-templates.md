@@ -65,9 +65,11 @@ Every tool window must include:
 <Border Background="#FAFAFA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0" Padding="14,6">
     <Grid>
         <TextBlock x:Name="status_text" FontSize="11" Foreground="#7F8C8D"/>
-        <TextBlock Grid.Column="1"      FontSize="11" Foreground="#BDC3C7" HorizontalAlignment="Right"/>
     </Grid>
 </Border>
+
+<!-- Copyright text should be added right before the main closing </Grid> of the window -->
+<TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
 ```
 
 ---
@@ -79,11 +81,11 @@ Define these as `Window.Resources`:
 ```xml
 <!-- PRIMARY - blue, white text -->
 <Style x:Key="PrimaryButton" TargetType="Button">
-    <Setter Property="Background"   Value="#3498DB"/>
+    <Setter Property="Background"   Value="#083D56"/>
     <Setter Property="Foreground"   Value="White"/>
     <Setter Property="Padding"      Value="12,6"/>
     <Setter Property="FontSize"     Value="12"/>
-    <Setter Property="FontFamily"   Value="Segoe UI"/>
+    <Setter Property="FontFamily"   Value="Inter"/>
     <Setter Property="Cursor"       Value="Hand"/>
     <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="Template">
@@ -98,10 +100,10 @@ Define these as `Window.Resources`:
     </Setter>
     <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
-            <Setter Property="Background" Value="#2980B9"/>
+            <Setter Property="Background" Value="#062A3C"/>
         </Trigger>
         <Trigger Property="IsEnabled" Value="False">
-            <Setter Property="Background" Value="#BDC3C7"/>
+            <Setter Property="Background" Value="#546E7A"/>
             <Setter Property="Cursor"     Value="Arrow"/>
         </Trigger>
     </Style.Triggers>
@@ -109,14 +111,14 @@ Define these as `Window.Resources`:
 
 <!-- SECONDARY - light gray, dark text -->
 <Style x:Key="SecondaryButton" TargetType="Button">
-    <Setter Property="Background"      Value="#ECF0F1"/>
+    <Setter Property="Background"      Value="#F8F9FA"/>
     <Setter Property="Foreground"      Value="#2C3E50"/>
     <Setter Property="Padding"         Value="12,6"/>
     <Setter Property="FontSize"        Value="12"/>
-    <Setter Property="FontFamily"      Value="Segoe UI"/>
+    <Setter Property="FontFamily"      Value="Inter"/>
     <Setter Property="Cursor"          Value="Hand"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="BorderBrush"     Value="#BDC3C7"/>
+    <Setter Property="BorderBrush"     Value="#546E7A"/>
     <Setter Property="Template">
         <Setter.Value>
             <ControlTemplate TargetType="Button">
@@ -131,17 +133,27 @@ Define these as `Window.Resources`:
     </Setter>
     <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
-            <Setter Property="Background" Value="#D5DBDB"/>
+            <Setter Property="Background" Value="#E2E6EA"/>
+        </Trigger>
+    </Style.Triggers>
+</Style>
+
+<!-- TERTIARY - brown (edit/accent) -->
+<Style x:Key="TertiaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+    <Setter Property="Background" Value="#523203"/>
+    <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+            <Setter Property="Background" Value="#3D2502"/>
         </Trigger>
     </Style.Triggers>
 </Style>
 
 <!-- DANGER - red (delete/destructive) -->
 <Style x:Key="DangerButton"  TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-    <Setter Property="Background" Value="#E74C3C"/>
+    <Setter Property="Background" Value="#D32F2F"/>
     <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
-            <Setter Property="Background" Value="#C0392B"/>
+            <Setter Property="Background" Value="#B71C1C"/>
         </Trigger>
     </Style.Triggers>
 </Style>
@@ -174,7 +186,7 @@ Define these as `Window.Resources`:
     </Setter>
     <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
-            <Setter Property="Background" Value="#ECF0F1"/>
+            <Setter Property="Background" Value="#F8F9FA"/>
         </Trigger>
     </Style.Triggers>
 </Style>
@@ -203,15 +215,15 @@ Define these as `Window.Resources`:
 ## DataGrid Style
 
 ```xml
-<DataGrid Background="White" BorderBrush="#BDC3C7" BorderThickness="1"
-          AlternatingRowBackground="#FAFAFA" FontFamily="Segoe UI" FontSize="12">
+<DataGrid Background="White" BorderBrush="#546E7A" BorderThickness="1"
+          AlternatingRowBackground="#F8F9FA" FontFamily="Inter" FontSize="12">
     <DataGrid.ColumnHeaderStyle>
         <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background"   Value="#ECF0F1"/>
+            <Setter Property="Background"   Value="#F8F9FA"/>
             <Setter Property="Foreground"   Value="#2C3E50"/>
             <Setter Property="FontWeight"   Value="SemiBold"/>
             <Setter Property="Padding"      Value="8,6"/>
-            <Setter Property="BorderBrush"  Value="#BDC3C7"/>
+            <Setter Property="BorderBrush"  Value="#546E7A"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
             <Setter Property="Height"       Value="34"/>
         </Style>
@@ -220,10 +232,10 @@ Define these as `Window.Resources`:
         <Style TargetType="DataGridRow">
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#EBF5FB"/>
+                    <Setter Property="Background" Value="#F8F9FA"/>
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#D6EAF8"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -236,11 +248,47 @@ Define these as `Window.Resources`:
 ## Info / Tip Box
 
 ```xml
-<Border BorderBrush="#3498DB" BorderThickness="1" Background="#E8F4F8"
+<Border BorderBrush="#083D56" BorderThickness="1" Background="#F8F9FA"
         CornerRadius="2" Padding="10">
     <StackPanel Orientation="Horizontal">
-        <TextBlock Text="Tip:" FontWeight="Bold" Foreground="#2980B9" Margin="0,0,5,0"/>
+        <TextBlock Text="Tip:" FontWeight="Bold" Foreground="#083D56" Margin="0,0,5,0"/>
         <TextBlock Text="Your message here." Foreground="#2C3E50"/>
     </StackPanel>
 </Border>
+```
+
+---
+
+## Progress Bar / Task Status
+
+Use this pattern in the status bar row for long-running tasks:
+
+```xml
+<!-- Progress panel: bar + Pause + Stop (hidden when idle) -->
+<Grid x:Name="progress_panel" Visibility="Collapsed" Margin="0,0,0,6">
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="8"/>
+        <ColumnDefinition Width="64"/>
+        <ColumnDefinition Width="4"/>
+        <ColumnDefinition Width="52"/>
+    </Grid.ColumnDefinitions>
+
+    <ProgressBar x:Name="pb_task" Grid.Column="0"
+                 Height="8" Minimum="0" Maximum="100" Value="0"
+                 Foreground="#083D56" Background="#E2E6EA"
+                 BorderThickness="0" VerticalAlignment="Center"/>
+
+    <!-- Pause / Resume -->
+    <Button x:Name="btn_pause_task" Grid.Column="2"
+            Content="⏸ Pause" Height="22" FontSize="10" 
+            Style="{StaticResource SecondaryButton}"
+            Click="pause_resume_clicked" VerticalAlignment="Center"/>
+
+    <!-- Stop -->
+    <Button x:Name="btn_stop_task" Grid.Column="4"
+            Content="■ Stop" Height="22" FontSize="10" 
+            Style="{StaticResource DangerButton}"
+            Click="stop_task_clicked" VerticalAlignment="Center"/>
+</Grid>
 ```

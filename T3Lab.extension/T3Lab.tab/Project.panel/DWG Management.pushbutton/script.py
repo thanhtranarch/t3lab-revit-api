@@ -151,7 +151,7 @@ class DWGManagementWindow(forms.WPFWindow):
 
     def __init__(self):
         forms.WPFWindow.__init__(self, XAML_FILE)
-        self._load_logo()
+
 
         self._all_items      = []
         self._filtered_items = []
@@ -159,22 +159,6 @@ class DWGManagementWindow(forms.WPFWindow):
 
         self._load_data()
 
-    # --------------------------------------------------
-    # Logo / Icon
-    # --------------------------------------------------
-
-    def _load_logo(self):
-        try:
-            logo_path = os.path.join(LIB_DIR, 'GUI', 'T3Lab_logo.png')
-            if os.path.exists(logo_path):
-                bmp = BitmapImage()
-                bmp.BeginInit()
-                bmp.UriSource = Uri(logo_path, UriKind.Absolute)
-                bmp.EndInit()
-                self.LogoImage.Source = bmp
-                self.Icon = bmp
-        except Exception as ex:
-            logger.warning("Could not load logo: {}".format(ex))
 
     # --------------------------------------------------
     # Data loading

@@ -1,4 +1,4 @@
-﻿<Window
+<Window
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
@@ -8,7 +8,7 @@
     WindowStartupLocation="CenterScreen"
     ResizeMode="CanResizeWithGrip"
     Background="White"
-    FontFamily="Segoe UI">
+    FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="64" UseAeroCaptionButtons="False" ResizeBorderThickness="5"/>
@@ -17,7 +17,7 @@
     <Window.Resources>
         <!-- Window control button -->
         <Style x:Key="WinCtrlButton" TargetType="Button">
-            <Setter Property="Width" Value="46"/>
+            <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="32"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -33,7 +33,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#D5DBDB"/>
+                                <Setter TargetName="bd" Property="Background" Value="#E2E6EA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -45,7 +45,7 @@
         <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WinCtrlButton}">
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E74C3C"/>
+                    <Setter Property="Background" Value="#D32F2F"/>
                     <Setter Property="Foreground" Value="White"/>
                 </Trigger>
             </Style.Triggers>
@@ -53,7 +53,7 @@
 
         <!-- Primary button -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Background" Value="#083D56"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="16,6"/>
@@ -68,7 +68,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#2980B9"/>
+                                <Setter TargetName="bd" Property="Background" Value="#062A3C"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -96,11 +96,11 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                               Foreground="#3498DB" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                               Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
                     <TextBlock Text="Find and Replace" FontSize="18" FontWeight="Bold"
                                Foreground="#2C3E50"/>
                 </StackPanel>
-                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
                 <TextBlock Text="Rename views and elements"
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
@@ -117,36 +117,36 @@
         </Grid>
 
         <!-- SEPARATOR -->
-        <Rectangle Grid.Row="1" Fill="#BDC3C7"/>
+        <Rectangle Grid.Row="1" Fill="#546E7A"/>
 
         <!-- CONTENT -->
         <StackPanel Grid.Row="2" Margin="16,12,16,12">
             <Label x:Name="UI_label" Content="ViewName"
                    Foreground="#7F8C8D" Padding="0,0,0,4"/>
 
-            <Border BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4"
+            <Border BorderBrush="#546E7A" BorderThickness="1" CornerRadius="4"
                     Padding="12,10">
                 <StackPanel>
                     <DockPanel Margin="0,0,0,6">
                         <TextBlock Text="Find:" Foreground="#2C3E50" Width="64" VerticalAlignment="Center"/>
                         <TextBox x:Name="input_find" Background="White" Foreground="#2C3E50"
-                                 BorderBrush="#BDC3C7" BorderThickness="1" Padding="4,3"
+                                 BorderBrush="#546E7A" BorderThickness="1" Padding="4,3"
                                  HorizontalAlignment="Stretch"/>
                     </DockPanel>
                     <DockPanel Margin="0,0,0,6">
                         <TextBlock Text="Replace:" Foreground="#2C3E50" Width="64" VerticalAlignment="Center"/>
                         <TextBox x:Name="input_replace" Background="White" Foreground="#2C3E50"
-                                 BorderBrush="#BDC3C7" BorderThickness="1" Padding="4,3"/>
+                                 BorderBrush="#546E7A" BorderThickness="1" Padding="4,3"/>
                     </DockPanel>
                     <DockPanel Margin="0,0,0,6">
                         <TextBlock Text="Prefix:" Foreground="#2C3E50" Width="64" VerticalAlignment="Center"/>
                         <TextBox x:Name="input_prefix" Background="White" Foreground="#2C3E50"
-                                 BorderBrush="#BDC3C7" BorderThickness="1" Padding="4,3"/>
+                                 BorderBrush="#546E7A" BorderThickness="1" Padding="4,3"/>
                     </DockPanel>
                     <DockPanel>
                         <TextBlock Text="Suffix:" Foreground="#2C3E50" Width="64" VerticalAlignment="Center"/>
                         <TextBox x:Name="input_suffix" Background="White" Foreground="#2C3E50"
-                                 BorderBrush="#BDC3C7" BorderThickness="1" Padding="4,3"/>
+                                 BorderBrush="#546E7A" BorderThickness="1" Padding="4,3"/>
                     </DockPanel>
                 </StackPanel>
             </Border>
@@ -156,5 +156,8 @@
                     Click="button_run" Margin="0,12,0,0"
                     HorizontalAlignment="Left"/>
         </StackPanel>
+    
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>

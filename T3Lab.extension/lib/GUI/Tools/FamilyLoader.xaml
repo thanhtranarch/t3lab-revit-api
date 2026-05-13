@@ -20,7 +20,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#ECF0F1"/>
+                                <Setter TargetName="bd" Property="Background" Value="#F8F9FA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -45,7 +45,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#E74C3C"/>
+                                <Setter TargetName="bd" Property="Background" Value="#D32F2F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -58,7 +58,7 @@
             <Setter Property="Height" Value="32"/>
             <Setter Property="Padding" Value="14,0"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Background" Value="#083D56"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -73,10 +73,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#2980B9"/>
+                                <Setter TargetName="bd" Property="Background" Value="#062A3C"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Background" Value="#BDC3C7"/>
+                                <Setter TargetName="bd" Property="Background" Value="#546E7A"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -101,23 +101,23 @@
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Background" Value="#083D56"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" CornerRadius="6"
+                        <Border x:Name="bd" CornerRadius="3"
                                 Background="{TemplateBinding Background}">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#2980B9"/>
+                                <Setter TargetName="bd" Property="Background" Value="#062A3C"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Background" Value="#BDC3C7"/>
+                                <Setter TargetName="bd" Property="Background" Value="#546E7A"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -136,15 +136,15 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" CornerRadius="6"
+                        <Border x:Name="bd" CornerRadius="3"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="#BDC3C7" BorderThickness="1">
+                                BorderBrush="#546E7A" BorderThickness="1">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#ECF0F1"/>
+                                <Setter TargetName="bd" Property="Background" Value="#F8F9FA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -173,7 +173,7 @@
         <!-- ══ ROW 0 — TITLE BAR ══════════════════════ -->
         <Border Grid.Row="0" x:Name="title_bar_grid"
                 Background="White"
-                BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
+                BorderBrush="#546E7A" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -186,12 +186,12 @@
                             VerticalAlignment="Center" Margin="16,0,0,0">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                                   Foreground="#3498DB" VerticalAlignment="Bottom"
+                                   Foreground="#083D56" VerticalAlignment="Bottom"
                                    Margin="0,0,6,3"/>
                         <TextBlock Text="Load Family" FontSize="18" FontWeight="Bold"
                                    Foreground="#2C3E50"/>
                     </StackPanel>
-                    <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                    <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
                     <TextBlock Text="Load Revit families from local folders or cloud"
                                FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
                 </StackPanel>
@@ -204,14 +204,14 @@
                     <Button x:Name="btn_minimize_fl"
                             Style="{StaticResource WinCtrlButton}"
                             ToolTip="Minimize">
-                        <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"
+                        <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"
                                    Margin="0,-1,0,0"/>
                     </Button>
                     <Button x:Name="btn_close_x_fl"
                             Style="{StaticResource CloseButton}"
                             ToolTip="Close">
                         <!-- X drawn as a Path so it scales cleanly -->
-                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                     </Button>
                 </StackPanel>
             </Grid>
@@ -219,8 +219,8 @@
 
         <!-- ══ ROW 1 — SEARCH BAR ════════════════════ -->
         <Border Grid.Row="1" Background="White" Padding="14,7"
-                BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
-            <Border BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="8"
+                BorderBrush="#546E7A" BorderThickness="0,0,0,1">
+            <Border BorderBrush="#546E7A" BorderThickness="1" CornerRadius="8"
                     Background="White">
                 <DockPanel>
                     <!-- magnifier icon (Unicode circle + line) -->
@@ -238,7 +238,7 @@
 
         <!-- ══ ROW 2 — FOLDER / SOURCE BAR ══════════ -->
         <Border Grid.Row="2" Background="#F8F9FA" Padding="12,0"
-                BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
+                BorderBrush="#546E7A" BorderThickness="0,0,0,1">
             <DockPanel VerticalAlignment="Center">
                 <!-- Source radio buttons on the right -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -274,11 +274,11 @@
 
             <!-- Left: Category tree (slim) -->
             <Border DockPanel.Dock="Left" Width="190"
-                    BorderBrush="#BDC3C7" BorderThickness="0,0,1,0"
+                    BorderBrush="#546E7A" BorderThickness="0,0,1,0"
                     Background="#F8F9FA">
                 <DockPanel>
                     <Border DockPanel.Dock="Top" Background="#F4F6F7"
-                            Padding="12,6" BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
+                            Padding="12,6" BorderBrush="#546E7A" BorderThickness="0,0,0,1">
                         <TextBlock Text="Categories" FontSize="11" FontWeight="SemiBold"
                                    Foreground="#2C3E50"/>
                     </Border>
@@ -295,7 +295,7 @@
                 <!-- Sub-header: count + select buttons -->
                 <Border DockPanel.Dock="Top" Padding="12,6"
                         Background="#F8F9FA"
-                        BorderBrush="#BDC3C7" BorderThickness="0,0,0,1">
+                        BorderBrush="#546E7A" BorderThickness="0,0,0,1">
                     <DockPanel>
                         <TextBlock x:Name="txt_result_count"
                                    Text="0 families found"
@@ -335,17 +335,17 @@
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="BorderThickness" Value="1"/>
-                                                <Setter Property="BorderBrush" Value="#BDC3C7"/>
+                                                <Setter Property="BorderBrush" Value="#546E7A"/>
                                                 <Setter Property="Background" Value="White"/>
                                                 <Style.Triggers>
                                                     <!-- Blue border + slightly thicker when selected -->
                                                     <DataTrigger Binding="{Binding IsChecked}" Value="True">
-                                                        <Setter Property="BorderBrush" Value="#3498DB"/>
+                                                        <Setter Property="BorderBrush" Value="#083D56"/>
                                                         <Setter Property="BorderThickness" Value="2"/>
-                                                        <Setter Property="Background" Value="#F0F8FF"/>
+                                                        <Setter Property="Background" Value="#F8F9FA"/>
                                                     </DataTrigger>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="BorderBrush" Value="#3498DB"/>
+                                                        <Setter Property="BorderBrush" Value="#083D56"/>
                                                     </Trigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -380,7 +380,7 @@
 
         <!-- ══ ROW 4 — FOOTER ═══════════════════════ -->
         <Border Grid.Row="4" Background="White"
-                BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
+                BorderBrush="#546E7A" BorderThickness="0,1,0,0"
                 Padding="16,10">
             <DockPanel VerticalAlignment="Center">
                 <!-- Copyright left -->
@@ -409,4 +409,5 @@
         </Border>
 
     </Grid>
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
 </Grid>

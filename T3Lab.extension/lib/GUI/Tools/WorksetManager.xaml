@@ -19,11 +19,11 @@
     <Window.Resources>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background"      Value="#3498DB"/>
+            <Setter Property="Background"      Value="#083D56"/>
             <Setter Property="Foreground"      Value="White"/>
             <Setter Property="Padding"         Value="12,6"/>
             <Setter Property="FontSize"        Value="12"/>
-            <Setter Property="FontFamily"      Value="Segoe UI"/>
+            <Setter Property="FontFamily"      Value="Inter"/>
             <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
@@ -38,24 +38,24 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2980B9"/>
+                    <Setter Property="Background" Value="#062A3C"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor"     Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background"      Value="#ECF0F1"/>
+            <Setter Property="Background"      Value="#F8F9FA"/>
             <Setter Property="Foreground"      Value="#2C3E50"/>
             <Setter Property="Padding"         Value="12,6"/>
             <Setter Property="FontSize"        Value="12"/>
-            <Setter Property="FontFamily"      Value="Segoe UI"/>
+            <Setter Property="FontFamily"      Value="Inter"/>
             <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush"     Value="#BDC3C7"/>
+            <Setter Property="BorderBrush"     Value="#546E7A"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -70,23 +70,23 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#D5DBDB"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="#BDC3C7"/>
+                    <Setter Property="Foreground" Value="#546E7A"/>
                     <Setter Property="Cursor"     Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-            <Setter Property="Background" Value="#E74C3C"/>
+            <Setter Property="Background" Value="#D32F2F"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#C0392B"/>
+                    <Setter Property="Background" Value="#B71C1C"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor"     Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
@@ -99,7 +99,7 @@
                     <Setter Property="Background" Value="#1E8449"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor"     Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
@@ -122,7 +122,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#ECF0F1"/>
+                    <Setter Property="Background" Value="#F8F9FA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -136,7 +136,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#E74C3C"/>
+                                <Setter TargetName="bd" Property="Background" Value="#D32F2F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -147,8 +147,8 @@
         <Style x:Key="GroupLabel" TargetType="TextBlock">
             <Setter Property="FontSize"          Value="9"/>
             <Setter Property="FontWeight"        Value="SemiBold"/>
-            <Setter Property="Foreground"        Value="#BDC3C7"/>
-            <Setter Property="FontFamily"        Value="Segoe UI"/>
+            <Setter Property="Foreground"        Value="#546E7A"/>
+            <Setter Property="FontFamily"        Value="Inter"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Margin"            Value="0,0,8,0"/>
         </Style>
@@ -177,11 +177,11 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                               Foreground="#3498DB" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                               Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
                     <TextBlock Text="Workset Manager" FontSize="18" FontWeight="Bold"
                                Foreground="#2C3E50"/>
                 </StackPanel>
-                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
                 <TextBlock Text="Manage user worksets in the active Revit project"
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
@@ -190,22 +190,22 @@
                         VerticalAlignment="Top"
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <TextBlock x:Name="doc_name" Foreground="#95A5A6" FontSize="10"
-                           FontFamily="Segoe UI" VerticalAlignment="Center"
+                           FontFamily="Inter" VerticalAlignment="Center"
                            Margin="0,14,8,0" TextTrimming="CharacterEllipsis" MaxWidth="300"/>
                 <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}"
                         Click="minimize_button_clicked" ToolTip="Minimize"
                         WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
                 <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
                         Click="maximize_button_clicked" ToolTip="Maximize"
                         WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
                 <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
                         Click="close_button_clicked" ToolTip="Close"
                         WindowChrome.IsHitTestVisibleInChrome="True">
-                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -221,12 +221,12 @@
                 </Button>
             </StackPanel>
 
-            <Border Height="1" VerticalAlignment="Bottom" Background="#BDC3C7"/>
+            <Border Height="1" VerticalAlignment="Bottom" Background="#546E7A"/>
         </Grid>
 
         <!-- ── TOOLBAR ─────────────────────────────────── -->
         <Border Grid.Row="1" Background="White"
-                BorderBrush="#BDC3C7" BorderThickness="0,0,0,1" Padding="12,7">
+                BorderBrush="#546E7A" BorderThickness="0,0,0,1" Padding="12,7">
             <WrapPanel VerticalAlignment="Center">
 
                 <!-- Group: Worksharing -->
@@ -238,7 +238,7 @@
                             ToolTip="Enable worksharing on this document"/>
                 </StackPanel>
 
-                <Rectangle Width="1" Fill="#BDC3C7" Margin="12,3"/>
+                <Rectangle Width="1" Fill="#546E7A" Margin="12,3"/>
 
                 <!-- Group: Worksets -->
                 <StackPanel Orientation="Horizontal">
@@ -253,7 +253,7 @@
                             ToolTip="Delete selected workset(s) and move their elements"/>
                 </StackPanel>
 
-                <Rectangle Width="1" Fill="#BDC3C7" Margin="12,3"/>
+                <Rectangle Width="1" Fill="#546E7A" Margin="12,3"/>
 
                 <!-- Group: Bulk -->
                 <StackPanel Orientation="Horizontal">
@@ -268,7 +268,7 @@
                             ToolTip="Remove worksets not in workset_list.txt"/>
                 </StackPanel>
 
-                <Rectangle Width="1" Fill="#BDC3C7" Margin="12,3"/>
+                <Rectangle Width="1" Fill="#546E7A" Margin="12,3"/>
 
                 <!-- Group: Views -->
                 <StackPanel Orientation="Horizontal">
@@ -296,23 +296,23 @@
                   GridLinesVisibility="Horizontal"
                   AlternatingRowBackground="#F8F9FA"
                   Background="White"
-                  BorderBrush="#BDC3C7"
+                  BorderBrush="#546E7A"
                   BorderThickness="1"
                   RowHeight="30"
                   HeadersVisibility="Column"
-                  FontFamily="Segoe UI"
+                  FontFamily="Inter"
                   FontSize="12"
                   IsReadOnly="True">
 
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader">
-                    <Setter Property="Background"      Value="#ECF0F1"/>
+                    <Setter Property="Background"      Value="#F8F9FA"/>
                     <Setter Property="Foreground"      Value="#2C3E50"/>
                     <Setter Property="FontWeight"      Value="SemiBold"/>
                     <Setter Property="FontSize"        Value="12"/>
-                    <Setter Property="FontFamily"      Value="Segoe UI"/>
+                    <Setter Property="FontFamily"      Value="Inter"/>
                     <Setter Property="Padding"         Value="8,6"/>
-                    <Setter Property="BorderBrush"     Value="#BDC3C7"/>
+                    <Setter Property="BorderBrush"     Value="#546E7A"/>
                     <Setter Property="BorderThickness" Value="0,0,1,1"/>
                     <Setter Property="Height"          Value="34"/>
                 </Style>
@@ -322,10 +322,10 @@
                 <Style TargetType="DataGridRow">
                     <Style.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#EBF5FB"/>
+                            <Setter Property="Background" Value="#F8F9FA"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="#D6EAF8"/>
+                            <Setter Property="Background" Value="#E2E6EA"/>
                         </Trigger>
                     </Style.Triggers>
                 </Style>
@@ -368,7 +368,7 @@
                                     <Style TargetType="CheckBox" BasedOn="{StaticResource ReadOnlyCheck}">
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                <Setter Property="Foreground" Value="#3498DB"/>
+                                                <Setter Property="Foreground" Value="#083D56"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -415,18 +415,21 @@
 
         <!-- ── STATUS BAR ──────────────────────────────── -->
         <Border Grid.Row="3" Background="#F8F9FA"
-                BorderBrush="#BDC3C7" BorderThickness="0,1,0,0" Padding="14,6">
+                BorderBrush="#546E7A" BorderThickness="0,1,0,0" Padding="14,6">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="status_text" Text="Loading..." FontSize="11"
-                           Foreground="#7F8C8D" VerticalAlignment="Center" FontFamily="Segoe UI"/>
+                           Foreground="#7F8C8D" VerticalAlignment="Center" FontFamily="Inter"/>
                 <TextBlock x:Name="ws_status" Grid.Column="1" Text="" FontSize="11"
-                           Foreground="#BDC3C7" VerticalAlignment="Center" FontFamily="Segoe UI"/>
+                           Foreground="#546E7A" VerticalAlignment="Center" FontFamily="Inter"/>
             </Grid>
         </Border>
 
+    
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>

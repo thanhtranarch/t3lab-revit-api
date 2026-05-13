@@ -308,7 +308,7 @@ class AutoJoinWindow(forms.WPFWindow):
 
     def __init__(self):
         forms.WPFWindow.__init__(self, XAML_FILE)
-        self._load_logo()
+
         self._rules = []
         self._cancel_requested = False
         self._pause_requested  = False
@@ -326,17 +326,7 @@ class AutoJoinWindow(forms.WPFWindow):
 
         self._refresh_rules()
 
-    def _load_logo(self):
-        try:
-            logo_path = os.path.join(EXT_DIR, 'lib', 'GUI', 'T3Lab_logo.png')
-            if os.path.exists(logo_path):
-                bitmap = BitmapImage()
-                bitmap.BeginInit()
-                bitmap.UriSource = Uri(logo_path, UriKind.Absolute)
-                bitmap.EndInit()
-                self.Icon = bitmap
-        except Exception as icon_ex:
-            logger.warning("Could not set window icon: {}".format(icon_ex))
+
 
     # --------------------------------------------------
     # Grid helpers

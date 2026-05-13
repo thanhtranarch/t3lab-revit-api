@@ -6,7 +6,8 @@
        WindowStartupLocation="CenterScreen"
        ResizeMode="CanResizeWithGrip"
        ShowInTaskbar="True"
-       Background="White">
+       Background="White"
+        FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="64"
@@ -26,7 +27,7 @@
         </Style>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Background" Value="#083D56"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Padding" Value="14,7"/>
             <Setter Property="FontSize" Value="12"/>
@@ -48,17 +49,17 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2980B9"/>
+                    <Setter Property="Background" Value="#062A3C"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor" Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="DangerButton" TargetType="Button">
-            <Setter Property="Background" Value="#E74C3C"/>
+            <Setter Property="Background" Value="#D32F2F"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Padding" Value="14,7"/>
             <Setter Property="FontSize" Value="12"/>
@@ -80,10 +81,10 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#C0392B"/>
+                    <Setter Property="Background" Value="#B71C1C"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor" Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
@@ -115,19 +116,19 @@
                     <Setter Property="Background" Value="#E67E22"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor" Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#ECF0F1"/>
+            <Setter Property="Background" Value="#F8F9FA"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
             <Setter Property="Padding" Value="12,6"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -144,7 +145,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#D5DBDB"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -156,7 +157,7 @@
         </Style>
 
         <!-- Window Control Button Style -->
-        <Style x:Key="WindowControlButton" TargetType="Button">
+        <Style x:Key="WinCtrlButton" TargetType="Button">
             <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="32"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -164,13 +165,13 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#ECF0F1"/>
+                    <Setter Property="Background" Value="#F8F9FA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <!-- Close Button Style -->
-        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
+        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WinCtrlButton}">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -179,7 +180,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#E74C3C"/>
+                                <Setter TargetName="border" Property="Background" Value="#D32F2F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -192,10 +193,10 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#EBF5FB"/>
+                    <Setter Property="Background" Value="#F8F9FA"/>
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#D6EAF8"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                     <Setter Property="Foreground" Value="#2C3E50"/>
                 </Trigger>
             </Style.Triggers>
@@ -219,7 +220,8 @@
         </Grid.RowDefinitions>
 
         <!-- Custom Title Bar -->
-        <Grid Grid.Row="0" Background="White" Height="64">
+        <Grid Grid.Row="0" Background="White"
+        FontFamily="Inter" Height="64">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -231,11 +233,11 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                               Foreground="#3498DB" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                               Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
                     <TextBlock Text="Annotation Manager" FontSize="18" FontWeight="Bold"
                                Foreground="#2C3E50"/>
                 </StackPanel>
-                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
                 <TextBlock Text="Find · Edit · Delete · Auto-Rename dimensions and text notes"
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
@@ -243,17 +245,17 @@
             <!-- Window Control Buttons -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,0,5,0"
                         WindowChrome.IsHitTestVisibleInChrome="True">
-                <Button x:Name="btn_minimize" Style="{StaticResource WindowControlButton}"
+                <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}"
                         ToolTip="Minimize" Click="minimize_button_clicked">
-                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
-                <Button x:Name="btn_maximize" Style="{StaticResource WindowControlButton}"
+                <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
                         ToolTip="Maximize" Click="maximize_button_clicked">
-                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
                 <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
                         ToolTip="Close" Click="close_button_clicked">
-                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -291,10 +293,10 @@
                         </Grid.RowDefinitions>
 
                         <!-- Tip box -->
-                        <Border Grid.Row="0" BorderBrush="#3498DB" BorderThickness="1" Padding="10,7"
-                                Background="#E8F4F8" CornerRadius="2" Margin="0,0,0,10">
+                        <Border Grid.Row="0" BorderBrush="#083D56" BorderThickness="1" Padding="10,7"
+                                Background="#F8F9FA" CornerRadius="2" Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="💡 Tip:" FontWeight="Bold" Foreground="#2980B9" Margin="0,0,5,0"/>
+                                <TextBlock Text="💡 Tip:" FontWeight="Bold" Foreground="#062A3C" Margin="0,0,5,0"/>
                                 <TextBlock Foreground="#2C3E50"
                                            Text="Find Dimensions to jump/delete. Find Types to rename inline (double-click Name)."/>
                             </StackPanel>
@@ -322,7 +324,7 @@
                                        FontWeight="Medium" Foreground="#2C3E50" Margin="0,0,8,0"/>
                             <TextBox x:Name="dim_kw" Grid.Column="1" Height="30"
                                      VerticalContentAlignment="Center" Padding="8,0"
-                                     BorderBrush="#BDC3C7" BorderThickness="1" FontFamily="Consolas"/>
+                                     BorderBrush="#546E7A" BorderThickness="1" FontFamily="Consolas"/>
                             <Button Grid.Column="2" Content="Search" Height="30" Margin="8,0,0,0"
                                     Style="{StaticResource PrimaryButton}" Click="dim_search"/>
                             <Button Grid.Column="3" Content="⟳ Refresh" Height="30" Margin="6,0,0,0"
@@ -333,7 +335,7 @@
                         </Grid>
 
                         <!-- Result DataGrid -->
-                        <Border Grid.Row="3" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="3">
+                        <Border Grid.Row="3" BorderBrush="#546E7A" BorderThickness="1" CornerRadius="3">
                             <DataGrid x:Name="dg_dim"
                                       AutoGenerateColumns="False"
                                       SelectionMode="Extended"
@@ -344,6 +346,7 @@
                                       HeadersVisibility="Column"
                                       AlternatingRowBackground="#F8F9FA"
                                       RowBackground="White"
+        FontFamily="Inter"
                                       RowHeight="26"
                                       BorderThickness="0"
                                       ScrollViewer.HorizontalScrollBarVisibility="Auto">
@@ -364,7 +367,7 @@
                                                 <Setter Property="FontFamily" Value="Consolas"/>
                                                 <Setter Property="FontSize" Value="11"/>
                                                 <Setter Property="Padding" Value="4,2"/>
-                                                <Setter Property="BorderBrush" Value="#3498DB"/>
+                                                <Setter Property="BorderBrush" Value="#083D56"/>
                                             </Style>
                                         </DataGridTextColumn.EditingElementStyle>
                                     </DataGridTextColumn>
@@ -445,7 +448,7 @@
                         </StackPanel>
 
                         <!-- Rename section -->
-                        <Border Grid.Row="5" Background="#F8F9FA" BorderBrush="#D5DBDB"
+                        <Border Grid.Row="5" Background="#F8F9FA" BorderBrush="#E2E6EA"
                                 BorderThickness="1" CornerRadius="3" Padding="12,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -479,10 +482,10 @@
                         </Grid.RowDefinitions>
 
                         <!-- Tip box -->
-                        <Border Grid.Row="0" BorderBrush="#3498DB" BorderThickness="1" Padding="10,7"
-                                Background="#E8F4F8" CornerRadius="2" Margin="0,0,0,10">
+                        <Border Grid.Row="0" BorderBrush="#083D56" BorderThickness="1" Padding="10,7"
+                                Background="#F8F9FA" CornerRadius="2" Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="💡 Tip:" FontWeight="Bold" Foreground="#2980B9" Margin="0,0,5,0"/>
+                                <TextBlock Text="💡 Tip:" FontWeight="Bold" Foreground="#062A3C" Margin="0,0,5,0"/>
                                 <TextBlock Foreground="#2C3E50"
                                            Text="Double-click Name to edit inline. Notes → edit content. Types → edit type name."/>
                             </StackPanel>
@@ -511,7 +514,7 @@
                                        Foreground="#2C3E50" Margin="0,0,8,0"/>
                             <TextBox x:Name="txt_kw" Grid.Column="1" Height="30"
                                      VerticalContentAlignment="Center" Padding="8,0"
-                                     BorderBrush="#BDC3C7" BorderThickness="1" FontFamily="Consolas"/>
+                                     BorderBrush="#546E7A" BorderThickness="1" FontFamily="Consolas"/>
                             <Button Grid.Column="2" Content="Search" Height="30" Margin="8,0,0,0"
                                     Style="{StaticResource PrimaryButton}" Click="txt_search"/>
                             <Button Grid.Column="3" Content="⟳ Refresh" Height="30" Margin="6,0,0,0"
@@ -522,7 +525,7 @@
                         </Grid>
 
                         <!-- Result DataGrid -->
-                        <Border Grid.Row="3" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="3">
+                        <Border Grid.Row="3" BorderBrush="#546E7A" BorderThickness="1" CornerRadius="3">
                             <DataGrid x:Name="dg_txt"
                                       AutoGenerateColumns="False"
                                       SelectionMode="Extended"
@@ -533,6 +536,7 @@
                                       HeadersVisibility="Column"
                                       AlternatingRowBackground="#F8F9FA"
                                       RowBackground="White"
+        FontFamily="Inter"
                                       RowHeight="26"
                                       BorderThickness="0"
                                       ScrollViewer.HorizontalScrollBarVisibility="Auto">
@@ -553,7 +557,7 @@
                                                 <Setter Property="FontFamily" Value="Consolas"/>
                                                 <Setter Property="FontSize" Value="11"/>
                                                 <Setter Property="Padding" Value="4,2"/>
-                                                <Setter Property="BorderBrush" Value="#3498DB"/>
+                                                <Setter Property="BorderBrush" Value="#083D56"/>
                                             </Style>
                                         </DataGridTextColumn.EditingElementStyle>
                                     </DataGridTextColumn>
@@ -634,7 +638,7 @@
                         </StackPanel>
 
                         <!-- Rename section -->
-                        <Border Grid.Row="5" Background="#F8F9FA" BorderBrush="#D5DBDB"
+                        <Border Grid.Row="5" Background="#F8F9FA" BorderBrush="#E2E6EA"
                                 BorderThickness="1" CornerRadius="3" Padding="12,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -658,9 +662,12 @@
             </TabControl>
 
             <!-- Status bar -->
-            <Border Grid.Row="1" BorderBrush="#ECF0F1" BorderThickness="0,1,0,0" Padding="4,6,0,0">
+            <Border Grid.Row="1" BorderBrush="#F8F9FA" BorderThickness="0,1,0,0" Padding="4,6,0,0">
                 <TextBlock x:Name="status" FontSize="11" Foreground="#7F8C8D" Text="Ready."/>
             </Border>
         </Grid>
+    
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>

@@ -6,7 +6,8 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="True"
-        Background="White">
+        Background="White"
+        FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="64"
@@ -35,11 +36,11 @@
         <Style x:Key="InputText" TargetType="TextBox">
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontFamily" Value="Inter"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
 
@@ -51,7 +52,7 @@
         </Style>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Background" Value="#083D56"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Padding" Value="16,8"/>
             <Setter Property="FontSize" Value="13"/>
@@ -73,10 +74,10 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2980B9"/>
+                    <Setter Property="Background" Value="#062A3C"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor" Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
@@ -89,19 +90,19 @@
                     <Setter Property="Background" Value="#1E8449"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor" Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#ECF0F1"/>
+            <Setter Property="Background" Value="#F8F9FA"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
             <Setter Property="Padding" Value="12,8"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -118,7 +119,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#D5DBDB"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -127,16 +128,16 @@
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,5"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontFamily" Value="Inter"/>
             <Setter Property="Height" Value="30"/>
         </Style>
 
         <!-- Window control buttons -->
-        <Style x:Key="WindowControlButton" TargetType="Button">
+        <Style x:Key="WinCtrlButton" TargetType="Button">
             <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="32"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -150,7 +151,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#ECF0F1"/>
+                                <Setter TargetName="border" Property="Background" Value="#F8F9FA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -158,7 +159,7 @@
             </Setter>
         </Style>
 
-        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
+        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WinCtrlButton}">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -167,7 +168,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#E74C3C"/>
+                                <Setter TargetName="border" Property="Background" Value="#D32F2F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -184,7 +185,8 @@
         </Grid.RowDefinitions>
 
         <!-- ========================= TITLE BAR ========================= -->
-        <Grid Grid.Row="0" Background="White" Height="64">
+        <Grid Grid.Row="0" Background="White"
+        FontFamily="Inter" Height="64">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -196,11 +198,11 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                               Foreground="#3498DB" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                               Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
                     <TextBlock Text="Feedback" FontSize="18" FontWeight="Bold"
                                Foreground="#2C3E50"/>
                 </StackPanel>
-                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
                 <TextBlock Text="Share your feedback or suggestions with the T3Lab team"
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
@@ -209,22 +211,22 @@
                         Margin="0,0,5,0"
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button x:Name="btn_minimize"
-                        Style="{StaticResource WindowControlButton}"
+                        Style="{StaticResource WinCtrlButton}"
                         ToolTip="Minimize"
                         Click="minimize_button_clicked">
-                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
                 <Button x:Name="btn_maximize"
-                        Style="{StaticResource WindowControlButton}"
+                        Style="{StaticResource WinCtrlButton}"
                         ToolTip="Maximize"
                         Click="maximize_button_clicked">
-                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
                 <Button x:Name="btn_close"
                         Style="{StaticResource CloseButton}"
                         ToolTip="Close"
                         Click="close_button_clicked">
-                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82">
+                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Style.Triggers>
@@ -253,11 +255,11 @@
             </Grid.RowDefinitions>
 
             <!-- Info / tip box -->
-            <Border Grid.Row="0" BorderBrush="#3498DB" BorderThickness="1"
-                    Padding="12,10" Background="#E8F4F8" CornerRadius="3"
+            <Border Grid.Row="0" BorderBrush="#083D56" BorderThickness="1"
+                    Padding="12,10" Background="#F8F9FA" CornerRadius="3"
                     Margin="0,4,0,4">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="💡 Tip:" FontWeight="Bold" Foreground="#2980B9"
+                    <TextBlock Text="💡 Tip:" FontWeight="Bold" Foreground="#062A3C"
                                Margin="0,0,6,0"/>
                     <TextBlock TextWrapping="Wrap" Foreground="#2C3E50"
                                Text="Your feedback will be emailed to trantienthanh909@gmail.com. Please describe your issue or idea as clearly as possible."/>
@@ -306,7 +308,7 @@
         </Grid>
 
         <!-- ========================= FOOTER ========================= -->
-        <Border Grid.Row="2" Background="#F8F9FA" BorderBrush="#ECF0F1"
+        <Border Grid.Row="2" Background="#F8F9FA" BorderBrush="#F8F9FA"
                 BorderThickness="0,1,0,0" Padding="24,10">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -333,5 +335,8 @@
                 </StackPanel>
             </Grid>
         </Border>
+    
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>

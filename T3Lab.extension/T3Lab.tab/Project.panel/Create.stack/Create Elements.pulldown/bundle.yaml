@@ -1,1 +1,5 @@
 layout:
+  - Beam
+  - DoorThreshold
+  - ImageToDrafting
+  - RoomToFloor

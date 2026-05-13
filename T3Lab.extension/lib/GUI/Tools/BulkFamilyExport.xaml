@@ -6,7 +6,7 @@
         Background="White"
         ResizeMode="CanResizeWithGrip"
         WindowStartupLocation="CenterScreen"
-        FontFamily="Segoe UI">
+        FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="64"
@@ -19,11 +19,11 @@
     <Window.Resources>
         <!-- PRIMARY BUTTON - blue, white text -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background"      Value="#3498DB"/>
+            <Setter Property="Background"      Value="#083D56"/>
             <Setter Property="Foreground"      Value="White"/>
             <Setter Property="Padding"         Value="12,6"/>
             <Setter Property="FontSize"        Value="12"/>
-            <Setter Property="FontFamily"      Value="Segoe UI"/>
+            <Setter Property="FontFamily"      Value="Inter"/>
             <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
@@ -38,10 +38,10 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2980B9"/>
+                    <Setter Property="Background" Value="#062A3C"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor"     Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
@@ -49,14 +49,14 @@
 
         <!-- SECONDARY BUTTON - light gray, dark text -->
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background"      Value="#ECF0F1"/>
+            <Setter Property="Background"      Value="#F8F9FA"/>
             <Setter Property="Foreground"      Value="#2C3E50"/>
             <Setter Property="Padding"         Value="12,6"/>
             <Setter Property="FontSize"        Value="12"/>
-            <Setter Property="FontFamily"      Value="Segoe UI"/>
+            <Setter Property="FontFamily"      Value="Inter"/>
             <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush"     Value="#BDC3C7"/>
+            <Setter Property="BorderBrush"     Value="#546E7A"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -71,7 +71,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#D5DBDB"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -104,7 +104,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#ECF0F1"/>
+                    <Setter Property="Background" Value="#F8F9FA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -119,7 +119,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#E74C3C"/>
+                                <Setter TargetName="bd" Property="Background" Value="#D32F2F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -144,12 +144,12 @@
             <StackPanel Orientation="Vertical" Margin="16,0,0,0" VerticalAlignment="Center"
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold" Foreground="#3498DB"
+                    <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold" Foreground="#083D56"
                                VerticalAlignment="Bottom" Margin="0,0,6,3"/>
                     <TextBlock Text="Bulk Family Export" FontSize="18" FontWeight="Bold"
                                Foreground="#2C3E50"/>
                 </StackPanel>
-                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
                 <TextBlock Text="Export CAD blocks or generate parametric Door/Window families"
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
@@ -158,7 +158,7 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}"
                         Click="minimize_button_clicked" ToolTip="Minimize">
-                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
                 <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
                         Click="maximize_button_clicked" ToolTip="Maximize">
@@ -166,15 +166,15 @@
                 </Button>
                 <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
                         Click="close_button_clicked" ToolTip="Close">
-                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
             </StackPanel>
 
-            <Border Height="1" VerticalAlignment="Bottom" Background="#BDC3C7"/>
+            <Border Height="1" VerticalAlignment="Bottom" Background="#546E7A"/>
         </Grid>
 
         <!-- ═══ CONFIGURATION ═══ -->
-        <Border Grid.Row="1" Background="White" BorderBrush="#BDC3C7" BorderThickness="0,0,0,1"
+        <Border Grid.Row="1" Background="White" BorderBrush="#546E7A" BorderThickness="0,0,0,1"
                 Padding="16,12">
             <Grid>
                 <Grid.RowDefinitions>
@@ -198,7 +198,7 @@
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="CAD Type:"
                            VerticalAlignment="Center" Foreground="#2C3E50" FontSize="12"/>
                 <ComboBox x:Name="cad_file_combo" Grid.Row="0" Grid.Column="1"
-                          FontFamily="Segoe UI" FontSize="12" Padding="6,4" Margin="0,0,8,0"/>
+                          FontFamily="Inter" FontSize="12" Padding="6,4" Margin="0,0,8,0"/>
                 <Button Content="Scan Blocks" Grid.Row="0" Grid.Column="2"
                         Style="{StaticResource PrimaryButton}" Click="scan_blocks_clicked"/>
 
@@ -206,13 +206,13 @@
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Discipline:"
                            VerticalAlignment="Center" Foreground="#2C3E50" FontSize="12"/>
                 <ComboBox x:Name="discipline_combo" Grid.Row="2" Grid.Column="1"
-                          Grid.ColumnSpan="2" FontFamily="Segoe UI" FontSize="12" Padding="6,4"/>
+                          Grid.ColumnSpan="2" FontFamily="Inter" FontSize="12" Padding="6,4"/>
 
                 <!-- Category -->
                 <TextBlock Grid.Row="4" Grid.Column="0" Text="Category:"
                            VerticalAlignment="Center" Foreground="#2C3E50" FontSize="12"/>
                 <ComboBox x:Name="category_combo" Grid.Row="4" Grid.Column="1"
-                          Grid.ColumnSpan="2" FontFamily="Segoe UI" FontSize="12" Padding="6,4"/>
+                          Grid.ColumnSpan="2" FontFamily="Inter" FontSize="12" Padding="6,4"/>
 
                 <!-- Geometry Mode -->
                 <TextBlock Grid.Row="6" Grid.Column="0" Text="Geometry:"
@@ -220,29 +220,29 @@
                 <StackPanel Orientation="Horizontal" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2">
                     <RadioButton x:Name="rb_3d_solid" Content=" 3D Solid / Extrusion" IsChecked="False"
                                  IsEnabled="False"
-                                 VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#BDC3C7" FontFamily="Segoe UI" FontSize="12"
+                                 VerticalAlignment="Center" Margin="0,0,20,0" Foreground="#546E7A" FontFamily="Inter" FontSize="12"
                                  ToolTip="3D Solid export — coming soon"/>
                     <RadioButton x:Name="rb_2d_lines" Content=" 2D Model Lines Only" IsChecked="True"
-                                 VerticalAlignment="Center" Foreground="#2C3E50" FontFamily="Segoe UI" FontSize="12"/>
+                                 VerticalAlignment="Center" Foreground="#2C3E50" FontFamily="Inter" FontSize="12"/>
                 </StackPanel>
 
                 <!-- Output Folder -->
                 <TextBlock Grid.Row="8" Grid.Column="0" Text="Output:"
                            VerticalAlignment="Center" Foreground="#2C3E50" FontSize="12"/>
                 <TextBox x:Name="output_path" Grid.Row="8" Grid.Column="1"
-                         IsReadOnly="True" FontFamily="Segoe UI" FontSize="12"
+                         IsReadOnly="True" FontFamily="Inter" FontSize="12"
                          Padding="6,4" Margin="0,0,8,0" Background="#F8F9FA"
-                         BorderBrush="#BDC3C7"/>
+                         BorderBrush="#546E7A"/>
                 <Button Content="Browse..." Grid.Row="8" Grid.Column="2"
                         Style="{StaticResource SecondaryButton}" Click="browse_folder_clicked"/>
             </Grid>
         </Border>
 
         <!-- ═══ INFO TIP ═══ -->
-        <Border Grid.Row="2" Margin="16,10,16,0" BorderBrush="#3498DB" BorderThickness="1"
-                Background="#E8F4F8" CornerRadius="2" Padding="10">
+        <Border Grid.Row="2" Margin="16,10,16,0" BorderBrush="#083D56" BorderThickness="1"
+                Background="#F8F9FA" CornerRadius="2" Padding="10">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Tip:" FontWeight="Bold" Foreground="#2980B9" Margin="0,0,5,0"/>
+                <TextBlock Text="Tip:" FontWeight="Bold" Foreground="#062A3C" Margin="0,0,5,0"/>
                 <TextBlock Foreground="#2C3E50" TextWrapping="Wrap"
                            Text="CAD Mode: Select a CAD file and click 'Scan Blocks' — category is auto-detected per block and can be changed in the grid. Preset Mode: Select output folder and category, then click 'Presets' to generate families without any CAD file."/>
             </StackPanel>
@@ -250,7 +250,7 @@
 
         <!-- ═══ DATAGRID ═══ -->
         <!-- FILTER BAR -->
-        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#BDC3C7"
+        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#546E7A"
                 BorderThickness="0,0,0,1" Padding="16,8">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -261,7 +261,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <!-- Search box -->
-                <Border Grid.Column="0" BorderBrush="#BDC3C7" BorderThickness="1"
+                <Border Grid.Column="0" BorderBrush="#546E7A" BorderThickness="1"
                         CornerRadius="3" Background="White">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -273,7 +273,7 @@
                                    Foreground="#7F8C8D" VerticalAlignment="Center"
                                    Margin="8,0,4,0"/>
                         <TextBox x:Name="txt_search" Grid.Column="1"
-                                 FontFamily="Segoe UI" FontSize="12"
+                                 FontFamily="Inter" FontSize="12"
                                  BorderThickness="0" Background="Transparent"
                                  VerticalAlignment="Center" Padding="0,5"
                                  ToolTip="Search block name or layer"
@@ -281,8 +281,8 @@
                         <TextBlock x:Name="txt_search_placeholder"
                                    Grid.Column="1" IsHitTestVisible="False"
                                    Text="Search block name or layer�"
-                                   FontFamily="Segoe UI" FontSize="12"
-                                   Foreground="#BDC3C7" VerticalAlignment="Center"
+                                   FontFamily="Inter" FontSize="12"
+                                   Foreground="#546E7A" VerticalAlignment="Center"
                                    Padding="2,5"/>
                         <Button x:Name="btn_clear_search" Grid.Column="2"
                                 Content="&#xE8BB;" Width="24" Height="24"
@@ -296,17 +296,17 @@
                 </Border>
                 <!-- Suggested filter -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Suggested:" FontFamily="Segoe UI" FontSize="12"
+                    <TextBlock Text="Suggested:" FontFamily="Inter" FontSize="12"
                                Foreground="#2C3E50" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox x:Name="combo_filter_suggested"
-                              FontFamily="Segoe UI" FontSize="12" Padding="6,4"
+                              FontFamily="Inter" FontSize="12" Padding="6,4"
                               Width="130"
                               SelectionChanged="filter_suggested_changed"
                               ToolTip="Filter by suggested category"/>
                 </StackPanel>
                 <!-- Visible count -->
                 <TextBlock x:Name="txt_filter_count" Grid.Column="4"
-                           FontFamily="Segoe UI" FontSize="11" Foreground="#7F8C8D"
+                           FontFamily="Inter" FontSize="11" Foreground="#7F8C8D"
                            VerticalAlignment="Center"/>
             </Grid>
         </Border>
@@ -314,19 +314,19 @@
         <!-- DATAGRID -->
         <DataGrid x:Name="blocks_grid" Grid.Row="4" Margin="16,6,16,0"
                   AutoGenerateColumns="False" CanUserAddRows="False"
-                  Background="White" BorderBrush="#BDC3C7" BorderThickness="1"
-                  AlternatingRowBackground="#F8F9FA" FontFamily="Segoe UI" FontSize="12"
+                  Background="White" BorderBrush="#546E7A" BorderThickness="1"
+                  AlternatingRowBackground="#F8F9FA" FontFamily="Inter" FontSize="12"
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                  HorizontalGridLinesBrush="#ECF0F1" SelectionMode="Single"
+                  HorizontalGridLinesBrush="#F8F9FA" SelectionMode="Single"
                   VerticalScrollBarVisibility="Auto">
 
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader">
-                    <Setter Property="Background"      Value="#ECF0F1"/>
+                    <Setter Property="Background"      Value="#F8F9FA"/>
                     <Setter Property="Foreground"      Value="#2C3E50"/>
                     <Setter Property="FontWeight"      Value="SemiBold"/>
                     <Setter Property="Padding"         Value="8,6"/>
-                    <Setter Property="BorderBrush"     Value="#BDC3C7"/>
+                    <Setter Property="BorderBrush"     Value="#546E7A"/>
                     <Setter Property="BorderThickness" Value="0,0,1,1"/>
                     <Setter Property="Height"          Value="34"/>
                 </Style>
@@ -336,10 +336,10 @@
                 <Style TargetType="DataGridRow">
                     <Style.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#EBF5FB"/>
+                            <Setter Property="Background" Value="#F8F9FA"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="#D6EAF8"/>
+                            <Setter Property="Background" Value="#E2E6EA"/>
                         </Trigger>
                     </Style.Triggers>
                 </Style>
@@ -404,7 +404,7 @@
         </DataGrid>
 
         <!-- ═══ ACTION BAR ═══ -->
-        <Border Grid.Row="5" Background="White" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
+        <Border Grid.Row="5" Background="White" BorderBrush="#546E7A" BorderThickness="0,1,0,0"
                 Padding="16,10">
             <Grid>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
@@ -420,7 +420,7 @@
                               VerticalAlignment="Center"
                               Margin="0,0,16,0"
                               Foreground="#2C3E50"
-                              FontFamily="Segoe UI"
+                              FontFamily="Inter"
                               FontSize="12"
                               ToolTip="After export, load each family into the current Revit project"/>
                     <Button x:Name="btn_presets" Content="&#x1F4E6; Presets"
@@ -447,10 +447,10 @@
                             ToolTip="Export each selected block as .rfa and place every CAD instance at its exact world-space position">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource SuccessButton}">
-                                <Setter Property="Background" Value="#2980B9"/>
+                                <Setter Property="Background" Value="#062A3C"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#2980B9"/>
+                                        <Setter Property="Background" Value="#062A3C"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -464,7 +464,7 @@
         </Border>
 
         <!-- ═══ STATUS BAR ═══ -->
-        <Border Grid.Row="6" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0"
+        <Border Grid.Row="6" Background="#F8F9FA" BorderBrush="#546E7A" BorderThickness="0,1,0,0"
                 Padding="14,8">
             <StackPanel>
 
@@ -480,18 +480,18 @@
 
                     <ProgressBar x:Name="pb_export" Grid.Column="0"
                                  Height="8" Minimum="0" Maximum="100" Value="0"
-                                 Foreground="#3498DB" Background="#DCE9F5"
+                                 Foreground="#083D56" Background="#E2E6EA"
                                  BorderThickness="0" VerticalAlignment="Center"/>
 
                     <!-- Pause / Resume -->
                     <Button x:Name="btn_pause_export" Grid.Column="2"
-                            Content="⏸  Pause" Height="22" FontSize="10" FontFamily="Segoe UI"
+                            Content="⏸  Pause" Height="22" FontSize="10" FontFamily="Inter"
                             Click="pause_resume_clicked" Cursor="Hand"
-                            BorderThickness="1" BorderBrush="#BDC3C7"
+                            BorderThickness="1" BorderBrush="#546E7A"
                             VerticalAlignment="Center">
                         <Button.Style>
                             <Style TargetType="Button">
-                                <Setter Property="Background" Value="#ECF0F1"/>
+                                <Setter Property="Background" Value="#F8F9FA"/>
                                 <Setter Property="Foreground" Value="#2C3E50"/>
                                 <Setter Property="Template">
                                     <Setter.Value>
@@ -507,10 +507,10 @@
                                 </Setter>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#D5DBDB"/>
+                                        <Setter Property="Background" Value="#E2E6EA"/>
                                     </Trigger>
                                     <Trigger Property="IsEnabled" Value="False">
-                                        <Setter Property="Foreground" Value="#BDC3C7"/>
+                                        <Setter Property="Foreground" Value="#546E7A"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -519,12 +519,12 @@
 
                     <!-- Stop -->
                     <Button x:Name="btn_stop_export" Grid.Column="4"
-                            Content="■  Stop" Height="22" FontSize="10" FontFamily="Segoe UI"
+                            Content="■  Stop" Height="22" FontSize="10" FontFamily="Inter"
                             Click="stop_export_clicked" Cursor="Hand"
                             BorderThickness="0" VerticalAlignment="Center">
                         <Button.Style>
                             <Style TargetType="Button">
-                                <Setter Property="Background" Value="#E74C3C"/>
+                                <Setter Property="Background" Value="#D32F2F"/>
                                 <Setter Property="Foreground" Value="White"/>
                                 <Setter Property="Template">
                                     <Setter.Value>
@@ -538,10 +538,10 @@
                                 </Setter>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#C0392B"/>
+                                        <Setter Property="Background" Value="#B71C1C"/>
                                     </Trigger>
                                     <Trigger Property="IsEnabled" Value="False">
-                                        <Setter Property="Background" Value="#BDC3C7"/>
+                                        <Setter Property="Background" Value="#546E7A"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -558,11 +558,15 @@
                     <TextBlock x:Name="status_text" Grid.Column="0" FontSize="11"
                                Foreground="#7F8C8D" Text="Ready"/>
                     <TextBlock x:Name="block_count_text" Grid.Column="1" FontSize="11"
-                               Foreground="#BDC3C7" Text="0 blocks found"/>
+                               Foreground="#546E7A" Text="0 blocks found"/>
                 </Grid>
 
             </StackPanel>
         </Border>
+    
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>
+
 

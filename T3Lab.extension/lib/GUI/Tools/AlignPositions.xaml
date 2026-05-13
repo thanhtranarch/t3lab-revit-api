@@ -5,7 +5,8 @@
         MinWidth="620" MinHeight="480"
         Background="White"
         ResizeMode="CanResizeWithGrip"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="64"
@@ -22,16 +23,16 @@
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="#7F8C8D"/>
             <Setter Property="Margin"     Value="0,14,0,6"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontFamily" Value="Inter"/>
         </Style>
 
         <!-- PRIMARY button - blue, white text -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background"      Value="#3498DB"/>
+            <Setter Property="Background"      Value="#083D56"/>
             <Setter Property="Foreground"      Value="White"/>
             <Setter Property="Padding"         Value="12,6"/>
             <Setter Property="FontSize"        Value="12"/>
-            <Setter Property="FontFamily"      Value="Segoe UI"/>
+            <Setter Property="FontFamily"      Value="Inter"/>
             <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
@@ -46,10 +47,10 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2980B9"/>
+                    <Setter Property="Background" Value="#062A3C"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor"     Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
@@ -57,14 +58,14 @@
 
         <!-- SECONDARY button - light gray, dark text -->
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background"      Value="#ECF0F1"/>
+            <Setter Property="Background"      Value="#F8F9FA"/>
             <Setter Property="Foreground"      Value="#2C3E50"/>
             <Setter Property="Padding"         Value="12,6"/>
             <Setter Property="FontSize"        Value="12"/>
-            <Setter Property="FontFamily"      Value="Segoe UI"/>
+            <Setter Property="FontFamily"      Value="Inter"/>
             <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush"     Value="#BDC3C7"/>
+            <Setter Property="BorderBrush"     Value="#546E7A"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -79,11 +80,11 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#D5DBDB"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#ECF0F1"/>
-                    <Setter Property="Foreground" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#F8F9FA"/>
+                    <Setter Property="Foreground" Value="#546E7A"/>
                     <Setter Property="Cursor"     Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
@@ -97,7 +98,7 @@
                     <Setter Property="Background" Value="#1E8449"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor"     Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
@@ -121,7 +122,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#ECF0F1"/>
+                    <Setter Property="Background" Value="#F8F9FA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -136,7 +137,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#E74C3C"/>
+                                <Setter TargetName="bd" Property="Background" Value="#D32F2F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -160,11 +161,11 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                               Foreground="#3498DB" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                               Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
                     <TextBlock Text="Align Positions" FontSize="18" FontWeight="Bold"
                                Foreground="#2C3E50"/>
                 </StackPanel>
-                <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
+                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
                 <TextBlock Text="Snap element distances to nearest 5 or 10 mm"
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
@@ -173,19 +174,19 @@
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}"
                         Click="minimize_button_clicked" ToolTip="Minimize">
-                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
                 <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
                         Click="maximize_button_clicked" ToolTip="Maximize">
-                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
                 <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
                         Click="close_button_clicked" ToolTip="Close">
-                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
             </StackPanel>
 
-            <Border Height="1" VerticalAlignment="Bottom" Background="#BDC3C7"/>
+            <Border Height="1" VerticalAlignment="Bottom" Background="#546E7A"/>
         </Grid>
 
         <!-- ═══ Row 1 : Reference + Settings ═══ -->
@@ -193,7 +194,7 @@
 
             <!-- Reference Element -->
             <TextBlock Text="REFERENCE ELEMENT" Style="{StaticResource SectionHeader}"/>
-            <Border BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="3" Padding="12,10">
+            <Border BorderBrush="#546E7A" BorderThickness="1" CornerRadius="3" Padding="12,10">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -205,13 +206,13 @@
                     <TextBlock x:Name="txt_ref_info" Grid.Column="1"
                                Text="No reference selected"
                                VerticalAlignment="Center" Foreground="#7F8C8D"
-                               FontSize="12" FontFamily="Segoe UI"/>
+                               FontSize="12" FontFamily="Inter"/>
                 </Grid>
             </Border>
 
             <!-- Settings -->
             <TextBlock Text="SETTINGS" Style="{StaticResource SectionHeader}"/>
-            <Border BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="3" Padding="12,10">
+            <Border BorderBrush="#546E7A" BorderThickness="1" CornerRadius="3" Padding="12,10">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -219,7 +220,7 @@
                     </Grid.RowDefinitions>
                     <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
                         <TextBlock Text="Units:" VerticalAlignment="Center" Width="70"
-                                   Foreground="#2C3E50" FontSize="12" FontFamily="Segoe UI"/>
+                                   Foreground="#2C3E50" FontSize="12" FontFamily="Inter"/>
                         <RadioButton x:Name="rb_metric" Content=" Metric (mm)" IsChecked="True"
                                      VerticalAlignment="Center" Margin="0,0,20,0" Checked="unit_changed"/>
                         <RadioButton x:Name="rb_imperial" Content=" Imperial (inch)"
@@ -227,18 +228,18 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Grid.Row="1">
                         <TextBlock Text="Snap to:" VerticalAlignment="Center" Width="70"
-                                   Foreground="#2C3E50" FontSize="12" FontFamily="Segoe UI"/>
+                                   Foreground="#2C3E50" FontSize="12" FontFamily="Inter"/>
                         <RadioButton x:Name="rb_snap1" Content=" 5 mm" IsChecked="True"
                                      VerticalAlignment="Center" Margin="0,0,20,0"
-                                     FontFamily="Segoe UI" FontSize="12" Foreground="#2C3E50"
+                                     FontFamily="Inter" FontSize="12" Foreground="#2C3E50"
                                      Checked="snap_changed"/>
                         <RadioButton x:Name="rb_snap2" Content=" 10 mm"
                                      VerticalAlignment="Center" Margin="0,0,20,0"
-                                     FontFamily="Segoe UI" FontSize="12" Foreground="#2C3E50"
+                                     FontFamily="Inter" FontSize="12" Foreground="#2C3E50"
                                      Checked="snap_changed"/>
                         <RadioButton x:Name="rb_snap3" Content=" 20 mm"
                                      VerticalAlignment="Center"
-                                     FontFamily="Segoe UI" FontSize="12" Foreground="#2C3E50"
+                                     FontFamily="Inter" FontSize="12" Foreground="#2C3E50"
                                      Checked="snap_changed"/>
                     </StackPanel>
                 </Grid>
@@ -257,7 +258,7 @@
                 <TextBlock x:Name="txt_element_count" Grid.Column="1"
                            Text="No elements collected"
                            VerticalAlignment="Center" Foreground="#7F8C8D"
-                           FontSize="12" FontFamily="Segoe UI"/>
+                           FontSize="12" FontFamily="Inter"/>
             </Grid>
         </StackPanel>
 
@@ -269,20 +270,20 @@
                   CanUserSortColumns="True"
                   SelectionMode="Single"
                   GridLinesVisibility="Horizontal"
-                  HorizontalGridLinesBrush="#ECF0F1"
+                  HorizontalGridLinesBrush="#F8F9FA"
                   Background="White"
-                  BorderBrush="#BDC3C7"
+                  BorderBrush="#546E7A"
                   BorderThickness="1"
-                  FontFamily="Segoe UI"
+                  FontFamily="Inter"
                   FontSize="12"
                   AlternatingRowBackground="#F8F9FA">
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader">
-                    <Setter Property="Background"      Value="#ECF0F1"/>
+                    <Setter Property="Background"      Value="#F8F9FA"/>
                     <Setter Property="Foreground"      Value="#2C3E50"/>
                     <Setter Property="FontWeight"      Value="SemiBold"/>
                     <Setter Property="Padding"         Value="8,6"/>
-                    <Setter Property="BorderBrush"     Value="#BDC3C7"/>
+                    <Setter Property="BorderBrush"     Value="#546E7A"/>
                     <Setter Property="BorderThickness" Value="0,0,1,1"/>
                     <Setter Property="Height"          Value="34"/>
                 </Style>
@@ -291,10 +292,10 @@
                 <Style TargetType="DataGridRow">
                     <Style.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#EBF5FB"/>
+                            <Setter Property="Background" Value="#F8F9FA"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="#D6EAF8"/>
+                            <Setter Property="Background" Value="#E2E6EA"/>
                         </Trigger>
                     </Style.Triggers>
                 </Style>
@@ -324,16 +325,16 @@
         <!-- ═══ Row 3 : Info box + Apply ═══ -->
         <StackPanel Grid.Row="3" Margin="20,10,20,12">
             <!-- Info / Tip box -->
-            <Border BorderBrush="#3498DB" BorderThickness="1" Background="#E8F4F8"
+            <Border BorderBrush="#083D56" BorderThickness="1" Background="#F8F9FA"
                     CornerRadius="2" Padding="10" Margin="0,0,0,10">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
-                        <TextBlock Text="Tip:" FontWeight="Bold" Foreground="#2980B9"
-                                   Margin="0,0,5,0" FontFamily="Segoe UI" FontSize="11"/>
-                        <TextBlock Foreground="#2C3E50" FontFamily="Segoe UI" FontSize="11"
+                        <TextBlock Text="Tip:" FontWeight="Bold" Foreground="#062A3C"
+                                   Margin="0,0,5,0" FontFamily="Inter" FontSize="11"/>
+                        <TextBlock Foreground="#2C3E50" FontFamily="Inter" FontSize="11"
                                    Text="Pick a Grid, Wall, or Column as reference."/>
                     </StackPanel>
-                    <TextBlock Foreground="#2C3E50" FontFamily="Segoe UI" FontSize="11" Margin="32,0,0,0"
+                    <TextBlock Foreground="#2C3E50" FontFamily="Inter" FontSize="11" Margin="32,0,0,0"
                                Text="Elements whose distance is already a clean multiple of 5/10 mm are hidden."/>
                 </StackPanel>
             </Border>
@@ -344,11 +345,14 @@
         </StackPanel>
 
         <!-- ═══ Row 4 : Status Bar ═══ -->
-        <Border Grid.Row="4" Background="#F8F9FA" BorderBrush="#BDC3C7"
+        <Border Grid.Row="4" Background="#F8F9FA" BorderBrush="#546E7A"
                 BorderThickness="0,1,0,0" Padding="14,6">
             <TextBlock x:Name="status_text" FontSize="11" Foreground="#7F8C8D"
-                       FontFamily="Segoe UI" Text="Ready"/>
+                       FontFamily="Inter" Text="Ready"/>
         </Border>
+    
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>
 

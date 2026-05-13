@@ -1,0 +1,358 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Door Threshold - T3Lab"
+        Width="750" Height="700"
+        MinWidth="600" MinHeight="550"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="True"
+        Background="White"
+        FontFamily="Inter"
+        FontSize="12">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="64"
+                      ResizeBorderThickness="5"
+                      GlassFrameThickness="0"
+                      CornerRadius="8"
+                      UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+
+        <!-- ── Primary button (blue) ── -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#083D56"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="Inter"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#062A3C"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="#546E7A"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── Secondary button (light gray) ── -->
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#F8F9FA"/>
+            <Setter Property="Foreground" Value="#2C3E50"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="Inter"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#E2E6EA"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── Success button (green) ── -->
+        <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="#27AE60"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1E8449"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ── Window control button ── -->
+        <Style x:Key="WinCtrlButton" TargetType="Button">
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F8F9FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ── Close button (red on hover) ── -->
+        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WinCtrlButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#D32F2F"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="64"/>     <!-- Title bar -->
+            <RowDefinition Height="Auto"/>   <!-- Toolbar -->
+            <RowDefinition Height="*"/>      <!-- Content -->
+            <RowDefinition Height="Auto"/>   <!-- Status bar -->
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════ TITLE BAR ═══════════════════════════════ -->
+        <Grid Grid.Row="0" Background="White" Height="64">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- T3Lab Title + Subtitle -->
+            <StackPanel Grid.Column="0" Orientation="Vertical" Margin="16,0,0,0" VerticalAlignment="Center"
+                        WindowChrome.IsHitTestVisibleInChrome="True">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
+                               Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
+                    <TextBlock Text="Door Threshold" FontSize="18" FontWeight="Bold"
+                               Foreground="#2C3E50"/>
+                </StackPanel>
+                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
+                <TextBlock Text="Place floor elements as thresholds under selected doors"
+                           FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
+            </StackPanel>
+
+            <!-- Window control buttons -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal"
+                        VerticalAlignment="Top" Margin="0,0,5,0"
+                        WindowChrome.IsHitTestVisibleInChrome="True">
+                <Button x:Name="btn_minimize"
+                        Style="{StaticResource WinCtrlButton}"
+                        ToolTip="Minimize"
+                        Click="minimize_button_clicked">
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
+                </Button>
+                <Button x:Name="btn_maximize"
+                        Style="{StaticResource WinCtrlButton}"
+                        ToolTip="Maximize"
+                        Click="maximize_button_clicked">
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
+                </Button>
+                <Button x:Name="btn_close"
+                        Style="{StaticResource CloseButton}"
+                        ToolTip="Close"
+                        Click="close_button_clicked">
+                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Button>
+            </StackPanel>
+
+            <Border Height="1" VerticalAlignment="Bottom" Background="#546E7A"
+                    Grid.ColumnSpan="3"/>
+        </Grid>
+
+        <!-- ═══════════════════════════════ TOOLBAR ═══════════════════════════════ -->
+        <Border Grid.Row="1" Background="White" BorderBrush="#546E7A" BorderThickness="0,0,0,1" Padding="12,8">
+            <WrapPanel VerticalAlignment="Center">
+                <Button x:Name="btn_select_all" Content="Select All"
+                        Style="{StaticResource SecondaryButton}" Margin="0,0,6,0"
+                        Click="select_all_clicked"/>
+                <Button x:Name="btn_select_none" Content="Select None"
+                        Style="{StaticResource SecondaryButton}" Margin="0,0,6,0"
+                        Click="select_none_clicked"/>
+                <Rectangle Width="1" Fill="#546E7A" Margin="6,2,12,2"/>
+                <TextBlock Text="Search Doors:" VerticalAlignment="Center" Foreground="#7F8C8D"
+                           Margin="0,0,6,0"/>
+                <TextBox x:Name="txt_search" Width="200" Height="28"
+                         VerticalContentAlignment="Center" Padding="6,2"
+                         BorderBrush="#546E7A" BorderThickness="1"
+                         TextChanged="search_changed"/>
+            </WrapPanel>
+        </Border>
+
+        <!-- ═══════════════════════════════ CONTENT ═══════════════════════════════ -->
+        <Grid Grid.Row="2" Margin="12,8,12,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="280"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Element List -->
+            <DataGrid x:Name="door_datagrid" Grid.Column="0"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      SelectionMode="Extended"
+                      IsReadOnly="True"
+                      Background="White"
+                      BorderBrush="#546E7A"
+                      BorderThickness="1"
+                      AlternatingRowBackground="#F8F9FA"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalGridLinesBrush="#F8F9FA"
+                      Margin="0,0,10,0">
+                <DataGrid.ColumnHeaderStyle>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="#F8F9FA"/>
+                        <Setter Property="Foreground" Value="#2C3E50"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                        <Setter Property="Padding" Value="8,6"/>
+                        <Setter Property="BorderBrush" Value="#546E7A"/>
+                        <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                        <Setter Property="Height" Value="34"/>
+                    </Style>
+                </DataGrid.ColumnHeaderStyle>
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#F8F9FA"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#E2E6EA"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="" Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="35"/>
+                    <DataGridTextColumn Header="Mark" Binding="{Binding Mark}" Width="80"/>
+                    <DataGridTextColumn Header="Door Type" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="100"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- Settings Panel -->
+            <StackPanel Grid.Column="1">
+
+                <!-- Floor Type Selection -->
+                <Border BorderBrush="#546E7A" BorderThickness="1" CornerRadius="3"
+                        Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="Threshold Settings" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="#2C3E50" Margin="0,0,0,10"/>
+
+                        <TextBlock Text="Threshold Type (Floor)" FontSize="11"
+                                   Foreground="#7F8C8D" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="cmb_floor_type" Height="28"
+                                  Margin="0,0,0,12"/>
+
+                        <TextBlock Text="Height Offset (mm)" FontSize="11"
+                                   Foreground="#7F8C8D" Margin="0,0,0,4"/>
+                        <TextBox x:Name="txt_offset" Height="26"
+                                 Text="0" VerticalContentAlignment="Center"
+                                 Padding="6,2" BorderBrush="#546E7A"
+                                 BorderThickness="1" Margin="0,0,0,12"/>
+
+                        <TextBlock Text="Width Extension (mm)" FontSize="11"
+                                   Foreground="#7F8C8D" Margin="0,0,0,4"/>
+                        <TextBox x:Name="txt_width_ext" Height="26"
+                                 Text="0" VerticalContentAlignment="Center"
+                                 Padding="6,2" BorderBrush="#546E7A"
+                                 BorderThickness="1" Margin="0,0,0,12"/>
+
+                        <TextBlock Text="Depth Extension (mm)" FontSize="11"
+                                   Foreground="#7F8C8D" Margin="0,0,0,4"/>
+                        <TextBox x:Name="txt_depth_ext" Height="26"
+                                 Text="0" VerticalContentAlignment="Center"
+                                 Padding="6,2" BorderBrush="#546E7A"
+                                 BorderThickness="1"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Tip Box -->
+                <Border BorderBrush="#083D56" BorderThickness="1" Background="#F8F9FA"
+                        CornerRadius="2" Padding="10">
+                    <StackPanel>
+                        <TextBlock Text="How it works:" FontWeight="Bold" Foreground="#062A3C"
+                                   Margin="0,0,0,4" FontSize="11"/>
+                        <TextBlock Text="Creates threshold floor elements at the base of selected doors. Dimensions automatically match the door width and host wall thickness, plus any specified extensions."
+                                   Foreground="#2C3E50" FontSize="11" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Action Buttons -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            Margin="0,20,0,0">
+                    <Button x:Name="btn_cancel" Content="Cancel"
+                            Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            Click="close_button_clicked" Width="80"/>
+                    <Button x:Name="btn_create" Content="Create Thresholds"
+                            Style="{StaticResource SuccessButton}"
+                            Click="create_thresholds_clicked" Width="130"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════════════════════════ STATUS BAR ═══════════════════════════════ -->
+        <Border Grid.Row="3" Background="#F8F9FA" BorderBrush="#546E7A"
+                BorderThickness="0,1,0,0" Padding="14,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="status_text" FontSize="11" Foreground="#7F8C8D"
+                           Text="Ready"/>
+                <TextBlock Grid.Column="1" FontSize="11" Foreground="#546E7A"
+                           HorizontalAlignment="Right" x:Name="status_count"
+                           Text="0 doors"/>
+            </Grid>
+        </Border>
+    
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
+    </Grid>
+</Window>

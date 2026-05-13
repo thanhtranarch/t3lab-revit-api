@@ -1,0 +1,3 @@
+title: Door Threshold
+tooltip: Creates threshold floor elements at the base of selected doors. Dimensions automatically match the door width and host wall thickness, plus any specified extensions.
+author: T3Lab

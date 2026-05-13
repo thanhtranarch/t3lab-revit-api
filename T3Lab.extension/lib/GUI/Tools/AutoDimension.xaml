@@ -1,13 +1,13 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Auto Dimension"
-        Width="520" Height="480"
-        MinWidth="480" MinHeight="440"
+        Width="520" Height="720"
+        MinWidth="480" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="True"
         Background="White"
-        FontFamily="Segoe UI">
+        FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="64"
@@ -29,11 +29,11 @@
 
         <!-- ── GroupBox override ── -->
         <Style x:Key="SectionGroup" TargetType="GroupBox">
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="12,8,12,12"/>
             <Setter Property="Margin" Value="0,0,0,10"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontFamily" Value="Inter"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -41,7 +41,7 @@
 
         <!-- ── Primary Button ── -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#3498DB"/>
+            <Setter Property="Background" Value="#083D56"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Padding" Value="16,9"/>
             <Setter Property="FontSize" Value="13"/>
@@ -63,10 +63,10 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2980B9"/>
+                    <Setter Property="Background" Value="#062A3C"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#BDC3C7"/>
+                    <Setter Property="Background" Value="#546E7A"/>
                     <Setter Property="Cursor" Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
@@ -74,13 +74,13 @@
 
         <!-- ── Secondary Button ── -->
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#ECF0F1"/>
+            <Setter Property="Background" Value="#F8F9FA"/>
             <Setter Property="Foreground" Value="#2C3E50"/>
             <Setter Property="Padding" Value="16,9"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="Medium"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#BDC3C7"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -97,14 +97,14 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#D5DBDB"/>
+                    <Setter Property="Background" Value="#E2E6EA"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <!-- ── Danger Button ── -->
         <Style x:Key="DangerButton" TargetType="Button">
-            <Setter Property="Background" Value="#E74C3C"/>
+            <Setter Property="Background" Value="#D32F2F"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Padding" Value="16,9"/>
             <Setter Property="FontSize" Value="13"/>
@@ -126,7 +126,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#C0392B"/>
+                    <Setter Property="Background" Value="#B71C1C"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -155,13 +155,13 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#219A52"/>
+                    <Setter Property="Background" Value="#1E8449"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <!-- ── Window Control Button ── -->
-        <Style x:Key="WindowControlButton" TargetType="Button">
+        <Style x:Key="WinCtrlButton" TargetType="Button">
             <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="32"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -175,7 +175,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bdr" Property="Background" Value="#ECF0F1"/>
+                                <Setter TargetName="bdr" Property="Background" Value="#F8F9FA"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -184,7 +184,7 @@
         </Style>
 
         <!-- ── Close Button (red on hover) ── -->
-        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
+        <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WinCtrlButton}">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -193,7 +193,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#E74C3C"/>
+                                <Setter TargetName="border" Property="Background" Value="#D32F2F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -230,27 +230,22 @@
                         VerticalAlignment="Center" Margin="16,0,0,0"
                         WindowChrome.IsHitTestVisibleInChrome="True">
 
-                <!-- T3Lab logo image (loaded from code via _load_logo) -->
-                <Image x:Name="logo_image"
-                       Width="32" Height="32"
-                       Margin="0,0,10,0"
-                       VerticalAlignment="Center"
-                       RenderOptions.BitmapScalingMode="HighQuality"/>
+
 
                 <!-- Brand + Tool name + Subtitle stacked -->
                 <StackPanel Orientation="Vertical" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="T3Lab Architect"
+                        <TextBlock Text="T3Lab"
                                    FontSize="11" FontWeight="Bold"
-                                   Foreground="#3498DB"
+                                   Foreground="#083D56"
                                    VerticalAlignment="Bottom"
                                    Margin="0,0,8,2"/>
                         <TextBlock Text="Auto Dimension"
                                    FontSize="18" FontWeight="Bold"
                                    Foreground="#2C3E50"/>
                     </StackPanel>
-                    <Separator Height="1" Background="#BDC3C7" Margin="0,2,0,2"/>
-                    <TextBlock Text="Auto-dimension walls, columns, doors, lifts &amp; grids in current view"
+                    <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
+                    <TextBlock Text="Shop drawing string dimensions — walls, columns, doors, lifts &amp; grids"
                                FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
                 </StackPanel>
             </StackPanel>
@@ -262,18 +257,18 @@
 
                 <!-- Minimize -->
                 <Button x:Name="btn_minimize"
-                        Style="{StaticResource WindowControlButton}"
+                        Style="{StaticResource WinCtrlButton}"
                         ToolTip="Minimize"
                         Click="minimize_button_clicked">
-                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
 
                 <!-- Maximize / Restore -->
                 <Button x:Name="btn_maximize"
-                        Style="{StaticResource WindowControlButton}"
+                        Style="{StaticResource WinCtrlButton}"
                         ToolTip="Maximize"
                         Click="maximize_button_clicked">
-                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#005B82"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
 
                 <!-- Close -->
@@ -284,7 +279,7 @@
                     <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="#005B82"/>
+                                <Setter Property="Foreground" Value="#083D56"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsMouseOver,
                                                  RelativeSource={RelativeSource AncestorType=Button}}"
@@ -333,13 +328,19 @@
                                   Foreground="#2C3E50"
                                   Margin="0,4,0,4"/>
                         <CheckBox x:Name="chk_grids"
-                                  Content="Grids"
+                                  Content="Grid-to-Grid Overall Chains"
+                                  IsChecked="True"
+                                  FontSize="13"
+                                  Foreground="#2C3E50"
+                                  Margin="0,4,0,4"/>
+                        <CheckBox x:Name="chk_windows"
+                                  Content="Windows (opening width)"
                                   IsChecked="True"
                                   FontSize="13"
                                   Foreground="#2C3E50"
                                   Margin="0,4,0,4"/>
                         <CheckBox x:Name="chk_doors"
-                                  Content="Doors (outer reference planes)"
+                                  Content="Doors (opening width)"
                                   IsChecked="True"
                                   FontSize="13"
                                   Foreground="#2C3E50"
@@ -350,6 +351,38 @@
                                   FontSize="13"
                                   Foreground="#2C3E50"
                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- ─────────────────────────────────────── -->
+                <!--  Section 2: Wall Reference Layer        -->
+                <!-- ─────────────────────────────────────── -->
+                <GroupBox Header="Wall Reference Layer"
+                          Style="{StaticResource SectionGroup}">
+                    <StackPanel IsEnabled="{Binding IsChecked, ElementName=chk_walls}">
+                        <TextBlock Text="Dimension walls to:"
+                                   FontSize="12"
+                                   Foreground="#7F8C8D"
+                                   Margin="0,0,0,6"/>
+                        <RadioButton x:Name="rad_wall_ext"
+                                     Content="Exterior face"
+                                     IsChecked="True"
+                                     GroupName="WallLayer"
+                                     FontSize="13"
+                                     Foreground="#2C3E50"
+                                     Margin="0,3,0,3"/>
+                        <RadioButton x:Name="rad_wall_int"
+                                     Content="Interior face"
+                                     GroupName="WallLayer"
+                                     FontSize="13"
+                                     Foreground="#2C3E50"
+                                     Margin="0,3,0,3"/>
+                        <RadioButton x:Name="rad_wall_both"
+                                     Content="Both faces  (dim string shows wall thickness)"
+                                     GroupName="WallLayer"
+                                     FontSize="13"
+                                     Foreground="#2C3E50"
+                                     Margin="0,3,0,0"/>
                     </StackPanel>
                 </GroupBox>
 
@@ -375,7 +408,7 @@
                                   Height="28"
                                   FontSize="12"
                                   Foreground="#2C3E50"
-                                  BorderBrush="#BDC3C7"
+                                  BorderBrush="#546E7A"
                                   BorderThickness="1"
                                   VerticalContentAlignment="Center">
                             <!-- Items are populated from code -->
@@ -388,49 +421,237 @@
                 </GroupBox>
 
                 <!-- ─────────────────────────────────────── -->
-                <!--  Section 4: Offset                      -->
+                <!--  Section 4: Dimension Settings          -->
                 <!-- ─────────────────────────────────────── -->
-                <GroupBox Header="Offset"
+                <GroupBox Header="Dimension Settings"
                           Style="{StaticResource SectionGroup}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="130"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                    <StackPanel>
 
-                        <TextBlock Grid.Column="0"
-                                   Text="Dimension Line Offset:"
-                                   FontSize="13"
-                                   Foreground="#2C3E50"
-                                   VerticalAlignment="Center"
-                                   TextWrapping="Wrap"/>
+                        <!-- Offset Mode row -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Offset mode:"
+                                       FontSize="13"
+                                       Foreground="#2C3E50"
+                                       VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cmb_offset_mode"
+                                      Grid.Column="1"
+                                      Height="28"
+                                      FontSize="12"
+                                      Foreground="#2C3E50"
+                                      BorderBrush="#546E7A"
+                                      BorderThickness="1"
+                                      VerticalContentAlignment="Center"
+                                      SelectionChanged="offset_mode_changed">
+                                <ComboBoxItem Content="Single offset" IsSelected="True"/>
+                                <ComboBoxItem Content="3-Level auto (L1 / L2 / L3)"/>
+                            </ComboBox>
+                        </Grid>
 
-                        <TextBox x:Name="txt_offset"
-                                 Grid.Column="1"
-                                 Text="1000"
-                                 Height="28"
-                                 FontSize="13"
-                                 Foreground="#2C3E50"
-                                 BorderBrush="#BDC3C7"
-                                 BorderThickness="1"
-                                 VerticalContentAlignment="Center"
-                                 Padding="6,0"
-                                 Margin="0,0,8,0"/>
+                        <!-- Single offset panel -->
+                        <Grid x:Name="pnl_single_offset" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Offset distance:"
+                                       FontSize="13"
+                                       Foreground="#2C3E50"
+                                       VerticalAlignment="Center"/>
+                            <TextBox x:Name="txt_offset"
+                                     Grid.Column="1"
+                                     Text="1000"
+                                     Height="28"
+                                     FontSize="13"
+                                     Foreground="#2C3E50"
+                                     BorderBrush="#546E7A"
+                                     BorderThickness="1"
+                                     VerticalContentAlignment="Center"
+                                     Padding="6,0"
+                                     Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="mm"
+                                       FontSize="13"
+                                       Foreground="#7F8C8D"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
 
-                        <TextBlock Grid.Column="2"
-                                   Text="mm"
-                                   FontSize="13"
-                                   Foreground="#7F8C8D"
-                                   VerticalAlignment="Center"/>
-                    </Grid>
+                        <!-- 3-Level offsets panel -->
+                        <StackPanel x:Name="pnl_3level_offsets"
+                                    Visibility="Collapsed"
+                                    Margin="0,0,0,8">
+                            <!-- L1 -->
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="L1 — Openings:"
+                                           FontSize="13"
+                                           Foreground="#2C3E50"
+                                           VerticalAlignment="Center"/>
+                                <TextBox x:Name="txt_l1"
+                                         Grid.Column="1"
+                                         Text="500"
+                                         Height="28"
+                                         FontSize="13"
+                                         Foreground="#2C3E50"
+                                         BorderBrush="#546E7A"
+                                         BorderThickness="1"
+                                         VerticalContentAlignment="Center"
+                                         Padding="6,0"
+                                         Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="mm"
+                                           FontSize="13"
+                                           Foreground="#7F8C8D"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                            <!-- L2 -->
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="L2 — Columns/Walls:"
+                                           FontSize="13"
+                                           Foreground="#2C3E50"
+                                           VerticalAlignment="Center"/>
+                                <TextBox x:Name="txt_l2"
+                                         Grid.Column="1"
+                                         Text="1000"
+                                         Height="28"
+                                         FontSize="13"
+                                         Foreground="#2C3E50"
+                                         BorderBrush="#546E7A"
+                                         BorderThickness="1"
+                                         VerticalContentAlignment="Center"
+                                         Padding="6,0"
+                                         Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="mm"
+                                           FontSize="13"
+                                           Foreground="#7F8C8D"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                            <!-- L3 -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="L3 — Grid overall:"
+                                           FontSize="13"
+                                           Foreground="#2C3E50"
+                                           VerticalAlignment="Center"/>
+                                <TextBox x:Name="txt_l3"
+                                         Grid.Column="1"
+                                         Text="1500"
+                                         Height="28"
+                                         FontSize="13"
+                                         Foreground="#2C3E50"
+                                         BorderBrush="#546E7A"
+                                         BorderThickness="1"
+                                         VerticalContentAlignment="Center"
+                                         Padding="6,0"
+                                         Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="mm"
+                                           FontSize="13"
+                                           Foreground="#7F8C8D"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Direction row -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Direction:"
+                                       FontSize="13"
+                                       Foreground="#2C3E50"
+                                       VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cmb_direction"
+                                      Grid.Column="1"
+                                      Height="28"
+                                      FontSize="12"
+                                      Foreground="#2C3E50"
+                                      BorderBrush="#546E7A"
+                                      BorderThickness="1"
+                                      VerticalContentAlignment="Center">
+                                <ComboBoxItem Content="Both X and Y" IsSelected="True"/>
+                                <ComboBoxItem Content="X only (above / below)"/>
+                                <ComboBoxItem Content="Y only (left / right)"/>
+                            </ComboBox>
+                        </Grid>
+
+                        <!-- Both sides checkbox -->
+                        <CheckBox x:Name="chk_both_sides"
+                                  Content="Mirror dim strings to both sides of building"
+                                  IsChecked="True"
+                                  FontSize="13"
+                                  Foreground="#2C3E50"
+                                  Margin="0,0,0,8"/>
+
+                        <!-- Conflict warning row -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <CheckBox x:Name="chk_min_seg"
+                                      Grid.Column="0"
+                                      Content="Warn if segment &lt; "
+                                      IsChecked="True"
+                                      FontSize="13"
+                                      Foreground="#2C3E50"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,4,0"/>
+                            <TextBox x:Name="txt_min_seg"
+                                     Grid.Column="1"
+                                     Text="300"
+                                     Height="28"
+                                     Width="60"
+                                     FontSize="13"
+                                     Foreground="#2C3E50"
+                                     BorderBrush="#546E7A"
+                                     BorderThickness="1"
+                                     VerticalContentAlignment="Center"
+                                     HorizontalAlignment="Left"
+                                     Padding="6,0"
+                                     Margin="0,0,6,0"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="mm"
+                                       FontSize="13"
+                                       Foreground="#7F8C8D"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                    </StackPanel>
                 </GroupBox>
 
                 <!-- ─────────────────────────────────────── -->
                 <!--  Info box                               -->
                 <!-- ─────────────────────────────────────── -->
-                <Border Background="#E8F4F8"
-                        BorderBrush="#AED6F1"
+                <Border Background="#F8F9FA"
+                        BorderBrush="#083D56"
                         BorderThickness="1"
                         CornerRadius="4"
                         Padding="12,10"
@@ -439,12 +660,12 @@
                         <TextBlock Text="&#xE946;"
                                    FontFamily="Segoe MDL2 Assets"
                                    FontSize="14"
-                                   Foreground="#2980B9"
+                                   Foreground="#062A3C"
                                    VerticalAlignment="Top"
                                    Margin="0,1,10,0"/>
-                        <TextBlock Text="Uses Linear dimension only. Walls: core layer faces. Doors: outer Left/Right reference planes. Each element dimensions to its nearest grid."
+                        <TextBlock Text="3-level nested dims: ① Inner (0.5× offset) — windows + doors in each structural row. ② Mid (1× offset) — column string per row. ③ Outer (2× offset) — grid-to-grid overall. Wall Reference Layer controls which face of each wall is used."
                                    FontSize="12"
-                                   Foreground="#1A5276"
+                                   Foreground="#2C3E50"
                                    TextWrapping="Wrap"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
@@ -458,7 +679,7 @@
         <!-- ═══════════════════════════════════════════════ -->
         <Border Grid.Row="2"
                 Background="White"
-                BorderBrush="#E0E0E0"
+                BorderBrush="#546E7A"
                 BorderThickness="0,1,0,0"
                 Padding="18,10">
             <Grid>
@@ -490,8 +711,8 @@
         <!--  STATUS BAR                                     -->
         <!-- ═══════════════════════════════════════════════ -->
         <Border Grid.Row="3"
-                Background="#FAFAFA"
-                BorderBrush="#E0E0E0"
+                Background="#F8F9FA"
+                BorderBrush="#546E7A"
                 BorderThickness="0,1,0,0"
                 Padding="18,0">
             <Grid>
@@ -508,10 +729,11 @@
                            VerticalAlignment="Center"/>
 
                 <TextBlock Grid.Column="1"
-                           Text="© T3Lab Architect"
+                           Text="© Copyright by T3Lab"
                            FontSize="11"
-                           Foreground="#BDC3C7"
-                           VerticalAlignment="Center"/>
+                           Foreground="#3498DB"
+                           VerticalAlignment="Center"
+                           IsHitTestVisible="False"/>
             </Grid>
         </Border>
 

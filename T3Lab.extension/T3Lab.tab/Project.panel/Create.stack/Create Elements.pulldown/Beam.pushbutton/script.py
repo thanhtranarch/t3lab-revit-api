@@ -36,8 +36,8 @@ from Autodesk.Revit import DB
 from pyrevit import forms, revit, script
 
 # Path setup
-# We need to go up 5 levels: Beam.pushbutton -> CAD.stack -> Project.panel -> T3Lab.tab -> T3Lab.extension
-extension_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+# We need to go up 6 levels: Beam.pushbutton -> Create Elements.pulldown -> Create.stack -> Project.panel -> T3Lab.tab -> T3Lab.extension
+extension_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))))
 lib_dir = os.path.join(extension_dir, 'lib')
 if lib_dir not in sys.path:
     sys.path.append(lib_dir)
@@ -160,7 +160,10 @@ class CADtoBeamWindow(forms.WPFWindow):
         self.cad_map = {}
         for imp in import_instances:
             type_elem = doc.GetElement(imp.GetTypeId())
-            name = type_elem.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString()
+            if not type_elem:
+                continue
+            name_param = type_elem.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME)
+            name = name_param.AsString() if name_param else type_elem.Name
             self.cad_map["{} (Id:{})".format(name, imp.Id)] = imp
         
         self.cb_cad_links.ItemsSource = sorted(self.cad_map.keys())
