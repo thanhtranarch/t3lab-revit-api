@@ -1,0 +1,8 @@
+title: Auto Clicker
+tooltip: Automate repetitive mouse clicking at specified screen coordinates
+description: |
+  Simulates automated mouse clicks at specific screen coordinates
+  with customizable click intervals and click counts.
+
+author: Tran Tien Thanh
+version: 1.0.0
