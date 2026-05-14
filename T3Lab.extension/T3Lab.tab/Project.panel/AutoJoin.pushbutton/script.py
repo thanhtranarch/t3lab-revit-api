@@ -15,7 +15,7 @@ Linkedin: linkedin.com/in/sunarch7899/
 """
 
 __author__  = "Tran Tien Thanh"
-__title__   = "Auto\nJoin"
+__title__   = "AutoJoin"
 __version__ = "1.0.0"
 
 # IMPORT LIBRARIES
