@@ -1,9 +1,0 @@
-title: Workset Views
-tooltip: Create 3D views per workset for visibility management
-description: |
-  Generates dedicated 3D views for each user workset in the project,
-  making it easy to isolate and review workset content. Useful for
-  coordination and model health checks.
-
-author: Tran Tien Thanh
-version: 1.0.0
