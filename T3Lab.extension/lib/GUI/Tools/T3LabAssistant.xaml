@@ -49,37 +49,37 @@
                 </Setter.Value>
             </Setter>
         </Style>
-62: 
-63:         <!-- ── Send button style (pill corner radius matching input) ── -->
-64:         <Style x:Key="SendButtonStyle" TargetType="Button">
-65:             <Setter Property="Background"      Value="#083D56"/>
-66:             <Setter Property="Foreground"      Value="White"/>
-67:             <Setter Property="Padding"         Value="18,0"/>
-68:             <Setter Property="FontSize"        Value="13"/>
-69:             <Setter Property="FontWeight"      Value="SemiBold"/>
-70:             <Setter Property="BorderThickness" Value="0"/>
-71:             <Setter Property="Cursor"          Value="Hand"/>
-72:             <Setter Property="Template">
-73:                 <Setter.Value>
-74:                     <ControlTemplate TargetType="Button">
-75:                         <Border Background="{TemplateBinding Background}"
-76:                                 CornerRadius="0,20,20,0"
-77:                                 Padding="{TemplateBinding Padding}">
-78:                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-79:                         </Border>
-80:                         <ControlTemplate.Triggers>
-81:                             <Trigger Property="IsMouseOver" Value="True">
-82:                                 <Setter Property="Background" Value="#062A3C"/>
-83:                             </Trigger>
-84:                             <Trigger Property="IsEnabled" Value="False">
-85:                                 <Setter Property="Background" Value="#546E7A"/>
-86:                                 <Setter Property="Cursor"     Value="Arrow"/>
-87:                             </Trigger>
-88:                         </ControlTemplate.Triggers>
-89:                     </ControlTemplate>
-90:                 </Setter.Value>
-91:             </Setter>
-92:         </Style>
+
+        <!-- ── Send button style (pill corner radius matching input) ── -->
+        <Style x:Key="SendButtonStyle" TargetType="Button">
+            <Setter Property="Background"      Value="#083D56"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="Padding"         Value="18,0"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="0,20,20,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#062A3C"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="#546E7A"/>
+                                <Setter Property="Cursor"     Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- ── Window control buttons ── -->
         <Style x:Key="WinCtrlButton" TargetType="Button">

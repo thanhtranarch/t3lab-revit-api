@@ -519,6 +519,9 @@ class T3LabAssistantWindow(forms.WPFWindow):
     def close_clicked(self, sender, e):
         self.Close()
 
+    def minimize_clicked(self, sender, e):
+        self.WindowState = WindowState.Minimized
+
     def undo_clicked(self, sender, e):
         """Undo the last Revit transaction."""
         try:
