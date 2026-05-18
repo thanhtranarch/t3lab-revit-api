@@ -1,6 +1,6 @@
 [
   {
-    "join_with": "Floors", 
-    "priority": "Structural Framing"
+    "priority": "Walls", 
+    "join_with": "Walls"
   }
 ]

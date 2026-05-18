@@ -304,6 +304,42 @@
             <StackPanel Margin="18,14,18,10">
 
                 <!-- ─────────────────────────────────────── -->
+                <!--  Section 0: Checking Mode               -->
+                <!-- ─────────────────────────────────────── -->
+                <GroupBox Header="Checking Mode"
+                          Style="{StaticResource SectionGroup}">
+                    <StackPanel>
+                        <CheckBox x:Name="chk_checking_mode"
+                                  Content="Enable Checking Mode — align to nearest grid only"
+                                  IsChecked="False"
+                                  FontSize="13"
+                                  Foreground="#2C3E50"
+                                  Margin="0,2,0,6"
+                                  Checked="checking_mode_changed"
+                                  Unchecked="checking_mode_changed"/>
+                        <Grid x:Name="pnl_check_dim_type" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Check dim style:"
+                                       FontSize="13"
+                                       Foreground="#2C3E50"
+                                       VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cmb_check_dim_type"
+                                      Grid.Column="1"
+                                      Height="28"
+                                      FontSize="12"
+                                      Foreground="#2C3E50"
+                                      BorderBrush="#546E7A"
+                                      BorderThickness="1"
+                                      VerticalContentAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- ─────────────────────────────────────── -->
                 <!--  Section 1: Element Types               -->
                 <!-- ─────────────────────────────────────── -->
                 <GroupBox Header="Element Types"
@@ -357,7 +393,8 @@
                 <!-- ─────────────────────────────────────── -->
                 <!--  Section 2: Wall Reference Layer        -->
                 <!-- ─────────────────────────────────────── -->
-                <GroupBox Header="Wall Reference Layer"
+                <GroupBox x:Name="grp_wall_layer"
+                          Header="Wall Reference Layer"
                           Style="{StaticResource SectionGroup}">
                     <StackPanel IsEnabled="{Binding IsChecked, ElementName=chk_walls}">
                         <TextBlock Text="Dimension walls to:"
@@ -389,7 +426,8 @@
                 <!-- ─────────────────────────────────────── -->
                 <!--  Section 3: Dimension Type              -->
                 <!-- ─────────────────────────────────────── -->
-                <GroupBox Header="Linear Dimension Type"
+                <GroupBox x:Name="grp_dim_type"
+                          Header="Linear Dimension Type"
                           Style="{StaticResource SectionGroup}">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -423,7 +461,8 @@
                 <!-- ─────────────────────────────────────── -->
                 <!--  Section 4: Dimension Settings          -->
                 <!-- ─────────────────────────────────────── -->
-                <GroupBox Header="Dimension Settings"
+                <GroupBox x:Name="grp_dim_settings"
+                          Header="Dimension Settings"
                           Style="{StaticResource SectionGroup}">
                     <StackPanel>
 
@@ -650,7 +689,8 @@
                 <!-- ─────────────────────────────────────── -->
                 <!--  Info box                               -->
                 <!-- ─────────────────────────────────────── -->
-                <Border Background="#F8F9FA"
+                <Border x:Name="brd_info"
+                        Background="#F8F9FA"
                         BorderBrush="#083D56"
                         BorderThickness="1"
                         CornerRadius="4"

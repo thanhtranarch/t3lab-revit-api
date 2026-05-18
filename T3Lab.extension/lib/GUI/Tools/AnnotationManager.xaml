@@ -220,8 +220,7 @@
         </Grid.RowDefinitions>
 
         <!-- Custom Title Bar -->
-        <Grid Grid.Row="0" Background="White"
-        FontFamily="Inter" Height="64">
+        <Grid Grid.Row="0" Background="White" Height="64">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
