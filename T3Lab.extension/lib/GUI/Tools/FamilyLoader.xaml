@@ -383,11 +383,6 @@
                 BorderBrush="#546E7A" BorderThickness="0,1,0,0"
                 Padding="16,10">
             <DockPanel VerticalAlignment="Center">
-                <!-- Copyright left -->
-                <TextBlock DockPanel.Dock="Left"
-                           Text="&#169; Copyright by T3Lab"
-                           VerticalAlignment="Center"
-                           FontSize="10" Foreground="#7F8C8D"/>
                 <!-- Buttons right -->
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Right">

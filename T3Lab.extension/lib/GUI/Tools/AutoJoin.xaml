@@ -11,7 +11,11 @@
     FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="64" UseAeroCaptionButtons="False" ResizeBorderThickness="5"/>
+        <WindowChrome CaptionHeight="64"
+                      ResizeBorderThickness="5"
+                      GlassFrameThickness="0"
+                      CornerRadius="8"
+                      UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
 
     <Window.Resources>

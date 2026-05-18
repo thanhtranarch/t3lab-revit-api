@@ -242,7 +242,6 @@
 
     <!-- Bottom: Action Buttons -->
     <Border Grid.Row="2" Background="#F8F9FA" BorderBrush="#546E7A" BorderThickness="0,1,0,0" Padding="15,10">
-        <StackPanel>
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -260,12 +259,8 @@
                     Width="80" Height="30" FontWeight="SemiBold"
                     Background="#083D56" Foreground="White" BorderThickness="0"/>
         </Grid>
-        <!-- Copyright -->
-        <TextBlock Text="© Copyright by T3Lab"
-                   FontSize="11" Foreground="#3498DB"
-                   HorizontalAlignment="Right"
-                   Margin="0,6,14,0"
-                   IsHitTestVisible="False"/>
-        </StackPanel>
     </Border>
+
+    <!-- Copyright added automatically -->
+    <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
 </Grid>
