@@ -989,7 +989,6 @@
 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock x:Name="status_text" Text="Ready | 0 sheets | Revit" FontStyle="Italic" FontSize="12" Foreground="#083D56"/>
-                    <TextBlock Text="© Copyright by T3Lab" FontSize="11" Foreground="#3498DB" Margin="0,2,0,0" IsHitTestVisible="False"/>
                 </StackPanel>
 
                 <Button x:Name="back_button" Grid.Column="1"
@@ -1047,5 +1046,8 @@
                 </Border>
             </Grid>
         </Border>
+
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>

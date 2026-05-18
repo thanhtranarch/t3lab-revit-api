@@ -755,27 +755,14 @@
                 BorderBrush="#546E7A"
                 BorderThickness="0,1,0,0"
                 Padding="18,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <TextBlock x:Name="status_text"
-                           Grid.Column="0"
-                           Text="Ready"
-                           FontSize="11"
-                           Foreground="#7F8C8D"
-                           VerticalAlignment="Center"/>
-
-                <TextBlock Grid.Column="1"
-                           Text="© Copyright by T3Lab"
-                           FontSize="11"
-                           Foreground="#3498DB"
-                           VerticalAlignment="Center"
-                           IsHitTestVisible="False"/>
-            </Grid>
+            <TextBlock x:Name="status_text"
+                       Text="Ready"
+                       FontSize="11"
+                       Foreground="#7F8C8D"
+                       VerticalAlignment="Center"/>
         </Border>
 
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>

@@ -188,7 +188,6 @@
                 Padding="15"
                 BorderBrush="#546E7A"
                 BorderThickness="0,1,0,0">
-            <StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="txt_selected_count"
                            Text="0 families selected"
@@ -207,13 +206,9 @@
                         Style="{StaticResource ActionButtonStyle}"
                         Margin="5,0"/>
             </StackPanel>
-            <!-- Copyright -->
-            <TextBlock Text="© Copyright by T3Lab"
-                       FontSize="11" Foreground="#3498DB"
-                       HorizontalAlignment="Right"
-                       Margin="0,6,14,0"
-                       IsHitTestVisible="False"/>
-            </StackPanel>
         </Border>
     </Grid>
+
+    <!-- Copyright added automatically -->
+    <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
 </Grid>

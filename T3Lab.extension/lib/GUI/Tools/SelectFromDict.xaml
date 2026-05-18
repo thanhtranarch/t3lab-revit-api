@@ -10,7 +10,11 @@
     FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="64" UseAeroCaptionButtons="False" ResizeBorderThickness="5"/>
+        <WindowChrome CaptionHeight="64"
+                      ResizeBorderThickness="5"
+                      GlassFrameThickness="0"
+                      CornerRadius="8"
+                      UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -125,12 +129,18 @@
                            FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-                <Button x:Name="btn_minimize" Content="&#x2212;" Style="{StaticResource WinCtrlButton}"
-                        Click="minimize_button_clicked"/>
-                <Button x:Name="btn_maximize" Content="&#x25A1;" Style="{StaticResource WinCtrlButton}"
-                        Click="maximize_button_clicked"/>
-                <Button x:Name="btn_close" Content="&#xE8BB;" Style="{StaticResource CloseButton}"
-                        Click="button_close"/>
+                <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}"
+                        Click="minimize_button_clicked" ToolTip="Minimize">
+                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
+                </Button>
+                <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
+                        Click="maximize_button_clicked" ToolTip="Maximize">
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
+                </Button>
+                <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
+                        Click="button_close" ToolTip="Close">
+                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
+                </Button>
             </StackPanel>
         </Grid>
 

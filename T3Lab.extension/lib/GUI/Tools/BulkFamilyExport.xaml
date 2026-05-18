@@ -162,7 +162,7 @@
                 </Button>
                 <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
                         Click="maximize_button_clicked" ToolTip="Maximize">
-                    <TextBlock Text="&#x25A1;" FontSize="14" Foreground="#7F8C8D"/>
+                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
                 </Button>
                 <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
                         Click="close_button_clicked" ToolTip="Close">

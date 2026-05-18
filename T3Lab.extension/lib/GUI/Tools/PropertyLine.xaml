@@ -553,29 +553,23 @@
         <Border Grid.Row="3" Background="#F8F9FA"
                 BorderBrush="#546E7A" BorderThickness="0,1,0,0"
                 Padding="16,12">
-            <StackPanel>
-                <DockPanel>
-                    <Button x:Name="btn_cancel"
-                            DockPanel.Dock="Right"
-                            Content="Close"
-                            MinWidth="90"
-                            Style="{StaticResource SecondaryBtn}"
-                            Click="btn_close_Click"/>
-                    <Button x:Name="btn_create"
-                            Content="Create Property Lines in Revit"
-                            Style="{StaticResource SuccessBtn}"
-                            IsEnabled="False"
-                            Margin="0,0,10,0"
-                            Click="btn_create_Click"/>
-                </DockPanel>
-                <!-- Copyright -->
-                <TextBlock Text="© Copyright by T3Lab"
-                           FontSize="11" Foreground="#3498DB"
-                           HorizontalAlignment="Right"
-                           Margin="0,8,14,0"
-                           IsHitTestVisible="False"/>
-            </StackPanel>
+            <DockPanel>
+                <Button x:Name="btn_cancel"
+                        DockPanel.Dock="Right"
+                        Content="Close"
+                        MinWidth="90"
+                        Style="{StaticResource SecondaryBtn}"
+                        Click="btn_close_Click"/>
+                <Button x:Name="btn_create"
+                        Content="Create Property Lines in Revit"
+                        Style="{StaticResource SuccessBtn}"
+                        IsEnabled="False"
+                        Margin="0,0,10,0"
+                        Click="btn_create_Click"/>
+            </DockPanel>
         </Border>
 
+        <!-- Copyright added automatically -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>
