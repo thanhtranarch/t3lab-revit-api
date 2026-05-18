@@ -63,7 +63,7 @@ SCRIPT_DIR = os.path.dirname(__file__)
 EXT_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 LIB_DIR    = os.path.join(EXT_DIR, 'lib')
 XAML_FILE  = os.path.join(EXT_DIR, 'lib', 'GUI', 'Tools', 'AutoDimension.xaml')
-LOGO_FILE  = os.path.join(EXT_DIR, 'lib', 'GUI', 'T3Lab_logo.png')
+
 
 if LIB_DIR not in sys.path:
     sys.path.insert(0, LIB_DIR)

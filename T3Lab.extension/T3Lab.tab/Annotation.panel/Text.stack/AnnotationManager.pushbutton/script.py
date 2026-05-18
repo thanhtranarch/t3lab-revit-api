@@ -17,7 +17,7 @@ Linkedin: linkedin.com/in/sunarch7899/
 
 __title__   = "Annotation Manager"
 __author__  = "Tran Tien Thanh"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 # IMPORT LIBRARIES
 # ==================================================
@@ -57,32 +57,62 @@ doc    = revit.doc
 uidoc  = revit.uidoc
 REVIT_VERSION = int(revit.doc.Application.VersionNumber)
 
-# CLASS/FUNCTIONS
-# ==================================================
+# ============================================================
+# NAMING STRUCTURE CONFIGURATION (EASILY CUSTOMIZED)
+# ============================================================
+# Tokens will be replaced with their evaluated values. Unused tokens (value is None or empty) are removed.
+NAMING_TEMPLATES = {
+    "Dimension": {
+        "Prefix": "LB",
+        "Separator": "_",
+        "Fields": [
+            "Prefix",          # E.g. "LB"
+            "Discipline",      # E.g. "ARC" or "STR"
+            "Size",            # E.g. "2.50mm"
+            "Font",            # E.g. "Arial"
+            "WidthScale",      # E.g. "0.7"
+            "Background",      # E.g. "Transparent" or "Opaque"
+            "Color",           # E.g. "Red" (skipped if Black)
+            "CenterSymbol",    # E.g. "Center"
+            "PrefixText",      # E.g. Prefix parameter of Dimension
+            "ElevationText",   # E.g. Elevation indicators
+            "Rounding"         # E.g. "Round1" or "Round0.1"
+        ]
+    },
+    "TextNote": {
+        "Prefix": "LB",
+        "Separator": "_",
+        "Fields": [
+            "Prefix",          # E.g. "LB"
+            "Discipline",      # E.g. "ARC" or "STR"
+            "Size",            # E.g. "2.50mm"
+            "Font",            # E.g. "Arial"
+            "WidthScale",      # E.g. "0.7"
+            "Background",      # E.g. "Transparent" or "Opaque"
+            "Color",           # E.g. "Red" (skipped if Black)
+            "Border",          # E.g. "Border"
+            "TextStyles"       # E.g. Bold/Underline/Italic "BUI"
+        ]
+    }
+}
 
 # ============================================================
 # SHARED COLOR TABLE
 # ============================================================
 _DIM_COLORS = {
-    (255,128,128):"Light Coral",(255,255,128):"Light Yellow",(128,255,128):"Pale Green",
-    (128,255,255):"Pale Cyan",(128,128,255):"Light Slate Blue",(255,128,255):"Orchid",
-    (255,0,0):"Red",(255,255,0):"Yellow",(0,255,0):"Lime",(0,255,255):"Cyan",
-    (0,0,255):"Blue",(255,0,255):"Magenta",(128,64,64):"Brown",(255,192,128):"Light Salmon",
-    (128,255,192):"Aquamarine",(192,192,255):"Lavender",(192,128,255):"Medium Orchid",
-    (128,0,0):"Maroon",(255,128,0):"Orange",(0,128,0):"Green",(0,128,128):"Teal",
-    (0,0,128):"Navy",(128,0,128):"Purple",(128,64,0):"Saddle Brown",(192,128,64):"Peru",
-    (0,128,64):"Dark Sea Green",(0,128,192):"Steel Blue",(64,128,255):"Dodger Blue",
-    (128,0,192):"Dark Orchid",(0,0,0):"Black",(128,128,0):"Olive",(128,128,128):"Gray128",
-    (0,192,192):"Medium Turquoise",(192,192,192):"Silver",(255,255,255):"White",
-    (70,70,70):"Gray70",(128,0,64):"Dark Raspberry",(77,77,77):"Gray77",
+    (255,128,128):"Light Coral", (255,255,128):"Light Yellow", (128,255,128):"Pale Green",
+    (128,255,255):"Pale Cyan", (128,128,255):"Light Slate Blue", (255,128,255):"Orchid",
+    (255,0,0):"Red", (255,255,0):"Yellow", (0,255,0):"Lime", (0,255,255):"Cyan",
+    (0,0,255):"Blue", (255,0,255):"Magenta", (128,64,64):"Brown", (255,192,128):"Light Salmon",
+    (128,255,192):"Aquamarine", (192,192,255):"Lavender", (192,128,255):"Medium Orchid",
+    (128,0,0):"Maroon", (255,128,0):"Orange", (0,128,0):"Green", (0,128,128):"Teal",
+    (0,0,128):"Navy", (128,0,128):"Purple", (128,64,0):"Saddle Brown", (192,128,64):"Peru",
+    (0,128,64):"Dark Sea Green", (0,128,192):"Steel Blue", (64,128,255):"Dodger Blue",
+    (128,0,192):"Dark Orchid", (0,0,0):"Black", (128,128,0):"Olive", (128,128,128):"Gray",
+    (0,192,192):"Medium Turquoise", (192,192,192):"Silver", (255,255,255):"White",
+    (70,70,70):"Gray70", (128,0,64):"Dark Raspberry", (77,77,77):"Gray77",
 }
-_TXT_COLORS = {
-    (255,0,0):"Red",(0,255,0):"Lime",(0,0,255):"Blue",(255,255,0):"Yellow",
-    (0,255,255):"Cyan",(255,0,255):"Magenta",(0,0,0):"Black",(255,255,255):"White",
-    (128,128,128):"Gray",(128,0,0):"Maroon",(0,128,0):"Green",(0,0,128):"Navy",
-    (128,128,0):"Olive",(0,128,128):"Teal",(128,0,128):"Purple",(255,128,0):"Orange",
-    (128,128,255):"LightBlue",(192,192,192):"Silver",
-}
+_TXT_COLORS = _DIM_COLORS
 
 def _rgb(color_int):
     return (color_int & 255, (color_int >> 8) & 255, (color_int >> 16) & 255)
@@ -94,7 +124,6 @@ def _sanitize(v):
 
 def _mm(param):
     return "{:.2f}mm".format(round(param.AsDouble() * 304.8, 2))
-
 
 # ============================================================
 # DIMENSION RENAME HELPERS
@@ -109,6 +138,8 @@ def _dim_name(dt, origin):
     size  = _mm(p) if p else "N/A"
     p = gp(BuiltInParameter.TEXT_FONT)
     font  = p.AsString() if p else "N/A"
+    p = gp(BuiltInParameter.TEXT_WIDTH_SCALE)
+    factor = "{:.2f}".format(p.AsDouble()).rstrip('0').rstrip('.') if p else "N/A"
     p = gp(BuiltInParameter.DIM_TEXT_BACKGROUND)
     bg    = p.AsValueString() if p else "N/A"
     p = gp(BuiltInParameter.LINE_COLOR)
@@ -124,17 +155,42 @@ def _dim_name(dt, origin):
     p = gp(BuiltInParameter.SPOT_ELEV_IND_BOTTOM)
     bot   = _sanitize(p.AsString()) if p else "N/A"
 
-    parts = ["LB", discipline, size, font, bg]
-    if color != "Black": parts.append(color)
-    if ctr  != "N/A":   parts.append(ctr)
-    if pref != "N/A":   parts.append(pref)
-    if elev != "N/A":
-        parts.append(elev)
-    else:
-        if top != "N/A": parts.append(top)
-        if bot != "N/A": parts.append(bot)
-    return "_".join(parts)
+    # Extract custom rounding if available
+    rounding_str = ""
+    try:
+        if hasattr(dt, "GetUnitsFormatOptions"):
+            opts = dt.GetUnitsFormatOptions()
+            if opts and not opts.UseDefault:
+                acc = opts.Accuracy
+                if acc != 1 and acc != 1.0:
+                    acc_str = "{:.12f}".format(acc).rstrip('0').rstrip('.')
+                    rounding_str = "Round{}".format(acc_str)
+    except Exception:
+        pass
 
+    # Map variable values to structure configuration fields
+    field_values = {
+        "Prefix": NAMING_TEMPLATES["Dimension"]["Prefix"],
+        "Discipline": discipline,
+        "Size": size,
+        "Font": font,
+        "WidthScale": factor,
+        "Background": bg,
+        "Color": color if color != "Black" else "N/A",
+        "CenterSymbol": ctr,
+        "PrefixText": pref,
+        "ElevationText": elev if elev != "N/A" else (top if top != "N/A" else (bot if bot != "N/A" else "N/A")),
+        "Rounding": rounding_str or "N/A"
+    }
+
+    # Construct naming parts based on defined Field structure
+    parts = []
+    for field in NAMING_TEMPLATES["Dimension"]["Fields"]:
+        val = field_values.get(field, "N/A")
+        if val != "N/A" and val:
+            parts.append(val)
+
+    return NAMING_TEMPLATES["Dimension"]["Separator"].join(parts)
 
 # ============================================================
 # TEXTNOTE RENAME HELPERS
@@ -152,11 +208,11 @@ def _txt_name(tt, origin):
     p = gp(BuiltInParameter.TEXT_BACKGROUND)
     bg     = ("Opaque" if p.AsInteger() == 0 else "Transparent") if p else "N/A"
     p = gp(BuiltInParameter.TEXT_WIDTH_SCALE)
-    factor = str(round(p.AsDouble(), 2)) if p else "N/A"
+    factor = "{:.2f}".format(p.AsDouble()).rstrip('0').rstrip('.') if p else "N/A"
     p = gp(BuiltInParameter.LINE_COLOR)
     color  = _TXT_COLORS.get(_rgb(p.AsInteger()), "RGB") if p else "N/A"
     p = gp(BuiltInParameter.TEXT_BOX_VISIBILITY)
-    border = p and p.AsInteger() == 1
+    border = "Border" if (p and p.AsInteger() == 1) else "N/A"
     p = gp(BuiltInParameter.TEXT_STYLE_BOLD)
     bold   = p and p.AsInteger() == 1
     p = gp(BuiltInParameter.TEXT_STYLE_UNDERLINE)
@@ -164,14 +220,33 @@ def _txt_name(tt, origin):
     p = gp(BuiltInParameter.TEXT_STYLE_ITALIC)
     italic = p and p.AsInteger() == 1
 
-    parts = ["LB", discipline, size, font, bg, factor]
-    if color != "Black": parts.append(color)
-    if border:  parts.append("Border")
-    if bold:    parts.append("B")
-    if uline:   parts.append("U")
-    if italic:  parts.append("I")
-    return "_".join(parts)
+    styles_list = []
+    if bold:   styles_list.append("B")
+    if uline:  styles_list.append("U")
+    if italic: styles_list.append("I")
+    styles_str = "".join(styles_list) if styles_list else "N/A"
 
+    # Map variable values to structure configuration fields
+    field_values = {
+        "Prefix": NAMING_TEMPLATES["TextNote"]["Prefix"],
+        "Discipline": discipline,
+        "Size": size,
+        "Font": font,
+        "WidthScale": factor,
+        "Background": bg,
+        "Color": color if color != "Black" else "N/A",
+        "Border": border,
+        "TextStyles": styles_str
+    }
+
+    # Construct naming parts based on defined Field structure
+    parts = []
+    for field in NAMING_TEMPLATES["TextNote"]["Fields"]:
+        val = field_values.get(field, "N/A")
+        if val != "N/A" and val:
+            parts.append(val)
+
+    return NAMING_TEMPLATES["TextNote"]["Separator"].join(parts)
 
 # ============================================================
 # XAML PATH
@@ -181,7 +256,6 @@ _GUI_DIR = os.path.join(
     'lib', 'GUI'
 )
 _XAML_PATH = os.path.join(_GUI_DIR, 'Tools', 'AnnotationManager.xaml')
-
 
 # ============================================================
 # WINDOW CLASS
@@ -194,9 +268,11 @@ class AnnotationManagerWindow(forms.WPFWindow):
             self._dim_submode = "instances"  # "instances" | "types"
             self._txt_submode = "notes"      # "notes"     | "types"
 
+            import System
             # ── Dimension DataTable ──────────────────────────────────────────
             self._dim_dt = DataTable()
-            for col in ["_id", "_cat", "Name", "Size", "Font", "Background", "Color", "Details"]:
+            self._dim_dt.Columns.Add("Selected", System.Boolean)
+            for col in ["_id", "_cat", "Name", "Size", "Font", "Background", "Color", "Details", "Type", "Count", "Status"]:
                 self._dim_dt.Columns.Add(col)
             self.dg_dim.ItemsSource = self._dim_dt.DefaultView
             self._dim_map = {}   # id-str → Revit element
@@ -204,26 +280,27 @@ class AnnotationManagerWindow(forms.WPFWindow):
 
             # ── TextNote DataTable ───────────────────────────────────────────
             self._txt_dt = DataTable()
-            for col in ["_id", "_cat", "Name", "Size", "Font", "Background", "Color", "Details"]:
+            self._txt_dt.Columns.Add("Selected", System.Boolean)
+            for col in ["_id", "_cat", "Name", "Size", "Font", "Background", "Color", "Details", "Type", "Count", "Status"]:
                 self._txt_dt.Columns.Add(col)
             self.dg_txt.ItemsSource = self._txt_dt.DefaultView
             self._txt_map = {}   # id-str → Revit element
             self.dg_txt.CellEditEnding += self.txt_cell_edit_ending
 
-            # Load logo
-            try:
-                if os.path.exists(_LOGO_PATH):
-                    bitmap = BitmapImage()
-                    bitmap.BeginInit()
-                    bitmap.UriSource = Uri(_LOGO_PATH, UriKind.Absolute)
-                    bitmap.EndInit()
-                    self.Icon = bitmap
-            except Exception as icon_ex:
-                logger.warning("Could not set window icon: {}".format(icon_ex))
+            # Sidebar list event bindings
+            self.lb_dim_types.SelectionChanged += self.dim_sidebar_select_changed
+            self.lb_txt_types.SelectionChanged += self.txt_sidebar_select_changed
+            self.dim_sidebar_search.TextChanged += self.dim_sidebar_search_changed
+            self.txt_sidebar_search.TextChanged += self.txt_sidebar_search_changed
+
+            # Main search text changed event bindings (for placeholder behavior and instant search)
+            self.dim_kw.TextChanged += self.dim_kw_changed
+            self.txt_kw.TextChanged += self.txt_kw_changed
 
             # Auto-load all elements on startup
             self._load_all_dims()
             self._load_all_txts()
+            self._load_sidebar_lists()
         except Exception as ex:
             logger.error("Error initializing window: {}".format(ex))
             raise
@@ -234,8 +311,9 @@ class AnnotationManagerWindow(forms.WPFWindow):
         self.status.Text = msg
 
     def _dt_add(self, dt, elem_id, cat_code, name, details,
-                size="", font="", bg="", color=""):
+                size="", font="", bg="", color="", selected=False, count="1", status="Active"):
         row = dt.NewRow()
+        row["Selected"]   = selected
         row["_id"]        = elem_id
         row["_cat"]       = cat_code
         row["Name"]       = name
@@ -244,6 +322,9 @@ class AnnotationManagerWindow(forms.WPFWindow):
         row["Background"] = bg
         row["Color"]      = color
         row["Details"]    = details
+        row["Type"]       = "Dimension Style" if "Dim" in cat_code else "Text Note Style"
+        row["Count"]      = count
+        row["Status"]     = status
         dt.Rows.Add(row)
 
     @staticmethod
@@ -282,6 +363,14 @@ class AnnotationManagerWindow(forms.WPFWindow):
         self._dim_dt.Clear()
         self._dim_map = {}
 
+        # Pre-calculate counts of instances per type
+        all_dims = FilteredElementCollector(doc).OfClass(Dimension)\
+                   .WhereElementIsNotElementType().ToElements()
+        dim_counts = {}
+        for d in all_dims:
+            tid = str(d.DimensionType.Id)
+            dim_counts[tid] = dim_counts.get(tid, 0) + 1
+
         if self._dim_submode == "instances":
             dims = FilteredElementCollector(doc).OfClass(Dimension)\
                    .WhereElementIsNotElementType().ToElements()
@@ -289,7 +378,8 @@ class AnnotationManagerWindow(forms.WPFWindow):
                 view = doc.GetElement(d.OwnerViewId)
                 if view:
                     self._dt_add(self._dim_dt, str(d.Id), "DimInst",
-                                 d.Name or "<unnamed>", view.Name)
+                                 d.Name or "<unnamed>", view.Name,
+                                 selected=False, count="1", status="Active")
                     self._dim_map[str(d.Id)] = d
         else:
             types = FilteredElementCollector(doc).OfClass(DimensionType)\
@@ -297,9 +387,12 @@ class AnnotationManagerWindow(forms.WPFWindow):
             for dt in types:
                 name = dt.Name or ""
                 size, font, bg, color = self._get_dim_params(dt)
+                count = dim_counts.get(str(dt.Id), 0)
+                status = "Active" if count > 0 else "Unused"
                 self._dt_add(self._dim_dt, str(dt.Id), "DimType",
                              name or "<unnamed>", "Dimension Type",
-                             size, font, bg, color)
+                             size, font, bg, color,
+                             selected=False, count=str(count), status=status)
                 self._dim_map[str(dt.Id)] = dt
 
         n = len(self._dim_map)
@@ -311,6 +404,14 @@ class AnnotationManagerWindow(forms.WPFWindow):
         self._txt_dt.Clear()
         self._txt_map = {}
 
+        # Pre-calculate counts of instances per type
+        all_notes = FilteredElementCollector(doc).OfClass(TextNote)\
+                    .WhereElementIsNotElementType().ToElements()
+        note_counts = {}
+        for tn in all_notes:
+            tid = str(tn.TextNoteType.Id)
+            note_counts[tid] = note_counts.get(tid, 0) + 1
+
         if self._txt_submode == "notes":
             notes = FilteredElementCollector(doc).OfClass(TextNote)\
                     .WhereElementIsNotElementType().ToElements()
@@ -319,7 +420,8 @@ class AnnotationManagerWindow(forms.WPFWindow):
                 if view:
                     preview = (tn.Text or "")[:60].replace("\n", " ").replace("\r", "")
                     self._dt_add(self._txt_dt, str(tn.Id), "TxtInst",
-                                 preview, view.Name)
+                                 preview, view.Name,
+                                 selected=False, count="1", status="Active")
                     self._txt_map[str(tn.Id)] = tn
         else:
             types = FilteredElementCollector(doc).OfClass(TextNoteType)\
@@ -327,9 +429,12 @@ class AnnotationManagerWindow(forms.WPFWindow):
             for tt in types:
                 name = tt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString() or ""
                 size, font, bg, color = self._get_txt_params(tt)
+                count = note_counts.get(str(tt.Id), 0)
+                status = "Active" if count > 0 else "Unused"
                 self._dt_add(self._txt_dt, str(tt.Id), "TxtType",
                              name or "<unnamed>", "Text Note Type",
-                             size, font, bg, color)
+                             size, font, bg, color,
+                             selected=False, count=str(count), status=status)
                 self._txt_map[str(tt.Id)] = tt
 
         n = len(self._txt_map)
@@ -339,9 +444,11 @@ class AnnotationManagerWindow(forms.WPFWindow):
 
     def dim_refresh(self, sender, args):
         self._load_all_dims()
+        self._load_sidebar_lists()
 
     def txt_refresh(self, sender, args):
         self._load_all_txts()
+        self._load_sidebar_lists()
 
     def _remove_rows(self, dt, elem_map, ok_ids):
         ok_set = set(ok_ids)
@@ -380,7 +487,8 @@ class AnnotationManagerWindow(forms.WPFWindow):
         self._dim_submode = "instances" if self.rb_dim_inst.IsChecked else "types"
         is_type = self._dim_submode == "types"
         self.btn_dim_jump.IsEnabled = not is_type
-        self.dim_lbl.Text = "Name:" if not is_type else "Type name:"
+        if hasattr(self, 'dim_lbl'):
+            self.dim_lbl.Text = "Name:" if not is_type else "Type name:"
         self._toggle_param_cols(self.dg_dim, is_type)
         self.btn_dim_apply.Visibility = Visibility.Visible if is_type else Visibility.Collapsed
         self._load_all_dims()
@@ -396,6 +504,14 @@ class AnnotationManagerWindow(forms.WPFWindow):
         self._dim_dt.Clear()
         self._dim_map = {}
 
+        # Pre-calculate counts of instances per type
+        all_dims = FilteredElementCollector(doc).OfClass(Dimension)\
+                   .WhereElementIsNotElementType().ToElements()
+        dim_counts = {}
+        for d in all_dims:
+            tid = str(d.DimensionType.Id)
+            dim_counts[tid] = dim_counts.get(tid, 0) + 1
+
         if self._dim_submode == "instances":
             dims = FilteredElementCollector(doc).OfClass(Dimension)\
                    .WhereElementIsNotElementType().ToElements()
@@ -404,7 +520,8 @@ class AnnotationManagerWindow(forms.WPFWindow):
                     view = doc.GetElement(d.OwnerViewId)
                     if view:
                         self._dt_add(self._dim_dt, str(d.Id), "DimInst",
-                                     d.Name or "<unnamed>", view.Name)
+                                     d.Name or "<unnamed>", view.Name,
+                                     selected=False, count="1", status="Active")
                         self._dim_map[str(d.Id)] = d
         else:  # types
             types = FilteredElementCollector(doc).OfClass(DimensionType)\
@@ -413,9 +530,12 @@ class AnnotationManagerWindow(forms.WPFWindow):
                 name = dt.Name or ""
                 if kw in name.lower():
                     size, font, bg, color = self._get_dim_params(dt)
+                    count = dim_counts.get(str(dt.Id), 0)
+                    status = "Active" if count > 0 else "Unused"
                     self._dt_add(self._dim_dt, str(dt.Id), "DimType",
                                  name or "<unnamed>", "Dimension Type",
-                                 size, font, bg, color)
+                                 size, font, bg, color,
+                                 selected=False, count=str(count), status=status)
                     self._dim_map[str(dt.Id)] = dt
 
         n = len(self._dim_map)
@@ -424,7 +544,7 @@ class AnnotationManagerWindow(forms.WPFWindow):
         self._status("Found {} {} matching '{}'.".format(n, kind, kw))
 
     def dim_cell_edit_ending(self, sender, args):
-        if str(args.Column.Header) != "Name":
+        if str(args.Column.Header) != "NAME":
             return
         if str(args.EditAction) != "Commit":
             return
@@ -464,11 +584,17 @@ class AnnotationManagerWindow(forms.WPFWindow):
             self._status("Rename failed: {}".format(e))
 
     def dim_jump(self, sender, args):
-        selected = list(self.dg_dim.SelectedItems)
-        if not selected:
+        selected_rows = []
+        for row in self._dim_dt.Rows:
+            if row["Selected"]:
+                selected_rows.append(row)
+        if not selected_rows:
+            selected_rows = list(self.dg_dim.SelectedItems)
+
+        if not selected_rows:
             self._status("Select a dimension first.")
             return
-        row     = selected[0]
+        row     = selected_rows[0]
         elem_id = str(row["_id"])
         d       = self._dim_map.get(elem_id)
         if not d:
@@ -481,15 +607,22 @@ class AnnotationManagerWindow(forms.WPFWindow):
                 view.Name, str(row["Name"])[:40]))
 
     def dim_delete(self, sender, args):
-        selected = list(self.dg_dim.SelectedItems)
-        if not selected:
-            self._status("Nothing selected.")
+        selected_rows = []
+        for row in self._dim_dt.Rows:
+            if row["Selected"]:
+                selected_rows.append(row)
+        if not selected_rows:
+            selected_rows = list(self.dg_dim.SelectedItems)
+
+        if not selected_rows:
+            self._status("Nothing selected. Check boxes or select rows to delete.")
             return
+
         t = Transaction(doc, "Delete Selected Dimensions")
         t.Start()
         ok_ids = []
         errors = 0
-        for row in selected:
+        for row in selected_rows:
             elem_id = str(row["_id"])
             elem    = self._dim_map.get(elem_id)
             if elem:
@@ -501,16 +634,19 @@ class AnnotationManagerWindow(forms.WPFWindow):
         t.Commit()
         self._remove_rows(self._dim_dt, self._dim_map, ok_ids)
         self.dim_count.Text = "{} found".format(len(self._dim_map))
-        msg = "Deleted {}.".format(len(ok_ids))
+        msg = "Deleted {} elements.".format(len(ok_ids))
         if errors:
             msg += "  ({} failed.)".format(errors)
         self._status(msg)
+        self._load_sidebar_lists()
 
     def dim_select_all(self, sender, args):
-        self.dg_dim.SelectAll()
+        for row in self._dim_dt.Rows:
+            row["Selected"] = True
 
     def dim_clear_sel(self, sender, args):
-        self.dg_dim.UnselectAll()
+        for row in self._dim_dt.Rows:
+            row["Selected"] = False
 
     def dim_apply(self, sender, args):
         """Apply edited Name back to DimensionType elements."""
@@ -537,6 +673,7 @@ class AnnotationManagerWindow(forms.WPFWindow):
         if errors:
             msg += "  ({} failed.)".format(errors)
         self._status(msg)
+        self._load_sidebar_lists()
 
     def dim_rename_all(self, sender, args):
         from pyrevit import forms as pf
@@ -549,26 +686,35 @@ class AnnotationManagerWindow(forms.WPFWindow):
         try:
             for dt in FilteredElementCollector(doc).OfClass(DimensionType)\
                       .WhereElementIsElementType().ToElements():
+                new_name = None
                 try:
                     origin = dt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString()
-                    dt.Name = _dim_name(dt, origin)
-                    count += 1
-                except Exception:
-                    pass
+                    new_name = _dim_name(dt, origin)
+                    if dt.Name != new_name:
+                        dt.Name = new_name
+                        count += 1
+                except Exception as ex:
+                    print("DEBUG: Failed to rename DimensionType '{}' to '{}': {}".format(
+                        dt.Name, new_name, ex
+                    ))
         finally:
             t.Commit()
         self._status("Renamed {} DimensionType(s).".format(count))
+        self._load_all_dims()
+        self._load_sidebar_lists()
 
     # ── TextNote sub-mode ────────────────────────────────────────────────
 
     def txt_submode(self, sender, args):
         if self.rb_notes.IsChecked:
             self._txt_submode = "notes"
-            self.txt_lbl.Text = "Content:"
+            if hasattr(self, 'txt_lbl'):
+                self.txt_lbl.Text = "Content:"
             self.btn_txt_jump.IsEnabled = True
         else:
             self._txt_submode = "types"
-            self.txt_lbl.Text = "Type name:"
+            if hasattr(self, 'txt_lbl'):
+                self.txt_lbl.Text = "Type name:"
             self.btn_txt_jump.IsEnabled = False
         is_type = self._txt_submode == "types"
         self._toggle_param_cols(self.dg_txt, is_type)
@@ -586,6 +732,14 @@ class AnnotationManagerWindow(forms.WPFWindow):
         self._txt_dt.Clear()
         self._txt_map = {}
 
+        # Pre-calculate counts of instances per type
+        all_notes = FilteredElementCollector(doc).OfClass(TextNote)\
+                    .WhereElementIsNotElementType().ToElements()
+        note_counts = {}
+        for tn in all_notes:
+            tid = str(tn.TextNoteType.Id)
+            note_counts[tid] = note_counts.get(tid, 0) + 1
+
         if self._txt_submode == "notes":
             notes = FilteredElementCollector(doc).OfClass(TextNote)\
                     .WhereElementIsNotElementType().ToElements()
@@ -595,7 +749,8 @@ class AnnotationManagerWindow(forms.WPFWindow):
                     if view:
                         preview = (tn.Text or "")[:60].replace("\n", " ").replace("\r", "")
                         self._dt_add(self._txt_dt, str(tn.Id), "TxtInst",
-                                     preview, view.Name)
+                                     preview, view.Name,
+                                     selected=False, count="1", status="Active")
                         self._txt_map[str(tn.Id)] = tn
         else:  # types
             types = FilteredElementCollector(doc).OfClass(TextNoteType)\
@@ -604,19 +759,22 @@ class AnnotationManagerWindow(forms.WPFWindow):
                 name = tt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString() or ""
                 if kw in name.lower():
                     size, font, bg, color = self._get_txt_params(tt)
+                    count = note_counts.get(str(tt.Id), 0)
+                    status = "Active" if count > 0 else "Unused"
                     self._dt_add(self._txt_dt, str(tt.Id), "TxtType",
                                  name or "<unnamed>", "Text Note Type",
-                                 size, font, bg, color)
+                                 size, font, bg, color,
+                                 selected=False, count=str(count), status=status)
                     self._txt_map[str(tt.Id)] = tt
 
         n = len(self._txt_map)
         self.txt_count.Text = "{} found".format(n)
-        self._status("Found {} {}.".format(
-            n, "note(s)" if self._txt_submode == "notes" else "type(s)"))
+        self._status("Found {} {} matching '{}'.".format(
+            n, "note(s)" if self._txt_submode == "notes" else "type(s)", kw))
 
     def txt_cell_edit_ending(self, sender, args):
         col_header = str(args.Column.Header)
-        if col_header not in ("Name / Content", "Name"):
+        if col_header not in ("NAME"):
             return
         if str(args.EditAction) != "Commit":
             return
@@ -657,11 +815,17 @@ class AnnotationManagerWindow(forms.WPFWindow):
         if self._txt_submode != "notes":
             self._status("Jump to View is only available in Find Notes mode.")
             return
-        selected = list(self.dg_txt.SelectedItems)
-        if not selected:
+        selected_rows = []
+        for row in self._txt_dt.Rows:
+            if row["Selected"]:
+                selected_rows.append(row)
+        if not selected_rows:
+            selected_rows = list(self.dg_txt.SelectedItems)
+
+        if not selected_rows:
             self._status("Select a text note first.")
             return
-        row     = selected[0]
+        row     = selected_rows[0]
         elem_id = str(row["_id"])
         tn      = self._txt_map.get(elem_id)
         if not tn:
@@ -674,16 +838,22 @@ class AnnotationManagerWindow(forms.WPFWindow):
                 view.Name, str(row["Name"])[:40]))
 
     def txt_delete(self, sender, args):
-        selected = list(self.dg_txt.SelectedItems)
-        if not selected:
-            self._status("Nothing selected.")
+        selected_rows = []
+        for row in self._txt_dt.Rows:
+            if row["Selected"]:
+                selected_rows.append(row)
+        if not selected_rows:
+            selected_rows = list(self.dg_txt.SelectedItems)
+
+        if not selected_rows:
+            self._status("Nothing selected. Check boxes or select rows to delete.")
             return
         label = "note instance(s)" if self._txt_submode == "notes" else "TextNoteType(s)"
         t = Transaction(doc, "Delete Selected Text {}".format(label))
         t.Start()
         ok_ids = []
         errors = 0
-        for row in selected:
+        for row in selected_rows:
             elem_id = str(row["_id"])
             elem    = self._txt_map.get(elem_id)
             if elem:
@@ -699,12 +869,15 @@ class AnnotationManagerWindow(forms.WPFWindow):
         if errors:
             msg += "  ({} could not be deleted — may be in use.)".format(errors)
         self._status(msg)
+        self._load_sidebar_lists()
 
     def txt_select_all(self, sender, args):
-        self.dg_txt.SelectAll()
+        for row in self._txt_dt.Rows:
+            row["Selected"] = True
 
     def txt_clear_sel(self, sender, args):
-        self.dg_txt.UnselectAll()
+        for row in self._txt_dt.Rows:
+            row["Selected"] = False
 
     def txt_apply(self, sender, args):
         """Apply edited Name back to TextNoteType elements."""
@@ -731,6 +904,7 @@ class AnnotationManagerWindow(forms.WPFWindow):
         if errors:
             msg += "  ({} failed.)".format(errors)
         self._status(msg)
+        self._load_sidebar_lists()
 
     def txt_rename_all(self, sender, args):
         from pyrevit import forms as pf
@@ -752,6 +926,96 @@ class AnnotationManagerWindow(forms.WPFWindow):
         finally:
             t.Commit()
         self._status("Renamed {} TextNoteType(s).".format(count))
+        self._load_all_txts()
+        self._load_sidebar_lists()
+
+    # ── Header Checkbox Toggle Event Handlers ─────────────────────────────────
+
+    def dim_header_select_all_clicked(self, sender, args):
+        is_checked = sender.IsChecked
+        for row in self._dim_dt.Rows:
+            row["Selected"] = is_checked
+
+    def txt_header_select_all_clicked(self, sender, args):
+        is_checked = sender.IsChecked
+        for row in self._txt_dt.Rows:
+            row["Selected"] = is_checked
+
+    # ── Top Horizontal Navigation Tab Event Handlers ─────────────────────────
+
+    def nav_dimensions_checked(self, sender, args):
+        if hasattr(self, 'main_tabs'):
+            self.main_tabs.SelectedIndex = 0
+
+    def nav_textnotes_checked(self, sender, args):
+        if hasattr(self, 'main_tabs'):
+            self.main_tabs.SelectedIndex = 1
+
+    def nav_settings_checked(self, sender, args):
+        if hasattr(self, 'main_tabs'):
+            self.main_tabs.SelectedIndex = 2
+
+    # ── Sidebar Browsing & Live Filtering List Event Handlers ────────────────
+
+    def _load_sidebar_lists(self):
+        # 1. Fetch unique DimensionType names
+        dim_types = FilteredElementCollector(doc).OfClass(DimensionType)\
+                    .WhereElementIsElementType().ToElements()
+        self._all_dim_type_names = sorted(list(set(dt.Name for dt in dim_types if dt.Name)))
+        
+        # 2. Fetch unique TextNoteType names
+        txt_types = FilteredElementCollector(doc).OfClass(TextNoteType)\
+                    .WhereElementIsElementType().ToElements()
+        self._all_txt_type_names = sorted(list(set(tt.Name for tt in txt_types if tt.Name)))
+        
+        self.filter_sidebar_dim_list()
+        self.filter_sidebar_txt_list()
+
+    def filter_sidebar_dim_list(self):
+        kw = self.dim_sidebar_search.Text.strip().lower()
+        self.lb_dim_types.Items.Clear()
+        for name in self._all_dim_type_names:
+            if not kw or kw in name.lower():
+                self.lb_dim_types.Items.Add(name)
+
+    def filter_sidebar_txt_list(self):
+        kw = self.txt_sidebar_search.Text.strip().lower()
+        self.lb_txt_types.Items.Clear()
+        for name in self._all_txt_type_names:
+            if not kw or kw in name.lower():
+                self.lb_txt_types.Items.Add(name)
+
+    def dim_sidebar_select_changed(self, sender, args):
+        selected_item = self.lb_dim_types.SelectedItem
+        if selected_item:
+            self.dim_kw.Text = selected_item
+            self.dim_kw_placeholder.Visibility = Visibility.Collapsed
+            self.dim_search(sender, args)
+
+    def txt_sidebar_select_changed(self, sender, args):
+        selected_item = self.lb_txt_types.SelectedItem
+        if selected_item:
+            self.txt_kw.Text = selected_item
+            self.txt_kw_placeholder.Visibility = Visibility.Collapsed
+            self.txt_search(sender, args)
+
+    def dim_sidebar_search_changed(self, sender, args):
+        self.dim_sidebar_placeholder.Visibility = Visibility.Collapsed if self.dim_sidebar_search.Text else Visibility.Visible
+        self.filter_sidebar_dim_list()
+
+    def txt_sidebar_search_changed(self, sender, args):
+        self.txt_sidebar_placeholder.Visibility = Visibility.Collapsed if self.txt_sidebar_search.Text else Visibility.Visible
+        self.filter_sidebar_txt_list()
+
+    # ── Keyword Instant Search Changed Event Handlers ───────────────────────
+
+    def dim_kw_changed(self, sender, args):
+        self.dim_kw_placeholder.Visibility = Visibility.Collapsed if self.dim_kw.Text else Visibility.Visible
+        self.dim_search(sender, args)
+
+    def txt_kw_changed(self, sender, args):
+        self.txt_kw_placeholder.Visibility = Visibility.Collapsed if self.txt_kw.Text else Visibility.Visible
+        self.txt_search(sender, args)
 
 
 # MAIN SCRIPT

@@ -1,12 +1,12 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-       Title="Annotation Manager - T3Lab"
-       Width="800" Height="680"
-       MinWidth="700" MinHeight="560"
-       WindowStartupLocation="CenterScreen"
-       ResizeMode="CanResizeWithGrip"
-       ShowInTaskbar="True"
-       Background="White"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="T3Lab - Annotation Manager"
+        Width="1100" Height="780"
+        MinWidth="950" MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="True"
+        Background="#FFFFFF"
         FontFamily="Inter">
 
     <WindowChrome.WindowChrome>
@@ -18,29 +18,31 @@
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
+        <!-- COLOR TOKENS -->
+        <!-- Primary branding blue -->
+        <SolidColorBrush x:Key="PrimaryBlue" Color="#083D56"/>
+        <SolidColorBrush x:Key="LightBlueHighlight" Color="#EBF5FB"/>
+        <SolidColorBrush x:Key="AccentBlue" Color="#3498DB"/>
+        <SolidColorBrush x:Key="TextDark" Color="#2C3E50"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#7F8C8D"/>
+        <SolidColorBrush x:Key="BorderLight" Color="#E5E9EC"/>
+        <SolidColorBrush x:Key="BgLight" Color="#F8F9FA"/>
 
-        <Style x:Key="SectionHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,8,0,4"/>
-            <Setter Property="Foreground" Value="#2C3E50"/>
-        </Style>
-
+        <!-- BUTTON STYLES -->
+        <!-- Primary button: solid dark blue -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#083D56"/>
+            <Setter Property="Background" Value="{StaticResource PrimaryBlue}"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="Padding" Value="16,8"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="3"
+                                CornerRadius="4"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
@@ -52,83 +54,21 @@
                     <Setter Property="Background" Value="#062A3C"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#546E7A"/>
+                    <Setter Property="Background" Value="#95A5A6"/>
                     <Setter Property="Cursor" Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="DangerButton" TargetType="Button">
-            <Setter Property="Background" Value="#D32F2F"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="14,7"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="3"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#B71C1C"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#546E7A"/>
-                    <Setter Property="Cursor" Value="Arrow"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="OrangeButton" TargetType="Button">
-            <Setter Property="Background" Value="#E67E22"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="14,7"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="3"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E67E22"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#546E7A"/>
-                    <Setter Property="Cursor" Value="Arrow"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
+        <!-- Secondary button: white background, gray border -->
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#F8F9FA"/>
-            <Setter Property="Foreground" Value="#2C3E50"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource TextDark}"/>
+            <Setter Property="BorderBrush" Value="#BDC3C7"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#546E7A"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Medium"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -136,7 +76,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="3"
+                                CornerRadius="4"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
@@ -145,18 +85,96 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E2E6EA"/>
+                    <Setter Property="Background" Value="#F2F4F4"/>
+                    <Setter Property="BorderBrush" Value="#95A5A6"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="#BDC3C7"/>
+                    <Setter Property="BorderBrush" Value="#E5E9EC"/>
+                    <Setter Property="Cursor" Value="Arrow"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="TabItemStyle" TargetType="TabItem">
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="Padding" Value="18,9"/>
+        <!-- Danger button: red background -->
+        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FDEDEC"/>
+                    <Setter Property="Foreground" Value="#E74C3C"/>
+                    <Setter Property="BorderBrush" Value="#E74C3C"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
-        <!-- Window Control Button Style -->
+        <!-- Action / Orange button -->
+        <Style x:Key="OrangeButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="#E67E22"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#D35400"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- TOP BAR NAV TAB STYLE -->
+        <Style x:Key="TopNavTabStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Padding" Value="16,20"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="0,0,0,2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter x:Name="contentPresenter" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBlue}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBlue}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource PrimaryBlue}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- SIDEBAR LISTBOX ITEM STYLE -->
+        <Style x:Key="SidebarListBoxItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="border" Background="Transparent" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter x:Name="contentPresenter" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#F0F4F8"/>
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBlue}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource LightBlueHighlight}"/>
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBlue}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- WINDOW CONTROL BUTTONS -->
         <Style x:Key="WinCtrlButton" TargetType="Button">
             <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="32"/>
@@ -170,8 +188,18 @@
             </Style.Triggers>
         </Style>
 
-        <!-- Close Button Style -->
+        <!-- Close Button with resources for text box styling inside -->
         <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource WinCtrlButton}">
+            <Style.Resources>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="{StaticResource TextDark}"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                            <Setter Property="Foreground" Value="White"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Style.Resources>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -188,21 +216,49 @@
             </Setter>
         </Style>
 
-        <!-- DataGrid Row / Cell styles -->
+        <!-- DATAGRID STYLES -->
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RowBackground" Value="White"/>
+            <Setter Property="AlternatingRowBackground" Value="#F9FBFD"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="VerticalGridLinesBrush" Value="Transparent"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="RowHeight" Value="36"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#F8F9FA"/>
+            <Setter Property="Foreground" Value="{StaticResource TextDark}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLight}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Height" Value="38"/>
+        </Style>
+
         <Style TargetType="DataGridRow">
             <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#F8F9FA"/>
+                    <Setter Property="Background" Value="#F0F4F8"/>
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#E2E6EA"/>
-                    <Setter Property="Foreground" Value="#2C3E50"/>
+                    <Setter Property="Background" Value="{StaticResource LightBlueHighlight}"/>
+                    <Setter Property="Foreground" Value="{StaticResource TextDark}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
+
         <Style TargetType="DataGridCell">
             <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,0"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="Transparent"/>
@@ -210,463 +266,525 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="64"/>       <!-- Header -->
+            <RowDefinition Height="*"/>        <!-- Content -->
+            <RowDefinition Height="28"/>       <!-- Footer status -->
         </Grid.RowDefinitions>
 
-        <!-- Custom Title Bar -->
-        <Grid Grid.Row="0" Background="White" Height="64">
+        <!-- ═══ HEADER ═══ -->
+        <Grid Grid.Row="0" Background="White">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>       <!-- Logo & Title -->
+                <ColumnDefinition Width="*"/>          <!-- Spacer / Middle -->
+                <ColumnDefinition Width="Auto"/>       <!-- Navigation Tab Buttons + Avatar + Window controls -->
             </Grid.ColumnDefinitions>
 
-            <!-- Logo and Title -->
-            <StackPanel Grid.Column="0" Orientation="Vertical" Margin="16,0,0,0" VerticalAlignment="Center"
-                        WindowChrome.IsHitTestVisibleInChrome="True">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold"
-                               Foreground="#083D56" VerticalAlignment="Bottom" Margin="0,0,6,3"/>
-                    <TextBlock Text="Annotation Manager" FontSize="18" FontWeight="Bold"
-                               Foreground="#2C3E50"/>
+            <!-- Bottom Border -->
+            <Border Grid.ColumnSpan="3" Height="1" BorderBrush="{StaticResource BorderLight}" BorderThickness="0,0,0,1" VerticalAlignment="Bottom"/>
+
+            <!-- Left: Logo & Title -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0" WindowChrome.IsHitTestVisibleInChrome="True">
+                <StackPanel Orientation="Vertical">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="T3Lab" FontSize="11" FontWeight="Bold" Foreground="{StaticResource PrimaryBlue}" Margin="0,0,6,0" VerticalAlignment="Bottom"/>
+                        <TextBlock Text="Annotation Manager - Master UI" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextDark}"/>
+                    </StackPanel>
                 </StackPanel>
-                <Separator Height="1" Background="#546E7A" Margin="0,2,0,2"/>
-                <TextBlock Text="Find · Edit · Delete · Auto-Rename dimensions and text notes"
-                           FontSize="10" Foreground="#7F8C8D" FontStyle="Italic"/>
             </StackPanel>
 
-            <!-- Window Control Buttons -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,0,5,0"
-                        WindowChrome.IsHitTestVisibleInChrome="True">
-                <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}"
-                        ToolTip="Minimize" Click="minimize_button_clicked">
-                    <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
-                </Button>
-                <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}"
-                        ToolTip="Maximize" Click="maximize_button_clicked">
-                    <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56"/>
-                </Button>
-                <Button x:Name="btn_close" Style="{StaticResource CloseButton}"
-                        ToolTip="Close" Click="close_button_clicked">
-                    <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#083D56">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
-                                        <Setter Property="Foreground" Value="White"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </Button>
+            <!-- Right Controls Panel -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch" WindowChrome.IsHitTestVisibleInChrome="True">
+                <!-- Navigation Tabs (RadioButtons styled as tabs) -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Stretch">
+                    <RadioButton x:Name="nav_dim" Content="Dimensions" Style="{StaticResource TopNavTabStyle}" IsChecked="True" Checked="nav_dimensions_checked"/>
+                    <RadioButton x:Name="nav_txt" Content="Text Notes" Style="{StaticResource TopNavTabStyle}" Checked="nav_textnotes_checked"/>
+                    <RadioButton x:Name="nav_settings" Content="Settings" Style="{StaticResource TopNavTabStyle}" Checked="nav_settings_checked"/>
+                </StackPanel>
+
+                <!-- Custom Minimize, Maximize, Close Buttons -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Margin="0,0,5,0">
+                    <Button x:Name="btn_minimize" Style="{StaticResource WinCtrlButton}" ToolTip="Minimize" Click="minimize_button_clicked">
+                        <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="{StaticResource TextDark}"/>
+                    </Button>
+                    <Button x:Name="btn_maximize" Style="{StaticResource WinCtrlButton}" ToolTip="Maximize" Click="maximize_button_clicked">
+                        <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="{StaticResource TextDark}"/>
+                    </Button>
+                    <Button x:Name="btn_close" Style="{StaticResource CloseButton}" ToolTip="Close" Click="close_button_clicked">
+                        <TextBlock x:Name="close_text" Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10"/>
+                    </Button>
+                </StackPanel>
             </StackPanel>
         </Grid>
 
-        <!-- Main Content -->
-        <Grid Grid.Row="1" Margin="20,0,20,16">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        <!-- ═══ MAIN TAB CONTAINER ═══ -->
+        <TabControl x:Name="main_tabs" Grid.Row="1" BorderThickness="0" Background="Transparent">
+            <!-- Hide Default Headers of TabControl since we created custom RadioButtons on top -->
+            <TabControl.ItemContainerStyle>
+                <Style TargetType="TabItem">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </Style>
+            </TabControl.ItemContainerStyle>
 
-            <!-- Tab Control -->
-            <TabControl Grid.Row="0" x:Name="main_tabs">
+            <!-- 1. DIMENSIONS TAB -->
+            <TabItem>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="260"/>       <!-- Sidebar -->
+                        <ColumnDefinition Width="*"/>          <!-- Main Area -->
+                    </Grid.ColumnDefinitions>
 
-                <!-- ═══ DIMENSION TAB ═══ -->
-                <TabItem Header="📐  Dimension" Style="{StaticResource TabItemStyle}">
-                    <Grid Margin="10,8,10,10">
+                    <!-- DIMENSION SIDEBAR -->
+                    <Grid Grid.Column="0" Background="White">
+                        <Border BorderBrush="{StaticResource BorderLight}" BorderThickness="0,0,1,0"/>
+                        <Grid Margin="16,16,16,16">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>       <!-- Radio Buttons -->
+                                <RowDefinition Height="Auto"/>       <!-- Search Label -->
+                                <RowDefinition Height="Auto"/>       <!-- Sidebar Search TextBox -->
+                                <RowDefinition Height="*"/>          <!-- List of Dimension Types -->
+                            </Grid.RowDefinitions>
+
+                            <!-- Radio buttons for sub-mode selection -->
+                            <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                                <RadioButton x:Name="rb_dim_inst" Content="Find Dimensions (search instances)" IsChecked="True" FontSize="12" Foreground="{StaticResource TextDark}" Margin="0,0,0,8" Checked="dim_submode"/>
+                                <RadioButton x:Name="rb_dim_type" Content="Find Types (rename inline)" FontSize="12" Foreground="{StaticResource TextDark}" Checked="dim_submode"/>
+                            </StackPanel>
+
+                            <!-- Search input label -->
+                            <TextBlock x:Name="dim_lbl" Grid.Row="1" Text="Type name:" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextDark}" Margin="0,0,0,6"/>
+
+                            <!-- Sidebar Search TextBox -->
+                            <Border Grid.Row="2" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4" Height="32" Margin="0,0,0,12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="8,0,6,0"/>
+                                    <TextBox x:Name="dim_sidebar_search" Grid.Column="1" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center" FontSize="12"/>
+                                    <TextBlock x:Name="dim_sidebar_placeholder" Grid.Column="1" IsHitTestVisible="False" Text="Search" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- List of unique type names -->
+                            <ListBox x:Name="lb_dim_types" Grid.Row="3" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemContainerStyle="{StaticResource SidebarListBoxItemStyle}">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel/>
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                            </ListBox>
+                        </Grid>
+                    </Grid>
+
+                    <!-- DIMENSION MAIN CONTENT AREA -->
+                    <Grid Grid.Column="1" Margin="20,16,20,12">
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>       <!-- Search Row -->
+                            <RowDefinition Height="*"/>          <!-- DataGrid -->
+                            <RowDefinition Height="Auto"/>       <!-- Bottom Action Buttons -->
+                            <RowDefinition Height="Auto"/>       <!-- Auto-Rename Card -->
                         </Grid.RowDefinitions>
 
-                        <!-- Tip box -->
-                        <Border Grid.Row="0" BorderBrush="#083D56" BorderThickness="1" Padding="10,7"
-                                Background="#F8F9FA" CornerRadius="2" Margin="0,0,0,10">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="💡 Tip:" FontWeight="Bold" Foreground="#062A3C" Margin="0,0,5,0"/>
-                                <TextBlock Foreground="#2C3E50"
-                                           Text="Find Dimensions to jump/delete. Find Types to rename inline (double-click Name)."/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Sub-mode toggle -->
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
-                            <RadioButton x:Name="rb_dim_inst" Content="Find Dimensions  (search instances)"
-                                         IsChecked="True" Margin="0,0,24,0" FontSize="12"
-                                         Foreground="#2C3E50" Checked="dim_submode"/>
-                            <RadioButton x:Name="rb_dim_type" Content="Find Types  (rename inline)"
-                                         FontSize="12" Foreground="#2C3E50" Checked="dim_submode"/>
-                        </StackPanel>
-
-                        <!-- Search row -->
-                        <Grid Grid.Row="2" Margin="0,0,0,8">
+                        <!-- Search and Filter Row -->
+                        <Grid Grid.Row="0" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="dim_lbl" Grid.Column="0" Text="Type name:" VerticalAlignment="Center"
-                                       FontWeight="Medium" Foreground="#2C3E50" Margin="0,0,8,0"/>
-                            <TextBox x:Name="dim_kw" Grid.Column="1" Height="30"
-                                     VerticalContentAlignment="Center" Padding="8,0"
-                                     BorderBrush="#546E7A" BorderThickness="1" FontFamily="Consolas"/>
-                            <Button Grid.Column="2" Content="Search" Height="30" Margin="8,0,0,0"
-                                    Style="{StaticResource PrimaryButton}" Click="dim_search"/>
-                            <Button Grid.Column="3" Content="⟳ Refresh" Height="30" Margin="6,0,0,0"
-                                    Style="{StaticResource SecondaryButton}" Click="dim_refresh"/>
-                            <TextBlock x:Name="dim_count" Grid.Column="4"
-                                       VerticalAlignment="Center" Margin="12,0,0,0"
-                                       FontSize="11" Foreground="#7F8C8D"/>
+                            <!-- Search box -->
+                            <Border Grid.Column="0" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4" Background="White" Height="36">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <!-- Search icon -->
+                                    <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                                    <!-- Keyword TextBox -->
+                                    <TextBox x:Name="dim_kw" Grid.Column="1" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center" FontSize="13"/>
+                                    <!-- Placeholder text -->
+                                    <TextBlock x:Name="dim_kw_placeholder" Grid.Column="1" IsHitTestVisible="False" Text="Search annotations..." FontSize="13" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Advanced Filters Button -->
+                            <Button x:Name="btn_dim_advanced_filters" Grid.Column="1" Height="36" Style="{StaticResource SecondaryButton}" Margin="10,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Advanced Filters" FontSize="12" FontWeight="Medium" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Grid.Column="1" Text="&#xE71C;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Quick Refresh -->
+                            <Button Grid.Column="2" Content="⟳" ToolTip="Refresh List" Height="36" Width="36" FontSize="14" FontWeight="Bold" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0" Click="dim_refresh"/>
                         </Grid>
 
-                        <!-- Result DataGrid -->
-                        <Border Grid.Row="3" BorderBrush="#546E7A" BorderThickness="1" CornerRadius="3">
-                            <DataGrid x:Name="dg_dim"
-                                      AutoGenerateColumns="False"
-                                      SelectionMode="Extended"
-                                      CanUserAddRows="False"
-                                      CanUserDeleteRows="False"
-                                      CanUserSortColumns="True"
-                                      GridLinesVisibility="Horizontal"
-                                      HeadersVisibility="Column"
-                                      AlternatingRowBackground="#F8F9FA"
-                                      RowBackground="White"
-        FontFamily="Inter"
-                                      RowHeight="26"
-                                      BorderThickness="0"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Binding="{Binding [_id]}"  IsReadOnly="True" Visibility="Collapsed" Width="0"/>
-                                    <DataGridTextColumn Binding="{Binding [_cat]}" IsReadOnly="True" Visibility="Collapsed" Width="0"/>
-                                    <DataGridTextColumn Header="Name" Binding="{Binding [Name]}" Width="*">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                        <DataGridTextColumn.EditingElementStyle>
-                                            <Style TargetType="TextBox">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="4,2"/>
-                                                <Setter Property="BorderBrush" Value="#083D56"/>
-                                            </Style>
-                                        </DataGridTextColumn.EditingElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Size" Binding="{Binding [Size]}" Width="80"
-                                                        Visibility="Collapsed">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Font" Binding="{Binding [Font]}" Width="110"
-                                                        Visibility="Collapsed">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Background" Binding="{Binding [Background]}" Width="90"
-                                                        Visibility="Collapsed">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Color" Binding="{Binding [Color]}" Width="90"
-                                                        Visibility="Collapsed">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="View / Details" Binding="{Binding [Details]}"
-                                                        IsReadOnly="True" Width="220">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Foreground" Value="#7F8C8D"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </Border>
+                        <!-- Results DataGrid (With explicitly declared modern columns) -->
+                        <DataGrid x:Name="dg_dim" Grid.Row="1" SelectionMode="Extended" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="True" AutoGenerateColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Width="40" IsReadOnly="False">
+                                    <DataGridTemplateColumn.HeaderTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Click="dim_header_select_all_clicked"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.HeaderTemplate>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="*" IsReadOnly="False"/>
+                                <DataGridTextColumn Header="VIEW / DETAILS" Binding="{Binding Details}" Width="1.8*" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="TYPE" Binding="{Binding Type}" Width="140" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="COUNT" Binding="{Binding Count}" Width="70" IsReadOnly="True"/>
+                                <DataGridTemplateColumn Header="STATUS" Width="90" IsReadOnly="True">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <Border.Resources>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="FontSize" Value="11"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Active">
+                                                                <Setter Property="Foreground" Value="#117A65"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Unused">
+                                                                <Setter Property="Foreground" Value="#D35400"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                    <Style TargetType="Border">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Active">
+                                                                <Setter Property="Background" Value="#E8F8F5"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Unused">
+                                                                <Setter Property="Background" Value="#FEF5E7"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Resources>
+                                                <TextBlock Text="{Binding Status}"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <!-- Parameters Columns (Hidden by default, shown in Find Types mode) -->
+                                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="70" IsReadOnly="True" Visibility="Collapsed"/>
+                                <DataGridTextColumn Header="Font" Binding="{Binding Font}" Width="90" IsReadOnly="True" Visibility="Collapsed"/>
+                                <DataGridTextColumn Header="Background" Binding="{Binding Background}" Width="90" IsReadOnly="True" Visibility="Collapsed"/>
+                                <DataGridTextColumn Header="Color" Binding="{Binding Color}" Width="90" IsReadOnly="True" Visibility="Collapsed"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
 
-                        <!-- Action buttons -->
-                        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,8">
-                            <Button x:Name="btn_dim_jump" Content="Jump to View"
-                                    Style="{StaticResource PrimaryButton}"
-                                    Margin="0,0,6,0" Click="dim_jump"/>
-                            <Button Content="Delete Selected" Style="{StaticResource DangerButton}"
-                                    Margin="0,0,6,0" Click="dim_delete"/>
-                            <Button Content="Select All" Style="{StaticResource SecondaryButton}"
-                                    Margin="0,0,6,0" Click="dim_select_all"/>
-                            <Button Content="Clear" Style="{StaticResource SecondaryButton}"
-                                    Margin="0,0,6,0" Click="dim_clear_sel"/>
-                            <Button x:Name="btn_dim_apply" Content="✔ Apply Changes"
-                                    Style="{StaticResource PrimaryButton}"
-                                    Visibility="Collapsed"
-                                    Click="dim_apply"/>
-                        </StackPanel>
+                        <!-- DataGrid Action Buttons -->
+                        <Grid Grid.Row="2" Margin="0,10,0,12">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                <Button x:Name="btn_dim_jump" Content="Jump to View" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="dim_jump" Width="120"/>
+                                <Button Content="Delete Selected" Style="{StaticResource DangerButton}" Margin="0,0,8,0" Click="dim_delete" Width="120"/>
+                                <Button Content="Select All" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="dim_select_all" Width="90"/>
+                                <Button Content="Clear" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="dim_clear_sel" Width="70"/>
+                                <Button x:Name="btn_dim_apply" Content="✔ Apply Changes" Style="{StaticResource PrimaryButton}" Visibility="Collapsed" Click="dim_apply" Width="130"/>
+                            </StackPanel>
+                            <TextBlock x:Name="dim_count" Text="0 found" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Grid>
 
-                        <!-- Rename section -->
-                        <Border Grid.Row="5" Background="#F8F9FA" BorderBrush="#E2E6EA"
-                                BorderThickness="1" CornerRadius="3" Padding="12,10">
+                        <!-- Auto-Rename Card -->
+                        <Border Grid.Row="3" Background="{StaticResource BgLight}" BorderBrush="{StaticResource BorderLight}" BorderThickness="1" CornerRadius="6" Padding="16,12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Auto-Rename All Dimension Types"
-                                               FontWeight="Bold" Foreground="#2C3E50" FontSize="12"/>
-                                    <TextBlock FontSize="10" Foreground="#7F8C8D" TextWrapping="Wrap" Margin="0,3,0,0"
-                                               Text="Generates: LB_[discipline]_[size]_[font]_[bg]_[color]_[prefix]_[indicators]"/>
+                                    <TextBlock Text="Auto-Rename All Dimension Types" FontWeight="Bold" Foreground="{StaticResource TextDark}" FontSize="12"/>
+                                    <TextBlock FontSize="10" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                               Text="Generates: LB_[discipline]_[size]_[font]_[factor]_[bg]_[color]_[prefix]_[centerline]_[elevation/top/bottom]_[rounding]"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Rename All" Width="110"
-                                        Style="{StaticResource OrangeButton}"
-                                        Click="dim_rename_all" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Rename All" Width="110" Style="{StaticResource OrangeButton}" Click="dim_rename_all" VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
                     </Grid>
-                </TabItem>
+                </Grid>
+            </TabItem>
 
-                <!-- ═══ TEXT NOTE TAB ═══ -->
-                <TabItem Header="📝  Text Note" Style="{StaticResource TabItemStyle}">
-                    <Grid Margin="10,8,10,10">
+            <!-- 2. TEXT NOTES TAB -->
+            <TabItem>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="260"/>       <!-- Sidebar -->
+                        <ColumnDefinition Width="*"/>          <!-- Main Area -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- TEXT NOTES SIDEBAR -->
+                    <Grid Grid.Column="0" Background="White">
+                        <Border BorderBrush="{StaticResource BorderLight}" BorderThickness="0,0,1,0"/>
+                        <Grid Margin="16,16,16,16">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>       <!-- Radio Buttons -->
+                                <RowDefinition Height="Auto"/>       <!-- Search Label -->
+                                <RowDefinition Height="Auto"/>       <!-- Sidebar Search TextBox -->
+                                <RowDefinition Height="*"/>          <!-- List of Text Note Types -->
+                            </Grid.RowDefinitions>
+
+                            <!-- Radio buttons for sub-mode selection -->
+                            <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                                <RadioButton x:Name="rb_notes" Content="Find Notes (search by content)" IsChecked="True" FontSize="12" Foreground="{StaticResource TextDark}" Margin="0,0,0,8" Checked="txt_submode"/>
+                                <RadioButton x:Name="rb_types" Content="Find Types (search by type name)" FontSize="12" Foreground="{StaticResource TextDark}" Checked="txt_submode"/>
+                            </StackPanel>
+
+                            <!-- Search input label -->
+                            <TextBlock x:Name="txt_lbl" Grid.Row="1" Text="Content:" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextDark}" Margin="0,0,0,6"/>
+
+                            <!-- Sidebar Search TextBox -->
+                            <Border Grid.Row="2" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4" Height="32" Margin="0,0,0,12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="8,0,6,0"/>
+                                    <TextBox x:Name="txt_sidebar_search" Grid.Column="1" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center" FontSize="12"/>
+                                    <TextBlock x:Name="txt_sidebar_placeholder" Grid.Column="1" IsHitTestVisible="False" Text="Search" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- List of unique type names -->
+                            <ListBox x:Name="lb_txt_types" Grid.Row="3" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemContainerStyle="{StaticResource SidebarListBoxItemStyle}">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel/>
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                            </ListBox>
+                        </Grid>
+                    </Grid>
+
+                    <!-- TEXT NOTES MAIN CONTENT AREA -->
+                    <Grid Grid.Column="1" Margin="20,16,20,12">
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>       <!-- Search Row -->
+                            <RowDefinition Height="*"/>          <!-- DataGrid -->
+                            <RowDefinition Height="Auto"/>       <!-- Bottom Action Buttons -->
+                            <RowDefinition Height="Auto"/>       <!-- Auto-Rename Card -->
                         </Grid.RowDefinitions>
 
-                        <!-- Tip box -->
-                        <Border Grid.Row="0" BorderBrush="#083D56" BorderThickness="1" Padding="10,7"
-                                Background="#F8F9FA" CornerRadius="2" Margin="0,0,0,10">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="💡 Tip:" FontWeight="Bold" Foreground="#062A3C" Margin="0,0,5,0"/>
-                                <TextBlock Foreground="#2C3E50"
-                                           Text="Double-click Name to edit inline. Notes → edit content. Types → edit type name."/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Sub-mode toggle -->
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
-                            <RadioButton x:Name="rb_notes" Content="Find Notes  (search by content)"
-                                         IsChecked="True" Margin="0,0,24,0" FontSize="12"
-                                         Foreground="#2C3E50" Checked="txt_submode"/>
-                            <RadioButton x:Name="rb_types" Content="Find Types  (search by type name)"
-                                         FontSize="12" Foreground="#2C3E50" Checked="txt_submode"/>
-                        </StackPanel>
-
-                        <!-- Search row -->
-                        <Grid Grid.Row="2" Margin="0,0,0,8">
+                        <!-- Search and Filter Row -->
+                        <Grid Grid.Row="0" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="txt_lbl" Grid.Column="0" Text="Content:"
-                                       VerticalAlignment="Center" FontWeight="Medium"
-                                       Foreground="#2C3E50" Margin="0,0,8,0"/>
-                            <TextBox x:Name="txt_kw" Grid.Column="1" Height="30"
-                                     VerticalContentAlignment="Center" Padding="8,0"
-                                     BorderBrush="#546E7A" BorderThickness="1" FontFamily="Consolas"/>
-                            <Button Grid.Column="2" Content="Search" Height="30" Margin="8,0,0,0"
-                                    Style="{StaticResource PrimaryButton}" Click="txt_search"/>
-                            <Button Grid.Column="3" Content="⟳ Refresh" Height="30" Margin="6,0,0,0"
-                                    Style="{StaticResource SecondaryButton}" Click="txt_refresh"/>
-                            <TextBlock x:Name="txt_count" Grid.Column="4"
-                                       VerticalAlignment="Center" Margin="12,0,0,0"
-                                       FontSize="11" Foreground="#7F8C8D"/>
+                            <!-- Search box -->
+                            <Border Grid.Column="0" BorderBrush="#BDC3C7" BorderThickness="1" CornerRadius="4" Background="White" Height="36">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <!-- Search icon -->
+                                    <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                                    <!-- Keyword TextBox -->
+                                    <TextBox x:Name="txt_kw" Grid.Column="1" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center" FontSize="13"/>
+                                    <!-- Placeholder text -->
+                                    <TextBlock x:Name="txt_kw_placeholder" Grid.Column="1" IsHitTestVisible="False" Text="Search annotations..." FontSize="13" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Advanced Filters Button -->
+                            <Button x:Name="btn_txt_advanced_filters" Grid.Column="1" Height="36" Style="{StaticResource SecondaryButton}" Margin="10,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Advanced Filters" FontSize="12" FontWeight="Medium" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Grid.Column="1" Text="&#xE71C;" FontFamily="Segoe MDL2 Assets" FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Quick Refresh -->
+                            <Button Grid.Column="2" Content="⟳" ToolTip="Refresh List" Height="36" Width="36" FontSize="14" FontWeight="Bold" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0" Click="txt_refresh"/>
                         </Grid>
 
-                        <!-- Result DataGrid -->
-                        <Border Grid.Row="3" BorderBrush="#546E7A" BorderThickness="1" CornerRadius="3">
-                            <DataGrid x:Name="dg_txt"
-                                      AutoGenerateColumns="False"
-                                      SelectionMode="Extended"
-                                      CanUserAddRows="False"
-                                      CanUserDeleteRows="False"
-                                      CanUserSortColumns="True"
-                                      GridLinesVisibility="Horizontal"
-                                      HeadersVisibility="Column"
-                                      AlternatingRowBackground="#F8F9FA"
-                                      RowBackground="White"
-        FontFamily="Inter"
-                                      RowHeight="26"
-                                      BorderThickness="0"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Binding="{Binding [_id]}"  IsReadOnly="True" Visibility="Collapsed" Width="0"/>
-                                    <DataGridTextColumn Binding="{Binding [_cat]}" IsReadOnly="True" Visibility="Collapsed" Width="0"/>
-                                    <DataGridTextColumn Header="Name / Content" Binding="{Binding [Name]}" Width="*">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                        <DataGridTextColumn.EditingElementStyle>
-                                            <Style TargetType="TextBox">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="4,2"/>
-                                                <Setter Property="BorderBrush" Value="#083D56"/>
-                                            </Style>
-                                        </DataGridTextColumn.EditingElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Size" Binding="{Binding [Size]}" Width="80"
-                                                        Visibility="Collapsed">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Font" Binding="{Binding [Font]}" Width="110"
-                                                        Visibility="Collapsed">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Background" Binding="{Binding [Background]}" Width="90"
-                                                        Visibility="Collapsed">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Color" Binding="{Binding [Color]}" Width="90"
-                                                        Visibility="Collapsed">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontFamily" Value="Consolas"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="View / Details" Binding="{Binding [Details]}"
-                                                        IsReadOnly="True" Width="220">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontSize" Value="11"/>
-                                                <Setter Property="Foreground" Value="#7F8C8D"/>
-                                                <Setter Property="Padding" Value="6,3"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </Border>
+                        <!-- Results DataGrid (With explicitly declared modern columns) -->
+                        <DataGrid x:Name="dg_txt" Grid.Row="1" SelectionMode="Extended" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="True" AutoGenerateColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Width="40" IsReadOnly="False">
+                                    <DataGridTemplateColumn.HeaderTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Click="txt_header_select_all_clicked"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.HeaderTemplate>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="*" IsReadOnly="False"/>
+                                <DataGridTextColumn Header="VIEW / DETAILS" Binding="{Binding Details}" Width="1.8*" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="TYPE" Binding="{Binding Type}" Width="140" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="COUNT" Binding="{Binding Count}" Width="70" IsReadOnly="True"/>
+                                <DataGridTemplateColumn Header="STATUS" Width="90" IsReadOnly="True">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <Border.Resources>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="FontSize" Value="11"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Active">
+                                                                <Setter Property="Foreground" Value="#117A65"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Unused">
+                                                                <Setter Property="Foreground" Value="#D35400"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                    <Style TargetType="Border">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Active">
+                                                                <Setter Property="Background" Value="#E8F8F5"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Unused">
+                                                                <Setter Property="Background" Value="#FEF5E7"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Resources>
+                                                <TextBlock Text="{Binding Status}"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <!-- Parameters Columns (Hidden by default, shown in Find Types mode) -->
+                                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="70" IsReadOnly="True" Visibility="Collapsed"/>
+                                <DataGridTextColumn Header="Font" Binding="{Binding Font}" Width="90" IsReadOnly="True" Visibility="Collapsed"/>
+                                <DataGridTextColumn Header="Background" Binding="{Binding Background}" Width="90" IsReadOnly="True" Visibility="Collapsed"/>
+                                <DataGridTextColumn Header="Color" Binding="{Binding Color}" Width="90" IsReadOnly="True" Visibility="Collapsed"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
 
-                        <!-- Action buttons -->
-                        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,8">
-                            <Button x:Name="btn_txt_jump" Content="Jump to View"
-                                    Style="{StaticResource PrimaryButton}"
-                                    Margin="0,0,6,0" Click="txt_jump"/>
-                            <Button Content="Delete Selected" Style="{StaticResource DangerButton}"
-                                    Margin="0,0,6,0" Click="txt_delete"/>
-                            <Button Content="Select All" Style="{StaticResource SecondaryButton}"
-                                    Margin="0,0,6,0" Click="txt_select_all"/>
-                            <Button Content="Clear" Style="{StaticResource SecondaryButton}"
-                                    Margin="0,0,6,0" Click="txt_clear_sel"/>
-                            <Button x:Name="btn_txt_apply" Content="✔ Apply Changes"
-                                    Style="{StaticResource PrimaryButton}"
-                                    Visibility="Collapsed"
-                                    Click="txt_apply"/>
-                        </StackPanel>
+                        <!-- DataGrid Action Buttons -->
+                        <Grid Grid.Row="2" Margin="0,10,0,12">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                <Button x:Name="btn_txt_jump" Content="Jump to View" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="txt_jump" Width="120"/>
+                                <Button Content="Delete Selected" Style="{StaticResource DangerButton}" Margin="0,0,8,0" Click="txt_delete" Width="120"/>
+                                <Button Content="Select All" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="txt_select_all" Width="90"/>
+                                <Button Content="Clear" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="txt_clear_sel" Width="70"/>
+                                <Button x:Name="btn_txt_apply" Content="✔ Apply Changes" Style="{StaticResource PrimaryButton}" Visibility="Collapsed" Click="txt_apply" Width="130"/>
+                            </StackPanel>
+                            <TextBlock x:Name="txt_count" Text="0 found" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Grid>
 
-                        <!-- Rename section -->
-                        <Border Grid.Row="5" Background="#F8F9FA" BorderBrush="#E2E6EA"
-                                BorderThickness="1" CornerRadius="3" Padding="12,10">
+                        <!-- Auto-Rename Card -->
+                        <Border Grid.Row="3" Background="{StaticResource BgLight}" BorderBrush="{StaticResource BorderLight}" BorderThickness="1" CornerRadius="6" Padding="16,12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Auto-Rename All Text Note Types"
-                                               FontWeight="Bold" Foreground="#2C3E50" FontSize="12"/>
-                                    <TextBlock FontSize="10" Foreground="#7F8C8D" TextWrapping="Wrap" Margin="0,3,0,0"
-                                               Text="Generates: LB_[discipline]_[size]_[font]_[bg]_[factor]_[color]_[border]_[B/U/I]"/>
+                                    <TextBlock Text="Auto-Rename All Text Note Types" FontWeight="Bold" Foreground="{StaticResource TextDark}" FontSize="12"/>
+                                    <TextBlock FontSize="10" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                               Text="Generates: LB_[discipline]_[size]_[font]_[factor]_[bg]_[color]_[border]_[B/U/I]"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="Rename All" Width="110"
-                                        Style="{StaticResource OrangeButton}"
-                                        Click="txt_rename_all" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Rename All" Width="110" Style="{StaticResource OrangeButton}" Click="txt_rename_all" VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
                     </Grid>
-                </TabItem>
+                </Grid>
+            </TabItem>
 
-            </TabControl>
+            <!-- 3. SETTINGS TAB -->
+            <TabItem>
+                <Grid Margin="24,24,24,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-            <!-- Status bar -->
-            <Border Grid.Row="1" BorderBrush="#F8F9FA" BorderThickness="0,1,0,0" Padding="4,6,0,0">
-                <TextBlock x:Name="status" FontSize="11" Foreground="#7F8C8D" Text="Ready."/>
-            </Border>
-        </Grid>
-    
-        <!-- Copyright added automatically -->
-        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
+                    <!-- Left Card: General Preferences -->
+                    <Border Grid.Column="0" Background="White" BorderBrush="{StaticResource BorderLight}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,12,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="20"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="12"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="12"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                <TextBlock Text="General Preferences" FontSize="16" FontWeight="Bold" Foreground="{StaticResource PrimaryBlue}"/>
+                                <TextBlock Text="Configure behavior settings for Annotation Manager" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                            </StackPanel>
+
+                            <!-- Setting Toggles -->
+                            <CheckBox Grid.Row="2" Content="Auto-select matching elements in view when clicking row" FontSize="13" Foreground="{StaticResource TextDark}" IsChecked="True"/>
+                            <CheckBox Grid.Row="4" Content="Include annotations inside groups in search results" FontSize="13" Foreground="{StaticResource TextDark}" IsChecked="False"/>
+                            <CheckBox Grid.Row="6" Content="Prompt for confirmation before batch deleting elements" FontSize="13" Foreground="{StaticResource TextDark}" IsChecked="True"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Right Card: About & Info -->
+                    <Border Grid.Column="1" Background="White" BorderBrush="{StaticResource BorderLight}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="12,0,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="20"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="16"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                <TextBlock Text="About T3Lab Annotation Suite" FontSize="16" FontWeight="Bold" Foreground="{StaticResource PrimaryBlue}"/>
+                                <TextBlock Text="Unified management for Revit drafting elements" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                            </StackPanel>
+
+                            <!-- Branding Details -->
+                            <StackPanel Grid.Row="2">
+                                <TextBlock Text="Annotation Manager" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextDark}"/>
+                                <TextBlock Text="Version 1.0.1" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                <TextBlock Text="Author: Tran Tien Thanh" FontSize="12" Foreground="{StaticResource TextDark}" Margin="0,8,0,0"/>
+                                <TextBlock Text="Contact: trantienthanh909@gmail.com" FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                            </StackPanel>
+
+                            <!-- Info Box -->
+                            <Border Grid.Row="4" Background="{StaticResource LightBlueHighlight}" CornerRadius="6" Padding="12">
+                                <TextBlock Text="This utility combines multiple annotation control panels into a unified tool, optimizing your Revit models by standardizing text, cleaning unused styles, and offering rapid auto-renaming of DimensionTypes and TextNoteTypes based on physical parameters."
+                                           TextWrapping="Wrap" FontSize="12" LineHeight="18" Foreground="{StaticResource PrimaryBlue}"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- ═══ FOOTER STATUS BAR ═══ -->
+        <Border Grid.Row="2" Background="#F8F9FA" BorderBrush="{StaticResource BorderLight}" BorderThickness="0,1,0,0" Padding="16,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="status" Grid.Column="0" FontSize="11" Foreground="{StaticResource TextMuted}" Text="Ready." VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- Mandatory Copyright Compliance Footer (Foreground="#3498DB", FontSize="11", IsHitTestVisible="False") -->
+        <TextBlock Text="© Copyright by T3Lab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,16,7" Foreground="#3498DB" FontSize="11" IsHitTestVisible="False" Panel.ZIndex="999"/>
     </Grid>
 </Window>

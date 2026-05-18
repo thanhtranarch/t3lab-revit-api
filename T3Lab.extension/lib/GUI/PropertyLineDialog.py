@@ -1242,6 +1242,10 @@ class PropertyLineDialog(forms.WPFWindow):
                 u"Example: 123 Main St, Los Angeles CA 90001")
             return
         self._hide_address_warning()
+        try:
+            self.img_map_preview.Source = None
+        except Exception:
+            pass
 
         api_key = self.txt_api_key.Text.strip()
         if not api_key:
@@ -1329,6 +1333,10 @@ class PropertyLineDialog(forms.WPFWindow):
             self.btn_create.IsEnabled = False
             self.grp_parcel_details.Visibility = Visibility.Collapsed
             self.grp_setback.Visibility = Visibility.Collapsed
+            try:
+                self.img_map_preview.Source = None
+            except Exception:
+                pass
             return
 
         self._selected_parcel = item
@@ -1342,6 +1350,57 @@ class PropertyLineDialog(forms.WPFWindow):
             self.grp_setback.Visibility = Visibility.Visible
         else:
             self.grp_setback.Visibility = Visibility.Collapsed
+
+        # Async load map preview in search results card
+        self._load_map_preview(item)
+
+    def _load_map_preview(self, item):
+        """Async load map preview tiles and overlay boundary, then display in dialog."""
+        try:
+            self.img_map_preview.Source = None
+        except Exception:
+            pass
+
+        coords = get_polygon_coords(item.geometry)
+        if not coords:
+            return
+
+        # Prepare a temp path for preview PNG
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        safe_apn = item.parcel_id.replace("/", "_").replace("\\", "_")
+        temp_path = os.path.join(temp_dir, "t3lab_map_preview_{}.png".format(safe_apn))
+        area = item.area_sqft_raw or 0
+
+        def bg_map_preview():
+            try:
+                # Generate map PNG (OSM tiles + boundary)
+                generate_parcel_map(coords, temp_path, area_sqft=area)
+
+                def update_ui():
+                    try:
+                        if os.path.exists(temp_path):
+                            from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
+                            from System import Uri
+                            bi = BitmapImage()
+                            bi.BeginInit()
+                            bi.UriSource = Uri(temp_path)
+                            bi.CacheOption = BitmapCacheOption.OnLoad
+                            bi.EndInit()
+                            self.img_map_preview.Source = bi
+                    except Exception as ui_ex:
+                        logger.warning("Failed to display map preview: {}".format(ui_ex))
+
+                self.Dispatcher.Invoke(
+                    DispatcherPriority.Normal,
+                    Action(update_ui)
+                )
+            except Exception as ex:
+                logger.warning("Background map preview failed: {}".format(ex))
+
+        t = threading.Thread(target=bg_map_preview)
+        t.daemon = True
+        t.start()
 
     def _show_parcel_details(self, item):
         self.grp_parcel_details.Visibility = Visibility.Visible

@@ -1,9 +1,0 @@
-title: Adjust TextNote
-tooltip: Batch modify TextNote content, type, or formatting
-description: |
-  Allows batch editing of TextNote elements in the active view, including
-  changing text content, note type, and formatting properties. Supports
-  search-and-replace and type reassignment workflows.
-
-author: Tran Tien Thanh
-version: 1.0.0
