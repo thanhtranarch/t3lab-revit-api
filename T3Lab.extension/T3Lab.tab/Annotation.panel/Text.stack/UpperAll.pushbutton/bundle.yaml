@@ -1,9 +1,23 @@
 title: Upper All Text
-tooltip: Convert all text notes in views and sheets to uppercase
+tooltip: Selection-aware uppercase for dimensions, text notes, and project-wide text
 description: |
-  Converts view names, sheet title block parameters, text notes, and
-  dimension text overrides to uppercase throughout the project. Helps
-  enforce consistent uppercase annotation standards.
+  Converts text to uppercase based on what is currently selected:
+
+  - Select Dimensions  -> uppercase only those dimension overrides.
+  - Select TextNotes   -> uppercase only those text notes.
+  - Select both        -> processes both kinds together.
+  - Select nothing     -> uppercases everything across the project:
+      view names, sheet names, title block instance text params,
+      every TextNote, and every Dimension override.
+
+  Selecting elements that are not dimensions or text notes is a no-op
+  (the tool stops with a hint) to avoid an accidental project-wide run.
+
+  Notes:
+  - Spot Dimensions / Spot Elevations are skipped (different override surface).
+  - Title block URL and Image params are skipped (uppercasing would corrupt them).
+  - Mixed inline formatting (bold/italic runs) inside a TextNote is flattened
+    to the note's default format — Revit's API does not expose per-run editing.
 
 author: Tran Tien Thanh
-version: 1.0.0
+version: 2.0.0
