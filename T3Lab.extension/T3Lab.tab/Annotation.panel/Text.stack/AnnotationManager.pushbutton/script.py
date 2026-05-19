@@ -44,7 +44,7 @@ from Autodesk.Revit.DB import (
 from pyrevit import revit, forms, script
 
 # Path setup
-extension_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+extension_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 lib_dir = os.path.join(extension_dir, 'lib')
 if lib_dir not in sys.path:
     sys.path.append(lib_dir)
@@ -252,7 +252,7 @@ def _txt_name(tt, origin):
 # XAML PATH
 # ============================================================
 _GUI_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))),
     'lib', 'GUI'
 )
 _XAML_PATH = os.path.join(_GUI_DIR, 'Tools', 'AnnotationManager.xaml')
@@ -377,16 +377,30 @@ class AnnotationManagerWindow(forms.WPFWindow):
             for d in dims:
                 view = doc.GetElement(d.OwnerViewId)
                 if view:
+                    try:
+                        d_name = d.Name or "<unnamed>"
+                    except Exception:
+                        try:
+                            _p = d.DimensionType.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
+                            d_name = _p.AsString() if _p else "<unnamed>"
+                        except Exception:
+                            d_name = "<unnamed>"
                     self._dt_add(self._dim_dt, str(d.Id), "DimInst",
-                                 d.Name or "<unnamed>", view.Name,
+                                 d_name, view.Name,
                                  selected=False, count="1", status="Active")
                     self._dim_map[str(d.Id)] = d
         else:
             types = FilteredElementCollector(doc).OfClass(DimensionType)\
                     .WhereElementIsElementType().ToElements()
             for dt in types:
-                name = dt.Name or ""
-                size, font, bg, color = self._get_dim_params(dt)
+                try:
+                    name = dt.Name or ""
+                except Exception:
+                    name = ""
+                try:
+                    size, font, bg, color = self._get_dim_params(dt)
+                except Exception:
+                    size, font, bg, color = "", "", "", ""
                 count = dim_counts.get(str(dt.Id), 0)
                 status = "Active" if count > 0 else "Unused"
                 self._dt_add(self._dim_dt, str(dt.Id), "DimType",
@@ -427,8 +441,15 @@ class AnnotationManagerWindow(forms.WPFWindow):
             types = FilteredElementCollector(doc).OfClass(TextNoteType)\
                     .WhereElementIsElementType().ToElements()
             for tt in types:
-                name = tt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString() or ""
-                size, font, bg, color = self._get_txt_params(tt)
+                try:
+                    p = tt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
+                    name = p.AsString() if p else (tt.Name or "")
+                except Exception:
+                    name = ""
+                try:
+                    size, font, bg, color = self._get_txt_params(tt)
+                except Exception:
+                    size, font, bg, color = "", "", "", ""
                 count = note_counts.get(str(tt.Id), 0)
                 status = "Active" if count > 0 else "Unused"
                 self._dt_add(self._txt_dt, str(tt.Id), "TxtType",
@@ -516,18 +537,33 @@ class AnnotationManagerWindow(forms.WPFWindow):
             dims = FilteredElementCollector(doc).OfClass(Dimension)\
                    .WhereElementIsNotElementType().ToElements()
             for d in dims:
-                if kw in (d.Name or "").lower():
+                try:
+                    d_name = d.Name or ""
+                except Exception:
+                    try:
+                        _p = d.DimensionType.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
+                        d_name = _p.AsString() if _p else ""
+                    except Exception:
+                        d_name = ""
+                if kw in d_name.lower():
                     view = doc.GetElement(d.OwnerViewId)
                     if view:
                         self._dt_add(self._dim_dt, str(d.Id), "DimInst",
-                                     d.Name or "<unnamed>", view.Name,
+                                     d_name or "<unnamed>", view.Name,
                                      selected=False, count="1", status="Active")
                         self._dim_map[str(d.Id)] = d
         else:  # types
             types = FilteredElementCollector(doc).OfClass(DimensionType)\
                     .WhereElementIsElementType().ToElements()
             for dt in types:
-                name = dt.Name or ""
+                try:
+                    name = dt.Name or ""
+                except Exception:
+                    try:
+                        _p = dt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
+                        name = _p.AsString() if _p else ""
+                    except Exception:
+                        name = ""
                 if kw in name.lower():
                     size, font, bg, color = self._get_dim_params(dt)
                     count = dim_counts.get(str(dt.Id), 0)
@@ -688,14 +724,24 @@ class AnnotationManagerWindow(forms.WPFWindow):
                       .WhereElementIsElementType().ToElements():
                 new_name = None
                 try:
-                    origin = dt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString()
+                    p = dt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
+                    if p is None:
+                        continue
+                    origin = p.AsString()
+                    if not origin:
+                        continue
                     new_name = _dim_name(dt, origin)
-                    if dt.Name != new_name:
+                    if origin != new_name:
                         dt.Name = new_name
                         count += 1
                 except Exception as ex:
+                    try:
+                        _p = dt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
+                        _cur = _p.AsString() if _p else str(dt.Id)
+                    except Exception:
+                        _cur = str(dt.Id)
                     print("DEBUG: Failed to rename DimensionType '{}' to '{}': {}".format(
-                        dt.Name, new_name, ex
+                        _cur, new_name, ex
                     ))
         finally:
             t.Commit()
@@ -756,7 +802,11 @@ class AnnotationManagerWindow(forms.WPFWindow):
             types = FilteredElementCollector(doc).OfClass(TextNoteType)\
                     .WhereElementIsElementType().ToElements()
             for tt in types:
-                name = tt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME).AsString() or ""
+                try:
+                    _p = tt.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
+                    name = _p.AsString() if _p else (tt.Name or "")
+                except Exception:
+                    name = ""
                 if kw in name.lower():
                     size, font, bg, color = self._get_txt_params(tt)
                     count = note_counts.get(str(tt.Id), 0)
@@ -958,16 +1008,30 @@ class AnnotationManagerWindow(forms.WPFWindow):
     # ── Sidebar Browsing & Live Filtering List Event Handlers ────────────────
 
     def _load_sidebar_lists(self):
-        # 1. Fetch unique DimensionType names
         dim_types = FilteredElementCollector(doc).OfClass(DimensionType)\
                     .WhereElementIsElementType().ToElements()
-        self._all_dim_type_names = sorted(list(set(dt.Name for dt in dim_types if dt.Name)))
-        
-        # 2. Fetch unique TextNoteType names
+        dim_names = []
+        for dt in dim_types:
+            try:
+                n = dt.Name
+                if n:
+                    dim_names.append(n)
+            except Exception:
+                pass
+        self._all_dim_type_names = sorted(list(set(dim_names)))
+
         txt_types = FilteredElementCollector(doc).OfClass(TextNoteType)\
                     .WhereElementIsElementType().ToElements()
-        self._all_txt_type_names = sorted(list(set(tt.Name for tt in txt_types if tt.Name)))
-        
+        txt_names = []
+        for tt in txt_types:
+            try:
+                n = tt.Name
+                if n:
+                    txt_names.append(n)
+            except Exception:
+                pass
+        self._all_txt_type_names = sorted(list(set(txt_names)))
+
         self.filter_sidebar_dim_list()
         self.filter_sidebar_txt_list()
 
