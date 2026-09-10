@@ -572,3 +572,305 @@ def duplicate_names(records):
         key = (record.name or "").strip().lower()
         counts[key] = counts.get(key, 0) + 1
     return set(key for key, count in counts.items() if count > 1 and key)
+
+
+# ── PLACEMENT: WHERE THE GROUP INSTANCES SIT ─────────────────────────────────
+# Everything below feeds the Placement tab's plan view. The Revit reads are
+# isolated in collect_placements(); the geometry maths underneath it is plain
+# Python so it can be unit-tested outside Revit (see dev/test_group_manager.py).
+
+class GroupPlacement(object):
+    """One placed group instance, reduced to what a plan view needs."""
+
+    __slots__ = ("instance_id", "type_id", "type_name", "kind",
+                 "x", "y", "z", "level_name", "view_name", "workset_name")
+
+    def __init__(self, instance_id, type_id, type_name, kind, x, y, z,
+                 level_name="", view_name="", workset_name=""):
+        self.instance_id = instance_id
+        self.type_id = type_id
+        self.type_name = type_name
+        self.kind = kind
+        self.x = float(x)
+        self.y = float(y)
+        self.z = float(z)
+        self.level_name = level_name or ""
+        self.view_name = view_name or ""
+        self.workset_name = workset_name or ""
+
+    @property
+    def location_label(self):
+        """Where this instance lives, in one phrase for the filter and tooltip."""
+        if self.level_name:
+            return self.level_name
+        if self.view_name:
+            return self.view_name
+        return "-"
+
+    def __repr__(self):
+        return "<GroupPlacement %s @ (%.1f, %.1f)>" % (self.type_name, self.x, self.y)
+
+
+def instance_point(group):
+    """(x, y, z) of a group instance in feet, or None when it has no location.
+
+    Prefers the insertion point; falls back to the centre of the bounding box,
+    which is what detail groups and some nested cases actually carry.
+    """
+    if group is None:
+        return None
+    try:
+        location = group.Location
+        point = getattr(location, "Point", None)
+        if point is not None:
+            return (point.X, point.Y, point.Z)
+    except Exception:
+        pass
+    try:
+        box = group.get_BoundingBox(None)
+        if box is not None:
+            return ((box.Min.X + box.Max.X) / 2.0,
+                    (box.Min.Y + box.Max.Y) / 2.0,
+                    (box.Min.Z + box.Max.Z) / 2.0)
+    except Exception:
+        pass
+    return None
+
+
+def instance_level_name(doc, group):
+    """Name of the level a group instance sits on, or an empty string."""
+    if doc is None or group is None:
+        return ""
+    try:
+        level_id = group.LevelId
+        if level_id is not None and eid_int(level_id) > 0:
+            level = doc.GetElement(level_id)
+            if level is not None:
+                return element_name(level)
+    except Exception:
+        pass
+    try:
+        param = group.get_Parameter(BuiltInParameter.GROUP_LEVEL)
+        if param is not None:
+            level = doc.GetElement(param.AsElementId())
+            if level is not None:
+                return element_name(level)
+    except Exception:
+        pass
+    return ""
+
+
+def instance_view_name(doc, group):
+    """Owner view of a view-specific group (detail groups), or an empty string."""
+    if doc is None or group is None:
+        return ""
+    try:
+        view_id = group.OwnerViewId
+        if view_id is not None and eid_int(view_id) > 0:
+            view = doc.GetElement(view_id)
+            if view is not None:
+                return element_name(view)
+    except Exception:
+        pass
+    return ""
+
+
+def collect_placements(doc, records):
+    """GroupPlacement for every located instance of `records`.
+
+    Instances Revit gives no usable point for are skipped rather than parked at
+    the origin -- a marker at (0,0) reads as "this group sits on the project base
+    point", which would be a lie. The caller reports the skipped count instead.
+    """
+    placements = []
+    for record in records or []:
+        for instance in getattr(record, "instances", None) or []:
+            point = instance_point(instance)
+            if point is None:
+                continue
+            try:
+                instance_id = eid_int(instance.Id)
+            except Exception:
+                continue
+            placements.append(GroupPlacement(
+                instance_id=instance_id,
+                type_id=record.type_id,
+                type_name=record.name,
+                kind=record.kind,
+                x=point[0], y=point[1], z=point[2],
+                level_name=instance_level_name(doc, instance),
+                view_name=instance_view_name(doc, instance),
+                workset_name=instance_workset_name(doc, instance)))
+    return placements
+
+
+def placed_instance_total(records):
+    """How many instances exist in total, located or not."""
+    return sum(int(getattr(r, "instance_count", 0) or 0) for r in records or [])
+
+
+# ── PLAN GEOMETRY (no Revit -- unit-tested) ──────────────────────────────────
+
+def placements_extent(placements):
+    """(min_x, min_y, max_x, max_y) covering `placements`, or None if empty."""
+    if not placements:
+        return None
+    xs = [p.x for p in placements]
+    ys = [p.y for p in placements]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def level_names_of(placements):
+    """Distinct level (or view) labels present, sorted, for the level filter."""
+    seen = set()
+    for placement in placements or []:
+        label = placement.location_label
+        if label and label != "-":
+            seen.add(label)
+    return sorted(seen, key=lambda s: s.lower())
+
+
+def filter_placements(placements, kind=None, level=None, type_ids=None):
+    """Subset of `placements` matching every filter that is not None."""
+    out = []
+    allowed = set(type_ids) if type_ids is not None else None
+    for placement in placements or []:
+        if kind and placement.kind != kind:
+            continue
+        if level and placement.location_label != level:
+            continue
+        if allowed is not None and placement.type_id not in allowed:
+            continue
+        out.append(placement)
+    return out
+
+
+def count_by_type(placements):
+    """{type_id: number of instances} for the legend counts."""
+    counts = {}
+    for placement in placements or []:
+        counts[placement.type_id] = counts.get(placement.type_id, 0) + 1
+    return counts
+
+
+class PlanTransform(object):
+    """Maps model feet onto canvas pixels, keeping aspect ratio and flipping Y.
+
+    Revit's Y grows north; WPF's Y grows down the screen. Without the flip the
+    plan comes out mirrored -- plausible enough that nobody notices until they
+    try to find the group on site.
+    """
+
+    __slots__ = ("scale", "offset_x", "offset_y", "extent")
+
+    def __init__(self, scale, offset_x, offset_y, extent):
+        self.scale = scale
+        self.offset_x = offset_x
+        self.offset_y = offset_y
+        self.extent = extent
+
+    @classmethod
+    def fit(cls, extent, width, height, padding=24.0):
+        """Transform that fits `extent` inside width x height pixels.
+
+        A degenerate extent -- one instance, or every instance on one line --
+        still yields a usable transform: the span is floored so the scale stays
+        finite and the content lands in the middle instead of at a corner.
+        """
+        width = max(1.0, float(width))
+        height = max(1.0, float(height))
+        padding = max(0.0, float(padding))
+        usable_w = max(1.0, width - 2 * padding)
+        usable_h = max(1.0, height - 2 * padding)
+
+        if not extent:
+            return cls(1.0, width / 2.0, height / 2.0, None)
+
+        min_x, min_y, max_x, max_y = extent
+        span_x = max(max_x - min_x, 1e-6)
+        span_y = max(max_y - min_y, 1e-6)
+        scale = min(usable_w / span_x, usable_h / span_y)
+
+        mid_x = (min_x + max_x) / 2.0
+        mid_y = (min_y + max_y) / 2.0
+        offset_x = width / 2.0 - mid_x * scale
+        offset_y = height / 2.0 + mid_y * scale      # plus, because Y is flipped
+        return cls(scale, offset_x, offset_y, extent)
+
+    def to_canvas(self, x, y):
+        """(px, py) on the canvas for a model point in feet."""
+        return (x * self.scale + self.offset_x,
+                self.offset_y - y * self.scale)
+
+    def to_model(self, px, py):
+        """Model point in feet for a canvas pixel -- the inverse of to_canvas."""
+        if not self.scale:
+            return (0.0, 0.0)
+        return ((px - self.offset_x) / self.scale,
+                (self.offset_y - py) / self.scale)
+
+    MIN_ZOOM_SCALE = 1e-4
+    MAX_ZOOM_SCALE = 1e4
+
+    def zoom_at(self, px, py, factor):
+        """Zoom by `factor` keeping the model point under (px, py) still.
+
+        Zooming around the window centre instead makes the thing you are
+        pointing at slide away, so the anchor is the cursor.
+        """
+        factor = float(factor)
+        if factor <= 0:
+            return self
+        new_scale = self.scale * factor
+        new_scale = max(self.MIN_ZOOM_SCALE, min(self.MAX_ZOOM_SCALE, new_scale))
+        if new_scale == self.scale:
+            return self
+        model_x, model_y = self.to_model(px, py)
+        self.scale = new_scale
+        self.offset_x = px - model_x * new_scale
+        self.offset_y = py + model_y * new_scale
+        return self
+
+    def pan_by(self, dx, dy):
+        """Slide the view by a pixel delta."""
+        self.offset_x += float(dx)
+        self.offset_y += float(dy)
+        return self
+
+
+def feet_to_metres_label(feet):
+    """Feet as a short metric string -- these models are all metric."""
+    metres = float(feet) * 0.3048
+    if abs(metres) >= 1000:
+        return "%.1f km" % (metres / 1000.0)
+    return "%.1f m" % metres
+
+
+def select_instances(uidoc, instance_ids):
+    """Put `instance_ids` into the Revit selection. Returns how many were set.
+
+    Selection is a UI operation, not a model edit, so there is no transaction to
+    open here.
+    """
+    if uidoc is None or not instance_ids:
+        return 0
+    # Imported here, not at module scope: the Revit-free unit tests exec this
+    # file with a stubbed `System`, and a top-level Generic import would need
+    # the stub to fake the whole namespace.
+    from System.Collections.Generic import List
+    ids = List[ElementId]()
+    for value in instance_ids:
+        element_id = new_element_id(value)
+        if element_id is not None:
+            ids.Add(element_id)
+    uidoc.Selection.SetElementIds(ids)
+    return ids.Count
+
+
+def extent_label(extent):
+    """Human-readable size of a plan extent, for the info strip under the plan."""
+    if not extent:
+        return "no extent"
+    min_x, min_y, max_x, max_y = extent
+    return "%s x %s" % (feet_to_metres_label(max_x - min_x),
+                        feet_to_metres_label(max_y - min_y))

@@ -893,6 +893,14 @@ class QuickSelectWindow(T3WPFWindow):
         except Exception as e:
             print("Zoom error: {}".format(str(e)))
 
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_dataGrid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua dataGrid."""
+        self.toggle_all_rows(self.dataGrid, "is_checked", sender.IsChecked)
+
 
 # =============================================================================
 # MAIN

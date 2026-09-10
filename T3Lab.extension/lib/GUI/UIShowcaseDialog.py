@@ -387,6 +387,9 @@ class UIShowcaseWindow(T3WPFWindow):
         except Exception:
             pass
         self._update_selection_summary()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_sample_grid"), self.sample_grid, "is_selected")
 
     def select_none_clicked(self, sender, e):
         for item in self._filtered_items:
@@ -396,6 +399,9 @@ class UIShowcaseWindow(T3WPFWindow):
         except Exception:
             pass
         self._update_selection_summary()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_sample_grid"), self.sample_grid, "is_selected")
 
     def grid_selection_changed(self, sender, e):
         self._update_selection_summary()
@@ -450,6 +456,14 @@ class UIShowcaseWindow(T3WPFWindow):
             self.exec_progress.Value = self.exec_progress.Maximum
         except Exception:
             pass
+
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_sample_grid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua sample_grid."""
+        self.toggle_all_rows(self.sample_grid, "is_selected", sender.IsChecked)
 
 
 def show_ui_standard_showcase():

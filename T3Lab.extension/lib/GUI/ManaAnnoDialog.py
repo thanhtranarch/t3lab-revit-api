@@ -1449,6 +1449,18 @@ class AnnotationManagerWindow(T3WPFWindow):
         self.txt_kw_placeholder.Visibility = Visibility.Collapsed if self.txt_kw.Text else Visibility.Visible
         self.txt_search(sender, args)
 
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_dg_dim_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua dg_dim."""
+        self.toggle_all_rows(self.dg_dim, "Selected", sender.IsChecked)
+
+    def select_all_dg_txt_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua dg_txt."""
+        self.toggle_all_rows(self.dg_txt, "Selected", sender.IsChecked)
+
 
 # MAIN SCRIPT
 # ==================================================

@@ -1,9 +1,9 @@
-title: "Group
-Manager"
-tooltip: "Rename model and detail groups, move them between worksets, purge unused group types"
+title: "Group\nManager"
+tooltip: "Rename model and detail groups, set their workset, purge unused types, and see where every instance sits on a plan"
 description: |
   Rename: find and replace, prefix, suffix, letter case and illegal-character cleanup, with a live preview
   Workset: move group instances — and optionally the elements inside them — onto one workset
   Cleanup: audit unused, single-instance, mixed-workset and badly named types, then purge or ungroup
+  Placement: plot every placed instance on a plan, coloured per group type, filtered by model/detail/attached and by level
 author: "Tran Tien Thanh"
-version: "1.0.0"
+version: "1.1.0"

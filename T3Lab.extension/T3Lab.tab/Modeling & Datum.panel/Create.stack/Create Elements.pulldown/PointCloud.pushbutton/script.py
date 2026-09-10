@@ -2224,6 +2224,14 @@ class PointCloudModelWindow(T3WPFWindow):
         self.result = None
         self.Close()
 
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_results_grid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua results_grid."""
+        self.toggle_all_rows(self.results_grid, "Include", sender.IsChecked)
+
 
 # MAIN
 # ==============================================================================

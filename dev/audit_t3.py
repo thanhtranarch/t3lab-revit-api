@@ -53,6 +53,41 @@ UI_LOCKED = set()
 COPYRIGHT_EXEMPT = {"CadtoFloorLayerItem.xaml"}
 COPYRIGHT_TEXT = "© Copyright by T3Lab"
 
+# ── Luật 23 · Select-all ở header cột checkbox ───────────────────────────
+# Miễn trừ: cột KHÔNG phải để chọn dòng mà là thuộc tính của chính dòng đó.
+# ManaWorkset ACTIVE/OPEN/EDITABLE là trạng thái từng workset trong Revit —
+# một checkbox "tất cả" ở đó nghĩa là mở/khoá toàn bộ workset, hành động khác
+# hẳn "chọn tất cả" và phải do người dùng làm có ý thức trên từng dòng.
+SELECTALL_EXEMPT = {
+    ("ManaWorkset.xaml", "ACTIVE"),
+    ("ManaWorkset.xaml", "OPEN"),
+    ("ManaWorkset.xaml", "EDITABLE"),
+}
+
+# ── Luật 22 · ICON ───────────────────────────────────────────────────────
+# UI-frozen theo CLAUDE.md: icon của 2 file này không đi theo hệ T3.Icon.*
+#   DWGManagement — thiết kế riêng đã chốt
+#   T3LabAssistant — chat surface, màu theo theme Revit ({DynamicResource
+#                    T3Theme*}), gắn T3.Icon (brush tĩnh) sẽ hỏng dark mode
+ICON_EXEMPT = {"DWGManagement.xaml", "T3LabAssistant.xaml"}
+
+# Ký tự Unicode hay bị dùng nhầm làm icon — render bằng Segoe UI nên lệch nét,
+# lệch baseline, lệch chiều cao so với glyph MDL2 đứng cạnh. Giá trị = glyph
+# MDL2 phải dùng thay thế.
+FAKE_ICON_GLYPHS = {
+    "&#X2212;": "→ &#xE921; Minimize",
+    "&#X25A2;": "→ &#xE922; Maximize",
+    "&#X2715;": "→ &#xE8BB; Close",
+    "&#X2716;": "→ &#xE8BB; Close",
+    "&#X2713;": "→ &#xE73E; CheckMark",
+    "&#X2714;": "→ &#xE73E; CheckMark",
+    "&#X26A0;": "→ &#xE7BA; Warning",
+    "&#X25B6;": "→ &#xE768; Play",
+    "&#X25C0;": "→ &#xE76B; ChevronLeft",
+    "&#X25BC;": "→ &#xE70D; ChevronDown",
+    "&#X25B2;": "→ &#xE70E; ChevronUp",
+}
+
 # Marker của khối stylesheet được nhúng bởi dev/sync_t3_styles.py.
 SYNC_BEGIN = "<!-- ═══ T3 STYLES — SINH TỰ ĐỘNG"
 SYNC_END = "<!-- ═══ HẾT T3 STYLES ═══ -->"
@@ -330,6 +365,61 @@ def audit(src, base, keys):
     if n_local_style:
         issues.append(("P2", "%d <Style x:Key> định nghĩa trong file tool — component "
                              "mới phải thêm vào T3Lab.Styles.xaml" % n_local_style))
+
+    # ── Luật 23 · Cột checkbox chọn dòng phải có select-all ở header ──────
+    # Bảng nào cho tick từng dòng thì phải cho tick tất cả — không bắt người
+    # dùng click 200 lần. Header của cột đó phải chứa một <CheckBox>.
+    for col in root.iter():
+        ctag = local(col.tag)
+        if ctag not in ("DataGridTemplateColumn", "DataGridCheckBoxColumn",
+                        "GridViewColumn"):
+            continue
+        cattrs = {local(k): v for k, v in col.attrib.items()}
+        hdr_text = cattrs.get("Header", "")
+        if (base, hdr_text) in SELECTALL_EXEMPT:
+            continue
+        # cột này có bind checkbox vào một property của dòng không?
+        bound = None
+        if ctag == "DataGridCheckBoxColumn":
+            bound = cattrs.get("Binding")
+        for e in col.iter():
+            if local(e.tag) != "CheckBox":
+                continue
+            if any(local(a.tag).endswith("CellTemplate") for a in ancestors(e)):
+                bound = bound or {local(k): v for k, v in e.attrib.items()}.get("IsChecked")
+        if not bound or "{Binding" not in (bound or ""):
+            continue
+        # header có checkbox chưa?
+        has_hdr_cb = any(
+            local(e.tag) == "CheckBox"
+            and any(local(a.tag).endswith(".Header")
+                    or local(a.tag).endswith("HeaderTemplate")
+                    for a in ancestors(e))
+            for e in col.iter())
+        if not has_hdr_cb:
+            prop = re.search(r"\{Binding\s+([\w.]+)", bound)
+            issues.append(("P2", "cột checkbox %s(%s) thiếu checkbox select-all ở "
+                                 "header — thêm <%s.Header><CheckBox .../>"
+                           % (ctag, prop.group(1) if prop else "?", ctag)))
+
+    # ── Luật 22 · ICON — một bộ icon cho toàn extension ───────────────────
+    # (a) Font icon duy nhất là Segoe MDL2 Assets, và LUÔN qua style T3.Icon.*
+    #     — không hardcode FontFamily/FontSize tại chỗ dùng.
+    n_inline_mdl2 = len(re.findall(r'FontFamily="Segoe MDL2 Assets"', src))
+    if n_inline_mdl2 and base not in ICON_EXEMPT:
+        issues.append(("P2", '%d icon khai FontFamily="Segoe MDL2 Assets" tại chỗ — '
+                             'dùng Style="{StaticResource T3.Icon}" (hoặc .Muted/.Field/'
+                             '.Lead/.Lg)' % n_inline_mdl2))
+    # (b) Ký tự Unicode thường làm icon: render bằng Segoe UI nên lệch nét và
+    #     lệch baseline so với glyph MDL2 đứng cạnh.
+    bad_glyphs = sorted({m for m in re.findall(r"&#x[0-9A-Fa-f]{4};", src)
+                         if m.upper() in FAKE_ICON_GLYPHS})
+    if bad_glyphs and base not in ICON_EXEMPT:
+        issues.append(("P2", "icon dùng ký tự Unicode thường (%s) — thay bằng glyph "
+                             "Segoe MDL2 Assets, xem bảng glyph trong T3Lab.Styles.xaml"
+                       % ", ".join("%s %s" % (g, FAKE_ICON_GLYPHS[g.upper()])
+                                   for g in bad_glyphs)))
+
     if n_primary > 1 and base not in MULTI_WINDOW:
         issues.append(("P2", "%d nút T3.Button.Primary — chuẩn cho đúng một" % n_primary))
     if has_list and not has_empty:

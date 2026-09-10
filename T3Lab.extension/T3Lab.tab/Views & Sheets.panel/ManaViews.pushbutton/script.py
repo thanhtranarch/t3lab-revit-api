@@ -61,6 +61,12 @@ except NameError:
         reload = None
 
 if reload:
+    # Nạp lại bộ lọc cột TRƯỚC dialog: dialog `from ... import` class này nên
+    # nếu module cũ còn trong sys.modules thì click lần 2 vẫn chạy code cũ.
+    # An toàn để reload vì nó chỉ chứa class Python thuần (không kế thừa CLR,
+    # không `__namespace__`) — xem CLAUDE.md · S15/S17.
+    if 'GUI.DataGridColumnFilter' in sys.modules:
+        reload(sys.modules['GUI.DataGridColumnFilter'])
     if 'GUI.ManaViewsDialog' in sys.modules:
         reload(sys.modules['GUI.ManaViewsDialog'])
     elif 'ManaViewsDialog' in sys.modules:

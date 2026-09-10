@@ -1005,11 +1005,17 @@ class FamilyCreatorDialog(T3WPFWindow):
         for item in self._block_items:
             item.IsSelected = True
         self.blocks_grid.Items.Refresh()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_blocks_grid"), self.blocks_grid, "IsSelected")
 
     def deselect_all_clicked(self, sender, e):
         for item in self._block_items:
             item.IsSelected = False
         self.blocks_grid.Items.Refresh()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_blocks_grid"), self.blocks_grid, "IsSelected")
 
     def export_clicked(self, sender, e):
         output_folder = self.output_path.Text
@@ -2902,6 +2908,14 @@ class FamilyCreatorDialog(T3WPFWindow):
         return built, total, skipped
 
     # ── Batch mode ───────────────────────────────────────────────────────────
+
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_blocks_grid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua blocks_grid."""
+        self.toggle_all_rows(self.blocks_grid, "IsSelected", sender.IsChecked)
 
 
 # ==============================================================================

@@ -59,6 +59,23 @@
           <SolidColorBrush x:Key="T3.Progress.Track" Color="#ECECEF"/>
           <SolidColorBrush x:Key="T3.Progress.Fill"  Color="#C2410C"/>
 
+          <!-- ── Bảng màu PHÂN LOẠI — CHỈ cho biểu đồ / plan view / marker ────────
+               Dùng khi cần phân biệt N hạng mục không có thứ tự (mỗi group type một
+               màu trên mặt bằng). KHÔNG dùng cho text, button, border hay trạng thái:
+               trạng thái đã có Success/Warning/Danger và chúng mang nghĩa cố định.
+               Thứ tự đã sắp để 2 màu cạnh nhau luôn khác hue rõ rệt; quay vòng khi
+               hết. Độ sáng đủ tương phản trên T3.Surface lẫn T3.SurfaceSunken.       -->
+          <SolidColorBrush x:Key="T3.Plot.1" Color="#2563EB"/>
+          <SolidColorBrush x:Key="T3.Plot.2" Color="#D97706"/>
+          <SolidColorBrush x:Key="T3.Plot.3" Color="#059669"/>
+          <SolidColorBrush x:Key="T3.Plot.4" Color="#DC2626"/>
+          <SolidColorBrush x:Key="T3.Plot.5" Color="#7C3AED"/>
+          <SolidColorBrush x:Key="T3.Plot.6" Color="#0891B2"/>
+          <SolidColorBrush x:Key="T3.Plot.7" Color="#C026D3"/>
+          <SolidColorBrush x:Key="T3.Plot.8" Color="#65A30D"/>
+          <!-- Hạng mục bị tắt hiển thị / nằm ngoài bộ lọc. -->
+          <SolidColorBrush x:Key="T3.Plot.Off" Color="#C7C7CE"/>
+
           <!-- ══════════════════ 2 · TYPE ══════════════════ -->
           <FontFamily x:Key="T3.Font">Segoe UI</FontFamily>
           <FontFamily x:Key="T3.Font.Mono">Consolas</FontFamily>
@@ -189,6 +206,57 @@
                 </ControlTemplate>
               </Setter.Value>
             </Setter>
+          </Style>
+
+          <!-- ══════════════════ ICON — MỘT bộ icon cho toàn extension ══════════════════
+               Font icon DUY NHẤT là `Segoe MDL2 Assets`. Tuyệt đối KHÔNG dùng ký tự
+               Unicode thường (✓ ✕ ⚠ ▶ ▢ −) làm icon: chúng render bằng Segoe UI nên lệch
+               nét, lệch baseline và lệch chiều cao so với glyph MDL2 bên cạnh.
+
+               Cách dùng — icon LUÔN là <TextBlock>, không bao giờ là Content của Button:
+                 <TextBlock Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
+
+               Bảng glyph chuẩn (dùng đúng glyph này cho đúng khái niệm, toàn dự án):
+                 E721 Search      E8BB Close      E921 Minimize   E922 Maximize
+                 E768 Play        E769 Pause      E71A Stop       E72C Refresh
+                 E73E Check       E711 Cancel     E710 Add        E74D Delete
+                 E946 Info        E7BA Warning    E783 Error      E713 Settings
+                 E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
+                 E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
+          -->
+
+          <!-- Icon nền: cỡ Label (11), màu thừa kế từ control chứa nó. -->
+          <Style x:Key="T3.Icon" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Label}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+          </Style>
+
+          <!-- Icon phụ trợ, không phải nội dung chính (icon trong ô tìm kiếm, cột phụ). -->
+          <Style x:Key="T3.Icon.Muted" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="Foreground" Value="{StaticResource T3.TextDisabled}"/>
+          </Style>
+
+          <!-- Icon dẫn của ô nhập (search box): mờ + cách chữ 8px. -->
+          <Style x:Key="T3.Icon.Field" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon.Muted}">
+            <Setter Property="Margin" Value="0,0,8,0"/>
+          </Style>
+
+          <!-- Icon đứng trước nhãn/nút: cách chữ 8px, màu thừa kế. -->
+          <Style x:Key="T3.Icon.Lead" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="Margin" Value="0,0,8,0"/>
+          </Style>
+
+          <!-- Icon lớn cho empty state / header, cỡ Display (19). -->
+          <Style x:Key="T3.Icon.Lg" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="FontSize" Value="{StaticResource T3.Size.Display}"/>
+          </Style>
+
+          <!-- Icon của callout: cỡ Caption, canh đỉnh dòng chữ đầu. -->
+          <Style x:Key="T3.Callout.Icon" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Caption}"/>
+            <Setter Property="Margin"     Value="0,0,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
           </Style>
 
           <!-- ══════════════════ 6 · BUTTONS ══════════════════
@@ -686,6 +754,26 @@
             <Setter Property="ColumnHeaderStyle" Value="{StaticResource T3.DataGridColumnHeader}"/>
             <Setter Property="RowStyle"          Value="{StaticResource T3.DataGridRow}"/>
             <Setter Property="CellStyle"         Value="{StaticResource T3.DataGridCell}"/>
+          </Style>
+
+
+          <!-- ══════════════════ 10b · LỌC THEO CỘT (DataGrid) ══════════════════
+               Không có dấu phễu đứng sẵn trên header — bấm thẳng vào TÊN cột là mở
+               popup lọc (popup do Python dựng trong `lib/GUI/DataGridColumnFilter.py`).
+               Cột đang lọc được tô đậm bằng code, không thêm icon.
+               Cột nào muốn lọc thì khai:
+                 HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
+               ══════════════════ -->
+          <Style x:Key="T3.DataGridColumnHeader.Filter" TargetType="DataGridColumnHeader"
+                 BasedOn="{StaticResource T3.DataGridColumnHeader}">
+            <Setter Property="Cursor"  Value="Hand"/>
+            <Setter Property="ToolTip" Value="Click the column name to filter"/>
+          </Style>
+
+          <!-- Dòng giá trị trong popup lọc (Python dựng, dùng khóa này cho checkbox). -->
+          <Style x:Key="T3.Filter.Item" TargetType="CheckBox" BasedOn="{StaticResource T3.CheckBox}">
+            <Setter Property="Margin"  Value="0,0,0,4"/>
+            <Setter Property="Padding" Value="8,0,0,0"/>
           </Style>
 
           <!-- ══════════════════ GRIDVIEW & LISTVIEW STYLES ══════════════════
@@ -1272,9 +1360,8 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
-                      <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets"
-                                 FontSize="11" Margin="0,0,8,0" VerticalAlignment="Center"
-                                 Foreground="{StaticResource T3.TextDisabled}"/>
+                      <TextBlock Grid.Column="0" Text="&#xE721;"
+                                 Style="{StaticResource T3.Icon.Field}"/>
                       <Grid Grid.Column="1">
                         <TextBlock x:Name="ph" Text="{TemplateBinding Tag}"
                                    Foreground="{StaticResource T3.TextDisabled}"
@@ -1341,15 +1428,7 @@
             <Setter Property="Foreground" Value="{StaticResource T3.TextDisabled}"/>
           </Style>
 
-          <!-- Icon của callout: Segoe MDL2, canh đỉnh dòng chữ đầu. -->
-          <Style x:Key="T3.Callout.Icon" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
-            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Caption}"/>
-            <Setter Property="Margin"     Value="0,0,8,0"/>
-            <Setter Property="VerticalAlignment" Value="Top"/>
-          </Style>
-
-          <!-- Chấm trạng thái 6px. Fill đặt tại chỗ dùng: Success/Warning/Danger/Progress. -->
+        <!-- Chấm trạng thái 6px. Fill đặt tại chỗ dùng: Success/Warning/Danger/Progress. -->
           <Style x:Key="T3.Dot" TargetType="Ellipse">
             <Setter Property="Width"  Value="6"/>
             <Setter Property="Height" Value="6"/>
@@ -1421,7 +1500,7 @@
                                RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Orientation="Vertical" VerticalAlignment="Center">
                             <TextBlock Text="Group Manager" Style="{StaticResource T3.Title}"/>
-                            <TextBlock Text="Rename model and detail groups, move them between worksets, clean up unused types"
+                            <TextBlock Text="Rename groups, set their workset, clean up unused types, and see where they sit on the plan"
                                        Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                     </StackPanel>
@@ -1429,15 +1508,15 @@
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize"
                                 Click="minimize_button_clicked">
-                            <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="11"/>
+                            <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                         <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize"
                                 Click="maximize_button_clicked">
-                            <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="11"/>
+                            <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                         <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close"
                                 IsCancel="True" Click="close_button_clicked">
-                            <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="11"/>
+                            <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -1460,11 +1539,14 @@
                         <RadioButton x:Name="chip_tab_cleanup" Content="Cleanup" GroupName="mg_tabs"
                                      Style="{StaticResource T3.Chip}"
                                      Checked="tab_chip_checked" Tag="2"/>
+                        <RadioButton x:Name="chip_tab_place" Content="Placement" GroupName="mg_tabs"
+                                     Style="{StaticResource T3.Chip}"
+                                     Checked="tab_chip_checked" Tag="3"/>
                     </StackPanel>
                 </Border>
                 <StackPanel Grid.Column="1" Orientation="Horizontal"
                             HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock Text="Show" Style="{StaticResource T3.Caption}"
+                    <TextBlock x:Name="lbl_kind" Text="Show" Style="{StaticResource T3.Caption}"
                                VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <ComboBox x:Name="cb_kind" Width="180"
                               Style="{StaticResource T3.ComboBox}"
@@ -1917,6 +1999,224 @@
                                         Padding="16,0" Height="28"
                                         Click="purge_clicked"/>
                             </StackPanel>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+                <!-- ────────────────── TAB 4: PLACEMENT ────────────────── -->
+                <TabItem x:Name="tab_item_place">
+                    <Grid Margin="16,12,16,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="300"/>  <!-- Legend rail -->
+                            <ColumnDefinition Width="*"/>    <!-- Plan -->
+                        </Grid.ColumnDefinitions>
+
+                        <!-- ══ LEFT: what to plot ══ -->
+                        <Grid Grid.Column="0" Margin="0,0,12,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- Label -->
+                                <RowDefinition Height="Auto"/> <!-- Kind + level -->
+                                <RowDefinition Height="*"/>    <!-- Legend -->
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="WHAT TO PLOT" Margin="0,0,0,8"
+                                       Style="{StaticResource T3.Label}"/>
+
+                            <StackPanel Grid.Row="1" Margin="0,0,0,8">
+                                <TextBlock Text="Group kind" Margin="0,0,0,4"
+                                           Style="{StaticResource T3.Caption}"/>
+                                <Border Style="{StaticResource T3.Pill}" HorizontalAlignment="Left"
+                                        Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <RadioButton x:Name="chip_plot_model" Content="Model"
+                                                     GroupName="mg_plot_kind" IsChecked="True"
+                                                     Style="{StaticResource T3.Chip}"
+                                                     Checked="plot_kind_checked" Tag="Model"/>
+                                        <RadioButton x:Name="chip_plot_detail" Content="Detail"
+                                                     GroupName="mg_plot_kind"
+                                                     Style="{StaticResource T3.Chip}"
+                                                     Checked="plot_kind_checked" Tag="Detail"/>
+                                        <RadioButton x:Name="chip_plot_attached" Content="Attached"
+                                                     GroupName="mg_plot_kind"
+                                                     Style="{StaticResource T3.Chip}"
+                                                     Checked="plot_kind_checked" Tag="Attached"/>
+                                        <RadioButton x:Name="chip_plot_all" Content="All"
+                                                     GroupName="mg_plot_kind"
+                                                     Style="{StaticResource T3.Chip}"
+                                                     Checked="plot_kind_checked" Tag=""/>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Level or view" Margin="0,0,0,4"
+                                           Style="{StaticResource T3.Caption}"/>
+                                <ComboBox x:Name="cb_plot_level"
+                                          Style="{StaticResource T3.ComboBox}"
+                                          ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
+                                          SelectionChanged="plot_level_changed"/>
+                            </StackPanel>
+
+                            <Border Grid.Row="2" Style="{StaticResource T3.Panel}"
+                                    Padding="0" ClipToBounds="True">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/> <!-- Legend toolbar -->
+                                        <RowDefinition Height="Auto"/> <!-- Rule -->
+                                        <RowDefinition Height="*"/>    <!-- Legend list -->
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0" Margin="12,8,12,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" x:Name="lbl_plot_legend"
+                                                   Text="0 group types"
+                                                   Style="{StaticResource T3.Caption}"
+                                                   VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <Button x:Name="btn_plot_all" Content="All"
+                                                    Style="{StaticResource T3.Button.Ghost}"
+                                                    Margin="0,0,4,0" Padding="8,0" Height="24"
+                                                    Click="plot_show_all_clicked"/>
+                                            <Button x:Name="btn_plot_none" Content="None"
+                                                    Style="{StaticResource T3.Button.Ghost}"
+                                                    Padding="8,0" Height="24"
+                                                    Click="plot_show_none_clicked"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Border Grid.Row="1" Height="1"
+                                            Background="{StaticResource T3.Border}"/>
+
+                                    <ListBox Grid.Row="2" x:Name="list_plot_legend"
+                                             Style="{StaticResource T3.ListBox}"
+                                             ItemContainerStyle="{StaticResource T3.ListBoxItem}"
+                                             BorderThickness="0"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             VirtualizingPanel.IsVirtualizing="True"
+                                             MouseDoubleClick="plot_legend_zoom">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <CheckBox Grid.Column="0"
+                                                              IsChecked="{Binding IsVisible, Mode=TwoWay,
+                                                                          UpdateSourceTrigger=PropertyChanged}"
+                                                              Style="{StaticResource T3.CheckBox}"
+                                                              Padding="0" Margin="0,0,8,0"
+                                                              VerticalAlignment="Center"
+                                                              Click="plot_legend_toggled"/>
+                                                    <Ellipse Grid.Column="1" Width="10" Height="10"
+                                                             Margin="0,0,8,0" VerticalAlignment="Center"
+                                                             Fill="{Binding Swatch}"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding TypeName}"
+                                                               VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding Tooltip}"/>
+                                                    <TextBlock Grid.Column="3" Text="{Binding CountLabel}"
+                                                               Margin="8,0,0,0"
+                                                               Style="{StaticResource T3.Cell.Number}"
+                                                               VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+
+                                    <TextBlock Grid.Row="2" x:Name="txt_plot_legend_empty"
+                                               Style="{StaticResource T3.Empty}"
+                                               Text="No group types of this kind in the model."
+                                               Visibility="Collapsed"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- ══ RIGHT: the plan ══ -->
+                        <Grid Grid.Column="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- Toolbar -->
+                                <RowDefinition Height="*"/>    <!-- Plan panel -->
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="PLAN VIEW"
+                                           Style="{StaticResource T3.Label}"
+                                           VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <CheckBox x:Name="chk_plot_labels" Content="Names"
+                                              Style="{StaticResource T3.CheckBox}"
+                                              VerticalAlignment="Center" Margin="0,0,12,0"
+                                              Click="plot_labels_toggled"/>
+                                    <Button x:Name="btn_plot_fit" Style="{StaticResource T3.Button.Ghost}"
+                                            Margin="0,0,4,0" Padding="8,0" Height="24"
+                                            ToolTip="Zoom to fit" Click="plot_fit_clicked">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE9A6;" Style="{StaticResource T3.Icon.Lead}"/>
+                                            <TextBlock Text="Fit" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="btn_plot_select" Content="Select In Revit"
+                                            Style="{StaticResource T3.Button.Ghost}"
+                                            Padding="8,0" Height="24"
+                                            ToolTip="Select every plotted instance in the model"
+                                            Click="plot_select_clicked"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <Border Grid.Row="1" Style="{StaticResource T3.Panel}"
+                                    Padding="0" ClipToBounds="True">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>    <!-- Canvas -->
+                                        <RowDefinition Height="Auto"/> <!-- Rule -->
+                                        <RowDefinition Height="Auto"/> <!-- Info strip -->
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0" ClipToBounds="True">
+                                        <Canvas x:Name="plan_canvas"
+                                                Background="{StaticResource T3.SurfaceSunken}"
+                                                ClipToBounds="True"
+                                                SizeChanged="plan_canvas_size_changed"
+                                                MouseWheel="plan_canvas_wheel"
+                                                MouseLeftButtonDown="plan_canvas_mouse_down"
+                                                MouseMove="plan_canvas_mouse_move"
+                                                MouseLeftButtonUp="plan_canvas_mouse_up"
+                                                MouseLeave="plan_canvas_mouse_up"/>
+                                        <TextBlock x:Name="txt_plot_empty"
+                                                   Style="{StaticResource T3.Empty}"
+                                                   Text="No placed instances to plot. Pick another kind or level."
+                                                   Visibility="Collapsed"/>
+                                    </Grid>
+
+                                    <Border Grid.Row="1" Height="1"
+                                            Background="{StaticResource T3.Border}"/>
+
+                                    <Grid Grid.Row="2" Margin="12,8,12,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" x:Name="lbl_plot_info"
+                                                   Text="No instances plotted"
+                                                   Style="{StaticResource T3.Caption}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" x:Name="lbl_plot_hint"
+                                                   Text="Scroll to zoom · drag to pan · click a marker to select it"
+                                                   Style="{StaticResource T3.Caption}"
+                                                   Foreground="{StaticResource T3.TextDisabled}"
+                                                   VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Grid>
+                            </Border>
                         </Grid>
                     </Grid>
                 </TabItem>

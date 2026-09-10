@@ -102,6 +102,87 @@ có gì đang chạy · `T3.Cell.Muted` ô "— none —" / "n/a" ·
 `T3.Callout.Icon` icon của callout · `T3.Dot` chấm trạng thái 6px ·
 `T3.Log.Time/.Ok/.Skipped/.Failed/.Plain` dòng log · `T3.Tally` dải đếm dưới log.
 
+## Bảng có checkbox — bắt buộc có select-all ở header
+
+Bảng nào cho tick từng dòng thì **phải** cho tick tất cả. Không có ngoại lệ vì
+"bảng này thường ít dòng" — filter đổi là số dòng đổi.
+
+```xml
+<DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
+  <DataGridTemplateColumn.Header>
+    <CheckBox x:Name="chk_all_sheets_grid" Style="{StaticResource T3.CheckBox}"
+              Click="select_all_sheets_grid_clicked"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              ToolTip="Select all rows"/>
+  </DataGridTemplateColumn.Header>
+  <DataGridTemplateColumn.CellTemplate>
+    <DataTemplate>
+      <CheckBox IsChecked="{Binding is_selected, Mode=TwoWay,
+                            UpdateSourceTrigger=PropertyChanged}"
+                Style="{StaticResource T3.CheckBox}"
+                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    </DataTemplate>
+  </DataGridTemplateColumn.CellTemplate>
+</DataGridTemplateColumn>
+```
+
+Code-behind đúng một dòng — `toggle_all_rows` nằm sẵn trong `T3WPFWindow`:
+
+```python
+def select_all_sheets_grid_clicked(self, sender, e):
+    self.toggle_all_rows(self.sheets_grid, "is_selected", sender.IsChecked)
+```
+
+- `toggle_all_rows` chạy trên `grid.Items` chứ không phải `ItemsSource`, nên
+  **chỉ đổi những dòng đang hiển thị** sau filter/sort — select-all không được
+  chọn lén các dòng đã bị lọc đi.
+- Tool nào đã có sẵn nút *Select All / Select None* thì gọi thêm
+  `self.sync_header_checkbox(self.FindName("chk_all_<grid>"), self.<grid>, "<prop>")`
+  ở cuối handler của nút, để checkbox header không lệch pha với nút.
+  Chọn một phần → header về trạng thái indeterminate.
+
+**Miễn trừ:** cột checkbox là **thuộc tính của chính dòng đó**, không phải để
+chọn dòng — ví dụ `ManaWorkset` ACTIVE / OPEN / EDITABLE là trạng thái từng
+workset trong Revit. "Tất cả" ở đó nghĩa là mở/khoá toàn bộ workset, một hành
+động khác hẳn và phải làm có ý thức trên từng dòng. Khai vào `SELECTALL_EXEMPT`
+trong `dev/audit_t3.py`.
+
+## Icon — một bộ duy nhất cho toàn extension
+
+Font icon **duy nhất** là `Segoe MDL2 Assets`. Icon **luôn** là một `<TextBlock>` mang
+style `T3.Icon.*`, **không bao giờ** là `Content` của Button và **không bao giờ**
+khai `FontFamily`/`FontSize` tại chỗ dùng.
+
+| Style | Dùng cho |
+|-------|----------|
+| `T3.Icon` | icon nền — cỡ Label (11), màu thừa kế từ control chứa nó. Chrome cửa sổ, icon trong nút |
+| `T3.Icon.Muted` | icon phụ trợ, không phải nội dung chính (`T3.TextDisabled`) |
+| `T3.Icon.Field` | icon dẫn của ô nhập/search — mờ + cách chữ 8px |
+| `T3.Icon.Lead` | icon đứng trước nhãn/chữ trong nút — cách chữ 8px, màu thừa kế |
+| `T3.Icon.Lg` | icon lớn cho empty state / header — cỡ Display (19) |
+| `T3.Callout.Icon` | icon của callout — cỡ Caption, canh đỉnh dòng chữ đầu |
+
+**Cấm ký tự Unicode thường làm icon** (`✓ ✕ ⚠ ▶ ▢ − ◀ ▲ ▼`). Chúng render bằng
+Segoe UI nên lệch nét, lệch baseline và lệch chiều cao so với glyph MDL2 đứng cạnh.
+
+Bảng glyph chuẩn — **một khái niệm, một glyph, toàn dự án**:
+
+| | | | |
+|---|---|---|---|
+| `E721` Search | `E8BB` Close | `E921` Minimize | `E922` Maximize |
+| `E768` Play | `E769` Pause | `E71A` Stop | `E72C` Refresh |
+| `E73E` Check | `E711` Cancel | `E710` Add | `E74D` Delete |
+| `E946` Info | `E7BA` Warning | `E783` Error | `E713` Settings |
+| `E70D` ChevronDown | `E70E` ChevronUp | `E76B` ChevronLeft | `E76C` ChevronRight |
+| `E74E` Save | `E8E5` OpenFile | `E774` Globe | `E7A7` Undo |
+
+Cần glyph chưa có trong bảng → thêm vào bảng này **và** vào comment đầu khối ICON
+trong `T3Lab.Styles.xaml`, đừng dùng lẻ.
+
+Gate: `python3 dev/audit_t3.py` bắt cả hai vi phạm (FontFamily inline · ký tự Unicode).
+Miễn trừ: `DWGManagement.xaml` (thiết kế riêng đã chốt) và `T3LabAssistant.xaml`
+(chat surface theo theme Revit — brush tĩnh của `T3.Icon` sẽ hỏng dark mode).
+
 ## File mẫu — copy từ đây
 
 `T3Lab.extension/lib/GUI/Tools/UIStandardShowcase.xaml` là **UI hoàn chỉnh chuẩn mẫu duy nhất**, tổng hợp toàn bộ 5 pattern (P1 form cấu hình thông số, P2 chọn phần tử & filter bar, P3 thanh tiến trình & log box, P4 bảng kết quả DataGrid & summary metrics, P5 callout cảnh báo & an toàn) vào một cửa sổ làm việc hoàn chỉnh duy nhất. Dùng 98/106 resource key, 0 vi phạm audit, 0 waiver. Viết tool mới thì mở nó ra để copy cấu trúc layout, control, hoặc toàn bộ khung.

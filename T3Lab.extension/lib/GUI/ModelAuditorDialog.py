@@ -1923,5 +1923,13 @@ class ModelAuditorWindow(T3WPFWindow):
         except Exception as ex:
             forms.alert("Export failed:\n{}".format(ex))
 
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_dg_smart_purge_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua dg_smart_purge."""
+        self.toggle_all_rows(self.dg_smart_purge, "is_selected", sender.IsChecked)
+
 def show_model_auditor(script_dir, revit):
     ModelAuditorWindow(script_dir, revit).ShowDialog()

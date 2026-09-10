@@ -2550,6 +2550,14 @@ class ManaParaWindow(T3WPFWindow):
             self.btn_loader_add.IsEnabled = True
             self.prg_loader.Visibility = self._vis('Collapsed')
 
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_dg_loader_params_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua dg_loader_params."""
+        self.toggle_all_rows(self.dg_loader_params, "is_selected", sender.IsChecked)
+
 
 # ============================================================================
 # PUBLIC API

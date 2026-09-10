@@ -1164,12 +1164,18 @@ class CreateRoomPlanWindow(T3WPFWindow):
             r.IsSelected = True
         self.room_datagrid.Items.Refresh()
         self._update_status()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_room_datagrid"), self.room_datagrid, "IsSelected")
 
     def select_none_clicked(self, sender, e):
         for r in self._all_rooms:
             r.IsSelected = False
         self.room_datagrid.Items.Refresh()
         self._update_status()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_room_datagrid"), self.room_datagrid, "IsSelected")
 
     def search_changed(self, sender, e):
         """Filter room list by search text."""
@@ -1706,6 +1712,14 @@ class CreateRoomPlanWindow(T3WPFWindow):
             self._layout_separate(result, p_sheet, e_sheet)
 
         return sheets
+
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_room_datagrid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua room_datagrid."""
+        self.toggle_all_rows(self.room_datagrid, "IsSelected", sender.IsChecked)
 
 
 # ╔╦╗╔═╗╦╔╗╔

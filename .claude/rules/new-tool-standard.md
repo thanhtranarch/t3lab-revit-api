@@ -46,7 +46,7 @@ không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy
 
 ---
 
-## 2 · XAML — 15 luật, `audit_t3.py` kiểm tra tự động
+## 2 · XAML — 23 luật, `audit_t3.py` kiểm tra tự động
 
 | # | Luật | Vi phạm |
 |---|------|---------|
@@ -70,6 +70,8 @@ không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy
 | 19 | **Bố cục liền mạch — Không có gap giữa các cột, hàng, bảng**: Bảng phải lấp đầy toàn bộ chiều rộng, cột cuối cùng phải tự động dãn khít mép phải (zero gap). Bảng và dải đếm/trạng thái dưới chân bảng phải nằm trong cùng một `<Border Style="{StaticResource T3.Panel}" Padding="0">`, ngăn cách bằng đường kẻ 1px `T3.Border`, tuyệt đối không tách 2 Border rời nhau gây khe hở margin lơ lửng | P2 |
 | 20 | **Resource Key phải tồn tại trong T3Lab.Styles.xaml**: Mọi `{StaticResource T3.*}` đều phải được định nghĩa trong stylesheet chuẩn. Không tự đặt key không có thực (như `T3.SurfaceHover`) gây lỗi `Cannot find resource named...` | **P0** |
 | 21 | **FindResource trong Python**: Khi code Python gọi `self.FindResource(...)`, bắt buộc dùng tên chuẩn `T3.*` dot-notation (ví dụ `T3.CheckBox`), cấm dùng tên cũ legacy (`T3CheckBox`), và luôn bọc trong `try/except` an toàn. | P1 |
+| 22 | **Icon một bộ duy nhất**: icon LUÔN là `<TextBlock Text="&#xE721;" Style="{StaticResource T3.Icon...}"/>`. Cấm khai `FontFamily="Segoe MDL2 Assets"` tại chỗ dùng, cấm để icon làm `Content` của Button, cấm ký tự Unicode thường (`✓ ✕ ⚠ ▶ ▢ −`) làm icon. Bảng glyph chuẩn ở mục "Icon" trong `T3LAB_UI_STANDARD.md` | P2 |
+| 23 | **Cột checkbox phải có select-all ở header**: bảng nào cho tick từng dòng thì header cột đó bắt buộc có `<X.Header><CheckBox x:Name="chk_all_<grid>" Style="{StaticResource T3.CheckBox}" Click="select_all_<grid>_clicked" ToolTip="Select all rows"/></X.Header>`. Handler chỉ một dòng: `self.toggle_all_rows(self.<grid>, "<prop>", sender.IsChecked)` (`toggle_all_rows` nằm sẵn trong `T3WPFWindow`). Miễn trừ: cột là **thuộc tính của dòng** chứ không phải để chọn dòng (ví dụ `ManaWorkset` ACTIVE/OPEN/EDITABLE) — khai vào `SELECTALL_EXEMPT` trong `dev/audit_t3.py` | P2 |
 
 Thêm hai thứ `audit_t3.py` cũng bắt: `<Grid.RowDefinition/>` dot-notation (**P0**,
 crash `EMPTYPROPERTYELEMENT` lúc mở tool) và mọi `Effect` (P2).
@@ -192,6 +194,7 @@ if __name__ == '__main__':
 [ ] python3 dev/audit_t3.py --quiet      → xanh (0 vi phạm)
 [ ] python3 dev/audit_tools.py --quiet   → xanh (clean)
 [ ] python3 dev/audit_cpython.py --quiet → 0 P0 (bẫy migration CPython)
+[ ] powershell -STA -File dev/check_xaml_wpf.ps1 → 57 OK, 0 FAILED
 [ ] Pattern P1–P5 rõ ràng, size class đúng S/M/L
 [ ] Mở tool trong Revit: không lỗi, chrome hoạt động, không trang trắng
 [ ] Happy path đúng; Ctrl+Z revert đúng một bước
@@ -203,3 +206,13 @@ if __name__ == '__main__':
 ```
 
 Bốn dòng cuối cần Revit thật. Chưa test thì ghi `NEEDS VERIFICATION`, **không tick**.
+
+> **`dev/check_xaml_wpf.ps1` bắt thứ `audit_t3.py` không bắt được.** Audit đọc XAML
+> bằng ElementTree — nó chỉ biết file có well-formed hay không. Script này nạp file
+> bằng **chính `XamlReader` của WPF** như pyRevit làm, nên tóm được lớp lỗi crash-lúc-mở:
+> thuộc tính không tồn tại trên control (`<ListBox HorizontalScrollBarVisibility>` —
+> phải là `ScrollViewer.HorizontalScrollBarVisibility`), `x:Key` trùng, attached
+> property sai cú pháp, resource không tồn tại. Chạy nó trước khi commit bất kỳ XAML nào.
+>
+> Xem một tool trông thế nào mà không cần mở Revit:
+> `powershell -STA -File dev/preview_t3_xaml.ps1 -Xaml <đường dẫn> -Out out.png -Tab <n>`

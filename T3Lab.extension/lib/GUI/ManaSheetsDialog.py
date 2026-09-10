@@ -71,6 +71,7 @@ except Exception:
 XAML_FILE = os.path.join(GUI_DIR, 'Tools', 'ManaSheets.xaml')
 
 from GUI.ProgressPauseMixin import ProgressPauseMixin
+from GUI.DataGridColumnFilter import ColumnFilterController
 
 
 # =====================================================
@@ -225,6 +226,21 @@ class SheetManagerWindow(T3WPFWindow):
         self.renum_close_btn.Click += self._on_close
         self.renum_grid.ItemsSource = self.renumber_items
 
+        # Column filters (nút phễu trên header — GUI/DataGridColumnFilter.py).
+        # Chỉ gắn cho bảng SHEETS: bảng Renumber là preview của chính danh sách
+        # đã lọc ở tab SHEETS, lọc thêm ở đó sẽ làm lệch dải số sinh ra.
+        self.sheets_col_filter = ColumnFilterController(
+            self, self.sheets_grid,
+            columns=[("NUMBER", "sheet_number"),
+                     ("SHEET NAME", "sheet_name"),
+                     ("DESIGNED BY", "designed_by"),
+                     ("CHECKED BY", "checked_by"),
+                     ("APPROVED BY", "approved_by"),
+                     ("DRAWN BY", "drawn_by")],
+            source=lambda: self.all_sheets,
+            on_changed=self._apply_sheets_filters,
+            status_setter=self._set_status)
+
         # Load initial data
         self._load_sheets_data()
         self._apply_sheets_filters()
@@ -234,6 +250,13 @@ class SheetManagerWindow(T3WPFWindow):
         # True when the XAML was parsed, so its Checked event fired before this
         # handler was wired above and tab_control.SelectedIndex was never set.
         self.tab_control.SelectedIndex = 0
+
+    def _set_status(self, text):
+        """Ghi một câu trạng thái ra footer."""
+        try:
+            self.txt_status_bar.Text = text
+        except Exception:
+            pass
 
     def _adopt_host_font(self):
         if _theme is None:
@@ -309,10 +332,14 @@ class SheetManagerWindow(T3WPFWindow):
             elif filter_index == 2: # Non-Placeholder Only
                 if item.element.IsPlaceholder:
                     continue
-                    
+            # Bộ lọc theo cột (nút phễu trên header)
+            if not self.sheets_col_filter.passes(item):
+                continue
+
             self.filtered_sheets.Add(item)
-            
+
         self._update_sheets_summary()
+        self.sheets_col_filter.refresh_glyphs()
 
     def _update_sheets_summary(self):
         self.sheets_total_text.Text = str(len(self.all_sheets))
@@ -697,6 +724,18 @@ class SheetManagerWindow(T3WPFWindow):
                 MessageBox.Show("Error during renumbering: {}".format(str(e)), "Error")
             finally:
                 self.end_progress()
+
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_sheets_grid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua sheets_grid."""
+        self.toggle_all_rows(self.sheets_grid, "is_selected", sender.IsChecked)
+
+    def select_all_renum_grid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua renum_grid."""
+        self.toggle_all_rows(self.renum_grid, "IsSelected", sender.IsChecked)
 
 
 # =====================================================

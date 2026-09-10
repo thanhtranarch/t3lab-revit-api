@@ -424,11 +424,17 @@ class DoorThresholdWindow(T3WPFWindow):
         for d in self._all_doors: d.IsSelected = True
         self.door_datagrid.Items.Refresh()
         self._update_status()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_door_datagrid"), self.door_datagrid, "IsSelected")
 
     def select_none_clicked(self, sender, e):
         for d in self._all_doors: d.IsSelected = False
         self.door_datagrid.Items.Refresh()
         self._update_status()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_door_datagrid"), self.door_datagrid, "IsSelected")
 
     def search_changed(self, sender, e):
         query = self.txt_search.Text.strip().upper()
@@ -492,6 +498,14 @@ class DoorThresholdWindow(T3WPFWindow):
 
         TaskDialog.Show("Door Threshold", msg)
         self.Close()
+
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_door_datagrid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua door_datagrid."""
+        self.toggle_all_rows(self.door_datagrid, "IsSelected", sender.IsChecked)
 
 if __name__ == '__main__':
     try:

@@ -3,7 +3,7 @@
 ManaGroupDialog.py
 ==================
 WPF Dialog for managing Revit groups — model groups, detail groups and attached
-detail groups — in three tabs:
+detail groups — in four tabs:
 
 * **Rename**  — batch rename group types with find/replace, prefix, suffix,
                 letter case and an illegal-character cleanup, with a live preview
@@ -12,6 +12,10 @@ detail groups — in three tabs:
                 optionally taking the elements inside each group with them.
 * **Cleanup** — audit every group type (unused, single instance, mixed worksets,
                 name problems) then purge unused types or ungroup instances.
+* **Placement** — plot every placed instance on a plan, coloured by group type,
+                filtered by kind (model / detail / attached) and by level or
+                view, so "where are these groups?" has a visual answer. Click a
+                marker to select that instance in Revit.
 
 Revit API work lives in ``Snippets/_group_ops.py``; this module is UI only.
 
@@ -28,7 +32,10 @@ clr.AddReference('PresentationFramework')
 clr.AddReference('WindowsBase')
 
 from System.Windows import Visibility
+from System.Windows.Controls import Canvas, TextBlock
+from System.Windows.Input import Cursors
 from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
+from System.Windows.Shapes import Ellipse
 from System import Uri, UriKind
 
 from pyrevit import revit
@@ -44,12 +51,22 @@ XAML_FILE = os.path.join(GUI_DIR, 'Tools', 'ManaGroup.xaml')
 TAB_RENAME = 0
 TAB_WORKSET = 1
 TAB_CLEANUP = 2
+TAB_PLACE = 3
 
 PRIMARY_LABELS = {
     TAB_RENAME: "Apply Rename",
     TAB_WORKSET: "Apply Workset",
     TAB_CLEANUP: "Rescan Model",
+    TAB_PLACE: "Rescan Model",
 }
+
+# ── Placement tab ────────────────────────────────────────────────────────────
+PLOT_ALL_LEVELS = "All levels and views"
+PLOT_PALETTE_SIZE = 8          # T3.Plot.1 .. T3.Plot.8, then it wraps
+PLOT_PADDING = 24.0            # px kept clear around the fitted extent
+PLOT_MARKER_RADIUS = 4.0
+PLOT_LABEL_SIZE = 10.0
+PLOT_ZOOM_STEP = 1.2
 
 KIND_ALL = "All groups"
 KIND_FILTERS = (
@@ -149,6 +166,48 @@ class GroupRow(object):
         self._severity = severity
 
 
+class PlotLegendRow(object):
+    """One row of the Placement legend: a group type, its colour and its count."""
+
+    def __init__(self, type_id, type_name, kind, count, swatch, is_visible=True):
+        self.type_id = type_id
+        self.count = count
+        self._type_name = type_name
+        self._kind = kind
+        self._swatch = swatch
+        self._is_visible = is_visible
+
+    @property
+    def TypeName(self):
+        return self._type_name
+
+    @property
+    def KindLabel(self):
+        return self._kind
+
+    @property
+    def Swatch(self):
+        return self._swatch
+
+    @property
+    def CountLabel(self):
+        return str(self.count)
+
+    @property
+    def Tooltip(self):
+        return "%s — %s group, %d placed instance%s" % (
+            self._type_name, self._kind.lower(), self.count,
+            "" if self.count == 1 else "s")
+
+    @property
+    def IsVisible(self):
+        return self._is_visible
+
+    @IsVisible.setter
+    def IsVisible(self, value):
+        self._is_visible = bool(value)
+
+
 class ManaGroupDialog(T3WPFWindow):
     """Main window class for Group Manager."""
 
@@ -165,12 +224,33 @@ class ManaGroupDialog(T3WPFWindow):
         self._cln_rows = []
         self._worksets = []          # [(id_int, name)]
 
+        # Placement tab
+        self._placements = []           # [GroupPlacement] for the whole model
+        self._plot_levels = []          # level/view labels behind cb_plot_level
+        self._plot_legend_rows = []
+        self._plot_hidden = set()       # type_ids the user unticked in the legend
+        self._plot_colour_by_type = {}
+        self._plot_transform = None     # None = refit on the next draw
+        self._plot_markers = {}         # instance_id -> GroupPlacement drawn
+        self._plot_unlocated = 0
+        self._plot_dragging = False
+        self._plot_drag_from = None
+        self._plot_marker_stroke = self._brush("T3.Surface")
+        self._plot_label_brush = self._brush("T3.TextSecondary")
+
         self._load_logo()
         self._init_filters()
         self._reload_model()
         self._loading = False
 
     # ── SETUP ────────────────────────────────────────────────────────────────
+
+    def _brush(self, key):
+        """A brush from the T3 stylesheet, or None if the key is missing."""
+        try:
+            return self.FindResource(key)
+        except Exception:
+            return None
 
     def _load_logo(self):
         """Load and bind the T3Lab logo to title bar and window icon."""
@@ -225,8 +305,13 @@ class ManaGroupDialog(T3WPFWindow):
                                "Warning")
 
         self._load_worksets()
+        self._load_placements()
         self._recompute_names()
         self._apply_filter()
+        self._rebuild_plot_levels()
+        self._rebuild_plot_legend()
+        self._plot_transform = None
+        self._draw_plan()
         for checkbox, rows in ((self.chk_ren_header, self._ren_rows),
                                (self.chk_ws_header, self._ws_rows),
                                (self.chk_cln_header, self._cln_rows)):
@@ -329,6 +414,8 @@ class ManaGroupDialog(T3WPFWindow):
 
     def _refresh_current_grid(self):
         """Redraw only the grid the user is looking at."""
+        if self._active_tab == TAB_PLACE:
+            return                      # the Placement tab has no grid
         if self._active_tab == TAB_WORKSET:
             self.grid_workset.Items.Refresh()
         elif self._active_tab == TAB_CLEANUP:
@@ -338,6 +425,8 @@ class ManaGroupDialog(T3WPFWindow):
 
     def _current_rows(self):
         """The row list belonging to the active tab."""
+        if self._active_tab == TAB_PLACE:
+            return []                   # the Placement tab has no row list
         if self._active_tab == TAB_WORKSET:
             return self._ws_rows
         if self._active_tab == TAB_CLEANUP:
@@ -393,6 +482,8 @@ class ManaGroupDialog(T3WPFWindow):
 
     def _header_for(self, tab=None):
         tab = self._active_tab if tab is None else tab
+        if tab == TAB_PLACE:
+            return None                 # the Placement tab has no header checkbox
         if tab == TAB_WORKSET:
             return self.chk_ws_header
         if tab == TAB_CLEANUP:
@@ -702,7 +793,20 @@ class ManaGroupDialog(T3WPFWindow):
             self._active_tab = TAB_RENAME
         self.tab_control.SelectedIndex = self._active_tab
         self.btn_primary.Content = PRIMARY_LABELS.get(self._active_tab, "Apply")
-        self._sync_header_checkbox(self._header_for(), self._visible(self._current_rows()))
+
+        # The Placement tab carries its own kind chips, so the global "Show"
+        # dropdown would be a second control for the same idea, set to a
+        # different value. Hide it there rather than let the two disagree.
+        on_plan = self._active_tab == TAB_PLACE
+        hidden = Visibility.Collapsed if on_plan else Visibility.Visible
+        self.lbl_kind.Visibility = hidden
+        self.cb_kind.Visibility = hidden
+
+        if on_plan:
+            self._refresh_plot(refit=False)
+        else:
+            self._sync_header_checkbox(self._header_for(),
+                                       self._visible(self._current_rows()))
 
     def primary_button_clicked(self, sender, e):
         if self._is_busy:
@@ -725,6 +829,10 @@ class ManaGroupDialog(T3WPFWindow):
         if getattr(self, '_loading', True):
             return
         self._apply_filter()
+        # The search box sits in the shared toolbar, so it narrows the plan's
+        # legend too — otherwise typing a name would visibly do nothing here.
+        if self._active_tab == TAB_PLACE:
+            self._refresh_plot(refit=False)
 
     def kind_filter_changed(self, sender, e):
         if getattr(self, '_loading', True):
@@ -844,6 +952,351 @@ class ManaGroupDialog(T3WPFWindow):
         if self._is_busy:
             return
         self._purge_selected()
+
+    # ── TAB 4: PLACEMENT ─────────────────────────────────────────────────────
+    # The plan is drawn by hand onto a Canvas rather than bound: a few thousand
+    # markers as bound ContentPresenters is slow to lay out, and every redraw
+    # (zoom, pan, filter) would rebuild the whole visual tree.
+
+    def _plot_kind(self):
+        """Kind selected by the Placement chips, or None for all kinds."""
+        for chip in (self.chip_plot_model, self.chip_plot_detail,
+                     self.chip_plot_attached, self.chip_plot_all):
+            if chip.IsChecked:
+                return str(chip.Tag) or None
+        return _group_ops.KIND_MODEL
+
+    def _plot_level(self):
+        """Level/view chosen in the Placement filter, or None for every level."""
+        index = self.cb_plot_level.SelectedIndex
+        if index is None or index <= 0 or index > len(self._plot_levels):
+            return None
+        return self._plot_levels[index - 1]
+
+    def _load_placements(self):
+        """Read every group instance's position once per model reload."""
+        try:
+            self._placements = _group_ops.collect_placements(self.doc, self._records)
+        except Exception:
+            self._placements = []
+        placed = len(self._placements)
+        total = _group_ops.placed_instance_total(self._records)
+        self._plot_unlocated = max(0, total - placed)
+
+    def _rebuild_plot_levels(self):
+        """Refill the level filter, keeping the current choice when it survives."""
+        previous = None
+        try:
+            if self.cb_plot_level.SelectedIndex > 0:
+                previous = self._plot_levels[self.cb_plot_level.SelectedIndex - 1]
+        except Exception:
+            previous = None
+
+        kind = self._plot_kind()
+        in_kind = _group_ops.filter_placements(self._placements, kind=kind)
+        self._plot_levels = _group_ops.level_names_of(in_kind)
+
+        labels = [PLOT_ALL_LEVELS] + list(self._plot_levels)
+        self.cb_plot_level.ItemsSource = to_items_source(labels)
+        if previous and previous in self._plot_levels:
+            self.cb_plot_level.SelectedIndex = self._plot_levels.index(previous) + 1
+        else:
+            self.cb_plot_level.SelectedIndex = 0
+
+    def _rebuild_plot_legend(self):
+        """One legend row per group type of the chosen kind, with its colour."""
+        kind = self._plot_kind()
+        needle = self._search_text()
+        in_scope = _group_ops.filter_placements(self._placements, kind=kind,
+                                                level=self._plot_level())
+        counts = _group_ops.count_by_type(in_scope)
+
+        previous_hidden = set(self._plot_hidden)
+        rows = []
+        index = 0
+        for record in self._records:
+            if kind and record.kind != kind:
+                continue
+            if needle and needle not in record.name.lower():
+                continue
+            count = counts.get(record.type_id, 0)
+            rows.append(PlotLegendRow(
+                type_id=record.type_id,
+                type_name=record.name,
+                kind=record.kind,
+                count=count,
+                swatch=self._plot_brush(index),
+                is_visible=record.type_id not in previous_hidden))
+            index += 1
+
+        self._plot_legend_rows = rows
+        self._plot_colour_by_type = dict(
+            (row.type_id, row.Swatch) for row in rows)
+        self.list_plot_legend.ItemsSource = to_items_source(rows)
+        self.txt_plot_legend_empty.Visibility = (
+            Visibility.Collapsed if rows else Visibility.Visible)
+        self._update_plot_legend_label()
+
+    def _update_plot_legend_label(self):
+        """Refresh the "N group types · M plotted" caption above the legend."""
+        rows = self._plot_legend_rows
+        plotted = sum(r.count for r in rows if r.IsVisible)
+        self.lbl_plot_legend.Text = "%d group type%s · %d plotted" % (
+            len(rows), "" if len(rows) == 1 else "s", plotted)
+
+    def _plot_brush(self, index):
+        """Categorical brush `index`, wrapping round the palette."""
+        key = "T3.Plot.%d" % ((index % PLOT_PALETTE_SIZE) + 1)
+        try:
+            return self.FindResource(key)
+        except Exception:
+            return None
+
+    def _visible_placements(self):
+        """Placements that pass every Placement-tab filter."""
+        shown_ids = set(row.type_id for row in self._plot_legend_rows if row.IsVisible)
+        return _group_ops.filter_placements(
+            self._placements,
+            kind=self._plot_kind(),
+            level=self._plot_level(),
+            type_ids=shown_ids)
+
+    def _refresh_plot(self, refit=True):
+        """Rebuild legend + level list, then redraw the plan."""
+        if getattr(self, '_loading', True):
+            return
+        self._rebuild_plot_legend()
+        if refit:
+            self._plot_transform = None
+        self._draw_plan()
+
+    def _draw_plan(self):
+        """Paint the markers. Cheap enough to call on every zoom and pan tick."""
+        canvas = self.plan_canvas
+        canvas.Children.Clear()
+        self._plot_markers = {}
+
+        placements = self._visible_placements()
+        width = float(canvas.ActualWidth or 0)
+        height = float(canvas.ActualHeight or 0)
+        if width < 2 or height < 2:
+            return                      # not laid out yet; SizeChanged calls back
+
+        self.txt_plot_empty.Visibility = (
+            Visibility.Collapsed if placements else Visibility.Visible)
+        if not placements:
+            self.lbl_plot_info.Text = self._plot_info_text(0, None)
+            return
+
+        if self._plot_transform is None:
+            self._plot_transform = _group_ops.PlanTransform.fit(
+                _group_ops.placements_extent(placements), width, height,
+                padding=PLOT_PADDING)
+        transform = self._plot_transform
+
+        show_labels = bool(self.chk_plot_labels.IsChecked)
+        radius = PLOT_MARKER_RADIUS
+        for placement in placements:
+            px, py = transform.to_canvas(placement.x, placement.y)
+            if px < -radius or py < -radius or px > width + radius or py > height + radius:
+                continue                # off screen: skip the visual entirely
+            brush = self._plot_colour_by_type.get(placement.type_id)
+            dot = Ellipse()
+            dot.Width = radius * 2
+            dot.Height = radius * 2
+            if brush is not None:
+                dot.Fill = brush
+            dot.Stroke = self._plot_marker_stroke
+            dot.StrokeThickness = 1.0
+            dot.Cursor = Cursors.Hand
+            dot.ToolTip = "%s\n%s · %s%s" % (
+                placement.type_name, placement.kind, placement.location_label,
+                ("\nWorkset: " + placement.workset_name) if placement.workset_name else "")
+            dot.Tag = placement
+            Canvas.SetLeft(dot, px - radius)
+            Canvas.SetTop(dot, py - radius)
+            dot.MouseLeftButtonUp += self.plan_marker_clicked
+            canvas.Children.Add(dot)
+            self._plot_markers[placement.instance_id] = placement
+
+            if show_labels:
+                label = TextBlock()
+                label.Text = placement.type_name
+                label.FontSize = PLOT_LABEL_SIZE
+                label.Foreground = self._plot_label_brush
+                label.IsHitTestVisible = False
+                Canvas.SetLeft(label, px + radius + 3)
+                Canvas.SetTop(label, py - PLOT_LABEL_SIZE)
+                canvas.Children.Add(label)
+
+        self.lbl_plot_info.Text = self._plot_info_text(
+            len(placements), _group_ops.placements_extent(placements))
+
+    def _plot_info_text(self, shown, extent):
+        """The sentence under the plan: how many, how big, what was left out."""
+        parts = ["%d instance%s plotted" % (shown, "" if shown == 1 else "s")]
+        if extent:
+            parts.append(_group_ops.extent_label(extent))
+        if self._plot_unlocated:
+            parts.append("%d instance%s have no location Revit can report"
+                         % (self._plot_unlocated,
+                            "" if self._plot_unlocated == 1 else "s"))
+        return " · ".join(parts)
+
+    def _selected_instance_ids(self):
+        """Element ids of every instance currently drawn on the plan."""
+        return [p.instance_id for p in self._visible_placements()]
+
+    def _select_in_revit(self, instance_ids, description):
+        """Push a selection into Revit and say what happened.
+
+        Selection is a UI operation, so no transaction — but the dialog is modal,
+        so the user only sees the result once they close it. The status line says
+        so rather than leaving them wondering whether the click did anything.
+        """
+        if not instance_ids:
+            self._set_status("Nothing to select — no instances are plotted.")
+            return
+        try:
+            uidoc = revit.uidoc
+        except Exception:
+            uidoc = None        # pyRevit's revit.uidoc raises, it does not return None
+        if uidoc is None:
+            self._set_status("Cannot reach the Revit UI to change the selection.")
+            return
+        try:
+            count = _group_ops.select_instances(uidoc, instance_ids)
+            self._set_status("Selected %d %s in Revit — close this window to see them."
+                             % (count, description))
+        except Exception as exc:
+            self._set_status("Could not change the Revit selection: %s"
+                             % _group_ops._short_error(exc, "unknown error"))
+
+    # ── EVENT HANDLERS: PLACEMENT ────────────────────────────────────────────
+
+    def plot_kind_checked(self, sender, e):
+        if getattr(self, '_loading', True):
+            return
+        self._rebuild_plot_levels()
+        self._refresh_plot()
+
+    def plot_level_changed(self, sender, e):
+        if getattr(self, '_loading', True):
+            return
+        self._refresh_plot()
+
+    def plot_legend_toggled(self, sender, e):
+        if getattr(self, '_loading', True):
+            return
+        row = getattr(sender, 'DataContext', None)
+        if row is not None:
+            if row.IsVisible:
+                self._plot_hidden.discard(row.type_id)
+            else:
+                self._plot_hidden.add(row.type_id)
+        self._update_plot_legend_label()
+        self._draw_plan()
+
+    def plot_legend_zoom(self, sender, e):
+        """Double-clicking a legend row zooms the plan onto that group type.
+
+        Double-click, not selection: clicking the row's checkbox selects the row
+        too, so zooming on selection would yank the view every time somebody
+        toggled a group's visibility.
+        """
+        if getattr(self, '_loading', True):
+            return
+        row = self.list_plot_legend.SelectedItem
+        if row is None:
+            return
+        matches = _group_ops.filter_placements(
+            self._placements, kind=self._plot_kind(), level=self._plot_level(),
+            type_ids=[row.type_id])
+        if not matches:
+            self._set_status("%s has no placed instance under the current filter."
+                             % row.TypeName)
+            return
+        self._plot_transform = _group_ops.PlanTransform.fit(
+            _group_ops.placements_extent(matches),
+            float(self.plan_canvas.ActualWidth or 1),
+            float(self.plan_canvas.ActualHeight or 1),
+            padding=PLOT_PADDING * 2)
+        self._draw_plan()
+        self._set_status("%s — %d instance%s on %s." % (
+            row.TypeName, len(matches), "" if len(matches) == 1 else "s",
+            row.KindLabel))
+
+    def plot_show_all_clicked(self, sender, e):
+        self._plot_hidden.clear()
+        self._refresh_plot()
+
+    def plot_show_none_clicked(self, sender, e):
+        for row in self._plot_legend_rows:
+            self._plot_hidden.add(row.type_id)
+        self._refresh_plot(refit=False)
+
+    def plot_labels_toggled(self, sender, e):
+        if getattr(self, '_loading', True):
+            return
+        self._draw_plan()
+
+    def plot_fit_clicked(self, sender, e):
+        self._plot_transform = None
+        self._draw_plan()
+
+    def plot_select_clicked(self, sender, e):
+        self._select_in_revit(self._selected_instance_ids(), "group instances")
+
+    def plan_marker_clicked(self, sender, e):
+        placement = getattr(sender, 'Tag', None)
+        if not isinstance(placement, _group_ops.GroupPlacement):
+            # pythonnet may hand the Tag back boxed; fall back to the id map.
+            try:
+                placement = self._plot_markers.get(int(sender.Tag))
+            except Exception:
+                placement = None
+        if placement is None:
+            return
+        self._plot_dragging = False
+        self._select_in_revit([placement.instance_id],
+                              "instance of %s" % placement.type_name)
+        e.Handled = True
+
+    def plan_canvas_size_changed(self, sender, e):
+        if getattr(self, '_loading', True):
+            return
+        self._draw_plan()
+
+    def plan_canvas_wheel(self, sender, e):
+        if self._plot_transform is None:
+            return
+        point = e.GetPosition(self.plan_canvas)
+        factor = PLOT_ZOOM_STEP if e.Delta > 0 else (1.0 / PLOT_ZOOM_STEP)
+        self._plot_transform.zoom_at(point.X, point.Y, factor)
+        self._draw_plan()
+        e.Handled = True
+
+    def plan_canvas_mouse_down(self, sender, e):
+        # Deliberately no CaptureMouse(): capturing on the Canvas routes every
+        # later event to it, so the markers would never see their own click and
+        # "click a marker to select it" would silently stop working. The cost is
+        # that a drag ends when the pointer leaves the canvas, which MouseLeave
+        # already handles.
+        self._plot_dragging = True
+        self._plot_drag_from = e.GetPosition(self.plan_canvas)
+
+    def plan_canvas_mouse_move(self, sender, e):
+        if not self._plot_dragging or self._plot_transform is None:
+            return
+        point = e.GetPosition(self.plan_canvas)
+        self._plot_transform.pan_by(point.X - self._plot_drag_from.X,
+                                    point.Y - self._plot_drag_from.Y)
+        self._plot_drag_from = point
+        self._draw_plan()
+
+    def plan_canvas_mouse_up(self, sender, e):
+        self._plot_dragging = False
+        self._plot_drag_from = None
 
 
 def show_group_manager(doc=None):

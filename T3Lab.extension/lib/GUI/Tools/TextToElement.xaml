@@ -60,6 +60,23 @@
           <SolidColorBrush x:Key="T3.Progress.Track" Color="#ECECEF"/>
           <SolidColorBrush x:Key="T3.Progress.Fill"  Color="#C2410C"/>
 
+          <!-- ── Bảng màu PHÂN LOẠI — CHỈ cho biểu đồ / plan view / marker ────────
+               Dùng khi cần phân biệt N hạng mục không có thứ tự (mỗi group type một
+               màu trên mặt bằng). KHÔNG dùng cho text, button, border hay trạng thái:
+               trạng thái đã có Success/Warning/Danger và chúng mang nghĩa cố định.
+               Thứ tự đã sắp để 2 màu cạnh nhau luôn khác hue rõ rệt; quay vòng khi
+               hết. Độ sáng đủ tương phản trên T3.Surface lẫn T3.SurfaceSunken.       -->
+          <SolidColorBrush x:Key="T3.Plot.1" Color="#2563EB"/>
+          <SolidColorBrush x:Key="T3.Plot.2" Color="#D97706"/>
+          <SolidColorBrush x:Key="T3.Plot.3" Color="#059669"/>
+          <SolidColorBrush x:Key="T3.Plot.4" Color="#DC2626"/>
+          <SolidColorBrush x:Key="T3.Plot.5" Color="#7C3AED"/>
+          <SolidColorBrush x:Key="T3.Plot.6" Color="#0891B2"/>
+          <SolidColorBrush x:Key="T3.Plot.7" Color="#C026D3"/>
+          <SolidColorBrush x:Key="T3.Plot.8" Color="#65A30D"/>
+          <!-- Hạng mục bị tắt hiển thị / nằm ngoài bộ lọc. -->
+          <SolidColorBrush x:Key="T3.Plot.Off" Color="#C7C7CE"/>
+
           <!-- ══════════════════ 2 · TYPE ══════════════════ -->
           <FontFamily x:Key="T3.Font">Segoe UI</FontFamily>
           <FontFamily x:Key="T3.Font.Mono">Consolas</FontFamily>
@@ -190,6 +207,57 @@
                 </ControlTemplate>
               </Setter.Value>
             </Setter>
+          </Style>
+
+          <!-- ══════════════════ ICON — MỘT bộ icon cho toàn extension ══════════════════
+               Font icon DUY NHẤT là `Segoe MDL2 Assets`. Tuyệt đối KHÔNG dùng ký tự
+               Unicode thường (✓ ✕ ⚠ ▶ ▢ −) làm icon: chúng render bằng Segoe UI nên lệch
+               nét, lệch baseline và lệch chiều cao so với glyph MDL2 bên cạnh.
+
+               Cách dùng — icon LUÔN là <TextBlock>, không bao giờ là Content của Button:
+                 <TextBlock Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
+
+               Bảng glyph chuẩn (dùng đúng glyph này cho đúng khái niệm, toàn dự án):
+                 E721 Search      E8BB Close      E921 Minimize   E922 Maximize
+                 E768 Play        E769 Pause      E71A Stop       E72C Refresh
+                 E73E Check       E711 Cancel     E710 Add        E74D Delete
+                 E946 Info        E7BA Warning    E783 Error      E713 Settings
+                 E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
+                 E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
+          -->
+
+          <!-- Icon nền: cỡ Label (11), màu thừa kế từ control chứa nó. -->
+          <Style x:Key="T3.Icon" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Label}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+          </Style>
+
+          <!-- Icon phụ trợ, không phải nội dung chính (icon trong ô tìm kiếm, cột phụ). -->
+          <Style x:Key="T3.Icon.Muted" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="Foreground" Value="{StaticResource T3.TextDisabled}"/>
+          </Style>
+
+          <!-- Icon dẫn của ô nhập (search box): mờ + cách chữ 8px. -->
+          <Style x:Key="T3.Icon.Field" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon.Muted}">
+            <Setter Property="Margin" Value="0,0,8,0"/>
+          </Style>
+
+          <!-- Icon đứng trước nhãn/nút: cách chữ 8px, màu thừa kế. -->
+          <Style x:Key="T3.Icon.Lead" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="Margin" Value="0,0,8,0"/>
+          </Style>
+
+          <!-- Icon lớn cho empty state / header, cỡ Display (19). -->
+          <Style x:Key="T3.Icon.Lg" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="FontSize" Value="{StaticResource T3.Size.Display}"/>
+          </Style>
+
+          <!-- Icon của callout: cỡ Caption, canh đỉnh dòng chữ đầu. -->
+          <Style x:Key="T3.Callout.Icon" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Caption}"/>
+            <Setter Property="Margin"     Value="0,0,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
           </Style>
 
           <!-- ══════════════════ 6 · BUTTONS ══════════════════
@@ -687,6 +755,26 @@
             <Setter Property="ColumnHeaderStyle" Value="{StaticResource T3.DataGridColumnHeader}"/>
             <Setter Property="RowStyle"          Value="{StaticResource T3.DataGridRow}"/>
             <Setter Property="CellStyle"         Value="{StaticResource T3.DataGridCell}"/>
+          </Style>
+
+
+          <!-- ══════════════════ 10b · LỌC THEO CỘT (DataGrid) ══════════════════
+               Không có dấu phễu đứng sẵn trên header — bấm thẳng vào TÊN cột là mở
+               popup lọc (popup do Python dựng trong `lib/GUI/DataGridColumnFilter.py`).
+               Cột đang lọc được tô đậm bằng code, không thêm icon.
+               Cột nào muốn lọc thì khai:
+                 HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
+               ══════════════════ -->
+          <Style x:Key="T3.DataGridColumnHeader.Filter" TargetType="DataGridColumnHeader"
+                 BasedOn="{StaticResource T3.DataGridColumnHeader}">
+            <Setter Property="Cursor"  Value="Hand"/>
+            <Setter Property="ToolTip" Value="Click the column name to filter"/>
+          </Style>
+
+          <!-- Dòng giá trị trong popup lọc (Python dựng, dùng khóa này cho checkbox). -->
+          <Style x:Key="T3.Filter.Item" TargetType="CheckBox" BasedOn="{StaticResource T3.CheckBox}">
+            <Setter Property="Margin"  Value="0,0,0,4"/>
+            <Setter Property="Padding" Value="8,0,0,0"/>
           </Style>
 
           <!-- ══════════════════ GRIDVIEW & LISTVIEW STYLES ══════════════════
@@ -1273,9 +1361,8 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
-                      <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="Segoe MDL2 Assets"
-                                 FontSize="11" Margin="0,0,8,0" VerticalAlignment="Center"
-                                 Foreground="{StaticResource T3.TextDisabled}"/>
+                      <TextBlock Grid.Column="0" Text="&#xE721;"
+                                 Style="{StaticResource T3.Icon.Field}"/>
                       <Grid Grid.Column="1">
                         <TextBlock x:Name="ph" Text="{TemplateBinding Tag}"
                                    Foreground="{StaticResource T3.TextDisabled}"
@@ -1342,15 +1429,7 @@
             <Setter Property="Foreground" Value="{StaticResource T3.TextDisabled}"/>
           </Style>
 
-          <!-- Icon của callout: Segoe MDL2, canh đỉnh dòng chữ đầu. -->
-          <Style x:Key="T3.Callout.Icon" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
-            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Caption}"/>
-            <Setter Property="Margin"     Value="0,0,8,0"/>
-            <Setter Property="VerticalAlignment" Value="Top"/>
-          </Style>
-
-          <!-- Chấm trạng thái 6px. Fill đặt tại chỗ dùng: Success/Warning/Danger/Progress. -->
+        <!-- Chấm trạng thái 6px. Fill đặt tại chỗ dùng: Success/Warning/Danger/Progress. -->
           <Style x:Key="T3.Dot" TargetType="Ellipse">
             <Setter Property="Width"  Value="6"/>
             <Setter Property="Height" Value="6"/>
@@ -1429,14 +1508,14 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
-                            <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="11"/>
+                            <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                         <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize">
-                            <TextBlock Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="11"/>
+                            <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                         <Button x:Name="btn_close_chrome" Style="{StaticResource T3.WinClose}" ToolTip="Close"
                                 IsCancel="True">
-                            <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="11"/>
+                            <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>
                 </Grid>

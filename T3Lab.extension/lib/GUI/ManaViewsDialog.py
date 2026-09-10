@@ -83,6 +83,7 @@ except Exception:
         _theme = None
 
 from GUI.ProgressPauseMixin import ProgressPauseMixin
+from GUI.DataGridColumnFilter import ColumnFilterController
 
 
 # =====================================================
@@ -271,6 +272,32 @@ class ViewManagerWindow(T3WPFWindow):
         self.tmpl_grid.SelectionChanged += self._on_tmpl_selection_changed
         self.tmpl_grid.ItemsSource = self.filtered_templates
         
+        # Column filters (nút phễu trên header — GUI/DataGridColumnFilter.py)
+        self.views_col_filter = ColumnFilterController(
+            self, self.views_grid,
+            columns=[("VIEW NAME", "name"),
+                     ("TYPE", "view_type"),
+                     ("LEVEL", "level_name"),
+                     ("VIEW TEMPLATE", "view_template"),
+                     ("SCALE 1:", "scale"),
+                     ("DETAIL LEVEL", "detail_level"),
+                     ("TITLE ON SHEET", "title_on_sheet"),
+                     ("SHEET NO.", "sheet_number")],
+            source=lambda: self.all_views,
+            on_changed=self._apply_views_filters,
+            status_setter=self._set_status)
+
+        self.tmpl_col_filter = ColumnFilterController(
+            self, self.tmpl_grid,
+            columns=[("TEMPLATE NAME", "name"),
+                     ("VIEW TYPE", "view_type"),
+                     ("SCALE 1:", "scale"),
+                     ("USAGE", "usage_count"),
+                     ("USAGE %", "usage_percentage")],
+            source=lambda: self.all_templates_data,
+            on_changed=self._apply_tmpl_filters,
+            status_setter=self._set_status)
+
         # Load combobox data
         self.template_items = self._get_all_templates_names()
         self.col_template.ItemsSource = to_items_source(self.template_items)
@@ -286,6 +313,13 @@ class ViewManagerWindow(T3WPFWindow):
         # True when the XAML was parsed, so its Checked event fired before this
         # handler was wired above and tab_control.SelectedIndex was never set.
         self.tab_control.SelectedIndex = 0
+
+    def _set_status(self, text):
+        """Ghi một câu trạng thái ra footer (dùng chung cho cả 2 tab)."""
+        try:
+            self.txt_status_bar.Text = text
+        except Exception:
+            pass
 
     def _adopt_host_font(self):
         if _theme is None:
@@ -381,7 +415,7 @@ class ViewManagerWindow(T3WPFWindow):
         sheets_filter = self._get_combo_value(self.views_sheets_combo, "All Views")
         search_text = self.views_search_box.Text.lower() if self.views_search_box.Text else ""
 
-        for view in self.all_views:
+        for view in self._views_sorted():
             if search_text and search_text not in view.name.lower():
                 continue
             if type_filter != "All Views" and view.view_type != type_filter:
@@ -394,10 +428,27 @@ class ViewManagerWindow(T3WPFWindow):
                 continue
             elif sheets_filter == "Not On Sheets" and view.on_sheets > 0:
                 continue
-            
+            # Bộ lọc theo cột (nút phễu trên header)
+            if not self.views_col_filter.passes(view):
+                continue
+
             self.filtered_views.Add(view)
 
         self._update_views_summary()
+        self.views_col_filter.refresh_glyphs()
+
+    def _views_sorted(self):
+        """Thứ tự mặc định của bảng views: TYPE trước, VIEW NAME sau.
+
+        Bảng luôn dựng theo thứ tự này sau mỗi lần lọc. Muốn sắp khác thì dùng
+        hai nút Sort trong popup lọc của cột (click header = mở bộ lọc).
+        """
+        def key(item):
+            return ((item.view_type or u"").lower(), (item.name or u"").lower())
+        try:
+            return sorted(self.all_views, key=key)
+        except Exception:
+            return list(self.all_views)
 
     def _update_views_summary(self):
         self.views_total_text.Text = str(len(self.all_views))
@@ -408,7 +459,8 @@ class ViewManagerWindow(T3WPFWindow):
         filters_active = (self._get_combo_value(self.views_type_combo, "All Views") != "All Views" or
                           self._get_combo_value(self.views_template_combo, "All Views") != "All Views" or
                           self._get_combo_value(self.views_sheets_combo, "All Views") != "All Views" or
-                          (self.views_search_box.Text != ""))
+                          (self.views_search_box.Text != "") or
+                          self.views_col_filter.is_active())
         self.views_filters_text.Text = "Yes" if filters_active else "No"
         
         self.views_selected_text.Text = str(len([v for v in self.filtered_views if v.is_selected]))
@@ -620,7 +672,7 @@ class ViewManagerWindow(T3WPFWindow):
         type_filter = self._get_combo_value(self.tmpl_type_combo, "All View Types")
         search_text = self.tmpl_search_box.Text.lower() if self.tmpl_search_box.Text else ""
 
-        for item in self.all_templates_data:
+        for item in self._templates_sorted():
             if search_text and search_text not in item.name.lower():
                 continue
             if type_filter != "All View Types" and item.view_type != type_filter:
@@ -629,10 +681,27 @@ class ViewManagerWindow(T3WPFWindow):
                 continue
             elif usage_filter == "Unused Only" and item.usage_count > 0:
                 continue
-                
+            # Bộ lọc theo cột (nút phễu trên header)
+            if not self.tmpl_col_filter.passes(item):
+                continue
+
             self.filtered_templates.Add(item)
-            
+
         self._update_tmpl_summary()
+        self.tmpl_col_filter.refresh_glyphs()
+
+    def _templates_sorted(self):
+        """Thứ tự mặc định của bảng template: VIEW TYPE trước, TEMPLATE NAME sau.
+
+        Bảng luôn dựng theo thứ tự này sau mỗi lần lọc. Muốn sắp khác thì dùng
+        hai nút Sort trong popup lọc của cột (click header = mở bộ lọc).
+        """
+        def key(item):
+            return ((item.view_type or u"").lower(), (item.name or u"").lower())
+        try:
+            return sorted(self.all_templates_data, key=key)
+        except Exception:
+            return list(self.all_templates_data)
 
     def _update_tmpl_summary(self):
         self.tmpl_total_text.Text = str(len(self.all_templates_data))
@@ -766,6 +835,18 @@ class ViewManagerWindow(T3WPFWindow):
                 self._on_tmpl_refresh(None, None)
             except Exception as ex:
                 MessageBox.Show("Error: {}".format(str(ex)), "Error")
+
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_views_grid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua views_grid."""
+        self.toggle_all_rows(self.views_grid, "is_selected", sender.IsChecked)
+
+    def select_all_tmpl_grid_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua tmpl_grid."""
+        self.toggle_all_rows(self.tmpl_grid, "is_selected", sender.IsChecked)
 
 
 # =====================================================

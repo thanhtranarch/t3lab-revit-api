@@ -2100,6 +2100,22 @@ class ManaStylesWindow(T3WPFWindow):
         if pn: msg += " by '{}'".format(pn)
         forms.alert(msg + "." + note, title="Color Splasher")
 
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_grid_style_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua grid_style."""
+        self.toggle_all_rows(self.grid_style, "is_selected", sender.IsChecked)
+
+    def select_all_grid_pattern_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua grid_pattern."""
+        self.toggle_all_rows(self.grid_pattern, "is_selected", sender.IsChecked)
+
+    def select_all_grid_fill_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua grid_fill."""
+        self.toggle_all_rows(self.grid_fill, "is_selected", sender.IsChecked)
+
 
 def show_visual_settings(script_dir, revit):
     # Fill Pattern / Line Pattern / Line Style tabs are document-level (not

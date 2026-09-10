@@ -110,6 +110,9 @@ _RUP    = 0x0010
 _VK_LBUTTON = 0x01
 _VK_RBUTTON = 0x02
 
+# Shortest allowed gap between two auto clicks (ms)
+_MIN_INTERVAL_MS = 50
+
 
 def _flush_keys():
     for vk in range(8, 256):
@@ -168,6 +171,7 @@ class AutoWorkWindow(T3WPFWindow):
         self._recorded_actions = []
         self._is_recording = False
         self._is_playing   = False
+        self._is_clicking  = False
 
         # Audit state
         self._all_records = []
@@ -194,6 +198,7 @@ class AutoWorkWindow(T3WPFWindow):
     def close_button_clicked(self, sender, e):
         self._is_recording = False
         self._is_playing   = False
+        self._is_clicking  = False
         self.Close()
 
     # ── Status bar ──────────────────────────────────────────────────────────
@@ -495,22 +500,42 @@ class AutoWorkWindow(T3WPFWindow):
         try:
             x            = int(self.txt_x.Text)
             y            = int(self.txt_y.Text)
-            total_clicks = 5
+            interval_ms  = int(round(float(self.txt_interval.Text) * 1000.0))
+            total_clicks = int(self.txt_clicks.Text)
         except ValueError:
-            self._set_status("Invalid values - enter numbers only.", error=True)
+            self._set_status("Invalid values - enter numbers only "
+                             "(interval in seconds, click count as a whole number).", error=True)
             return
 
-        self._set_status("Starting in 2 seconds...")
+        if total_clicks < 1:
+            self._set_status("Click count must be 1 or more.", error=True)
+            return
+        if interval_ms < _MIN_INTERVAL_MS:
+            interval_ms = _MIN_INTERVAL_MS
+
+        self.btn_start_click.IsEnabled = False
+        self._is_clicking = True
+        self._set_status("Starting in 2 seconds - {} click(s) every {:.2f}s. "
+                         "Press any key to stop.".format(total_clicks, interval_ms / 1000.0))
         self.WindowState = WindowState.Minimized
+
+        t = Thread(ThreadStart(
+            lambda: self._click_worker(x, y, interval_ms, total_clicks)))
+        t.IsBackground = True
+        t.Start()
+
+    def _click_worker(self, x, y, interval_ms, total_clicks):
+        """Send the clicks off the UI thread so long runs do not freeze Revit."""
         Thread.Sleep(2000)
         _flush_keys()
 
         clicks_done = 0
-        while clicks_done < total_clicks:
+        aborted     = False
+
+        while clicks_done < total_clicks and self._is_clicking:
             if _any_key_pressed():
-                self.WindowState = WindowState.Normal
-                self._set_status("Stopped by keypress after {} click(s).".format(clicks_done), error=True)
-                return
+                aborted = True
+                break
 
             ctypes.windll.user32.SetCursorPos(x, y)
             ctypes.windll.user32.mouse_event(_LDOWN, 0, 0, 0, 0)
@@ -518,14 +543,21 @@ class AutoWorkWindow(T3WPFWindow):
             ctypes.windll.user32.mouse_event(_LUP, 0, 0, 0, 0)
             clicks_done += 1
 
-            if clicks_done < total_clicks:
-                if _interruptible_sleep(1000):
-                    self.WindowState = WindowState.Normal
-                    self._set_status("Stopped by keypress after {} click(s).".format(clicks_done), error=True)
-                    return
+            if clicks_done < total_clicks and _interruptible_sleep(interval_ms):
+                aborted = True
+                break
 
-        self.WindowState = WindowState.Normal
-        self._set_status("Done - {} click(s) completed.".format(clicks_done))
+        def _finish():
+            self._is_clicking = False
+            self.WindowState = WindowState.Normal
+            self.btn_start_click.IsEnabled = True
+            if aborted:
+                self._set_status("Stopped by keypress after {} of {} click(s).".format(
+                    clicks_done, total_clicks), error=True)
+            else:
+                self._set_status("Done - {} click(s) completed.".format(clicks_done))
+
+        self.Dispatcher.BeginInvoke(DispatcherPriority.Normal, Action(_finish))
 
     def start_recording_clicked(self, sender, e):
         self.btn_start_record.IsEnabled = False

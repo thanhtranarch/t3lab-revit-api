@@ -1796,10 +1796,13 @@ class LLMSettingWindow(T3WPFWindow):
 
                 x = TextBlock()
                 x.Text = _GLYPH_CANCEL
-                x.FontFamily = System.Windows.Media.FontFamily(
-                    "Segoe MDL2 Assets")
-                x.FontSize = 10
-                x.Foreground = _MUTED
+                try:
+                    x.Style = self.FindResource("T3.Icon.Muted")
+                except Exception:
+                    x.FontFamily = System.Windows.Media.FontFamily(
+                        "Segoe MDL2 Assets")
+                    x.FontSize = 11
+                    x.Foreground = _MUTED
                 x.Cursor = Cursors.Hand
                 x.Margin = Thickness(10, 2, 2, 0)
                 x.ToolTip = u"Forget this fact"
@@ -1923,11 +1926,14 @@ class LLMSettingWindow(T3WPFWindow):
                 g.Children.Add(lbl)
 
                 x = TextBlock()
-                x.Text = u""
-                x.FontFamily = System.Windows.Media.FontFamily(
-                    "Segoe MDL2 Assets")
-                x.FontSize = 10
-                x.Foreground = _MUTED
+                x.Text = _GLYPH_CANCEL
+                try:
+                    x.Style = self.FindResource("T3.Icon.Muted")
+                except Exception:
+                    x.FontFamily = System.Windows.Media.FontFamily(
+                        "Segoe MDL2 Assets")
+                    x.FontSize = 11
+                    x.Foreground = _MUTED
                 x.Cursor = Cursors.Hand
                 x.Margin = Thickness(10, 2, 2, 0)
                 x.ToolTip = u"Remove"

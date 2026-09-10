@@ -1,10 +1,10 @@
 #! python3
 # -*- coding: utf-8 -*-
-"""Group Manager — rename model and detail groups, set their workset, clean up unused types."""
+"""Group Manager — rename groups, set their workset, clean up unused types, and plot where every instance sits."""
 
 __title__   = "Group\nManager"
 __author__  = "Tran Tien Thanh"
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 # ── IMPORTS & BOOTSTRAP ──────────────────────────────────────────────────────
 import os

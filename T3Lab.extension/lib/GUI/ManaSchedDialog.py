@@ -1594,6 +1594,18 @@ class ManaSchedWindow(T3WPFWindow):
     def btn_dup_run_clicked(self, sender, e):
         self._on_dup_run(sender, e)
 
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_xl_dg_schedules_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua xl_dg_schedules."""
+        self.toggle_all_rows(self.xl_dg_schedules, "is_checked", sender.IsChecked)
+
+    def select_all_dup_dg_schedules_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua dup_dg_schedules."""
+        self.toggle_all_rows(self.dup_dg_schedules, "is_checked", sender.IsChecked)
+
 
 # ============================================================
 # PUBLIC ENTRY POINT

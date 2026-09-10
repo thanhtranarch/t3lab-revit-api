@@ -986,6 +986,72 @@ class T3WPFWindow(Window):
         """Safely assign items to control.ItemsSource under both CPython 3 and IronPython."""
         set_items_source(control, items)
 
+    # ── Select-all ở header của cột checkbox ────────────────────────────
+    # Mọi bảng có cột checkbox chọn dòng đều phải có checkbox select-all ở
+    # header. Handler trong tool chỉ cần gọi 2 hàm dưới đây, không tự lặp.
+
+    def toggle_all_rows(self, grid, prop, is_checked):
+        """Bật/tắt `prop` trên MỌI dòng ĐANG HIỂN THỊ của `grid`.
+
+        Dùng `grid.Items` chứ không phải `ItemsSource` để tôn trọng filter/sort
+        đang áp: select-all phải chọn đúng những gì người dùng đang nhìn thấy,
+        không chọn lén các dòng đã bị lọc đi.
+
+        Trả về số dòng đã đổi.
+        """
+        if grid is None:
+            return 0
+        value = bool(is_checked)
+        changed = 0
+        try:
+            rows = list(grid.Items)
+        except Exception:
+            return 0
+        for row in rows:
+            try:
+                if getattr(row, prop) != value:
+                    setattr(row, prop, value)
+                    changed += 1
+            except AttributeError:
+                continue        # dòng placeholder "new item" của DataGrid
+        try:
+            grid.Items.Refresh()
+        except Exception:
+            pass
+        return changed
+
+    def sync_header_checkbox(self, header_cb, grid, prop):
+        """Đồng bộ checkbox header theo trạng thái các dòng.
+
+        Tất cả chọn → checked · không dòng nào chọn → unchecked ·
+        chọn một phần → indeterminate (ô vuông đặc), để người dùng nhìn là biết
+        đang ở trạng thái hỗn hợp thay vì đoán.
+        """
+        if header_cb is None or grid is None:
+            return
+        try:
+            rows = list(grid.Items)
+        except Exception:
+            return
+        flags = []
+        for row in rows:
+            try:
+                flags.append(bool(getattr(row, prop)))
+            except AttributeError:
+                continue
+        # IsThreeState phải là False: nó chỉ quyết định CÚ CLICK của người dùng
+        # có đi qua trạng thái indeterminate hay không. Select-all mà click ba
+        # nhịp là khó chịu — ta vẫn gán None được bằng code khi hỗn hợp.
+        header_cb.IsThreeState = False
+        if not flags:
+            header_cb.IsChecked = False
+        elif all(flags):
+            header_cb.IsChecked = True
+        elif not any(flags):
+            header_cb.IsChecked = False
+        else:
+            header_cb.IsChecked = None      # indeterminate
+
 
 class my_WPF(T3WPFWindow):
     """Legacy alias for backward compatibility."""

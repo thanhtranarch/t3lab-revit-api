@@ -498,6 +498,9 @@ class PDFImportDialog(T3WPFWindow):
         self._loading = False
         self._assign_pages()
         self._update_status()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_grid_views"), self.grid_views, "IsSelected")
 
     def select_none_clicked(self, sender, args):
         self._loading = True
@@ -506,6 +509,9 @@ class PDFImportDialog(T3WPFWindow):
         self._loading = False
         self._assign_pages()
         self._update_status()
+        # Giu checkbox select-all o header khop voi nut nay.
+        self.sync_header_checkbox(
+            self.FindName("chk_all_grid_views"), self.grid_views, "IsSelected")
 
     def cell_edit_ending(self, sender, args):
         """Validate a manual page-number edit in the PAGE column (index 1)."""
@@ -688,6 +694,14 @@ class PDFImportDialog(T3WPFWindow):
 
     def close_button_clicked(self, sender, args):
         self.Close()
+
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_grid_views_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua grid_views."""
+        self.toggle_all_rows(self.grid_views, "IsSelected", sender.IsChecked)
 
 
 def show_pdf_import():

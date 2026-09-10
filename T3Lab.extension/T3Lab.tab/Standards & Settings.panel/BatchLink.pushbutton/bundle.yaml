@@ -1,5 +1,4 @@
-title: "Batch
-Link"
+title: "Batch\nLink"
 tooltip: "Link Revit models, manage link worksets and per-view link display"
 description: |
   Link Models: pick a folder, filter backups, link many models at once

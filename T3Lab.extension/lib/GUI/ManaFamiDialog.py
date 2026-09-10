@@ -1468,6 +1468,14 @@ class ManaFamiWindow(T3WPFWindow):
         except Exception:
             pass
 
+    # ── Select-all o header cot checkbox ────────────────────────────────
+    # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
+    # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
+
+    def select_all_dg_families_clicked(self, sender, e):
+        """Header checkbox: chon/bo chon moi dong dang hien thi cua dg_families."""
+        self.toggle_all_rows(self.dg_families, "IsSelected", sender.IsChecked)
+
 
 def show_family_manager(script_dir=None, revit=None, default_tab=0):
     try:
