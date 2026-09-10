@@ -24,6 +24,42 @@ import io
 import re
 import sys
 
+
+# ── STALENESS DETECTOR ───────────────────────────────────────────────────────
+# The CPython engine is PERSISTENT: `sys.modules` survives between clicks, so a
+# module keeps running the bytecode it was first imported with until pyRevit is
+# reloaded. pyRevit renders tracebacks by reading the CURRENT file from disk, so
+# a stale module produces a traceback whose line numbers are real but whose code
+# is not — an error message that no longer exists in the source, pointing at a
+# line that belongs to a different function. That has cost two debugging rounds.
+#
+# Recording the file's mtime AT IMPORT lets any error path say so outright.
+try:
+    _LOADED_MTIME = os.path.getmtime(os.path.abspath(__file__))
+except Exception:
+    _LOADED_MTIME = None
+
+
+def module_is_stale():
+    """True when this file changed on disk after the running module was imported."""
+    if _LOADED_MTIME is None:
+        return False
+    try:
+        return os.path.getmtime(os.path.abspath(__file__)) > _LOADED_MTIME + 1.0
+    except Exception:
+        return False
+
+
+def stale_module_note():
+    """A line to append to any error raised out of a possibly stale module."""
+    if not module_is_stale():
+        return ""
+    return ("\n\nNOTE: GUI/WPF_Base.py changed on disk AFTER this module was "
+            "loaded, so Revit is running the older copy and the line numbers "
+            "above do not match the code that actually ran. Reload pyRevit "
+            "(pyRevit tab -> Reload) and try again before reading anything "
+            "else in this traceback.")
+
 # ─── CLR References ────────────────────────────────────────────────────────────
 try:
     import clr
@@ -364,13 +400,21 @@ class T3WPFWindow(Window):
 
         loaded_win = None
         xr = XamlReader
-        if xr is None:
+        # Re-resolve when the module-level capture is unusable. `XamlReader` is
+        # read once at import time, and this module lives in a PERSISTENT
+        # CPython engine: if PresentationFramework was not loadable on that very
+        # first import, a None gets baked in for the rest of the Revit session
+        # and every window after it fails for a reason that has since gone away.
+        # Missing `Parse` counts as unusable too, not just None.
+        if xr is None or not hasattr(xr, 'Parse'):
             try:
                 import clr
                 clr.AddReference("PresentationFramework")
-                from System.Windows.Markup import XamlReader as xr
+                from System.Windows.Markup import XamlReader as _xr
+                if _xr is not None and hasattr(_xr, 'Parse'):
+                    xr = _xr
             except Exception:
-                xr = None
+                pass
 
         # The real XAML error surfaces here. Swallowing it sent every failure
         # down the XmlReader fallback below, which then died with a misleading
@@ -419,10 +463,29 @@ class T3WPFWindow(Window):
         if loaded_win is None:
             if parse_error is not None:
                 raise RuntimeError(
-                    "Failed to parse XAML for {}:\n{}".format(
-                        getattr(self, '_xaml_source', '<inline XAML>'), parse_error))
-            raise RuntimeError("Failed to parse XAML via XamlReader. "
-                               "Ensure PresentationFramework is loaded.")
+                    "Failed to parse XAML for {}:\n{}{}".format(
+                        getattr(self, '_xaml_source', '<inline XAML>'),
+                        parse_error, stale_module_note()))
+            # No exception AND no window: the parser never ran, or it returned
+            # null. Report which piece was actually missing — the old message
+            # blamed PresentationFramework without checking, which sent the
+            # investigation after a XAML bug that did not exist.
+            raise RuntimeError(
+                "Failed to build the window from {}: the XAML parser produced "
+                "nothing and raised nothing.\n"
+                "  XamlReader       : {}\n"
+                "  XamlReader.Parse : {}\n"
+                "  StringReader     : {}\n"
+                "  XmlReader.Create : {}\n"
+                "  sanitised XAML   : {} chars, starts {!r}".format(
+                    getattr(self, '_xaml_source', '<inline XAML>'),
+                    "resolved" if xr is not None else "MISSING",
+                    "present" if (xr is not None and hasattr(xr, 'Parse')) else "MISSING",
+                    "resolved" if StringReader is not None else "MISSING",
+                    "present" if (XmlReader is not None
+                                  and hasattr(XmlReader, 'Create')) else "MISSING",
+                    len(clean_xaml or ""), (clean_xaml or "")[:60])
+                + stale_module_note())
 
         # Copy essential window properties
         for prop in ('Title', 'Width', 'Height', 'MinWidth', 'MinHeight',

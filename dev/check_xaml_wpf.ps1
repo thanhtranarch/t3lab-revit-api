@@ -2,6 +2,12 @@
 # XML well-formedness is not enough: unknown members, duplicate resource keys and
 # bad attached-property syntax only surface here, and in Revit they crash the
 # tool the moment somebody clicks the button.
+param(
+  # Point at dev/check_xaml_load.py's --out folder to test the SANITISED text,
+  # which is what pyRevit actually hands to XamlReader.
+  [string]$Dir = "T3Lab.extension\lib\GUI\Tools"
+)
+
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
@@ -19,7 +25,7 @@ $events = 'Click|Checked|Unchecked|SelectionChanged|TextChanged|SizeChanged|' +
 
 $ok = 0
 $failures = @()
-foreach ($file in Get-ChildItem "T3Lab.extension\lib\GUI\Tools\*.xaml") {
+foreach ($file in Get-ChildItem (Join-Path $Dir "*.xaml")) {
   $name = $file.Name
   $src = Get-Content -Raw -Encoding UTF8 $file.FullName
   $src = [regex]::Replace($src, "\s($events)=`"[^`"]*`"", '')

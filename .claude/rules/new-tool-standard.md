@@ -194,7 +194,8 @@ if __name__ == '__main__':
 [ ] python3 dev/audit_t3.py --quiet      → xanh (0 vi phạm)
 [ ] python3 dev/audit_tools.py --quiet   → xanh (clean)
 [ ] python3 dev/audit_cpython.py --quiet → 0 P0 (bẫy migration CPython)
-[ ] powershell -STA -File dev/check_xaml_wpf.ps1 → 57 OK, 0 FAILED
+[ ] python3 dev/check_xaml_load.py --out %TEMP%\t3xaml  → 0 hỏng sau sanitise
+[ ] powershell -STA -File dev/check_xaml_wpf.ps1 -Dir %TEMP%\t3xaml → 0 FAILED
 [ ] Pattern P1–P5 rõ ràng, size class đúng S/M/L
 [ ] Mở tool trong Revit: không lỗi, chrome hoạt động, không trang trắng
 [ ] Happy path đúng; Ctrl+Z revert đúng một bước
@@ -207,12 +208,18 @@ if __name__ == '__main__':
 
 Bốn dòng cuối cần Revit thật. Chưa test thì ghi `NEEDS VERIFICATION`, **không tick**.
 
-> **`dev/check_xaml_wpf.ps1` bắt thứ `audit_t3.py` không bắt được.** Audit đọc XAML
-> bằng ElementTree — nó chỉ biết file có well-formed hay không. Script này nạp file
-> bằng **chính `XamlReader` của WPF** như pyRevit làm, nên tóm được lớp lỗi crash-lúc-mở:
-> thuộc tính không tồn tại trên control (`<ListBox HorizontalScrollBarVisibility>` —
-> phải là `ScrollViewer.HorizontalScrollBarVisibility`), `x:Key` trùng, attached
-> property sai cú pháp, resource không tồn tại. Chạy nó trước khi commit bất kỳ XAML nào.
+> **Hai script này bắt thứ `audit_t3.py` không bắt được.** Audit đọc XAML bằng
+> ElementTree — nó chỉ biết file có well-formed **trên đĩa** hay không. pyRevit thì
+> chạy `WPF_Base._sanitize_xaml` (một lượt regex viết lại text để gỡ event handler)
+> **trước**, rồi mới đưa cho `XamlReader`. Nên một file hoàn toàn hợp lệ trên đĩa vẫn
+> có thể hỏng đúng lúc WPF đọc nó.
+>
+> `check_xaml_load.py` chạy **đúng cái sanitiser đó**, lấy thẳng từ source đang ship
+> nên không thể lệch. `check_xaml_wpf.ps1 -Dir` nạp kết quả bằng **chính `XamlReader`
+> của WPF**, tóm được lớp lỗi crash-lúc-mở: thuộc tính không tồn tại trên control
+> (`<ListBox HorizontalScrollBarVisibility>` — phải là
+> `ScrollViewer.HorizontalScrollBarVisibility`), `x:Key` trùng, attached property sai
+> cú pháp, resource không tồn tại. Chạy cả hai trước khi commit bất kỳ XAML nào.
 >
 > Xem một tool trông thế nào mà không cần mở Revit:
 > `powershell -STA -File dev/preview_t3_xaml.ps1 -Xaml <đường dẫn> -Out out.png -Tab <n>`

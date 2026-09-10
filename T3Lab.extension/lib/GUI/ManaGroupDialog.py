@@ -35,7 +35,7 @@ from System.Windows import Visibility
 from System.Windows.Controls import Canvas, TextBlock
 from System.Windows.Input import Cursors
 from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
-from System.Windows.Shapes import Ellipse
+from System.Windows.Shapes import Ellipse, Line
 from System import Uri, UriKind
 
 from pyrevit import revit
@@ -67,6 +67,8 @@ PLOT_PADDING = 24.0            # px kept clear around the fitted extent
 PLOT_MARKER_RADIUS = 4.0
 PLOT_LABEL_SIZE = 10.0
 PLOT_ZOOM_STEP = 1.2
+PLOT_WALL_WIDTH = 1.0          # interior walls / core
+PLOT_WALL_WIDTH_EXT = 1.8      # exterior walls = building outline
 
 KIND_ALL = "All groups"
 KIND_FILTERS = (
@@ -237,6 +239,10 @@ class ManaGroupDialog(T3WPFWindow):
         self._plot_drag_from = None
         self._plot_marker_stroke = self._brush("T3.Surface")
         self._plot_label_brush = self._brush("T3.TextSecondary")
+        self._plot_wall_brush = self._brush("T3.BorderStrong")
+        self._plot_wall_brush_ext = self._brush("T3.TextSecondary")
+        self._outline_cache = {}        # level name -> ([OutlineSegment], truncated)
+        self._outline_truncated = False
 
         self._load_logo()
         self._init_filters()
@@ -975,6 +981,7 @@ class ManaGroupDialog(T3WPFWindow):
 
     def _load_placements(self):
         """Read every group instance's position once per model reload."""
+        self._outline_cache = {}        # the model may have changed under us
         try:
             self._placements = _group_ops.collect_placements(self.doc, self._records)
         except Exception:
@@ -1002,6 +1009,7 @@ class ManaGroupDialog(T3WPFWindow):
             self.cb_plot_level.SelectedIndex = self._plot_levels.index(previous) + 1
         else:
             self.cb_plot_level.SelectedIndex = 0
+        self._update_context_availability()
 
     def _rebuild_plot_legend(self):
         """One legend row per group type of the chosen kind, with its colour."""
@@ -1052,6 +1060,29 @@ class ManaGroupDialog(T3WPFWindow):
         except Exception:
             return None
 
+    def _current_outline(self):
+        """Wall segments for the chosen level, or [] when there is nothing to draw.
+
+        Only drawn for ONE level: overlaying every storey of a tower turns the
+        plan into a grey smear, which is worse than no context at all.
+        """
+        if not self.chk_plot_context.IsChecked:
+            self._outline_truncated = False
+            return []
+        level = self._plot_level()
+        if not level:
+            self._outline_truncated = False
+            return []
+        if level not in self._outline_cache:
+            try:
+                self._outline_cache[level] = _group_ops.collect_level_outline(
+                    self.doc, level)
+            except Exception:
+                self._outline_cache[level] = ([], False)
+        segments, truncated = self._outline_cache[level]
+        self._outline_truncated = truncated
+        return segments
+
     def _visible_placements(self):
         """Placements that pass every Placement-tab filter."""
         shown_ids = set(row.type_id for row in self._plot_legend_rows if row.IsVisible)
@@ -1077,22 +1108,30 @@ class ManaGroupDialog(T3WPFWindow):
         self._plot_markers = {}
 
         placements = self._visible_placements()
+        outline = self._current_outline()
         width = float(canvas.ActualWidth or 0)
         height = float(canvas.ActualHeight or 0)
         if width < 2 or height < 2:
             return                      # not laid out yet; SizeChanged calls back
 
+        marker_extent = _group_ops.placements_extent(placements)
         self.txt_plot_empty.Visibility = (
-            Visibility.Collapsed if placements else Visibility.Visible)
-        if not placements:
+            Visibility.Collapsed if (placements or outline) else Visibility.Visible)
+        if not placements and not outline:
             self.lbl_plot_info.Text = self._plot_info_text(0, None)
             return
 
         if self._plot_transform is None:
+            # Fit to markers AND context together: fitting to the markers alone
+            # would push the building outline off screen the moment a level has
+            # its groups clustered in one corner.
             self._plot_transform = _group_ops.PlanTransform.fit(
-                _group_ops.placements_extent(placements), width, height,
-                padding=PLOT_PADDING)
+                _group_ops.union_extent(marker_extent,
+                                        _group_ops.outline_extent(outline)),
+                width, height, padding=PLOT_PADDING)
         transform = self._plot_transform
+
+        self._draw_outline(canvas, outline, transform, width, height)
 
         show_labels = bool(self.chk_plot_labels.IsChecked)
         radius = PLOT_MARKER_RADIUS
@@ -1130,13 +1169,48 @@ class ManaGroupDialog(T3WPFWindow):
                 canvas.Children.Add(label)
 
         self.lbl_plot_info.Text = self._plot_info_text(
-            len(placements), _group_ops.placements_extent(placements))
+            len(placements),
+            _group_ops.union_extent(marker_extent,
+                                    _group_ops.outline_extent(outline)),
+            len(outline))
 
-    def _plot_info_text(self, shown, extent):
+    def _draw_outline(self, canvas, segments, transform, width, height):
+        """Paint the level's walls behind the markers.
+
+        Exterior walls get the heavier stroke, so the building edge reads as the
+        boundary and everything inside it reads as core and partitions.
+        """
+        if not segments:
+            return
+        for segment in segments:
+            x1, y1 = transform.to_canvas(segment.x1, segment.y1)
+            x2, y2 = transform.to_canvas(segment.x2, segment.y2)
+            # Cull whole segments that cannot touch the viewport.
+            if max(x1, x2) < 0 or min(x1, x2) > width:
+                continue
+            if max(y1, y2) < 0 or min(y1, y2) > height:
+                continue
+            line = Line()
+            line.X1, line.Y1, line.X2, line.Y2 = x1, y1, x2, y2
+            if segment.is_exterior:
+                line.Stroke = self._plot_wall_brush_ext
+                line.StrokeThickness = PLOT_WALL_WIDTH_EXT
+            else:
+                line.Stroke = self._plot_wall_brush
+                line.StrokeThickness = PLOT_WALL_WIDTH
+            line.IsHitTestVisible = False      # never steal a marker's click
+            canvas.Children.Add(line)
+
+    def _plot_info_text(self, shown, extent, wall_count=0):
         """The sentence under the plan: how many, how big, what was left out."""
         parts = ["%d instance%s plotted" % (shown, "" if shown == 1 else "s")]
         if extent:
             parts.append(_group_ops.extent_label(extent))
+        if wall_count:
+            parts.append("%d wall segment%s" % (
+                wall_count, "" if wall_count == 1 else "s"))
+        if self._outline_truncated:
+            parts.append("plan context cut short — this level has too many walls")
         if self._plot_unlocated:
             parts.append("%d instance%s have no location Revit can report"
                          % (self._plot_unlocated,
@@ -1183,14 +1257,30 @@ class ManaGroupDialog(T3WPFWindow):
     def plot_level_changed(self, sender, e):
         if getattr(self, '_loading', True):
             return
+        self._update_context_availability()
         self._refresh_plot()
+
+    def _update_context_availability(self):
+        """Plan context needs one level; grey the toggle out on "All levels"."""
+        one_level = bool(self._plot_level())
+        self.chk_plot_context.IsEnabled = one_level
+        self.chk_plot_context.ToolTip = (
+            "Draw the walls of the chosen level behind the markers" if one_level
+            else "Pick a single level to draw its walls behind the markers")
 
     def plot_legend_toggled(self, sender, e):
         if getattr(self, '_loading', True):
             return
         row = getattr(sender, 'DataContext', None)
         if row is not None:
-            if row.IsVisible:
+            # Read the CheckBox, NOT row.IsVisible. Under pythonnet a TwoWay
+            # binding does not reliably write back into a Python property, so
+            # the tick can flip on screen while the object still says True —
+            # which showed up as "9 boxes unticked, 130 instances still plotted".
+            # The control's own state is the one that is always right.
+            visible = bool(sender.IsChecked)
+            row.IsVisible = visible
+            if visible:
                 self._plot_hidden.discard(row.type_id)
             else:
                 self._plot_hidden.add(row.type_id)
@@ -1238,6 +1328,14 @@ class ManaGroupDialog(T3WPFWindow):
     def plot_labels_toggled(self, sender, e):
         if getattr(self, '_loading', True):
             return
+        self._draw_plan()
+
+    def plot_context_toggled(self, sender, e):
+        if getattr(self, '_loading', True):
+            return
+        # Turning context on can widen the extent a lot, so refit rather than
+        # leave the building drawn half outside the panel.
+        self._plot_transform = None
         self._draw_plan()
 
     def plot_fit_clicked(self, sender, e):

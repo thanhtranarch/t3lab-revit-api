@@ -151,31 +151,76 @@ class T3Dialog(_WPFWindow):
         self.Close()
 
 
+# ── LAST-RESORT FALLBACK ─────────────────────────────────────────────────────
+# A dialog whose whole job is to carry a message must never be the thing that
+# swallows it. If the WPF window cannot be built for any reason -- XamlReader
+# unavailable in this engine, a stale module in the persistent CPython engine,
+# a broken resource -- fall back to Revit's own TaskDialog so the user still
+# reads the message instead of a traceback.
+
+def _task_dialog(message, title, details, buttons=1):
+    """Revit's native TaskDialog. Returns True on OK/Yes, False otherwise."""
+    from Autodesk.Revit.UI import TaskDialog, TaskDialogCommonButtons, TaskDialogResult
+    dialog = TaskDialog(title or "T3Lab")
+    dialog.MainInstruction = message or ""
+    if details:
+        dialog.MainContent = details
+    if buttons == 2:
+        dialog.CommonButtons = (TaskDialogCommonButtons.Yes |
+                                TaskDialogCommonButtons.No)
+        dialog.DefaultButton = TaskDialogResult.No
+        return dialog.Show() == TaskDialogResult.Yes
+    dialog.CommonButtons = TaskDialogCommonButtons.Close
+    dialog.Show()
+    return True
+
+
+def _run(build, message, title, details, buttons=1):
+    """Show the T3 dialog, or degrade to TaskDialog rather than raise."""
+    try:
+        dlg = build()
+        dlg.ShowDialog()
+        return dlg.result if buttons == 2 else True
+    except Exception as exc:
+        try:
+            note = details or ""
+            # Say why the styled dialog is missing: silently swapping chrome
+            # looks like a different bug next time somebody reports it.
+            if note:
+                note += "\n\n"
+            note += "(T3 dialog unavailable: %s)" % exc
+            return _task_dialog(message, title, note, buttons)
+        except Exception:
+            return False if buttons == 2 else True
+
+
 def show_info(message, title="Information", details=None, owner=None):
     """Show an info modal dialog."""
-    dlg = T3Dialog(message, title=title, details=details, mode=T3Dialog.MODE_INFO, owner=owner)
-    dlg.ShowDialog()
-    return True
+    return _run(lambda: T3Dialog(message, title=title, details=details,
+                                 mode=T3Dialog.MODE_INFO, owner=owner),
+                message, title, details)
 
 
 def show_warning(message, title="Warning", details=None, owner=None):
     """Show a warning modal dialog."""
-    dlg = T3Dialog(message, title=title, details=details, mode=T3Dialog.MODE_WARNING, owner=owner)
-    dlg.ShowDialog()
-    return True
+    return _run(lambda: T3Dialog(message, title=title, details=details,
+                                 mode=T3Dialog.MODE_WARNING, owner=owner),
+                message, title, details)
 
 
 def show_error(message, title="Error", details=None, owner=None):
     """Show an error modal dialog."""
-    dlg = T3Dialog(message, title=title, details=details, mode=T3Dialog.MODE_ERROR, ok_text="Close", owner=owner)
-    dlg.ShowDialog()
-    return True
+    return _run(lambda: T3Dialog(message, title=title, details=details,
+                                 mode=T3Dialog.MODE_ERROR, ok_text="Close",
+                                 owner=owner),
+                message, title, details)
 
 
 def confirm(message, title="Confirm Action", ok_text="Proceed", cancel_text="Cancel",
             danger=False, details=None, owner=None):
     """Show a confirmation dialog. Returns True if confirmed, False otherwise."""
-    dlg = T3Dialog(message, title=title, details=details, mode=T3Dialog.MODE_CONFIRM,
-                   ok_text=ok_text, cancel_text=cancel_text, danger=danger, owner=owner)
-    dlg.ShowDialog()
-    return dlg.result
+    return _run(lambda: T3Dialog(message, title=title, details=details,
+                                 mode=T3Dialog.MODE_CONFIRM, ok_text=ok_text,
+                                 cancel_text=cancel_text, danger=danger,
+                                 owner=owner),
+                message, title, details, buttons=2)

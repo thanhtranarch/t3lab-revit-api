@@ -874,3 +874,159 @@ def extent_label(extent):
     min_x, min_y, max_x, max_y = extent
     return "%s x %s" % (feet_to_metres_label(max_x - min_x),
                         feet_to_metres_label(max_y - min_y))
+
+
+# ── LEVEL CONTEXT: THE PLAN UNDER THE MARKERS ────────────────────────────────
+# Dots floating in an empty rectangle say nothing about where a group actually
+# is. Drawing the walls of one level behind them turns the plan into something
+# readable: exterior walls give the building outline, interior walls give the
+# core and the partitions.
+
+# Segments are capped so a pathological level cannot freeze the window while
+# WPF lays out fifty thousand Line visuals.
+MAX_OUTLINE_SEGMENTS = 6000
+
+# Arcs and splines are flattened to this many segments each. Four is enough for
+# a wall arc at plan scale and keeps the budget for the rest of the floor.
+CURVE_TESSELLATION = 8
+
+
+class OutlineSegment(object):
+    """One straight piece of a wall centre line, in model feet."""
+
+    __slots__ = ("x1", "y1", "x2", "y2", "is_exterior")
+
+    def __init__(self, x1, y1, x2, y2, is_exterior=False):
+        self.x1 = float(x1)
+        self.y1 = float(y1)
+        self.x2 = float(x2)
+        self.y2 = float(y2)
+        self.is_exterior = bool(is_exterior)
+
+
+def level_id_by_name(doc, level_name):
+    """ElementId of the level called `level_name`, or None."""
+    if doc is None or not level_name:
+        return None
+    try:
+        for level in FilteredElementCollector(doc) \
+                .OfCategory(BuiltInCategory.OST_Levels) \
+                .WhereElementIsNotElementType():
+            if element_name(level) == level_name:
+                return level.Id
+    except Exception:
+        pass
+    return None
+
+
+def _curve_segments(curve, is_exterior):
+    """Flatten one curve into OutlineSegment pieces."""
+    out = []
+    try:
+        start = curve.GetEndPoint(0)
+        end = curve.GetEndPoint(1)
+    except Exception:
+        return out
+
+    is_line = True
+    try:
+        # Anything that is not a straight Line needs tessellating; asking for the
+        # type name keeps this free of a Line import and works on every version.
+        is_line = curve.GetType().Name == "Line"
+    except Exception:
+        pass
+
+    if is_line:
+        out.append(OutlineSegment(start.X, start.Y, end.X, end.Y, is_exterior))
+        return out
+
+    try:
+        previous = None
+        for step in range(CURVE_TESSELLATION + 1):
+            point = curve.Evaluate(float(step) / CURVE_TESSELLATION, True)
+            if previous is not None:
+                out.append(OutlineSegment(previous.X, previous.Y,
+                                          point.X, point.Y, is_exterior))
+            previous = point
+    except Exception:
+        out.append(OutlineSegment(start.X, start.Y, end.X, end.Y, is_exterior))
+    return out
+
+
+def _wall_is_exterior(wall):
+    """True when the wall type is marked Exterior — that is the building edge."""
+    try:
+        function = wall.WallType.Function
+        return str(function) == "Exterior"
+    except Exception:
+        return False
+
+
+def collect_level_outline(doc, level_name, limit=MAX_OUTLINE_SEGMENTS):
+    """Wall centre lines on one level, as [OutlineSegment].
+
+    Walls rather than floor sketches: a wall plan is what makes a floor legible,
+    and it gives the building outline (exterior walls) and the core and
+    partitions (interior walls) from one read instead of two.
+
+    Returns ([], True) when the level has no walls; the bool says whether the
+    result was cut short by `limit`.
+    """
+    level_id = level_id_by_name(doc, level_name)
+    if level_id is None:
+        return [], False
+
+    segments = []
+    truncated = False
+    try:
+        walls = FilteredElementCollector(doc) \
+            .OfCategory(BuiltInCategory.OST_Walls) \
+            .WhereElementIsNotElementType() \
+            .ToElements()
+    except Exception:
+        return [], False
+
+    target = eid_int(level_id)
+    for wall in walls:
+        try:
+            if eid_int(wall.LevelId) != target:
+                continue
+        except Exception:
+            continue
+        try:
+            location = wall.Location
+            curve = getattr(location, "Curve", None)
+            if curve is None:
+                continue
+        except Exception:
+            continue
+        segments.extend(_curve_segments(curve, _wall_is_exterior(wall)))
+        if len(segments) >= limit:
+            truncated = True
+            del segments[limit:]
+            break
+    return segments, truncated
+
+
+def outline_extent(segments):
+    """(min_x, min_y, max_x, max_y) covering `segments`, or None if empty."""
+    if not segments:
+        return None
+    xs = []
+    ys = []
+    for segment in segments:
+        xs.append(segment.x1)
+        xs.append(segment.x2)
+        ys.append(segment.y1)
+        ys.append(segment.y2)
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def union_extent(first, second):
+    """Smallest extent covering both, ignoring whichever one is None."""
+    if not first:
+        return second
+    if not second:
+        return first
+    return (min(first[0], second[0]), min(first[1], second[1]),
+            max(first[2], second[2]), max(first[3], second[3]))

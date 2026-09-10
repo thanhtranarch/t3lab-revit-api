@@ -395,5 +395,54 @@ class TestPlacedInstanceTotal(unittest.TestCase):
         self.assertEqual(self.ops.placed_instance_total([]), 0)
 
 
+
+class TestOutlineGeometry(unittest.TestCase):
+    """The plan-context extent maths that keeps building and markers both in view."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ops = _load_group_ops_module()
+
+    def _seg(self, x1, y1, x2, y2, ext=False):
+        return self.ops.OutlineSegment(x1, y1, x2, y2, ext)
+
+    def test_outline_extent_covers_both_ends_of_every_segment(self):
+        segments = [self._seg(0, 0, 10, 4), self._seg(-5, 20, 3, -2)]
+        self.assertEqual(self.ops.outline_extent(segments), (-5, -2, 10, 20))
+
+    def test_outline_extent_of_nothing_is_none(self):
+        self.assertIsNone(self.ops.outline_extent([]))
+
+    def test_segment_stores_floats_and_the_exterior_flag(self):
+        s = self._seg(1, 2, 3, 4, ext=True)
+        self.assertEqual((s.x1, s.y1, s.x2, s.y2), (1.0, 2.0, 3.0, 4.0))
+        self.assertTrue(s.is_exterior)
+        self.assertFalse(self._seg(0, 0, 1, 1).is_exterior)
+
+    def test_union_extent_covers_both(self):
+        self.assertEqual(
+            self.ops.union_extent((0, 0, 10, 10), (-5, 2, 4, 30)),
+            (-5, 0, 10, 30))
+
+    def test_union_extent_tolerates_a_missing_side(self):
+        self.assertEqual(self.ops.union_extent(None, (1, 2, 3, 4)), (1, 2, 3, 4))
+        self.assertEqual(self.ops.union_extent((1, 2, 3, 4), None), (1, 2, 3, 4))
+        self.assertIsNone(self.ops.union_extent(None, None))
+
+    def test_markers_in_one_corner_still_fit_with_the_building(self):
+        """The whole reason for union_extent: groups clustered in a corner must
+        not push the building outline off screen."""
+        building = (0, 0, 300, 200)
+        markers = (280, 180, 290, 190)
+        both = self.ops.union_extent(markers, building)
+        t = self.ops.PlanTransform.fit(both, 600, 400, padding=10)
+        for x, y in ((0, 0), (300, 200), (280, 180)):
+            px, py = t.to_canvas(x, y)
+            self.assertGreaterEqual(px, 10 - 1e-6)
+            self.assertLessEqual(px, 600 - 10 + 1e-6)
+            self.assertGreaterEqual(py, 10 - 1e-6)
+            self.assertLessEqual(py, 400 - 10 + 1e-6)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -54,15 +54,19 @@ from pyrevit import revit
 
 # ── ENTRY POINT ──────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    try:
-        doc = revit.doc
-    except Exception:
-        doc = None
+    # `revit.doc` on its own is a getattr chain that yields None whenever this
+    # engine has no active document — which is NOT the same thing as "no model
+    # is open", and it made the tool refuse to start with a project loaded.
+    # Snippets._host.resolve_doc walks the real fallback chain (revit.doc →
+    # ActiveUIDocument → the single open model) and returns a message worth
+    # showing when there genuinely is nothing to act on.
+    from Snippets._host import resolve_doc
+    doc, doc_error = resolve_doc()
 
     if not doc:
         from GUI.T3Dialog import show_warning
         show_warning(
-            "Open a Revit project before running Group Manager.",
+            doc_error or "Open a Revit project before running Group Manager.",
             title="Group Manager",
             details="Group Manager needs an active document to read its groups from.")
     elif doc.IsFamilyDocument:
