@@ -444,5 +444,63 @@ class TestOutlineGeometry(unittest.TestCase):
             self.assertLessEqual(py, 400 - 10 + 1e-6)
 
 
+class TestRenamePlan(unittest.TestCase):
+    """plan_rename decides what is rejected, what is parked, and what is written.
+
+    Revit refuses a name another type still carries, and renames are sequential,
+    so A->B while B->A used to fail on whichever went first.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ops = _load_group_ops_module()
+
+    def test_swap_parks_one_of_the_two(self):
+        a = _FakeRecord("A")
+        b = _FakeRecord("B")
+        rejected, parked, writes = self.ops.plan_rename([(a, "B"), (b, "A")])
+        self.assertEqual(rejected, [])
+        self.assertEqual(len(writes), 2)
+        # Both names are wanted by the other record, so both get parked.
+        self.assertEqual(sorted(id(r) for r in parked), sorted([id(a), id(b)]))
+
+    def test_chain_parks_the_name_in_the_middle(self):
+        a = _FakeRecord("A")
+        b = _FakeRecord("B")
+        rejected, parked, writes = self.ops.plan_rename([(a, "B"), (b, "C")])
+        self.assertEqual(rejected, [])
+        self.assertEqual([id(r) for r in parked], [id(b)])
+
+    def test_independent_renames_park_nothing(self):
+        a = _FakeRecord("A")
+        b = _FakeRecord("B")
+        _rejected, parked, writes = self.ops.plan_rename([(a, "A2"), (b, "B2")])
+        self.assertEqual(parked, [])
+        self.assertEqual(len(writes), 2)
+
+    def test_rejects_empty_illegal_and_unchanged(self):
+        empty = _FakeRecord("Keep")
+        same = _FakeRecord("Same")
+        bad = _FakeRecord("Bad")
+        rejected, parked, writes = self.ops.plan_rename(
+            [(empty, "   "), (same, "Same"), (bad, "No{brace}")])
+        self.assertEqual(writes, [])
+        self.assertEqual(parked, [])
+        messages = dict((id(r), m) for r, m in rejected)
+        self.assertEqual(messages[id(empty)], "Empty name")
+        self.assertEqual(messages[id(same)], "Unchanged")
+        self.assertTrue(messages[id(bad)].startswith("Illegal"))
+
+    def test_parking_is_case_insensitive(self):
+        a = _FakeRecord("pod")
+        b = _FakeRecord("POD 2")
+        _rejected, parked, _writes = self.ops.plan_rename([(a, "POD 2"), (b, "pod")])
+        self.assertEqual(len(parked), 2)
+
+    def test_handles_empty_input(self):
+        self.assertEqual(self.ops.plan_rename([]), ([], [], []))
+        self.assertEqual(self.ops.plan_rename(None), ([], [], []))
+
+
 if __name__ == '__main__':
     unittest.main()

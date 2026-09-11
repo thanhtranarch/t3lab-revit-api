@@ -1,8 +1,8 @@
 title: "Batch\nLink"
-tooltip: "Link Revit models, manage link worksets and per-view link display"
+tooltip: "Link Revit models, set the workset each link sits on, control per-view link display"
 description: |
   Link Models: pick a folder, filter backups, link many models at once
-  Link Worksets: open or close the worksets inside loaded links, in batch
+  Link Workset: move the link instances of this model onto one of its worksets
   View Display: set By Host View / By Linked View / Custom, visibility and halftone
   Display settings need Revit 2025 or newer
 author: "Tran Tien Thanh"

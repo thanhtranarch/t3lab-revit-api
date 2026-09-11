@@ -715,14 +715,22 @@
             </Setter>
           </Style>
 
+          <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
+               có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
+               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
               <Setter.Value>
                 <ControlTemplate TargetType="DataGridCell">
-                  <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                  <Border Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          Padding="{TemplateBinding Padding}">
                     <ContentPresenter VerticalAlignment="Center"/>
                   </Border>
                 </ControlTemplate>
@@ -1500,7 +1508,7 @@
                                RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Orientation="Vertical" VerticalAlignment="Center">
                             <TextBlock Text="Batch Link Models" Style="{StaticResource T3.Title}"/>
-                            <TextBlock Text="Link, reload and control Revit links — worksets and per-view display"
+                            <TextBlock Text="Link models, set the workset each link sits on, and control per-view display"
                                        Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                     </StackPanel>
@@ -1529,7 +1537,7 @@
                     <RadioButton x:Name="chip_tab_link" Content="Link Models" GroupName="bl_tabs"
                                  Style="{StaticResource T3.Chip}" IsChecked="True"
                                  Checked="tab_chip_checked" Tag="0"/>
-                    <RadioButton x:Name="chip_tab_worksets" Content="Link Worksets" GroupName="bl_tabs"
+                    <RadioButton x:Name="chip_tab_worksets" Content="Link Workset" GroupName="bl_tabs"
                                  Style="{StaticResource T3.Chip}"
                                  Checked="tab_chip_checked" Tag="1"/>
                     <RadioButton x:Name="chip_tab_display" Content="View Display" GroupName="bl_tabs"
@@ -1711,146 +1719,60 @@
                     </Grid>
                 </TabItem>
 
-                <!-- ────────────────── TAB 2: LINK WORKSETS ────────────────── -->
+                <!-- ────────────────── TAB 2: LINK WORKSET IN THIS MODEL ────────────────── -->
                 <TabItem x:Name="tab_item_worksets">
                     <Grid Margin="16,12,16,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="360"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>   <!-- Toolbar -->
+                            <RowDefinition Height="*"/>      <!-- Link table -->
+                            <RowDefinition Height="Auto"/>   <!-- Assign strip -->
+                        </Grid.RowDefinitions>
 
-                        <!-- LEFT: LOADED LINKS -->
-                        <Grid Grid.Column="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <Grid Grid.Row="0" Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="LINKED MODELS" Style="{StaticResource T3.Label}"
-                                           VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                            HorizontalAlignment="Right" VerticalAlignment="Center">
-                                    <Button x:Name="btn_ws_reload_links" Content="Refresh"
-                                            Style="{StaticResource T3.Button.Ghost}"
-                                            Padding="8,0" Height="24" Margin="0,0,12,0"
-                                            Click="reload_links_clicked"/>
-                                    <TextBlock x:Name="lbl_ws_link_count" Text="0 links"
-                                               Style="{StaticResource T3.Caption}"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <Border Grid.Row="1" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
-                                <Grid>
-                                    <DataGrid x:Name="grid_ws_links"
-                                              Style="{StaticResource T3.DataGrid}"
-                                              BorderThickness="0"
-                                              AutoGenerateColumns="False"
-                                              EnableRowVirtualization="True"
-                                              HorizontalScrollBarVisibility="Disabled"
-                                              SelectionMode="Single"
-                                              SelectionUnit="FullRow"
-                                              SelectionChanged="ws_link_selection_changed">
-                                        <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="36" CanUserSort="False" CanUserResize="False">
-                                                <DataGridTemplateColumn.HeaderStyle>
-                                                    <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
-                                                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                                                        <Setter Property="Padding" Value="0"/>
-                                                    </Style>
-                                                </DataGridTemplateColumn.HeaderStyle>
-                                                <DataGridTemplateColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Setter Property="Padding" Value="0"/>
-                                                    </Style>
-                                                </DataGridTemplateColumn.CellStyle>
-                                                <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_ws_links_header"
-                                                              Style="{StaticResource T3.CheckBox}"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                              Padding="0" Margin="0"
-                                                              ToolTip="Select All / Deselect All"
-                                                              Click="ws_links_header_clicked"/>
-                                                </DataGridTemplateColumn.Header>
-                                                <DataGridTemplateColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  IsEnabled="{Binding IsEnabled}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                  Padding="0" Margin="0"
-                                                                  Click="ws_link_checkbox_clicked"/>
-                                                    </DataTemplate>
-                                                </DataGridTemplateColumn.CellTemplate>
-                                            </DataGridTemplateColumn>
-
-                                            <DataGridTextColumn Header="LINK" Width="*" Binding="{Binding LinkName}"/>
-                                            <DataGridTextColumn Header="OPEN" Width="80" Binding="{Binding WorksetSummary}"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                            <DataGridTemplateColumn Header="STATUS" Width="110"
-                                                                    CellTemplate="{StaticResource T3.StatusPill}"/>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-
-                                    <TextBlock x:Name="txt_ws_links_empty" Style="{StaticResource T3.Empty}"
-                                               Visibility="Visible"
-                                               Text="No Revit links in this project.&#x0a;Link a model first, or reload an unloaded link."/>
-                                </Grid>
-                            </Border>
+                        <!-- TOOLBAR -->
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="LINKS IN THIS MODEL" Style="{StaticResource T3.Label}"
+                                           VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <TextBox x:Name="tb_ws_filter" Width="220"
+                                         Style="{StaticResource T3.Search}"
+                                         Tag="Search links..."
+                                         TextChanged="ws_filter_changed"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button x:Name="btn_ws_reload_links" Content="Refresh"
+                                        Style="{StaticResource T3.Button.Ghost}"
+                                        Padding="12,0" Margin="0,0,16,0"
+                                        Click="reload_links_clicked"/>
+                                <Button x:Name="btn_ws_select_all" Content="Select All"
+                                        Style="{StaticResource T3.Button.Ghost}"
+                                        Padding="12,0" Margin="0,0,4,0"
+                                        Click="ws_select_all_clicked"/>
+                                <Button x:Name="btn_ws_select_none" Content="Select None"
+                                        Style="{StaticResource T3.Button.Ghost}"
+                                        Padding="12,0" Margin="0,0,4,0"
+                                        Click="ws_select_none_clicked"/>
+                                <Button x:Name="btn_ws_invert" Content="Invert"
+                                        Style="{StaticResource T3.Button.Ghost}"
+                                        Padding="12,0"
+                                        Click="ws_invert_clicked"/>
+                            </StackPanel>
                         </Grid>
 
-                        <!-- RIGHT: WORKSETS OF FOCUSED LINK -->
-                        <Grid Grid.Column="2">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
+                        <!-- LINK TABLE + COUNT STRIP (one panel, no floating gap) -->
+                        <Border Grid.Row="1" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
-                            <Grid Grid.Row="0" Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="WORKSETS" Style="{StaticResource T3.Label}" Margin="0,0,12,0"/>
-                                    <TextBox x:Name="tb_ws_filter" Width="180" Height="26"
-                                             Style="{StaticResource T3.Search}"
-                                             Tag="Search worksets..."
-                                             TextChanged="ws_filter_changed"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                            HorizontalAlignment="Right" VerticalAlignment="Center">
-                                    <Button x:Name="btn_ws_open_all" Content="Open All"
-                                            Style="{StaticResource T3.Button.Ghost}"
-                                            Padding="8,0" Height="24" Margin="0,0,4,0"
-                                            Click="ws_open_all_clicked"/>
-                                    <Button x:Name="btn_ws_close_all" Content="Close All"
-                                            Style="{StaticResource T3.Button.Ghost}"
-                                            Padding="8,0" Height="24" Margin="0,0,4,0"
-                                            Click="ws_close_all_clicked"/>
-                                    <Button x:Name="btn_ws_invert" Content="Invert"
-                                            Style="{StaticResource T3.Button.Ghost}"
-                                            Padding="8,0" Height="24" Margin="0,0,12,0"
-                                            Click="ws_invert_clicked"/>
-                                    <TextBlock x:Name="lbl_ws_count" Text="0 worksets"
-                                               Style="{StaticResource T3.Caption}"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <TextBlock Grid.Row="1" x:Name="lbl_ws_focus" Margin="0,0,0,8"
-                                       Style="{StaticResource T3.Body.Secondary}"
-                                       Text="Select a link on the left to list its worksets."
-                                       TextTrimming="CharacterEllipsis"/>
-
-                            <Border Grid.Row="2" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
-                                <Grid>
-                                    <DataGrid x:Name="grid_worksets"
+                                <Grid Grid.Row="0">
+                                    <DataGrid x:Name="grid_ws_links"
                                               Style="{StaticResource T3.DataGrid}"
                                               BorderThickness="0"
                                               AutoGenerateColumns="False"
@@ -1872,49 +1794,83 @@
                                                     </Style>
                                                 </DataGridTemplateColumn.CellStyle>
                                                 <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_ws_header"
+                                                    <CheckBox x:Name="chk_ws_links_header"
                                                               Style="{StaticResource T3.CheckBox}"
                                                               HorizontalAlignment="Center" VerticalAlignment="Center"
                                                               Padding="0" Margin="0"
-                                                              ToolTip="Open All / Close All"
-                                                              Click="ws_header_clicked"/>
+                                                              ToolTip="Select all links"
+                                                              Click="ws_links_header_clicked"/>
                                                 </DataGridTemplateColumn.Header>
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  IsEnabled="{Binding IsEnabled}"
                                                                   Style="{StaticResource T3.CheckBox}"
                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
                                                                   Padding="0" Margin="0"
-                                                                  ToolTip="Checked = workset open in the link"
-                                                                  Click="ws_checkbox_clicked"/>
+                                                                  ToolTip="Checked = this link moves to the workset chosen below"
+                                                                  Click="ws_link_checkbox_clicked"/>
                                                     </DataTemplate>
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
 
-                                            <DataGridTextColumn Header="WORKSET NAME" Width="*" Binding="{Binding WorksetName}"/>
-                                            <DataGridTextColumn Header="IN LINKS" Width="90" Binding="{Binding Coverage}"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                            <DataGridTemplateColumn Header="STATE" Width="110"
+                                            <DataGridTextColumn Header="LINK" Width="*" Binding="{Binding LinkName}"/>
+                                            <DataGridTextColumn Header="PLACED" Width="80" Binding="{Binding InstanceCount}"
+                                                                ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                            <DataGridTextColumn Header="CURRENT WORKSET" Width="200" Binding="{Binding CurrentWorkset}"/>
+                                            <DataGridTextColumn Header="NEW WORKSET" Width="200" Binding="{Binding TargetWorkset}"
+                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
+                                            <DataGridTemplateColumn Header="STATUS" Width="120"
                                                                     CellTemplate="{StaticResource T3.StatusPill}"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
 
-                                    <TextBlock x:Name="txt_ws_empty" Style="{StaticResource T3.Empty}"
+                                    <TextBlock x:Name="txt_ws_links_empty" Style="{StaticResource T3.Empty}"
                                                Visibility="Visible"
-                                               Text="No worksets to show.&#x0a;Pick a loaded, workshared link on the left."/>
+                                               Text="No Revit links in this project.&#x0a;Link a model first on the Link Models tab."/>
                                 </Grid>
-                            </Border>
 
-                            <Border Grid.Row="3" Style="{StaticResource T3.Callout}" Margin="0,12,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="Applying worksets reloads each selected link from its source."
-                                               Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap"/>
-                                    <CheckBox x:Name="chk_ws_apply_all_selected" Margin="0,8,0,0"
-                                              Content="Apply this workset list to every checked link (matched by workset name)"
-                                              Style="{StaticResource T3.CheckBox}" IsChecked="True"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
+                                <Border Grid.Row="1" BorderBrush="{StaticResource T3.Border}"
+                                        BorderThickness="0,1,0,0" Padding="12,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" x:Name="lbl_ws_link_count" Text="0 links"
+                                                   Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" x:Name="lbl_ws_active" Text=""
+                                                   Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- ASSIGN STRIP -->
+                        <Border Grid.Row="2" Style="{StaticResource T3.Callout}" Margin="0,12,0,0">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="280"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Move checked links to workset"
+                                               Style="{StaticResource T3.Body}"
+                                               VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <ComboBox Grid.Column="1" x:Name="cb_ws_target"
+                                              Style="{StaticResource T3.ComboBox}"
+                                              ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
+                                              SelectionChanged="ws_target_changed"/>
+                                    <CheckBox Grid.Column="2" x:Name="chk_ws_include_type"
+                                              Content="Move the link type onto the same workset"
+                                              Style="{StaticResource T3.CheckBox}"
+                                              IsChecked="True" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                                </Grid>
+                                <TextBlock Style="{StaticResource T3.Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           Text="This changes the workset the link sits on in the CURRENT model. Worksets inside the linked files are not touched, and no link is reloaded."/>
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </TabItem>
 

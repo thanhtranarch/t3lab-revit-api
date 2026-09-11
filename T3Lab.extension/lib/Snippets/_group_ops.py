@@ -342,6 +342,56 @@ def user_worksets(doc):
 
 # ── RENAME ───────────────────────────────────────────────────────────────────
 
+TEMP_NAME_PREFIX = "T3TMP-"
+
+
+def plan_rename(pairs):
+    """Split `pairs` into what to reject, what to park, and what to write.
+
+    Renaming is sequential, so A->B while B->A fails on whichever goes first:
+    Revit will not accept a name another type still carries. The same is true of
+    any longer cycle, and of a chain renamed in the wrong order. The fix is to
+    park every name that is both wanted by one record and currently held by
+    another on a temporary name first, then write the real names.
+
+    Returns ``(rejected, parked, writes)``:
+      rejected — [(record, message)] names that can never be written
+      parked   — [record] records to give a temporary name first
+      writes   — [(record, wanted)] in the order they should be written
+
+    No Revit call here, so it is unit-tested outside Revit.
+    """
+    rejected = []
+    writes = []
+    for record, new_name in pairs or []:
+        wanted = (new_name or "").strip()
+        if not wanted:
+            rejected.append((record, "Empty name"))
+            continue
+        if wanted == record.name:
+            rejected.append((record, "Unchanged"))
+            continue
+        bad = illegal_chars_in(wanted)
+        if bad:
+            rejected.append((record, "Illegal %s" % " ".join(bad)))
+            continue
+        writes.append((record, wanted))
+
+    # Current names of the records being written, so a wanted name can be told
+    # apart from a name that is merely free.
+    holder = {}
+    for record, _wanted in writes:
+        holder[(record.name or "").strip().lower()] = record
+
+    parked = []
+    for _record, wanted in writes:
+        occupant = holder.get(wanted.lower())
+        if occupant is not None and occupant not in parked:
+            parked.append(occupant)
+
+    return rejected, parked, writes
+
+
 def rename_group_types(doc, pairs, progress=None):
     """Rename group types in one transaction.
 
@@ -353,32 +403,51 @@ def rename_group_types(doc, pairs, progress=None):
     if doc is None or not pairs:
         return results
 
-    total = len(pairs)
+    rejected, parked, writes = plan_rename(pairs)
+    results.extend((record, False, message) for record, message in rejected)
+
+    total = len(writes)
+    # The label the progress line shows. Read before phase 1, or a parked record
+    # would be announced as "T3TMP-0-Bath Pod".
+    labels = dict((id(record), record.name) for record, _wanted in writes)
+
     transaction = Transaction(doc, "T3Lab — Rename Groups")
     transaction.Start()
     try:
-        for index, (record, new_name) in enumerate(pairs, 1):
+        # Phase 1 — park the names somebody else is about to take.
+        original = {}
+        for offset, record in enumerate(parked):
+            try:
+                original[id(record)] = record.name
+                record.group_type.Name = "%s%d-%s" % (
+                    TEMP_NAME_PREFIX, offset, record.name)
+                record.name = element_name(record.group_type)
+            except Exception:
+                original.pop(id(record), None)   # still on its own name
+
+        # Phase 2 — write the names the user asked for.
+        for index, (record, wanted) in enumerate(writes, 1):
             if progress:
-                progress(index, total, record.name)
-
-            wanted = (new_name or "").strip()
-            if not wanted:
-                results.append((record, False, "Empty name"))
-                continue
-            if wanted == record.name:
-                results.append((record, False, "Unchanged"))
-                continue
-            bad = illegal_chars_in(wanted)
-            if bad:
-                results.append((record, False, "Illegal %s" % " ".join(bad)))
-                continue
-
+                progress(index, total, labels.get(id(record), record.name))
             try:
                 record.group_type.Name = wanted
                 record.name = wanted
                 results.append((record, True, "Renamed"))
             except Exception as exc:
                 results.append((record, False, _short_error(exc, "Rename failed")))
+
+        # A parked name that never got its real name would be committed as
+        # "T3TMP-...", which is worse than the rename simply not happening.
+        for record in parked:
+            was = original.get(id(record))
+            if was is None or not (record.name or "").startswith(TEMP_NAME_PREFIX):
+                continue
+            try:
+                record.group_type.Name = was
+                record.name = was
+            except Exception:
+                pass
+
         transaction.Commit()
     except Exception:
         if transaction.HasStarted() and not transaction.HasEnded():

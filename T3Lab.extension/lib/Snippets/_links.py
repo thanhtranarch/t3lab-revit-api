@@ -6,6 +6,7 @@ Revit API helpers for managing Revit links (RVT links):
 
 * discover link types / instances in the host document
 * read and apply the **worksets** of a linked model
+* read and change the **host workset** a link instance sits on
 * read and apply the per-view **display settings** of a link
   (By Host View / By Linked View / Custom)
 
@@ -22,6 +23,7 @@ import os
 
 from Autodesk.Revit.DB import (
     BuiltInParameter,
+    CheckoutStatus,
     Element,
     ElementId,
     ExternalResourceTypes,
@@ -39,6 +41,7 @@ from Autodesk.Revit.DB import (
     WorksetConfigurationOption,
     WorksetId,
     WorksetKind,
+    WorksharingUtils,
 )
 
 import Autodesk.Revit.DB as DB
@@ -160,13 +163,27 @@ def _mode_index(link_visibility_value):
 # -- LINK DISCOVERY ----------------------------------------------------------
 
 class LinkRecord(object):
-    """One Revit link in the host document (type + its first placed instance)."""
+    """One Revit link in the host document: the type and every placed instance."""
 
-    def __init__(self, link_type, instance):
+    def __init__(self, link_type, instances=None):
+        # A link type can be placed more than once. Keeping only the first
+        # instance made "hide this link" / "halftone this link" silently act on
+        # one copy while the others stayed as they were, which reads as the tool
+        # having done nothing.
+        if instances is None:
+            instances = []
+        elif not isinstance(instances, (list, tuple)):
+            instances = [instances]
+        instances = [i for i in instances if i is not None]
+
+        instance = instances[0] if instances else None
         self.link_type = link_type
         self.instance = instance
+        self.instances = instances
+        self.instance_count = len(instances)
         self.type_id = link_type.Id
         self.instance_id = instance.Id if instance is not None else ElementId.InvalidElementId
+        self.instance_ids = [i.Id for i in instances]
         self.name = element_name(link_type)
         self.is_nested = bool(getattr(link_type, 'IsNestedLink', False))
         self.pinned = bool(getattr(instance, 'Pinned', False)) if instance is not None else False
@@ -235,7 +252,7 @@ def collect_links(doc, loaded_only=False, include_nested=False):
     try:
         for inst in FilteredElementCollector(doc).OfClass(RevitLinkInstance):
             key = eid_int(inst.GetTypeId())
-            instances_by_type.setdefault(key, inst)
+            instances_by_type.setdefault(key, []).append(inst)
     except Exception:
         pass
 
@@ -244,7 +261,7 @@ def collect_links(doc, loaded_only=False, include_nested=False):
         for lt in FilteredElementCollector(doc).OfClass(RevitLinkType):
             if not include_nested and bool(getattr(lt, 'IsNestedLink', False)):
                 continue
-            rec = LinkRecord(lt, instances_by_type.get(eid_int(lt.Id)))
+            rec = LinkRecord(lt, instances_by_type.get(eid_int(lt.Id), []))
             if loaded_only and not rec.is_loaded:
                 continue
             records.append(rec)
@@ -324,6 +341,33 @@ def split_workset_ids(worksets, open_names, closed_names):
     return open_ids, close_ids
 
 
+def workset_config_ids(worksets, open_names, closed_names):
+    """Open/close ids covering **every** workset of one link.
+
+    ``split_workset_ids`` only classifies the worksets whose name the user
+    actually saw in the grid. ``apply_link_worksets`` then starts its
+    WorksetConfiguration from OpenAllWorksets, so anything left unclassified was
+    silently **opened** -- which is what happens when the workset list of the
+    focused link does not cover every link being reloaded.
+
+    This classifies the leftovers explicitly by their current state instead, so
+    a workset nobody ticked comes back exactly as it was.
+    Returns ``(open_ids, close_ids)``.
+    """
+    open_ids = []
+    close_ids = []
+    for ws in worksets or []:
+        if ws.name in open_names:
+            open_ids.append(ws.workset_id)
+        elif ws.name in closed_names:
+            close_ids.append(ws.workset_id)
+        elif getattr(ws, 'is_open', True):
+            open_ids.append(ws.workset_id)
+        else:
+            close_ids.append(ws.workset_id)
+    return open_ids, close_ids
+
+
 def apply_link_worksets(link_type, open_ids, close_ids):
     """Reload link_type with the given worksets opened / closed.
 
@@ -376,6 +420,200 @@ def apply_link_worksets(link_type, open_ids, close_ids):
     if res in ok_results:
         return True, "Reloaded"
     return False, str(res)
+
+
+# -- WORKSET OF THE LINK IN THE HOST MODEL -----------------------------------
+# Khác hẳn phần trên: ở đây là workset của CHÍNH host document mà link instance
+# đang nằm trên, không phải workset bên trong file link. Đổi workset chỉ là ghi
+# ELEM_PARTITION_PARAM trong một transaction — không reload link.
+
+class HostWorkset(object):
+    """A user workset of the host document."""
+
+    def __init__(self, workset_id, name, is_open, is_editable, owner):
+        self.workset_id = workset_id          # int
+        self.name = name
+        self.is_open = bool(is_open)
+        self.is_editable = bool(is_editable)
+        self.owner = owner or ""
+
+
+def is_workshared(doc):
+    """True when doc has worksharing enabled (worksets exist at all)."""
+    try:
+        return bool(doc is not None and doc.IsWorkshared)
+    except Exception:
+        return False
+
+
+def get_host_worksets(doc):
+    """User worksets of the host document, sorted by name."""
+    result = []
+    if not is_workshared(doc):
+        return result
+    try:
+        for ws in FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset):
+            result.append(HostWorkset(eid_int_workset(ws.Id), ws.Name,
+                                      ws.IsOpen, ws.IsEditable, ws.Owner))
+    except Exception:
+        pass
+    result.sort(key=lambda w: w.name.lower())
+    return result
+
+
+def active_workset_id(doc):
+    """Id of the workset new elements land on, or -1."""
+    if not is_workshared(doc):
+        return -1
+    try:
+        return eid_int_workset(doc.GetWorksetTable().GetActiveWorksetId())
+    except Exception:
+        return -1
+
+
+def _workset_param(element):
+    if element is None:
+        return None
+    try:
+        return element.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM)
+    except Exception:
+        return None
+
+
+def element_workset_name(element):
+    """Name of the workset an element sits on ("" when it has none)."""
+    p = _workset_param(element)
+    if p is None:
+        return ""
+    try:
+        return p.AsValueString() or ""
+    except Exception:
+        return ""
+
+
+def element_workset_id(element):
+    """Id of the workset an element sits on, or -1."""
+    p = _workset_param(element)
+    if p is None:
+        return -1
+    try:
+        return int(p.AsInteger())
+    except Exception:
+        return -1
+
+
+def element_owner(doc, element_id):
+    """Username holding an element, "" when nobody does."""
+    try:
+        info = WorksharingUtils.GetWorksharingTooltipInfo(doc, element_id)
+        return info.Owner or ""
+    except Exception:
+        return ""
+
+
+def owned_by_other(doc, element_id):
+    """True when another user has the element checked out."""
+    try:
+        return (WorksharingUtils.GetCheckoutStatus(doc, element_id)
+                == CheckoutStatus.OwnedByOtherUser)
+    except Exception:
+        return False
+
+
+def link_host_workset(link_record):
+    """Workset label of a link's placed instances in the host document.
+
+    A link placed twice can sit on two different worksets; saying so is the
+    point - "Mixed" tells the user why one apply will change two things.
+    Returns (label, workset_id) with workset_id -1 when there is nothing to
+    move or the instances disagree.
+    """
+    instances = list(getattr(link_record, 'instances', None) or [])
+    if not instances:
+        return "Not placed", -1
+
+    names = []
+    ids = []
+    for inst in instances:
+        name = element_workset_name(inst)
+        names.append(name or "—")
+        ids.append(element_workset_id(inst))
+
+    if len(set(ids)) == 1:
+        return names[0], ids[0]
+    return "Mixed ({} instances)".format(len(instances)), -1
+
+
+def set_element_workset(doc, element, workset_id):
+    """Move one element onto workset_id. Needs an OPEN transaction.
+
+    Returns (ok, message); ok is True when the element already sat there.
+    """
+    if element is None:
+        return False, "Element no longer exists"
+    p = _workset_param(element)
+    if p is None:
+        return False, "No workset parameter"
+
+    try:
+        if int(p.AsInteger()) == int(workset_id):
+            return True, "Already there"
+    except Exception:
+        pass
+
+    try:
+        if p.IsReadOnly:
+            owner = element_owner(doc, element.Id)
+            return False, ("Owned by %s" % owner) if owner else "Workset is read-only"
+    except Exception:
+        pass
+
+    if owned_by_other(doc, element.Id):
+        owner = element_owner(doc, element.Id)
+        return False, ("Owned by %s" % owner) if owner else "Owned by another user"
+
+    try:
+        p.Set(int(workset_id))
+        return True, "Moved"
+    except Exception as ex:
+        owner = element_owner(doc, element.Id)
+        if owner:
+            return False, "Owned by %s" % owner
+        return False, str(ex).split("\n")[0]
+
+
+def set_link_workset(doc, link_record, workset_id, include_type=True):
+    """Put every placed instance of a link - and optionally its type - on one
+    workset of the HOST document. Needs an OPEN transaction.
+
+    Returns (ok, message). The first instance that refuses stops this link and
+    its reason is what comes back; instances already written stay written inside
+    the caller's transaction, so undoing the whole apply is one Ctrl+Z.
+    """
+    if link_record is None:
+        return False, "Link no longer exists"
+    instances = list(getattr(link_record, 'instances', None) or [])
+    if not instances:
+        return False, "Not placed in this model"
+
+    moved = 0
+    for inst in instances:
+        ok, message = set_element_workset(doc, inst, workset_id)
+        if not ok:
+            return False, message
+        if message == "Moved":
+            moved += 1
+
+    if include_type:
+        ok, type_message = set_element_workset(doc, link_record.link_type, workset_id)
+        if not ok:
+            return False, "Type: %s" % type_message
+        if type_message == "Moved":
+            moved += 1
+
+    if moved == 0:
+        return True, "Already there"
+    return True, "Moved"
 
 
 # -- VIEWS INSIDE A LINKED MODEL ---------------------------------------------
@@ -497,16 +735,15 @@ def set_link_display(view, link_record, mode_index, linked_view_id=-1, aspects=N
     if view is None or link_record is None:
         return False, "No view or link"
 
-    target = link_record.instance_id
-    if target is None or target == ElementId.InvalidElementId:
-        target = link_record.type_id
+    targets = _placed_instance_ids(link_record) or [link_record.type_id]
 
     if int(mode_index) == 0:
-        try:
-            view.RemoveLinkOverrides(target)
-            return True, "By Host View"
-        except Exception as ex:
-            return False, str(ex).split("\n")[0]
+        for target in targets:
+            try:
+                view.RemoveLinkOverrides(target)
+            except Exception as ex:
+                return False, str(ex).split("\n")[0]
+        return True, "By Host View"
 
     mode_index = int(mode_index)
     has_view = linked_view_id is not None and int(linked_view_id) > 0
@@ -543,20 +780,41 @@ def set_link_display(view, link_record, mode_index, linked_view_id=-1, aspects=N
                 except Exception:
                     pass
 
-        view.SetLinkOverrides(target, settings)
+        for target in targets:
+            view.SetLinkOverrides(target, settings)
         return True, DISPLAY_MODES[mode_index]
     except Exception as ex:
         return False, str(ex).split("\n")[0]
 
 
+def _placed_instance_ids(link_record):
+    """Every placed instance of a link; falls back to the legacy single id."""
+    if link_record is None:
+        return []
+    ids = [i for i in (getattr(link_record, 'instance_ids', None) or [])
+           if i is not None and i != ElementId.InvalidElementId]
+    if ids:
+        return ids
+    single = getattr(link_record, 'instance_id', None)
+    if single is not None and single != ElementId.InvalidElementId:
+        return [single]
+    return []
+
+
 def set_link_visibility(view, link_record, visible):
-    """Show or hide a link instance in view. Caller owns the transaction."""
-    inst_id = link_record.instance_id if link_record else None
-    if view is None or inst_id is None or inst_id == ElementId.InvalidElementId:
+    """Show or hide every placed instance of a link in view.
+
+    A link type placed more than once used to have only its first instance
+    hidden, which reads on screen as the tool having done nothing.
+    Caller owns the transaction.
+    """
+    inst_ids = _placed_instance_ids(link_record)
+    if view is None or not inst_ids:
         return False, "Link has no placed instance"
     try:
         ids = NetList[ElementId]()
-        ids.Add(inst_id)
+        for inst_id in inst_ids:
+            ids.Add(inst_id)
         if visible:
             view.UnhideElements(ids)
         else:
@@ -567,16 +825,20 @@ def set_link_visibility(view, link_record, visible):
 
 
 def set_link_halftone(view, link_record, halftone):
-    """Halftone a link instance in view. Caller owns the transaction."""
-    inst_id = link_record.instance_id if link_record else None
-    if view is None or inst_id is None or inst_id == ElementId.InvalidElementId:
+    """Halftone every placed instance of a link in view.
+
+    Caller owns the transaction.
+    """
+    inst_ids = _placed_instance_ids(link_record)
+    if view is None or not inst_ids:
         return False, "Link has no placed instance"
     try:
-        ogs = view.GetElementOverrides(inst_id)
-        if ogs is None:
-            ogs = OverrideGraphicSettings()
-        ogs.SetHalftone(bool(halftone))
-        view.SetElementOverrides(inst_id, ogs)
+        for inst_id in inst_ids:
+            ogs = view.GetElementOverrides(inst_id)
+            if ogs is None:
+                ogs = OverrideGraphicSettings()
+            ogs.SetHalftone(bool(halftone))
+            view.SetElementOverrides(inst_id, ogs)
         return True, "Halftone on" if halftone else "Halftone off"
     except Exception as ex:
         return False, str(ex).split("\n")[0]

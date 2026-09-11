@@ -77,9 +77,19 @@ def _load_links_module():
 
 
 class _FakeWorkset(object):
-    def __init__(self, workset_id, name):
+    def __init__(self, workset_id, name, is_open=True):
         self.workset_id = workset_id
         self.name = name
+        self.is_open = is_open
+
+
+class _FakeLinkRecord(object):
+    """Stands in for Snippets._links.LinkRecord in the instance-fan-out tests."""
+
+    def __init__(self, instance_ids, instance_id=None):
+        self.instance_ids = list(instance_ids)
+        self.instance_id = (instance_id if instance_id is not None
+                            else (instance_ids[0] if instance_ids else None))
 
 
 class TestLinkHelpers(unittest.TestCase):
@@ -109,6 +119,35 @@ class TestLinkHelpers(unittest.TestCase):
     def test_split_workset_ids_handles_empty(self):
         self.assertEqual(self.links.split_workset_ids(None, set(), set()), ([], []))
         self.assertEqual(self.links.split_workset_ids([], {'x'}, {'y'}), ([], []))
+
+    def test_workset_config_ids_covers_every_workset(self):
+        """Worksets the grid never listed keep their own state, not "open"."""
+        worksets = [_FakeWorkset(1, 'Shared Levels', is_open=True),
+                    _FakeWorkset(2, 'Furniture', is_open=True),
+                    _FakeWorkset(3, 'Only In This Link', is_open=False),
+                    _FakeWorkset(4, 'Also Only Here', is_open=True)]
+        open_ids, close_ids = self.links.workset_config_ids(
+            worksets, {'Shared Levels'}, {'Furniture'})
+        # 1 ticked open, 4 unlisted but currently open -> open.
+        self.assertEqual(sorted(open_ids), [1, 4])
+        # 2 ticked closed, 3 unlisted and currently closed -> closed.
+        self.assertEqual(sorted(close_ids), [2, 3])
+
+    def test_workset_config_ids_handles_empty(self):
+        self.assertEqual(self.links.workset_config_ids(None, set(), set()), ([], []))
+        self.assertEqual(self.links.workset_config_ids([], {'x'}, {'y'}), ([], []))
+
+    def test_placed_instance_ids_returns_every_instance(self):
+        record = _FakeLinkRecord([11, 12, 13])
+        self.assertEqual(self.links._placed_instance_ids(record), [11, 12, 13])
+
+    def test_placed_instance_ids_falls_back_to_single(self):
+        record = _FakeLinkRecord([], instance_id=7)
+        self.assertEqual(self.links._placed_instance_ids(record), [7])
+
+    def test_placed_instance_ids_of_unplaced_link_is_empty(self):
+        self.assertEqual(self.links._placed_instance_ids(None), [])
+        self.assertEqual(self.links._placed_instance_ids(_FakeLinkRecord([])), [])
 
     def test_display_modes_order(self):
         self.assertEqual(self.links.DISPLAY_MODES,

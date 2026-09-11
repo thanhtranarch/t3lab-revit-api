@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <polygon points="24,12 40,12 40,36 56,36 56,48 8,48 8,36 24,36" fill="#182A3E"/>
-  <line x1="8" y1="56" x2="56" y2="56" stroke="#D07818" stroke-width="4" stroke-linecap="round"/>
-  <line x1="8" y1="52" x2="8" y2="60" stroke="#D07818" stroke-width="4"/>
-  <line x1="56" y1="52" x2="56" y2="60" stroke="#D07818" stroke-width="4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- khoi isometric - mat tren la the tich do duoc -->
+  <polygon points="16,4 30,11 16,18 2,11" fill="#FFAA00" stroke="#464646" stroke-width="1"/>
+  <polygon points="2,11 16,18 16,30 2,23" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <polygon points="30,11 16,18 16,30 30,23" fill="#999999" stroke="#464646" stroke-width="1"/>
 </svg>

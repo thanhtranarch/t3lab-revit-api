@@ -31,8 +31,8 @@ clr.AddReference('PresentationCore')
 clr.AddReference('PresentationFramework')
 clr.AddReference('WindowsBase')
 
-from System.Windows import Visibility
-from System.Windows.Controls import Canvas, TextBlock
+from System.Windows import Visibility, RoutedEventHandler
+from System.Windows.Controls import Canvas, CheckBox, TextBlock
 from System.Windows.Input import Cursors
 from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
 from System.Windows.Shapes import Ellipse, Line
@@ -89,6 +89,10 @@ class GroupRow(object):
         self.record = record
         self._new_name = record.name
         self._manual = False
+        # Plain attribute, not a property: the amber DataTrigger in the XAML
+        # binds straight to it, and GroupRow carries no INotifyPropertyChanged,
+        # so it is only re-read when the grid is refreshed.
+        self.dirty_NewName = False
         self._status_text = status_text
         self._severity = severity
         self._is_selected = bool(is_selected)
@@ -245,11 +249,41 @@ class ManaGroupDialog(T3WPFWindow):
         self._outline_truncated = False
 
         self._load_logo()
+        self._wire_row_events()
         self._init_filters()
         self._reload_model()
         self._loading = False
 
     # ── SETUP ────────────────────────────────────────────────────────────────
+
+    def _wire_row_events(self):
+        """Attach the per-row handlers the XAML cannot attach for itself.
+
+        An event handler written inside a <DataTemplate> is silently never
+        wired: the template owns its own namescope, so the loader's FindName
+        cannot reach the control, and the binding is dropped. Ticking a row
+        therefore left the "N checked" counter, the header tri-state and the
+        rename preview all frozen.
+
+        Click and CellEditEnding both bubble, so one handler on the grid catches
+        every row beneath it — and unlike a template handler, this one is real.
+        """
+        for grid, handler in ((self.grid_rename, self.rename_checkbox_clicked),
+                              (self.grid_workset, self.workset_checkbox_clicked),
+                              (self.grid_cleanup, self.cleanup_checkbox_clicked)):
+            try:
+                grid.AddHandler(CheckBox.ClickEvent, RoutedEventHandler(handler), True)
+            except Exception:
+                pass
+        try:
+            self.list_plot_legend.AddHandler(
+                CheckBox.ClickEvent, RoutedEventHandler(self.plot_legend_toggled), True)
+        except Exception:
+            pass
+        try:
+            self.grid_rename.CellEditEnding += self.new_name_cell_edited
+        except Exception:
+            pass
 
     def _brush(self, key):
         """A brush from the T3 stylesheet, or None if the key is missing."""
@@ -538,6 +572,9 @@ class ManaGroupDialog(T3WPFWindow):
 
         for row in self._ren_rows:
             wanted = (row.NewName or "").strip()
+            # Cleared first: only the rows that survive every check below are
+            # actually going to be written, and those are the ones worth amber.
+            row.dirty_NewName = False
             if not row.IsSelected:
                 row.set_status("Not selected", "Warning")
                 continue
@@ -555,6 +592,7 @@ class ManaGroupDialog(T3WPFWindow):
                 row.set_status("Duplicate name", "Danger")
                 continue
             row.set_status("Will rename", "Success")
+            row.dirty_NewName = True
 
     def _apply_rename(self):
         """Rename every checked group type whose proposed name is valid."""
@@ -910,25 +948,56 @@ class ManaGroupDialog(T3WPFWindow):
     def rule_toggled(self, sender, e):
         self.rule_changed(sender, e)
 
-    def new_name_changed(self, sender, e):
-        """A name typed straight into the grid wins over the rules.
+    def new_name_cell_edited(self, sender, e):
+        """A NEW NAME cell was committed — it wins over the rename rules.
 
-        TextChanged also fires while the grid realises its rows and the binding
-        fills each box, so only a keyboard-focused box counts as a manual edit —
-        otherwise scrolling the grid would pin every name against the rules.
+        Raised by the grid itself, so unlike the old TextChanged handler buried
+        in a DataTemplate it actually fires. The edit is staged only: the row
+        goes amber and Apply Rename is what writes it to the model.
         """
         if getattr(self, '_loading', True):
             return
         try:
-            if not sender.IsKeyboardFocusWithin:
+            from System.Windows.Controls import DataGridEditAction
+            if e.EditAction == DataGridEditAction.Cancel:
                 return
         except Exception:
+            pass
+
+        row = getattr(e, 'Row', None)
+        row = getattr(row, 'Item', None)
+        if not isinstance(row, GroupRow):
             return
-        row = getattr(sender, 'DataContext', None)
-        if isinstance(row, GroupRow):
-            row._manual = True
-            row.NewName = sender.Text
+        try:
+            typed = e.EditingElement.Text
+        except Exception:
+            return
+
+        row._manual = (typed or "").strip() != row.record.name
+        row.NewName = typed
         self._recompute_names()
+        self._update_counts()
+        self._refresh_rename_later()
+
+    def _refresh_rename_later(self):
+        """Repaint the Rename grid once the cell has finished committing.
+
+        GroupRow carries no INotifyPropertyChanged, so the amber DataTrigger
+        only re-reads `dirty_NewName` on a refresh — and refreshing while the
+        cell is still committing throws "not allowed during an EditItem
+        transaction".
+        """
+        try:
+            from System.Windows.Threading import DispatcherPriority
+            from System import Action
+            self.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                Action(lambda: self.grid_rename.Items.Refresh()))
+        except Exception:
+            try:
+                self.grid_rename.Items.Refresh()
+            except Exception:
+                pass
 
     def reset_names_clicked(self, sender, e):
         for row in self._ren_rows:

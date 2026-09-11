@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path d="M12,48 L12,12 A36,36 0 0,1 48,48" fill="none" stroke="#182A3E" stroke-width="4"/>
-  <line x1="12" y1="48" x2="48" y2="48" stroke="#D07818" stroke-width="6"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - lo cua giua hai doan tuong, canh cua mo, nguong ben duoi -->
+  <rect x="2" y="7" width="9" height="6" fill="#999999"/>
+  <rect x="21" y="7" width="9" height="6" fill="#999999"/>
+  <rect x="11.5" y="7.5" width="3" height="14" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="2" y="24" width="28" height="5" fill="#FFAA00"/>
 </svg>

@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="6" y="10" width="52" height="36" rx="6" fill="#182A3E"/>
-  <polygon points="14,46 14,56 26,46" fill="#182A3E"/>
-  <rect x="16" y="22" width="32" height="5" rx="2.5" fill="#D07818"/>
-  <rect x="16" y="33" width="20" height="5" rx="2.5" fill="#EEF2F7" opacity="0.4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - bong thoai gop y -->
+  <polygon points="3.5,4.5 28.5,4.5 28.5,20.5 13.5,20.5 8.5,27.5 8.5,20.5 3.5,20.5" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="7" y="9" width="17" height="2" fill="#999999"/>
+  <rect x="7" y="14" width="12" height="2" fill="#FFAA00"/>
 </svg>

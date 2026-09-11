@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="8" y="12" width="48" height="40" rx="4" fill="none" stroke="#182A3E" stroke-width="4"/>
-  <polygon points="14,44 28,26 38,36 48,22 50,44" fill="#182A3E"/>
-  <circle cx="42" cy="22" r="4" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - anh trong drafting view -->
+  <rect x="3.5" y="5.5" width="25" height="21" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <polygon points="7,23 14,13 19,19 23,15 27,23" fill="#999999"/>
+  <rect x="20" y="8" width="5" height="5" fill="#FFAA00"/>
 </svg>

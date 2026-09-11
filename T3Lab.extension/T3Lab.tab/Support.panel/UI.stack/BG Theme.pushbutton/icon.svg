@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <circle cx="32" cy="32" r="26" fill="#EEF2F7" stroke="#182A3E" stroke-width="4"/>
-  <path d="M32,6 A26,26 0 0,0 32,58 Z" fill="#182A3E"/>
-  <circle cx="32" cy="32" r="6" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - nen chia doi sang/toi, o vuong bao theme dang chon -->
+  <rect x="3.5" y="3.5" width="25" height="25" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="16" y="4" width="12" height="24" fill="#999999"/>
+  <rect x="6" y="20" width="6" height="6" fill="#FFAA00"/>
 </svg>

@@ -1,9 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="6" y="8" width="52" height="12" rx="3" fill="#182A3E"/>
-  <rect x="6" y="26" width="52" height="12" rx="3" fill="#182A3E"/>
-  <rect x="6" y="44" width="52" height="12" rx="3" fill="#182A3E"/>
-  <rect x="6" y="44" width="8" height="12" rx="2" fill="#D07818"/>
-  <circle cx="48" cy="14" r="3" fill="#EEF2F7"/>
-  <circle cx="48" cy="32" r="3" fill="#EEF2F7"/>
-  <circle cx="48" cy="50" r="3" fill="#EEF2F7"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - hai khoi server cua cau MCP, den trang thai ben trai -->
+  <rect x="3.5" y="4.5" width="25" height="8" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="3.5" y="16.5" width="25" height="8" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="6" y="7" width="4" height="3" fill="#FFAA00"/>
+  <rect x="6" y="19" width="4" height="3" fill="#999999"/>
 </svg>

@@ -1,5 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="6" y="10" width="24" height="18" rx="2" fill="#182A3E"/>
-  <rect x="34" y="10" width="24" height="18" rx="2" fill="#182A3E"/>
-  <rect x="18" y="34" width="28" height="18" rx="2" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - cac view xep luoi tren sheet -->
+  <rect x="2.5" y="4.5" width="27" height="23" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="5" y="7" width="10" height="8" fill="#999999"/>
+  <rect x="18" y="7" width="9" height="8" fill="#999999"/>
+  <rect x="5" y="18" width="22" height="7" fill="#FFAA00"/>
 </svg>

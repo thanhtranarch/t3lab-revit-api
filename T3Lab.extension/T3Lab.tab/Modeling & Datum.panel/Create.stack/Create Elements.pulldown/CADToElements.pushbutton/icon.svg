@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <polygon points="12,18 42,10 52,18 22,26" fill="#182A3E"/>
-  <polygon points="12,38 42,30 52,38 22,46" fill="#182A3E"/>
-  <polygon points="12,48 42,40 52,48 22,56" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - hai net CAD song song thanh mot buc tuong -->
+  <rect x="3" y="5" width="26" height="2" fill="#999999"/>
+  <rect x="3" y="10" width="26" height="2" fill="#999999"/>
+  <rect x="3.5" y="18.5" width="25" height="9" fill="#FFAA00" stroke="#464646" stroke-width="1"/>
 </svg>

@@ -147,6 +147,65 @@ workset trong Revit. "Tất cả" ở đó nghĩa là mở/khoá toàn bộ work
 động khác hẳn và phải làm có ý thức trên từng dòng. Khai vào `SELECTALL_EXEMPT`
 trong `dev/audit_t3.py`.
 
+## Sửa trực tiếp trên bảng — ô vàng, ghi khi ấn Apply
+
+Bảng cho sửa ô thì theo đúng ba luật này, không tự chế kiểu khác:
+
+1. **Không bao giờ ghi thẳng vào model lúc gõ.** Ô vừa sửa được *treo*, tô vàng,
+   và chỉ đi vào Revit khi người dùng ấn nút Apply của tab đó.
+2. **Tô từng Ô, không tô cả dòng.** Sửa 2 ô trên 1 dòng thì vàng đúng 2 ô.
+3. **Điều hướng theo BINDING PATH, cấm theo `column.Header`.** Header là chữ hiển
+   thị; đổi chữ header là logic chết câm. `GUI/GridPendingEdits.column_key()` đọc
+   binding path — dùng nó.
+
+```xml
+<DataGridTextColumn Header="SHEET NAME" Binding="{Binding sheet_name}" Width="*">
+  <DataGridTextColumn.CellStyle>
+    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding dirty_sheet_name}" Value="True">
+          <Setter Property="Background"      Value="{StaticResource T3.Warning.Fill}"/>
+          <Setter Property="BorderBrush"     Value="{StaticResource T3.Warning.Accent}"/>
+          <Setter Property="BorderThickness" Value="3,0,0,0"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </DataGridTextColumn.CellStyle>
+</DataGridTextColumn>
+```
+
+Python — `GUI/GridPendingEdits.py` lo phần treo, `init_pending` phải chạy trên
+mọi dòng lúc nạp, nếu không cờ `dirty_*` không tồn tại và DataTrigger **im lặng
+không bao giờ nổ**:
+
+```python
+from GUI import GridPendingEdits as _pend
+SHEET_EDIT_FIELDS = ("sheet_number", "sheet_name")
+
+for row in rows:
+    _pend.init_pending(row, SHEET_EDIT_FIELDS)      # lúc nạp dữ liệu
+
+def _on_cell_edit(self, sender, args):              # grid.CellEditEnding
+    field = _pend.column_key(args.Column)           # KHÔNG dùng args.Column.Header
+    typed = _pend.editor_text(args.EditingElement)
+    if _pend.same_text(typed, getattr(item, field, None)):
+        _pend.unstage(item, field)                  # gõ về như cũ → hết vàng
+    else:
+        _pend.stage(item, field, typed)
+```
+
+### Hai cái bẫy phải biết
+
+- **Handler viết trong `<DataTemplate>` KHÔNG BAO GIỜ chạy.** Template có
+  namescope riêng, `FindName` lúc load không với tới, binding bị bỏ im lặng. Ô
+  sửa được phải là `DataGridTextColumn` (bắt `CellEditEnding` của chính grid),
+  hoặc nối bằng routed event từ Python:
+  `grid.AddHandler(CheckBox.ClickEvent, RoutedEventHandler(handler), True)`.
+- **Dòng không có `INotifyPropertyChanged` thì phải refresh** mới thấy vàng, và
+  refresh ngay trong `CellEditEnding` sẽ ném *"not allowed during an EditItem
+  transaction"*. Đẩy qua dispatcher:
+  `self.Dispatcher.BeginInvoke(DispatcherPriority.Background, Action(lambda: grid.Items.Refresh()))`.
+
 ## Icon — một bộ duy nhất cho toàn extension
 
 Font icon **duy nhất** là `Segoe MDL2 Assets`. Icon **luôn** là một `<TextBlock>` mang

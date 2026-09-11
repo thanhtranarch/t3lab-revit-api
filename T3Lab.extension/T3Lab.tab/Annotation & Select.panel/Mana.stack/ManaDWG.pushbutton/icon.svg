@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="8" y="24" width="36" height="32" rx="3" fill="#182A3E"/>
-  <rect x="20" y="10" width="36" height="32" rx="3" fill="#FFFFFF" stroke="#182A3E" stroke-width="4"/>
-  <line x1="28" y1="20" x2="48" y2="20" stroke="#D07818" stroke-width="4"/>
-  <line x1="28" y1="30" x2="42" y2="30" stroke="#182A3E" stroke-width="4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - file CAD + huy hieu link -->
+  <rect x="2.5" y="6.5" width="16" height="19" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="5" y="10" width="11" height="2" fill="#999999"/>
+  <rect x="5" y="15" width="8" height="2" fill="#999999"/>
+  <rect x="20" y="12" width="9" height="9" fill="#FFAA00"/>
 </svg>

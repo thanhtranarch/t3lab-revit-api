@@ -715,14 +715,22 @@
             </Setter>
           </Style>
 
+          <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
+               có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
+               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
               <Setter.Value>
                 <ControlTemplate TargetType="DataGridCell">
-                  <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                  <Border Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          Padding="{TemplateBinding Padding}">
                     <ContentPresenter VerticalAlignment="Center"/>
                   </Border>
                 </ControlTemplate>
@@ -1728,7 +1736,19 @@
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="VIEW NAME" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding name}" Width="*"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
+                                                                ElementStyle="{StaticResource T3.Cell.Mono}">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_name}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                             <DataGridTextColumn Header="TYPE" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding view_type}" Width="110" IsReadOnly="True"
                                                                 ElementStyle="{StaticResource T3.Cell.Muted}"/>
@@ -1737,15 +1757,63 @@ Binding="{Binding level_name}" Width="100" IsReadOnly="True"
                                                                 ElementStyle="{StaticResource T3.Cell.Muted}"/>
                                             <DataGridComboBoxColumn x:Name="col_template" Header="VIEW TEMPLATE" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Width="160"
-                                                                    SelectedItemBinding="{Binding view_template}"/>
+                                                                    SelectedItemBinding="{Binding view_template}">
+                                                <DataGridComboBoxColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_view_template}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridComboBoxColumn.CellStyle>
+                                            </DataGridComboBoxColumn>
                                             <DataGridTextColumn Header="SCALE 1:" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding scale}" Width="70" IsReadOnly="False"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
+                                                                ElementStyle="{StaticResource T3.Cell.Mono}">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_scale}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                             <DataGridComboBoxColumn x:Name="col_detail" Header="DETAIL LEVEL" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Width="100"
-                                                                    SelectedItemBinding="{Binding detail_level}"/>
+                                                                    SelectedItemBinding="{Binding detail_level}">
+                                                <DataGridComboBoxColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_detail_level}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridComboBoxColumn.CellStyle>
+                                            </DataGridComboBoxColumn>
                                             <DataGridTextColumn Header="TITLE ON SHEET" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding title_on_sheet}" Width="140" IsReadOnly="False"/>
+Binding="{Binding title_on_sheet}" Width="140" IsReadOnly="False">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_title_on_sheet}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                             <DataGridTextColumn Header="SHEET NO." HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding sheet_number}" Width="90" IsReadOnly="True"
                                                                 ElementStyle="{StaticResource T3.Cell.Mono}"/>
@@ -1777,7 +1845,11 @@ Binding="{Binding sheet_number}" Width="90" IsReadOnly="True"
                                         <Button x:Name="views_close_btn" Content="Close"
                                                 Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                         <Button x:Name="views_rename_btn" Content="Batch Rename"
-                                                Style="{StaticResource T3.Button.Primary}" IsDefault="True"/>
+                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                                        <Button x:Name="views_apply_btn" Content="Apply Changes"
+                                                Style="{StaticResource T3.Button.Primary}" IsDefault="True"
+                                                IsEnabled="False"
+                                                ToolTip="Write every amber cell to the model"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -1928,8 +2000,20 @@ Binding="{Binding sheet_number}" Width="90" IsReadOnly="True"
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="TEMPLATE NAME" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding name}" Width="*" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
+Binding="{Binding name}" Width="*"
+                                                                ElementStyle="{StaticResource T3.Cell.Mono}">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_name}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                             <DataGridTextColumn Header="VIEW TYPE" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding view_type}" Width="130" IsReadOnly="True"
                                                                 ElementStyle="{StaticResource T3.Cell.Muted}"/>
@@ -1972,7 +2056,13 @@ Binding="{Binding usage_percentage}" Width="80" IsReadOnly="True"
                                         <Button x:Name="tmpl_del_btn" Content="Delete Unused"
                                                 Style="{StaticResource T3.Button.Danger}" Margin="0,0,8,0"/>
                                         <Button x:Name="tmpl_close_btn" Content="Close"
-                                                Style="{StaticResource T3.Button.Secondary}"/>
+                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                                        <!-- Secondary, not Primary: the window already carries its one
+                                             T3.Button.Primary on the Views tab footer. -->
+                                        <Button x:Name="tmpl_apply_btn" Content="Apply Changes"
+                                                Style="{StaticResource T3.Button.Secondary}"
+                                                IsEnabled="False"
+                                                ToolTip="Write every amber cell to the model"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>

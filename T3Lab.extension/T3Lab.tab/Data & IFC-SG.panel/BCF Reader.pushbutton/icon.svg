@@ -1,6 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <polygon points="12,8 42,8 52,18 52,56 12,56" fill="#182A3E"/>
-  <polygon points="42,8 42,18 52,18" fill="#EEF2F7"/>
-  <rect x="24" y="32" width="32" height="20" rx="4" fill="#D07818"/>
-  <polygon points="44,52 44,58 50,52" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- danh sach issue, mot issue dang mo -->
+  <rect x="3.5" y="5.5" width="25" height="21" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="7" y="10" width="4" height="4" fill="#FFAA00"/>
+  <rect x="14" y="11" width="12" height="2" fill="#999999"/>
+  <rect x="7" y="18" width="4" height="4" fill="#999999"/>
+  <rect x="14" y="19" width="12" height="2" fill="#999999"/>
 </svg>

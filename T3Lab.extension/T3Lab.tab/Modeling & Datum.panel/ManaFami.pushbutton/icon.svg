@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="6" y="10" width="14" height="18" rx="2" fill="#182A3E"/>
-  <rect x="25" y="10" width="14" height="18" rx="2" fill="#182A3E"/>
-  <rect x="44" y="10" width="14" height="18" rx="2" fill="#182A3E"/>
-  <rect x="6" y="36" width="14" height="18" rx="2" fill="#182A3E"/>
-  <rect x="25" y="36" width="14" height="18" rx="2" fill="#D07818"/>
-  <rect x="44" y="36" width="14" height="18" rx="2" fill="#182A3E"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- bo family - mot type dang chon -->
+  <rect x="3.5" y="3.5" width="25" height="25" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="6" y="6" width="9" height="9" fill="#FFAA00"/>
+  <rect x="17" y="6" width="9" height="9" fill="#999999"/>
+  <rect x="6" y="17" width="9" height="9" fill="#999999"/>
+  <rect x="17" y="17" width="9" height="9" fill="#999999"/>
 </svg>

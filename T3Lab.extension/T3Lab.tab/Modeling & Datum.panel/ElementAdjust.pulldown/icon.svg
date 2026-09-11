@@ -1,5 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <line x1="12" y1="32" x2="52" y2="32" stroke="#182A3E" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="24" cy="32" r="10" fill="#182A3E"/>
-  <circle cx="44" cy="32" r="10" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- phan tu + 4 tay nam chinh -->
+  <rect x="8.5" y="8.5" width="15" height="15" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="2" y="2" width="5" height="5" fill="#FFAA00"/>
+  <rect x="25" y="2" width="5" height="5" fill="#FFAA00"/>
+  <rect x="2" y="25" width="5" height="5" fill="#FFAA00"/>
+  <rect x="25" y="25" width="5" height="5" fill="#FFAA00"/>
 </svg>

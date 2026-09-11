@@ -67,6 +67,8 @@ try:
         "System",
         "System.IO",
         "System.Xml",
+        "System.Xml.ReaderWriter",
+        "System.Private.Xml",
         "WindowsBase",
         "PresentationCore",
         "PresentationFramework",
@@ -393,99 +395,129 @@ class T3WPFWindow(Window):
             self.setup_default_handlers()
 
     def _load_via_xaml_reader(self, xaml_content):
-        """Hydrates Window via System.Windows.Markup.XamlReader."""
+        """Hydrates Window via System.Windows.Markup.XamlReader with multi-strategy fallbacks."""
         if xaml_content is not None:
             xaml_content = xaml_content.lstrip('\ufeff \t\r\n')
         clean_xaml, event_bindings, named_elements = _sanitize_xaml(xaml_content)
 
         loaded_win = None
-        xr = XamlReader
-        # Re-resolve when the module-level capture is unusable. `XamlReader` is
-        # read once at import time, and this module lives in a PERSISTENT
-        # CPython engine: if PresentationFramework was not loadable on that very
-        # first import, a None gets baked in for the rest of the Revit session
-        # and every window after it fails for a reason that has since gone away.
-        # Missing `Parse` counts as unusable too, not just None.
-        if xr is None or not hasattr(xr, 'Parse'):
-            try:
-                import clr
-                clr.AddReference("PresentationFramework")
-                from System.Windows.Markup import XamlReader as _xr
-                if _xr is not None and hasattr(_xr, 'Parse'):
-                    xr = _xr
-            except Exception:
-                pass
+        errors = []
 
-        # The real XAML error surfaces here. Swallowing it sent every failure
-        # down the XmlReader fallback below, which then died with a misleading
-        # "XmlReader has no attribute Create" and hid the actual cause.
-        parse_error = None
-        if xr is not None and hasattr(xr, 'Parse'):
+        # ── Strategy 1: Direct System.Windows.Markup.XamlReader.Parse ──
+        try:
+            from System.Windows.Markup import XamlReader as _xr_direct
+            if _xr_direct is not None and hasattr(_xr_direct, 'Parse'):
+                loaded_win = _xr_direct.Parse(clean_xaml)
+        except Exception as ex:
+            errors.append("XamlReader.Parse: {}".format(ex))
+            loaded_win = None
+
+        # ── Strategy 2: Direct MemoryStream -> XamlReader.Load(Stream) ──
+        if loaded_win is None:
             try:
-                loaded_win = xr.Parse(clean_xaml)
+                import System.IO
+                import System.Text
+                from System.Windows.Markup import XamlReader as _xr_direct
+                if _xr_direct is not None and hasattr(_xr_direct, 'Load'):
+                    raw_bytes = System.Text.Encoding.UTF8.GetBytes(clean_xaml)
+                    ms = System.IO.MemoryStream(raw_bytes)
+                    loaded_win = _xr_direct.Load(ms)
             except Exception as ex:
-                parse_error = ex
+                errors.append("XamlReader.Load(Stream): {}".format(ex))
                 loaded_win = None
 
+        # ── Strategy 3: AppDomain Reflection for PresentationFramework XamlReader ──
         if loaded_win is None:
-            sr = StringReader
-            if sr is None:
-                try:
-                    from System.IO import StringReader as sr
-                except Exception:
-                    sr = None
+            try:
+                import System
+                import clr
+                xr_type = None
+                # Search PresentationFramework specifically
+                for asm in System.AppDomain.CurrentDomain.GetAssemblies():
+                    try:
+                        asm_name = asm.FullName or ""
+                        if asm_name.startswith("PresentationFramework"):
+                            t = asm.GetType("System.Windows.Markup.XamlReader")
+                            if t is not None:
+                                xr_type = t
+                                break
+                    except Exception:
+                        continue
 
-            # On .NET Core / Revit 2026 the System.Xml facade can resolve to an
-            # XmlReader without the static Create overloads, so test for the
-            # member rather than for None.
-            xml_r = XmlReader
-            if xml_r is None or not hasattr(xml_r, 'Create'):
+                # Fallback: search all loaded assemblies
+                if xr_type is None:
+                    for asm in System.AppDomain.CurrentDomain.GetAssemblies():
+                        try:
+                            t = asm.GetType("System.Windows.Markup.XamlReader")
+                            if t is not None:
+                                xr_type = t
+                                break
+                        except Exception:
+                            continue
+
+                if xr_type is not None:
+                    # 3a. Reflection Parse(string)
+                    try:
+                        str_type = clr.GetClrType(System.String) if hasattr(clr, 'GetClrType') else System.String
+                        parse_m = xr_type.GetMethod("Parse", System.Array[System.Type]([str_type]))
+                        if parse_m is not None:
+                            loaded_win = parse_m.Invoke(None, System.Array[System.Object]([clean_xaml]))
+                    except Exception as ex:
+                        errors.append("Reflection XamlReader.Parse: {}".format(ex))
+
+                    # 3b. Reflection Load(Stream)
+                    if loaded_win is None:
+                        try:
+                            import System.IO
+                            import System.Text
+                            raw_bytes = System.Text.Encoding.UTF8.GetBytes(clean_xaml)
+                            ms = System.IO.MemoryStream(raw_bytes)
+                            for m in xr_type.GetMethods():
+                                if m.Name == "Load":
+                                    params = m.GetParameters()
+                                    if len(params) == 1 and params[0].ParameterType.Name == "Stream":
+                                        loaded_win = m.Invoke(None, System.Array[System.Object]([ms]))
+                                        break
+                        except Exception as ex:
+                            errors.append("Reflection XamlReader.Load(Stream): {}".format(ex))
+            except Exception as ex:
+                errors.append("AppDomain reflection: {}".format(ex))
+
+        # ── Strategy 4: XmlReader.Create + XamlReader.Load(XmlReader) ──
+        if loaded_win is None:
+            try:
+                import System.IO
+                from System.Windows.Markup import XamlReader as _xr
+                xml_r = None
                 try:
-                    import clr
-                    clr.AddReference("System.Xml")
-                    clr.AddReference("System.Private.Xml")
                     from System.Xml import XmlReader as xml_r
                 except Exception:
                     pass
-                if xml_r is not None and not hasattr(xml_r, 'Create'):
-                    xml_r = None
-
-            if xr is not None and sr is not None and xml_r is not None:
-                try:
-                    string_reader = sr(clean_xaml)
-                    xml_reader = xml_r.Create(string_reader)
-                    loaded_win = xr.Load(xml_reader)
-                except Exception as ex:
-                    if parse_error is None:
-                        parse_error = ex
-                    loaded_win = None
+                if xml_r is None or not hasattr(xml_r, 'Create'):
+                    import clr
+                    for ref in ("System.Xml.ReaderWriter", "System.Private.Xml", "System.Xml"):
+                        try:
+                            clr.AddReference(ref)
+                        except Exception:
+                            pass
+                    try:
+                        from System.Xml import XmlReader as xml_r
+                    except Exception:
+                        pass
+                if xml_r is not None and hasattr(xml_r, 'Create') and _xr is not None and hasattr(_xr, 'Load'):
+                    sr = System.IO.StringReader(clean_xaml)
+                    xml_reader = xml_r.Create(sr)
+                    loaded_win = _xr.Load(xml_reader)
+            except Exception as ex:
+                errors.append("XmlReader.Create + Load: {}".format(ex))
 
         if loaded_win is None:
-            if parse_error is not None:
-                raise RuntimeError(
-                    "Failed to parse XAML for {}:\n{}{}".format(
-                        getattr(self, '_xaml_source', '<inline XAML>'),
-                        parse_error, stale_module_note()))
-            # No exception AND no window: the parser never ran, or it returned
-            # null. Report which piece was actually missing — the old message
-            # blamed PresentationFramework without checking, which sent the
-            # investigation after a XAML bug that did not exist.
+            err_msg = "\n  - ".join(errors) if errors else "XAML parser returned None without error"
             raise RuntimeError(
-                "Failed to build the window from {}: the XAML parser produced "
-                "nothing and raised nothing.\n"
-                "  XamlReader       : {}\n"
-                "  XamlReader.Parse : {}\n"
-                "  StringReader     : {}\n"
-                "  XmlReader.Create : {}\n"
-                "  sanitised XAML   : {} chars, starts {!r}".format(
+                "Failed to parse XAML for {}:\n  - {}{}".format(
                     getattr(self, '_xaml_source', '<inline XAML>'),
-                    "resolved" if xr is not None else "MISSING",
-                    "present" if (xr is not None and hasattr(xr, 'Parse')) else "MISSING",
-                    "resolved" if StringReader is not None else "MISSING",
-                    "present" if (XmlReader is not None
-                                  and hasattr(XmlReader, 'Create')) else "MISSING",
-                    len(clean_xaml or ""), (clean_xaml or "")[:60])
-                + stale_module_note())
+                    err_msg,
+                    stale_module_note()))
 
         # Copy essential window properties
         for prop in ('Title', 'Width', 'Height', 'MinWidth', 'MinHeight',

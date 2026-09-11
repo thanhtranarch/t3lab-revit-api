@@ -715,14 +715,22 @@
             </Setter>
           </Style>
 
+          <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
+               có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
+               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
               <Setter.Value>
                 <ControlTemplate TargetType="DataGridCell">
-                  <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                  <Border Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          Padding="{TemplateBinding Padding}">
                     <ContentPresenter VerticalAlignment="Center"/>
                   </Border>
                 </ControlTemplate>
@@ -1655,16 +1663,27 @@
                                         <DataGridTextColumn Header="PLACED" Width="80" IsReadOnly="True"
                                                             Binding="{Binding InstanceCount}"
                                                             ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                        <DataGridTemplateColumn Header="NEW NAME" Width="300" CanUserSort="False">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <TextBox Height="24" Margin="0,0,8,0"
-                                                             Style="{StaticResource T3.TextBox}"
-                                                             Text="{Binding NewName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                             TextChanged="new_name_changed"/>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
+                                        <!-- A plain text column, not a template column holding a TextBox:
+                                             an event handler declared inside a DataTemplate is never wired
+                                             up (the template has its own namescope, so the loader's
+                                             FindName cannot see the control), which is why typing here
+                                             used to leave the row's status and _manual flag untouched.
+                                             A DataGridTextColumn raises the grid's own CellEditEnding,
+                                             which IS reachable. Amber = staged, waiting for Apply Rename. -->
+                                        <DataGridTextColumn Header="NEW NAME" Width="300" CanUserSort="False"
+                                                            Binding="{Binding NewName, Mode=TwoWay}">
+                                            <DataGridTextColumn.CellStyle>
+                                                <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding dirty_NewName}" Value="True">
+                                                            <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                            <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </DataGridTextColumn.CellStyle>
+                                        </DataGridTextColumn>
                                         <DataGridTemplateColumn Header="STATUS" Width="150"
                                                                 CellTemplate="{StaticResource T3.StatusPill}"/>
                                     </DataGrid.Columns>

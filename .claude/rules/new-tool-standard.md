@@ -34,7 +34,10 @@ Không có pattern nào vừa → dừng lại, ghi `DESIGN SYSTEM GAP` vào
 T3Lab.extension/
 ├── T3Lab.tab/<Panel>.panel/<Tool>.pushbutton/
 │   ├── script.py          ← entry point, KHÔNG chứa logic Revit nặng
-│   ├── icon.png           ← 32×32
+│   ├── icon.svg           ← NGUỒN DUY NHẤT, viewBox "0 0 32 32"
+│   ├── icon.dark.svg      ← sinh tự động, KHÔNG sửa tay
+│   ├── icon.png           ← sinh tự động, 64×64
+│   ├── icon.dark.png      ← sinh tự động, 64×64
 │   └── bundle.yaml        ← title + tooltip
 ├── lib/GUI/Tools/<Tool>.xaml       ← MỌI file .xaml nằm ở đây, không ngoại lệ
 ├── lib/GUI/<Tool>Dialog.py         ← class WPF (nếu tool đủ lớn để tách)
@@ -43,6 +46,11 @@ T3Lab.extension/
 
 **Tách bạch bắt buộc:** XAML không biết gì về Revit API; `script.py` / `*Dialog.py`
 không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy vào `lib/Snippets/`.
+
+**Icon ribbon:** chỉ vẽ `icon.svg` theo
+`docs/ui-governance/09-ribbon-icon-standard.md`, rồi chạy
+`python3 dev/build_icons.py` để sinh ba file còn lại. Tuyệt đối không vẽ tay
+`icon.dark.svg` hay `*.png` — lần build sau ghi đè. `Support.panel` được miễn trừ.
 
 ---
 
@@ -194,6 +202,8 @@ if __name__ == '__main__':
 [ ] python3 dev/audit_t3.py --quiet      → xanh (0 vi phạm)
 [ ] python3 dev/audit_tools.py --quiet   → xanh (clean)
 [ ] python3 dev/audit_cpython.py --quiet → 0 P0 (bẫy migration CPython)
+[ ] python3 dev/build_icons.py --check   → không lệch (icon đã build)
+[ ] python3 dev/audit_icons.py --quiet   → xanh (0 lỗi)
 [ ] python3 dev/check_xaml_load.py --out %TEMP%\t3xaml  → 0 hỏng sau sanitise
 [ ] powershell -STA -File dev/check_xaml_wpf.ps1 -Dir %TEMP%\t3xaml → 0 FAILED
 [ ] Pattern P1–P5 rõ ràng, size class đúng S/M/L

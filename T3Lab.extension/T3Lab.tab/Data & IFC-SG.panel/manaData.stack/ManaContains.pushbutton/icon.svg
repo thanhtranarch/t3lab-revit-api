@@ -1,5 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="8" y="8" width="48" height="48" rx="6" fill="none" stroke="#182A3E" stroke-width="4"/>
-  <rect x="18" y="18" width="16" height="16" rx="2" fill="#182A3E"/>
-  <rect x="36" y="36" width="12" height="12" rx="2" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - container chua phan tu -->
+  <rect x="3.5" y="5.5" width="25" height="21" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="7" y="9" width="7" height="7" fill="#999999"/>
+  <rect x="18" y="9" width="7" height="7" fill="#999999"/>
+  <rect x="7" y="19" width="7" height="4" fill="#FFAA00"/>
 </svg>

@@ -1,8 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <circle cx="32" cy="32" r="20" fill="none" stroke="#182A3E" stroke-width="8"/>
-  <rect x="28" y="4" width="8" height="8" fill="#182A3E"/>
-  <rect x="28" y="52" width="8" height="8" fill="#182A3E"/>
-  <rect x="4" y="28" width="8" height="8" fill="#182A3E"/>
-  <rect x="52" y="28" width="8" height="8" fill="#182A3E"/>
-  <polygon points="28,22 42,32 28,42" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- khung lam viec + nut chay -->
+  <rect x="4.5" y="4.5" width="23" height="23" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <polygon points="13,10 24,16 13,22" fill="#FFAA00"/>
 </svg>

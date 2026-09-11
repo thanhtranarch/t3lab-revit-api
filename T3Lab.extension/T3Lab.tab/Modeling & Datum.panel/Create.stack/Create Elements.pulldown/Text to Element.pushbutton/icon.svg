@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path d="M8,48 L18,12 L28,48 M12,38 L24,38" fill="none" stroke="#182A3E" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="46,26 58,32 58,48 46,54 34,48 34,32" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - noi dung text chay ngang sang parameter cua phan tu -->
+  <rect x="2" y="7" width="13" height="2" fill="#999999"/>
+  <rect x="2" y="12" width="10" height="2" fill="#999999"/>
+  <polygon points="16,8 22,13 16,18" fill="#FFAA00"/>
+  <rect x="23.5" y="6.5" width="6" height="14" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
 </svg>

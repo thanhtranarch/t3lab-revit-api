@@ -72,6 +72,13 @@ XAML_FILE = os.path.join(GUI_DIR, 'Tools', 'ManaSheets.xaml')
 
 from GUI.ProgressPauseMixin import ProgressPauseMixin
 from GUI.DataGridColumnFilter import ColumnFilterController
+from GUI import GridPendingEdits as _pend
+
+# Row fields the grid lets the user edit. Each needs a matching `dirty_<field>`
+# flag on the row and a CellStyle DataTrigger in ManaSheets.xaml bound to it,
+# otherwise the amber "waiting for Apply" highlight never shows.
+SHEET_EDIT_FIELDS = ("sheet_number", "sheet_name", "designed_by",
+                     "checked_by", "approved_by", "drawn_by")
 
 
 # =====================================================
@@ -309,6 +316,8 @@ class SheetManagerWindow(T3WPFWindow):
     # ── SHEETS Tab Logics ─────────────────────────────────────────
     def _load_sheets_data(self):
         self.all_sheets = self.revit_service.get_all_sheets()
+        for item in self.all_sheets:
+            _pend.init_pending(item, SHEET_EDIT_FIELDS)
         self.change_tracker.clear_all()
         self._update_sheets_summary()
 
@@ -352,7 +361,14 @@ class SheetManagerWindow(T3WPFWindow):
                 categories.add(s.designed_by)
         self.sheets_categories_text.Text = str(len(categories)) if categories else "1"
         
-        self.sheets_changes_text.Text = str(len(self.change_tracker.modified_items))
+        # Count the amber cells, not the tracked rows: two edits on one sheet is
+        # two pending changes to the person looking at the grid.
+        pending_cells = _pend.pending_count(self.all_sheets)
+        self.sheets_changes_text.Text = str(pending_cells)
+        try:
+            self.sheets_apply_btn.IsEnabled = pending_cells > 0
+        except Exception:
+            pass
 
     def _on_sheets_search_changed(self, sender, args):
         self._apply_sheets_filters()
@@ -381,61 +397,82 @@ class SheetManagerWindow(T3WPFWindow):
         self._update_sheets_summary()
 
     def _on_sheets_cell_edit(self, sender, args):
+        """Stage the edit and paint the cell amber. Apply Changes writes it.
+
+        Dispatch is on the column's BINDING PATH. This used to compare
+        `column.Header` against "Sheet Number" while the XAML said "NUMBER", so
+        no branch ever matched: nothing was tracked, the amber never appeared,
+        and Apply kept reporting "No pending changes to apply" however much the
+        user had typed.
+        """
         from System.Windows.Controls import DataGridEditAction
         if args.EditAction == DataGridEditAction.Cancel:
             return
-            
+
         try:
             item = args.Row.Item
-            column = args.Column
-            
-            # Edit sheet number
-            if column.Header == "Sheet Number":
-                new_val = args.EditingElement.Text
-                if item.sheet_number != new_val:
-                    item.sheet_number = new_val
-                    item.check_if_modified()
-                    self.change_tracker.track_modification(item)
-                    
-            # Edit sheet name
-            elif column.Header == "Sheet Name":
-                new_val = args.EditingElement.Text
-                if item.sheet_name != new_val:
-                    item.sheet_name = new_val
-                    item.check_if_modified()
-                    self.change_tracker.track_modification(item)
-                    
-            # Edit designed_by
-            elif column.Header == "Designed By":
-                new_val = args.EditingElement.Text
-                item.designed_by = new_val
-                item.is_modified = True
+            field = _pend.column_key(args.Column)
+            if not field or field not in SHEET_EDIT_FIELDS:
+                return
+
+            typed = _pend.editor_text(args.EditingElement)
+            current = getattr(item, field, None)
+
+            if _pend.same_text(typed, current):
+                _pend.unstage(item, field)      # typed it back to how it was
+            elif field in ("sheet_number", "sheet_name") and not (typed or "").strip():
+                # Revit refuses both outright, so the cell is bounced here
+                # rather than at Apply time when it is buried among the rest.
+                _pend.revert_editor(args.EditingElement, current)
+                self._set_status(
+                    "A sheet number and a sheet name cannot be empty — "
+                    "the cell was left unchanged.")
+                return
+            else:
+                _pend.stage(item, field, typed)
+                # The binding writes `typed` into the row right after this
+                # returns, so the row already carries the new value; the tracker
+                # just needs to know the row is dirty for Apply to pick it up.
                 self.change_tracker.track_modification(item)
-                
-            # Edit checked_by
-            elif column.Header == "Checked By":
-                new_val = args.EditingElement.Text
-                item.checked_by = new_val
-                item.is_modified = True
-                self.change_tracker.track_modification(item)
-                
-            # Edit approved_by
-            elif column.Header == "Approved By":
-                new_val = args.EditingElement.Text
-                item.approved_by = new_val
-                item.is_modified = True
-                self.change_tracker.track_modification(item)
-                
-            # Edit drawn_by
-            elif column.Header == "Drawn By":
-                new_val = args.EditingElement.Text
-                item.drawn_by = new_val
-                item.is_modified = True
-                self.change_tracker.track_modification(item)
-                
+
+            if not _pend.has_pending(item):
+                self._untrack(item)
+
+            self._refresh_sheets_grid_later()
             self._update_sheets_summary()
         except Exception as e:
-            MessageBox.Show("Error editing sheet parameter: {}".format(str(e)), "Error")
+            self._set_status("Could not read that edit: {}".format(str(e)))
+
+    def _untrack(self, item):
+        """Drop a row from the tracker once its last amber cell is gone."""
+        try:
+            item.check_if_modified()
+        except Exception:
+            pass
+        try:
+            self.change_tracker.modified_items.remove(item)
+        except Exception:
+            pass
+
+    def _refresh_sheets_grid_later(self):
+        """Redraw once the edit has finished committing.
+
+        SheetModel carries no INotifyPropertyChanged, so the amber DataTrigger
+        only re-reads `dirty_<field>` on a refresh — and calling Refresh() while
+        the cell is still committing throws "not allowed during an EditItem
+        transaction". Hence the trip through the dispatcher.
+        """
+        try:
+            from System.Windows.Threading import DispatcherPriority
+            from System import Action
+            self.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                Action(lambda: self.sheets_grid.Items.Refresh()))
+        except Exception:
+            try:
+                self.sheets_grid.Items.Refresh()
+            except Exception:
+                pass
 
     def _on_sheets_sets(self, sender, args):
         if self.sheet_sets_service:
@@ -584,13 +621,23 @@ class SheetManagerWindow(T3WPFWindow):
         self._apply_sheets_filters()
 
     def _on_sheets_apply(self, sender, args):
-        if not self.change_tracker.has_changes():
-            MessageBox.Show("No pending changes to apply.", "Info", MessageBoxButton.OK, MessageBoxImage.Information)
+        # Drive off the staged cells, not the tracker alone: the tracker is a
+        # row-level flag, while what the user sees waiting on screen is the
+        # amber cells. Keeping the two in step is what makes the counter honest.
+        staged = _pend.pending_rows(self.all_sheets)
+        for item in staged:
+            self.change_tracker.track_modification(item)
+        if not staged:
+            MessageBox.Show("No pending changes to apply.", "Info",
+                            MessageBoxButton.OK, MessageBoxImage.Information)
             return
-            
-        modified = len(self.change_tracker.modified_items)
-        msg = "Apply changes?\n\nModified Sheets: {}".format(modified)
-        
+
+        modified = len(staged)
+        cells = _pend.pending_count(self.all_sheets)
+        msg = "Apply {} edited cell{} on {} sheet{}?".format(
+            cells, "" if cells == 1 else "s",
+            modified, "" if modified == 1 else "s")
+
         result = MessageBox.Show(msg, "Confirm Changes", MessageBoxButton.YesNo, MessageBoxImage.Question)
         if result == MessageBoxResult.Yes:
             t = Transaction(self.doc, "Apply Sheet Manager Changes")
@@ -619,6 +666,7 @@ class SheetManagerWindow(T3WPFWindow):
                         # Update Number & Name
                         if self.revit_service.update_sheet(item):
                             item.commit_changes()
+                            _pend.clear_pending(item)
                             success += 1
                         else:
                             failed += 1

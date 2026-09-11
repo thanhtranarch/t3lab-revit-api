@@ -715,14 +715,22 @@
             </Setter>
           </Style>
 
+          <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
+               có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
+               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
               <Setter.Value>
                 <ControlTemplate TargetType="DataGridCell">
-                  <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                  <Border Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          Padding="{TemplateBinding Padding}">
                     <ContentPresenter VerticalAlignment="Center"/>
                   </Border>
                 </ControlTemplate>
@@ -1719,21 +1727,93 @@
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="NUMBER" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding sheet_number}" Width="120"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
+                                                                ElementStyle="{StaticResource T3.Cell.Mono}">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_sheet_number}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                             <DataGridTextColumn Header="SHEET NAME" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding sheet_name}" Width="*"/>
+Binding="{Binding sheet_name}" Width="*">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_sheet_name}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                             <DataGridTextColumn Header="DESIGNED BY" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding designed_by}" Width="120"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
+                                                                ElementStyle="{StaticResource T3.Cell.Muted}">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_designed_by}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                             <DataGridTextColumn Header="CHECKED BY" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding checked_by}" Width="120"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
+                                                                ElementStyle="{StaticResource T3.Cell.Muted}">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_checked_by}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                             <DataGridTextColumn Header="APPROVED BY" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding approved_by}" Width="120"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
+                                                                ElementStyle="{StaticResource T3.Cell.Muted}">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_approved_by}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                             <DataGridTextColumn Header="DRAWN BY" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
 Binding="{Binding drawn_by}" Width="110"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
+                                                                ElementStyle="{StaticResource T3.Cell.Muted}">
+                                                <DataGridTextColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding dirty_drawn_by}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.CellStyle>
+                                            </DataGridTextColumn>
                                         </DataGrid.Columns>
                                     </DataGrid>
 

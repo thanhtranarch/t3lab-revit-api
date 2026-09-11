@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="8" y="8" width="48" height="24" rx="4" fill="none" stroke="#182A3E" stroke-width="4"/>
-  <rect x="8" y="44" width="48" height="12" rx="2" fill="#D07818"/>
-  <path d="M32,24 L32,38 M26,32 L32,38 L38,32" fill="none" stroke="#182A3E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B - room o tren thanh san o duoi -->
+  <rect x="3.5" y="4.5" width="25" height="11" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <polygon points="12,17 20,17 16,21" fill="#FFAA00"/>
+  <rect x="3.5" y="22.5" width="25" height="6" fill="#999999" stroke="#464646" stroke-width="1"/>
 </svg>

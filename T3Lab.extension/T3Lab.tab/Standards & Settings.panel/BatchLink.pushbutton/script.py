@@ -1,6 +1,6 @@
 #! python3
 # -*- coding: utf-8 -*-
-"""Batch Link — Link Revit models, manage their worksets and per-view display."""
+"""Batch Link — Link Revit models, set their workset in this model, and their per-view display."""
 
 __title__   = "Batch\nLink"
 __author__  = "Tran Tien Thanh"
@@ -54,17 +54,27 @@ from pyrevit import revit
 
 # ── ENTRY POINT ──────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    try:
-        doc = revit.doc
-    except Exception:
-        doc = None
+    # `revit.doc` on its own is a getattr chain that yields None whenever this
+    # engine has no active document -- which is NOT the same thing as "no model
+    # is open", and it made the tool refuse to start with a project loaded.
+    # Snippets._host.resolve_doc walks the real fallback chain (revit.doc ->
+    # ActiveUIDocument -> the single open model) and returns a message worth
+    # showing when there genuinely is nothing to act on.
+    from Snippets._host import resolve_doc
+    doc, doc_error = resolve_doc()
 
     if not doc:
         from GUI.T3Dialog import show_warning
         show_warning(
-            "Open a Revit project before running Batch Link.",
+            doc_error or "Open a Revit project before running Batch Link.",
             title="Batch Link",
             details="Batch Link needs an active document to read its links from.")
+    elif doc.IsFamilyDocument:
+        from GUI.T3Dialog import show_warning
+        show_warning(
+            "Batch Link works on projects, not on family documents.",
+            title="Batch Link",
+            details="Open the project the models should be linked into, then run it again.")
     else:
         from GUI.BatchLinkDialog import show_batch_link
         show_batch_link(doc)

@@ -1,22 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-<!-- Back view layers -->
-<rect x="2" y="18" width="40" height="30" rx="4" fill="#3A5C7A"/>
-<rect x="6" y="11" width="40" height="30" rx="4" fill="#28445E"/>
-<!-- Main view (front, white) -->
-<rect x="14" y="4" width="48" height="38" rx="4" fill="#EEF2F7"/>
-<!-- Orange active header -->
-<rect x="14" y="4" width="48" height="10" rx="4" fill="#D07818"/>
-<rect x="14" y="10" width="48" height="4" fill="#D07818"/>
-<!-- 4-quadrant viewport grid -->
-<line x1="38" y1="14" x2="38" y2="42" stroke="#CBD5E1" stroke-width="2"/>
-<line x1="14" y1="28" x2="62" y2="28" stroke="#CBD5E1" stroke-width="2"/>
-<!-- Small view type indicators in each quadrant -->
-<rect x="17" y="17" width="18" height="9" rx="2" fill="#D8E4EF"/>
-<rect x="41" y="17" width="18" height="9" rx="2" fill="#C8D8EB"/>
-<rect x="17" y="31" width="18" height="9" rx="2" fill="#B8CCE0"/>
-<rect x="41" y="31" width="18" height="9" rx="2" fill="#A8C0D0"/>
-<!-- Status bar -->
-<rect x="14" y="48" width="48" height="12" rx="4" fill="#182A3E"/>
-<rect x="18" y="52" width="20" height="3" rx="1.5" fill="#5A7290"/>
-<rect x="52" y="52" width="6" height="3" rx="1.5" fill="#D07818"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- cua so view + 4 khung nhin -->
+  <rect x="3.5" y="5.5" width="25" height="21" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="4" y="6" width="24" height="4" fill="#FFAA00"/>
+  <rect x="4" y="12" width="11" height="6" fill="#999999"/>
+  <rect x="17" y="12" width="11" height="6" fill="#999999"/>
+  <rect x="4" y="20" width="11" height="6" fill="#999999"/>
+  <rect x="17" y="20" width="11" height="6" fill="#999999"/>
 </svg>

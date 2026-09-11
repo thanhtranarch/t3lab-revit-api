@@ -1,32 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-<!-- Arrow box (left) — import action -->
-<rect x="2" y="14" width="24" height="34" rx="5" fill="#182A3E"/>
-<!-- Arrow shaft -->
-<rect x="5" y="28.5" width="11" height="5" rx="2.5" fill="white"/>
-<!-- Arrow head -->
-<polygon points="14,22 28,31 14,40" fill="white"/>
-<!-- PDF Document (right) -->
-<rect x="24" y="6" width="36" height="50" rx="4" fill="white"/>
-<rect x="24" y="6" width="36" height="50" rx="4" fill="none" stroke="#C8D8E8" stroke-width="1.5"/>
-<!-- Folded corner top-right -->
-<polygon points="46,6 60,6 60,19" fill="#E0EAF5"/>
-<line x1="46" y1="6" x2="60" y2="19" stroke="#C8D8E8" stroke-width="1.5"/>
-<!-- PDF red band -->
-<rect x="24" y="17" width="36" height="12" fill="#D85050"/>
-<!-- P -->
-<rect x="28" y="20" width="3" height="6" rx="0.5" fill="white"/>
-<rect x="28" y="20" width="6.5" height="2" rx="0.5" fill="white"/>
-<rect x="28" y="24" width="6.5" height="1.8" rx="0.5" fill="white"/>
-<!-- D -->
-<rect x="37" y="20" width="3" height="6" rx="0.5" fill="white"/>
-<rect x="40" y="21" width="3" height="4" rx="1.5" fill="white"/>
-<!-- F -->
-<rect x="46" y="20" width="3" height="6" rx="0.5" fill="white"/>
-<rect x="46" y="20" width="7" height="2" rx="0.5" fill="white"/>
-<rect x="46" y="24" width="5" height="1.8" rx="0.5" fill="white"/>
-<!-- Document content lines -->
-<rect x="28" y="33" width="24" height="2" rx="1" fill="#C8D8E8"/>
-<rect x="28" y="38" width="16" height="2" rx="1" fill="#C8D8E8"/>
-<rect x="28" y="43" width="20" height="2" rx="1" fill="#C8D8E8"/>
-<rect x="28" y="48" width="13" height="2" rx="1" fill="#C8D8E8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tai lieu gap goc + mui ten nap vao -->
+  <polygon points="4.5,2.5 16.5,2.5 21.5,7.5 21.5,23.5 4.5,23.5" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <polygon points="16.5,2.5 21.5,7.5 16.5,7.5" fill="#999999"/>
+  <rect x="7" y="11" width="11" height="1" fill="#999999"/>
+  <rect x="7" y="14" width="8" height="1" fill="#999999"/>
+  <rect x="23" y="16" width="4" height="7" fill="#FFAA00"/>
+  <polygon points="20,23 30,23 25,30" fill="#FFAA00"/>
 </svg>

@@ -1,5 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="12" y="8" width="40" height="12" rx="3" fill="#D07818"/>
-  <rect x="12" y="26" width="40" height="12" rx="3" fill="#182A3E"/>
-  <rect x="12" y="44" width="40" height="12" rx="3" fill="#182A3E"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- workset dang mo -->
+  <rect x="3.5" y="5.5" width="25" height="6" fill="#FFAA00" stroke="#464646" stroke-width="1"/>
+  <rect x="3.5" y="13.5" width="25" height="6" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="3.5" y="21.5" width="25" height="6" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
+  <rect x="6" y="16" width="10" height="1" fill="#999999"/>
+  <rect x="6" y="24" width="10" height="1" fill="#999999"/>
 </svg>
