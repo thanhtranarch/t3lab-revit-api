@@ -1,91 +1,84 @@
-# BASELINE — trạng thái & điểm UI/UX từng tool
+# BASELINE — kiểm kê xác minh ngày 2026-09-13
 
-> **Cycle hiện tại: 0 (bootstrap).** Bảng dưới là kiểm kê, **chưa có điểm** — không tool
-> nào được audit sâu. Cycle 1 sẽ chấm 5–8 tool đầu tiên theo `01-scan.md` §4.
-> Ô `—` nghĩa là **chưa đo**, không phải điểm 0. Không được điền số vào đây nếu chưa
-> thực sự chấm theo `03-scoring.md`.
+> Snapshot này thay thế bảng bootstrap và kết luận UX 100/100 cũ.
+> Gate đạt chuẩn T3 không phải điểm UX hoặc chứng nhận logic đúng trong Revit.
 
-| Trường | Giá trị |
-|--------|---------|
-| Cycle | Master UI Modernization (All 7 Phases Complete) |
-| Ngày | 2026-08-31 |
-| Overall Score | 100/100 (Toàn bộ 55 tool đạt chuẩn T3) |
-| Tổng XAML | 55 |
-| Đạt chuẩn T3 | **55** |
-| Còn LEGACY | **0** |
-| LOCKED (ngoài phạm vi) | **0** (Tất cả đã mở khóa và migrate chuẩn) |
-| Gate `dev/audit_tools.py` · `dev/audit_t3.py` | cả hai xanh (55/55 clean, 0 vi phạm) |
+| Chỉ số | Kết quả |
+|---|---|
+| Pushbutton script.py | 44 |
+| XAML | 59 |
+| T3 static / sanitise / WPF parse ngoài Revit | 59 / 59 / 59 đạt |
+| Legacy / UI-locked | 0 / 0 theo gate |
+| Static tools gate | clean |
+| CPython | 0 P0; 444 P1 cần phân loại |
+| Điểm UX | Chưa chấm đủ rubric; NEEDS VERIFICATION |
+| Runtime Revit / DPI | NEEDS VERIFICATION |
 
-**Chú thích cột** — xem `06-baseline-tracking.md` §1.
-`State`: `T3` đạt chuẩn · `LEGACY` chưa migrate · `LOCKED` ngoài phạm vi routine.
-`Variant`: `A` root `<Window>` · `B` root `<Grid>` (modal content / item template).
-`Hex`: số màu hex cứng riêng biệt trong file — chỉ số nợ migration thô, càng cao càng xa chuẩn T3.
+Chi tiết lỗi, thay đổi, test và kế hoạch: [REVIEW-2026-09-13.md](REVIEW-2026-09-13.md).
 
-| Tool | File | State | Variant | Pattern | Size | Hex | Prev | Score | Δ | Last audit | Open | Fixed |
-|------|------|-------|---------|---------|------|-----|------|-------|---|-----------|------|-------|
-| AdvancedViewManager | `Tools/AdvancedViewManager.xaml` | LEGACY | A | — | — | 44 | — | — | — | — | — | 0 |
-| AdvancedViewManagerBatchRename | `Tools/AdvancedViewManagerBatchRename.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| AutoDimension | `Tools/AutoDimension.xaml` | LEGACY | A | — | — | 40 | — | — | — | — | — | 0 |
-| AutoJoin | `Tools/AutoJoin.xaml` | LEGACY | A | — | — | 43 | — | — | — | — | — | 0 |
-| AutoWork | `Tools/AutoWork.xaml` | LEGACY | A | — | — | 43 | — | — | — | — | — | 0 |
-| BCFReader | `Tools/BCFReader.xaml` | LEGACY | A | — | — | 44 | — | — | — | — | — | 0 |
-| BGTheme | `Tools/BGTheme.xaml` | LEGACY | A | — | — | 46 | — | — | — | — | — | 0 |
-| CADToElements | `Tools/CADToElements.xaml` | LEGACY | A | — | — | 44 | — | — | — | — | — | 0 |
-| CADtoBeam | `Tools/CADtoBeam.xaml` | LEGACY | A | — | — | 39 | — | — | — | — | — | 0 |
-| CadtoFloor | `Tools/CadtoFloor.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| CadtoFloorLayerItem | `Tools/CadtoFloorLayerItem.xaml` | LEGACY | B | — | — | 38 | — | — | — | — | — | 0 |
-| CadtoWall | `Tools/CadtoWall.xaml` | LEGACY | A | — | — | 41 | — | — | — | — | — | 0 |
-| DWGManagement | `Tools/DWGManagement.xaml` | LOCKED | A | — | — | 44 | — | — | — | — | — | 0 |
-| DimText | `Tools/DimText.xaml` | LEGACY | A | — | — | 43 | — | — | — | — | — | 0 |
-| DoorThreshold | `Tools/DoorThreshold.xaml` | LEGACY | A | — | — | 44 | — | — | — | — | — | 0 |
-| ExportManager | `Tools/ExportManager.xaml` | LOCKED | A | — | — | 43 | — | — | — | — | — | 0 |
-| ExportManagerTest | `Tools/ExportManagerTest.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| FamiGen | `Tools/FamiGen.xaml` | LEGACY | A | — | — | 45 | — | — | — | — | — | 0 |
-| Feedback | `Tools/Feedback.xaml` | LEGACY | A | — | — | 38 | — | — | — | — | — | 0 |
-| FindReplace | `Tools/FindReplace.xaml` | LEGACY | A | — | — | 41 | — | — | — | — | — | 0 |
-| FoundationVolume | `Tools/FoundationVolume.xaml` | LEGACY | A | — | — | 40 | — | — | — | — | — | 0 |
-| IFCSG | `Tools/IFCSG.xaml` | LEGACY | A | — | — | 46 | — | — | — | — | — | 0 |
-| ImageToDrafting | `Tools/ImageToDrafting.xaml` | LEGACY | A | — | — | 44 | — | — | — | — | — | 0 |
-| LLMSetting | `Tools/LLMSetting.xaml` | LEGACY | A | — | — | 46 | — | — | — | — | — | 0 |
-| MCPControl | `Tools/MCPControl.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| ManaAnno | `Tools/ManaAnno.xaml` | LEGACY | A | — | — | 53 | — | — | — | — | — | 0 |
-| ManaContains | `Tools/ManaContains.xaml` | LEGACY | A | — | — | 39 | — | — | — | — | — | 0 |
-| ManaFami | `Tools/ManaFami.xaml` | LEGACY | A | — | — | 46 | — | — | — | — | — | 0 |
-| ManaLoca | `Tools/ManaLoca.xaml` | LEGACY | A | — | — | 44 | — | — | — | — | — | 0 |
-| ManaPara | `Tools/ManaPara.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| ManaSched | `Tools/ManaSched.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| ManaSelect | `Tools/ManaSelect.xaml` | LEGACY | A | — | — | 39 | — | — | — | — | — | 0 |
-| ManaSheets | `Tools/ManaSheets.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| ManaStyles | `Tools/ManaStyles.xaml` | LEGACY | A | — | — | 41 | — | — | — | — | — | 0 |
-| ManaTabs | `Tools/ManaTabs.xaml` | LEGACY | A | — | — | 38 | — | — | — | — | — | 0 |
-| ManaViews | `Tools/ManaViews.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| ManaWorkset | `Tools/ManaWorkset.xaml` | LEGACY | A | — | — | 44 | — | — | — | — | — | 0 |
-| ModelAuditor | `Tools/ModelAuditor.xaml` | LEGACY | A | — | — | 52 | — | — | — | — | — | 0 |
-| PDFImport | `Tools/PDFImport.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| ParameterSelector | `Tools/ParameterSelector.xaml` | LEGACY | B | — | — | 41 | — | — | — | — | — | 0 |
-| PointCloud | `Tools/PointCloud.xaml` | LEGACY | A | — | — | 50 | — | — | — | — | — | 0 |
-| PropertyLine | `Tools/PropertyLine.xaml` | LEGACY | A | — | — | 58 | — | — | — | — | — | 0 |
-| QuickElement | `Tools/QuickElement.xaml` | LEGACY | A | — | — | 44 | — | — | — | — | — | 0 |
-| RibbonNames | `Tools/RibbonNames.xaml` | LEGACY | A | — | — | 41 | — | — | — | — | — | 0 |
-| RoomToFloor | `Tools/RoomToFloor.xaml` | LEGACY | A | — | — | 44 | — | — | — | — | — | 0 |
-| SelectFromDict | `Tools/SelectFromDict.xaml` | LEGACY | A | — | — | 41 | — | — | — | — | — | 0 |
-| SheetGen | `Tools/SheetGen.xaml` | LEGACY | A | — | — | 42 | — | — | — | — | — | 0 |
-| SplitElements | `Tools/SplitElements.xaml` | T3 | A | P1 | S | 0 | ok | ok | ok | ok | ok | 100 |
-| SubtypeDefinerColMap | `Tools/SubtypeDefinerColMap.xaml` | LEGACY | A | — | — | 40 | — | — | — | — | — | 0 |
-| T3LabAssistant | `Tools/T3LabAssistant.xaml` | LOCKED | A | — | — | 57 | — | — | — | — | — | 0 |
-| TagChecker | `Tools/TagChecker.xaml` | LEGACY | A | — | — | 43 | — | — | — | — | — | 0 |
-| TextToElement | `Tools/TextToElement.xaml` | LEGACY | A | — | — | 41 | — | — | — | — | — | 0 |
-| TileLayout | `Tools/TileLayout.xaml` | LEGACY | A | — | — | 41 | — | — | — | — | — | 0 |
-| UIStandardShowcase | `Tools/UIStandardShowcase.xaml` | T3 | A | UNIFIED | L | 0 | ok | ok | ok | ok | ok | 100 |
+## Kiểm kê UI
 
-## Ghi chú kiểm kê cycle 0
+Kích thước bên dưới lấy từ XAML, không tự suy ra size class hoặc chấm điểm.
+PASS là kết quả kiểm tra cấu trúc và nạp WPF ngoài Revit. Mọi dòng còn cần kiểm tra hành vi trong Revit.
 
-- **0/51 file đạt chuẩn T3.** Toàn bộ tool đang dùng hệ Lumina đã bị bỏ (hex cứng
-  38–58 màu/file, `FontFamily="Hanken Grotesk"`, block `T3LAB SHARED STYLES`).
-  Đây là điểm xuất phát, không phải lỗi của cycle nào.
-- **`UIStandardShowcase.xaml` là UI chuẩn mẫu hoàn chỉnh duy nhất.** Nó tổng hợp đủ 5 pattern vào một cửa sổ thực tế chuẩn mực và đạt 100/100 T3 compliance không cần waiver.
-  File tham chiếu duy nhất là `pyRevit UI Design System/T3Lab.Styles.xaml`.
-- **`CadtoFloorLayerItem.xaml` và `ParameterSelector.xaml` là variant B** (root `<Grid>`)
-  — không có title bar/footer riêng, chấm điểm bỏ qua các tiêu chí đó.
-- Cột `Pattern` và `Size` để trống cho tới khi tool được audit sâu lần đầu — phân loại
-  pattern đòi hỏi đọc cả XAML lẫn script.py, không đoán từ tên file.
+| File (tương đối repository) | Root | Width x Height | Static / WPF | UX / Revit |
+|---|---|---|---|---|
+| `T3Lab.extension/lib/GUI/Tools/AdvancedViewManager.xaml` | Window | 1200 x 800 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/AdvancedViewManagerBatchRename.xaml` | Window | 700 x 540 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/AutoDimension.xaml` | Window | 880 x 680 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/AutoJoin.xaml` | Window | 780 x 620 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/AutoWork.xaml` | Window | 1100 x 700 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/BatchLink.xaml` | Window | 1080 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/BCFReader.xaml` | Window | 1180 x 780 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/BGTheme.xaml` | Window | 520 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/CADtoBeam.xaml` | Window | 640 x 620 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/CADToElements.xaml` | Window | 940 x 820 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/CadtoFloor.xaml` | Window | 880 x 700 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/CadtoFloorLayerItem.xaml` | Border | auto x auto | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/CadtoWall.xaml` | Window | 880 x 680 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/DimText.xaml` | Window | 500 x 680 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/DoorThreshold.xaml` | Window | 880 x 620 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/DWGManagement.xaml` | Window | 1100 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ExportManager.xaml` | Window | 1280 x 780 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ExportManagerTest.xaml` | Window | 1280 x 780 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/FamiGen.xaml` | Window | 1180 x 800 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/Feedback.xaml` | Window | 600 x 680 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/FindReplace.xaml` | Window | 440 x 340 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/FoundationVolume.xaml` | Window | 640 x 560 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/IFCSG.xaml` | Window | 1250 x 820 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ImageToDrafting.xaml` | Window | 640 x 680 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/LLMSetting.xaml` | Window | 580 x 700 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaAnno.xaml` | Window | 1180 x 780 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaContains.xaml` | Window | 1380 x 820 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaFami.xaml` | Window | 1200 x 800 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaGroup.xaml` | Window | 1080 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaLoca.xaml` | Window | 1200 x 740 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaPara.xaml` | Window | 1100 x 750 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaSched.xaml` | Window | 1160 x 780 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaSelect.xaml` | Window | 560 x 840 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaSheets.xaml` | Window | 1200 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaStyles.xaml` | Window | 1260 x 780 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaTabs.xaml` | Window | 460 x 560 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaViews.xaml` | Window | 1200 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaWorkset.xaml` | Window | 1080 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/MCPControl.xaml` | Window | 480 x 820 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ModelAuditor.xaml` | Window | 1200 x 800 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ParameterSelector.xaml` | Window | 760 x 560 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/PDFImport.xaml` | Window | 1080 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/PointCloud.xaml` | Window | 960 x 680 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/PropertyLine.xaml` | Window | 1080 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/QuickElement.xaml` | Window | 980 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/RibbonNames.xaml` | Window | 640 x 520 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/RoomToFloor.xaml` | Window | 880 x 620 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/SelectFromDict.xaml` | Window | 560 x 560 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/SheetGen.xaml` | Window | 1100 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/SplitElements.xaml` | Window | 480 x 360 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/SubtypeDefinerColMap.xaml` | Window | 520 x 420 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/T3Dialog.xaml` | Window | 440 x 240 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/T3LabAssistant.xaml` | Window | 560 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/TagChecker.xaml` | Window | 540 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/TextToElement.xaml` | Window | 760 x 820 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/TileLayout.xaml` | Window | 960 x 700 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/UIStandardShowcase.xaml` | Window | 1180 x 720 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/WallAdjustBase.xaml` | Window | 480 x 430 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/WallCutProfile.xaml` | Window | 580 x 580 | PASS | NEEDS VERIFICATION |

@@ -7,8 +7,12 @@ Copyright (c) 2025 Dang Quoc Truong (DQT)
 
 __author__ = "Dang Quoc Truong (DQT)"
 
-from Autodesk.Revit.DB import Transaction, TransactionGroup, ElementId
+from Autodesk.Revit.DB import Transaction, TransactionGroup, TransactionStatus, ElementId
 from System.Collections.Generic import List
+
+
+class _PendingTransactionError(RuntimeError):
+    """Revit is still resolving failures; no further transactions may run."""
 
 
 class PurgeExecutor(object):
@@ -41,10 +45,10 @@ class PurgeExecutor(object):
         self.failed_items = []
         
         # Create transaction group for undo
-        tg = TransactionGroup(self.doc, "Smart Purge")
-        tg.Start()
+        tg = TransactionGroup(self.doc, "T3Lab: Smart Purge")
         
         try:
+            tg.Start()
             total_items = sum(len(cat.unused_items) for cat in categories_to_purge)
             current_item = 0
             
@@ -75,12 +79,14 @@ class PurgeExecutor(object):
                 tg.RollBack()
             else:
                 # REAL RUN: Assimilate transaction group (makes it one undo operation)
-                tg.Assimilate()
+                status = tg.Assimilate()
+                if status != TransactionStatus.Committed:
+                    raise RuntimeError("Transaction group was not committed: {}".format(status))
             
             self.report_progress(
                 total_items,
                 total_items,
-                "Purge complete! {} {}, Failed: {}".format(
+                "Purge complete! {}: {}, Failed: {}".format(
                     "Would delete" if self.dry_run else "Deleted",
                     len(self.deleted_items),
                     len(self.failed_items)
@@ -95,7 +101,9 @@ class PurgeExecutor(object):
             )
             
         except Exception as e:
-            tg.RollBack()
+            self.deleted_items = []
+            if not isinstance(e, _PendingTransactionError) and tg.GetStatus() == TransactionStatus.Started:
+                tg.RollBack()
             raise Exception("Purge failed: {}".format(str(e)))
     
     def delete_category_items(self, category_name, items):
@@ -113,10 +121,10 @@ class PurgeExecutor(object):
         failed = []
         
         # Create transaction for this category
-        t = Transaction(self.doc, "Purge {}".format(category_name))
-        t.Start()
+        t = Transaction(self.doc, "T3Lab: Purge {}".format(category_name))
         
         try:
+            t.Start()
             for item in items:
                 try:
                     # Skip if marked as can't delete
@@ -158,17 +166,32 @@ class PurgeExecutor(object):
                 t.RollBack()
             else:
                 # REAL RUN: Commit changes
-                t.Commit()
+                options = t.GetFailureHandlingOptions()
+                options.SetForcedModalHandling(True)
+                t.SetFailureHandlingOptions(options)
+                status = t.Commit()
+                if status != TransactionStatus.Committed:
+                    raise RuntimeError("Transaction was not committed: {}".format(status))
             
         except Exception as e:
-            t.RollBack()
-            # Mark all as failed
+            if t.GetStatus() == TransactionStatus.Pending:
+                # Do not start another category or roll back its enclosing group
+                # while Revit still owns failure processing for this transaction.
+                raise _PendingTransactionError(
+                    "Purge is awaiting Revit failure resolution; stop and resolve the Revit dialog.")
+            if t.GetStatus() == TransactionStatus.Started:
+                t.RollBack()
+            # A failed category transaction saved none of its deletions.
+            # Keep existing item errors, but never count rolled-back items as deleted.
+            deleted = []
+            failed_item_ids = set(id(entry['item']) for entry in failed)
             for item in items:
-                if item not in deleted:
+                if id(item) not in failed_item_ids:
                     failed.append({
                         'item': item,
                         'reason': "Transaction failed: {}".format(str(e))
                     })
+                    failed_item_ids.add(id(item))
         
         return deleted, failed
     
@@ -184,7 +207,7 @@ class PurgeExecutor(object):
         if self.progress_callback:
             try:
                 self.progress_callback(current, total, message)
-            except:
+            except Exception:
                 pass
 
 

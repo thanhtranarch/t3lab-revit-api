@@ -63,20 +63,12 @@ SCAN → AUDIT → SCORE → IDENTIFY → PRIORITIZE → IMPROVE → VERIFY → 
 Ngân sách: audit sâu 5–8 tool · in-place fix ≤10 issue · migrate ≤2 file · ≤1 đề xuất
 cấp hệ thống. Hết ngân sách thì đẩy phần dư vào `PRIORITY_QUEUE.md`.
 
-## Trạng thái hiện tại (cycle 0)
+## Trạng thái xác minh 2026-09-13
 
-| Chỉ số | Giá trị |
-|--------|---------|
-| Tổng XAML | 54 |
-| Đạt chuẩn T3 | **0** |
-| Còn LEGACY | 51 |
-| LOCKED (ngoài phạm vi) | 3 |
-| Overall Score | — (chưa tool nào được chấm) |
+44 pushbutton `script.py`, 59 XAML. Gate T3 và static sạch; 59 XAML qua sanitise
+và WPF parse ngoài Revit. Không còn legacy theo gate hiện tại.
 
-Hai việc chặn cần user quyết trước khi migration bắt đầu — xem `PRIORITY_QUEUE.md`
-(Q1 — thay gate bằng `dev/audit_t3.py` — đã xong 2026-08-28):
-
-1. **GAP #1** — `T3Lab.Styles.xaml` nằm ngoài `T3Lab.extension/` nên pyRevit không nạp
-   được lúc runtime. Chưa chốt vị trí deploy thì chưa migrate được file nào.
-2. **GAP #3** — dòng copyright `© Copyright by T3Lab` có ở cả 54 file nhưng không có
-   trong chuẩn T3. Giữ hay bỏ?
+Chưa có đủ kiểm chứng để chấm điểm UX hoặc chứng nhận toàn bộ logic trong Revit.
+Xem [review và phương án phát triển](REVIEW-2026-09-13.md), [baseline](BASELINE.md)
+và [hàng đợi](PRIORITY_QUEUE.md). Các gap deploy stylesheet và copyright đã có
+quyết định trong lịch sử; không còn là blocker migration.

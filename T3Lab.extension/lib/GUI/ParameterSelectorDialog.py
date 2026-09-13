@@ -299,7 +299,7 @@ class ParameterSelectorDialog(T3WPFWindow):
 
     def _on_move_down(self, sender, e):
         """Move selected parameter down in the list."""
-        if self.list_selected.SelectedIndex < len(self.selected_params) - 1:
+        if 0 <= self.list_selected.SelectedIndex < len(self.selected_params) - 1:
             index = self.list_selected.SelectedIndex
             item = self.selected_params[index]
             self.selected_params.RemoveAt(index)
@@ -319,7 +319,7 @@ class ParameterSelectorDialog(T3WPFWindow):
 
     def _on_move_bottom(self, sender, e):
         """Move selected parameter to the bottom of the list."""
-        if self.list_selected.SelectedIndex < len(self.selected_params) - 1:
+        if 0 <= self.list_selected.SelectedIndex < len(self.selected_params) - 1:
             index = self.list_selected.SelectedIndex
             item = self.selected_params[index]
             self.selected_params.RemoveAt(index)

@@ -25,6 +25,7 @@ try:
         Workset,
         WorksetKind,
         Transaction,
+        TransactionStatus,
         WorksetTable,
         DeleteWorksetSettings,
         DeleteWorksetOption,
@@ -35,7 +36,7 @@ try:
     )
 except Exception:
     FilteredElementCollector = FilteredWorksetCollector = Workset = WorksetKind = None
-    Transaction = WorksetTable = DeleteWorksetSettings = DeleteWorksetOption = None
+    Transaction = TransactionStatus = WorksetTable = DeleteWorksetSettings = DeleteWorksetOption = None
     View3D = ViewFamilyType = ViewFamily = WorksetVisibility = None
 
 logger = script.get_logger()
@@ -166,25 +167,46 @@ def enable_worksharing(doc):
         return False
 
 
+def _commit_transaction(transaction):
+    """A commit may return RolledBack without raising an exception."""
+    options = transaction.GetFailureHandlingOptions()
+    options.SetForcedModalHandling(True)
+    transaction.SetFailureHandlingOptions(options)
+    status = transaction.Commit()
+    if status != TransactionStatus.Committed:
+        raise RuntimeError("Transaction was not committed: {}".format(status))
+
+
+def _rollback_started(transaction):
+    """Do not roll back a transaction that failed to start or already ended."""
+    if transaction is not None and transaction.GetStatus() == TransactionStatus.Started:
+        transaction.RollBack()
+
+
 def create_worksets(doc, workset_names, existing_names=None):
     """Create worksets not already present; returns list of created names."""
     if not doc:
         return []
     if existing_names is None:
         existing_names = set(get_workset_names(doc))
+    elif not isinstance(existing_names, set):
+        existing_names = set(existing_names)
 
     created = []
     for name in workset_names:
         if name not in existing_names:
-            t = Transaction(doc, "Create Workset: {}".format(name))
-            t.Start()
+            t = Transaction(doc, "T3Lab: Create Workset: {}".format(name))
             try:
+                t.Start()
                 Workset.Create(doc, name)
-                t.Commit()
+                _commit_transaction(t)
                 created.append(name)
                 existing_names.add(name)
             except Exception as e:
-                t.RollBack()
+                _rollback_started(t)
+                if t.GetStatus() == TransactionStatus.Pending:
+                    # Revit must finish failure processing before another transaction.
+                    raise
                 logger.warning("Failed to create workset '{}': {}".format(name, e))
     return created
 
@@ -199,7 +221,7 @@ def _get_3d_view_type_id(doc):
 
 def create_workset_views(doc):
     """Create one 3D isometric view per user workset, isolating visibility to that workset."""
-    if not doc.IsWorkshared:
+    if not doc or not doc.IsWorkshared:
         return None, None, "Document is not workshared."
 
     type_id = _get_3d_view_type_id(doc)
@@ -213,9 +235,9 @@ def create_workset_views(doc):
     existing = set(v.Name for v in FilteredElementCollector(doc).OfClass(View3D).ToElements())
     created, skipped = [], []
 
-    t = Transaction(doc, "Create Workset Views")
-    t.Start()
+    t = Transaction(doc, "T3Lab: Create Workset Views")
     try:
+        t.Start()
         for ws in worksets:
             if ws.Name in existing:
                 skipped.append(ws.Name)
@@ -228,9 +250,9 @@ def create_workset_views(doc):
                        else WorksetVisibility.Hidden)
                 view3d.SetWorksetVisibility(other.Id, vis)
             created.append(ws.Name)
-        t.Commit()
+        _commit_transaction(t)
     except Exception as e:
-        t.RollBack()
+        _rollback_started(t)
         return None, None, str(e)
 
     return created, skipped, None
@@ -238,6 +260,7 @@ def create_workset_views(doc):
 
 def delete_workset(doc, ws_to_delete, ws_to_reassign=None):
     """Delete a user workset, moving its elements into another workset or deleting them."""
+    t = None
     try:
         ws_all = get_user_worksets(doc)
         ws_del = next((w for w in ws_all if w.Name == ws_to_delete), None)
@@ -252,10 +275,15 @@ def delete_workset(doc, ws_to_delete, ws_to_reassign=None):
         else:
             settings = DeleteWorksetSettings(DeleteWorksetOption.DeleteElements)
 
-        t = Transaction(doc, "Delete Workset: {}".format(ws_to_delete))
+        t = Transaction(doc, "T3Lab: Delete Workset: {}".format(ws_to_delete))
         t.Start()
         WorksetTable.DeleteWorkset(doc, ws_del.Id, settings)
-        t.Commit()
+        _commit_transaction(t)
         return True, None
     except Exception as e:
+        _rollback_started(t)
+        if t is not None and t.GetStatus() == TransactionStatus.Pending:
+            # Callers may delete several worksets; abort that batch until Revit
+            # finishes failure processing rather than returning a recoverable failure.
+            raise
         return False, str(e)

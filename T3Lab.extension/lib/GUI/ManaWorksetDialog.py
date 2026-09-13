@@ -168,19 +168,10 @@ def _remove_workset(doc, ws_delete_name, ws_move_name, all_worksets):
     ws_move = next((ws for ws in all_worksets if ws.Name == ws_move_name), None)
     if not ws_del or not ws_move:
         return False
-    t = Transaction(doc, "Delete Workset: {}".format(ws_delete_name))
-    t.Start()
-    try:
-        settings = DeleteWorksetSettings(
-            DeleteWorksetOption.MoveElementsToWorkset, ws_move.Id
-        )
-        WorksetTable.DeleteWorkset(doc, ws_del.Id, settings)
-        t.Commit()
-        return True
-    except Exception as e:
-        t.RollBack()
-        forms.alert("Failed to delete '{}':\n{}".format(ws_delete_name, e))
-        return False
+    ok, error = delete_workset(doc, ws_delete_name, ws_move_name)
+    if not ok:
+        forms.alert("Failed to delete '{}':\n{}".format(ws_delete_name, error))
+    return ok
 
 
 

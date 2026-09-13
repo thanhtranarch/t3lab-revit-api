@@ -1,4 +1,21 @@
-# PRIORITY QUEUE — hàng đợi cho cycle kế tiếp
+# PRIORITY QUEUE — cập nhật 2026-09-13
+
+Hàng đợi hiện tại dựa trên [review có bằng chứng](REVIEW-2026-09-13.md).
+Không migrate lại 59 XAML đã đạt T3. Các checkbox migration bên dưới giữ làm lịch sử.
+
+| Thứ tự | Mức | Hạng mục | Điều kiện hoàn thành |
+|---|---|---|---|
+| 1 | P1 | Verify các sửa SelectFromDict, ParameterSelector, Workset, Smart Purge trong Revit | Happy path, failure, Cancel, Undo, click lần 2; ghi kết quả thực |
+| 2 | P1 | AutoJoin / Advanced Purge / Group Manager: kết quả sau commit/rollback | Test lỗi transaction và không báo thành công sai |
+| 3 | P2 | BatchOut: 0 file, partial export, cancel | Kết quả khớp artifact thực tế |
+| 4 | P2 | ManaSheets / ManaViews / SheetGen: preview, validation, recovery | Preview khớp dữ liệu sau thao tác và thông báo lỗi theo item |
+| 5 | P2 | Modeless và hình học | Đổi/đóng document, dữ liệu lớn, progress và cancel |
+| 6 | P3 | Phân loại 444 cảnh báo C5/C6 | Xác minh từng nhóm, không nới gate |
+| 7 | P3 | Chấm UX theo rubric | Test keyboard và DPI 100/125%, không gán điểm từ static gate |
+
+---
+
+## Lịch sử hàng đợi 2026-08-28 (không phải trạng thái hiện tại)
 
 > Cập nhật cuối: 2026-08-28 (cycle 0 — bootstrap + dọn dẹp)
 > Thứ tự xếp hàng theo `04-severity-and-issues.md` §4. Cycle sau vào là chạy từ trên xuống.

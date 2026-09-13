@@ -3,8 +3,8 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Select"
-        Height="580" Width="420"
-        MinWidth="380" MinHeight="480"
+        Height="560" Width="560"
+        MinWidth="560" MinHeight="420"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="False"
@@ -1691,8 +1691,13 @@
                 <Border Grid.Row="0" Background="{StaticResource T3.Surface}"
                         BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
                         Padding="16,8">
-                    <TextBlock x:Name="text_label" Text="Select Elements:"
-                               Style="{StaticResource T3.Label}"/>
+                    <StackPanel>
+                        <TextBlock x:Name="text_label" Text="Select Elements:"
+                                   Style="{StaticResource T3.Label}"/>
+                        <TextBlock x:Name="selection_status" Text="0 shown | 0 selected"
+                                   Style="{StaticResource T3.Caption}" Margin="0,4,0,0"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
                 </Border>
 
                 <ListBox Grid.Row="1" x:Name="main_ListBox"
@@ -1700,9 +1705,9 @@
                          SelectionMode="Single" BorderThickness="0" Padding="8">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <CheckBox IsChecked="{Binding IsChecked}"
+                            <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       Style="{StaticResource T3.CheckBox}"
-                                      Checked="UIe_ItemChecked" Margin="0,4">
+                                      Margin="0,4">
                                 <TextBlock Text="{Binding Name}" Style="{StaticResource T3.Body}"/>
                             </CheckBox>
                         </DataTemplate>
@@ -1711,7 +1716,8 @@
 
                 <TextBlock x:Name="main_ListBox_empty" Grid.Row="1"
                            Style="{StaticResource T3.Empty}"
-                           Text="No items available." Margin="16" Visibility="Collapsed"/>
+                           Text="No items match the filter. Clear the search box to see all items."
+                           Margin="16" Visibility="Collapsed"/>
             </Grid>
 
             <!-- ══════════════════ ROW 3: ACTION BUTTONS ══════════════════ -->
@@ -1725,9 +1731,9 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel x:Name="UI_Buttons_all_none" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="Select All" Style="{StaticResource T3.Button.Secondary}"
+                        <Button Content="Select visible" Style="{StaticResource T3.Button.Secondary}"
                                 Click="button_select_all" Margin="0,0,8,0"/>
-                        <Button Content="Select None" Style="{StaticResource T3.Button.Secondary}"
+                        <Button Content="Clear visible" Style="{StaticResource T3.Button.Secondary}"
                                 Click="button_select_none"/>
                     </StackPanel>
 
