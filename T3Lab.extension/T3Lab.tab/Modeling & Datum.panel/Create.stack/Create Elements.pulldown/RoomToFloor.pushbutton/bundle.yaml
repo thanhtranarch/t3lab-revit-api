@@ -1,4 +1,4 @@
-title: "Room To Floor"
+title: "Room To\nFloor"
 tooltip: "Create architectural or structural floors from selected room boundaries"
 description: |
   Automatically generates floor elements using the boundary curves

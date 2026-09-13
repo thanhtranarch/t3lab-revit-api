@@ -29,7 +29,7 @@ REGISTRY_FILE = os.path.join(_LIB_DIR, 'config', 'tool_registry.json')
 # Bump when the entry schema changes — a mismatched on-disk registry is
 # rebuilt from scratch so every entry carries the new fields (doc, xaml,
 # aliases, url, kind).
-REGISTRY_VERSION = 3
+REGISTRY_VERSION = 4
 
 # Button folder suffixes that carry a launchable tool. `.urlbutton` entries
 # (Autodesk Forma / Health, Bluebeam Status) have no script.py at all — they
@@ -194,10 +194,32 @@ def _read_meta(script_path):
             break
 
     # XAML files the script loads — their basenames are tool aliases
-    for x in re.findall(r'([\w\-. ]+?\.xaml)', src):
+    for x in re.findall(r'([\w\-]+\.xaml)', src):
         base = os.path.basename(x).rsplit('.xaml', 1)[0].strip()
         if base and base.lower() != 'wpf_styles' and base not in xamls:
             xamls.append(base)
+
+    # If the script is a launcher importing a dialog from GUI, inspect the dialog file too
+    cur_p = os.path.dirname(script_path)
+    while cur_p and not os.path.exists(os.path.join(cur_p, 'lib')):
+        parent_p = os.path.dirname(cur_p)
+        if parent_p == cur_p:
+            break
+        cur_p = parent_p
+    lib_p = os.path.join(cur_p, 'lib')
+    for dlg in re.findall(r'(?:from\s+(?:GUI\.)?|import\s+(?:GUI\.)?)(\w+Dialog)\b', src):
+        dlg_path = os.path.join(lib_p, 'GUI', dlg + '.py')
+        if os.path.exists(dlg_path):
+            try:
+                with io.open(dlg_path, 'r', encoding='utf-8', errors='ignore') as df:
+                    dsrc = df.read()
+                for x in re.findall(r'([\w\-]+\.xaml)', dsrc):
+                    base = os.path.basename(x).rsplit('.xaml', 1)[0].strip()
+                    if base and base.lower() != 'wpf_styles' and base not in xamls:
+                        xamls.append(base)
+            except Exception:
+                pass
+
     return title, doc, xamls
 
 

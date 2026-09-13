@@ -5,7 +5,11 @@ Provides Info, Warning, Error (Danger), and Confirm modal dialogs conforming to 
 """
 
 import os
-from pyrevit import forms
+
+# Python.NET 3 refuses to convert a plain int into a .NET enum, so every
+# Visibility assignment must use the real System.Windows.Visibility member --
+# `x.Visibility = 2` raises "int can not be converted to Enum implicitly".
+from System.Windows import Visibility as _Visibility
 
 try:
     from GUI.WPF_Base import T3WPFWindow as _WPFWindow
@@ -13,7 +17,13 @@ except Exception:
     try:
         from WPF_Base import T3WPFWindow as _WPFWindow
     except Exception:
-        _WPFWindow = getattr(forms, 'WPFWindow', object)
+        # pyrevit.forms raises PyRevitCPythonNotSupported on *any* attribute
+        # access under CPython, so this last resort must stay guarded.
+        try:
+            from pyrevit import forms as _forms
+            _WPFWindow = _forms.WPFWindow
+        except Exception:
+            _WPFWindow = object
 
 try:
     from GUI import RevitTheme as _theme
@@ -58,9 +68,10 @@ class T3Dialog(_WPFWindow):
         if hasattr(self, 'txt_details') and self.txt_details:
             if details:
                 self.txt_details.Text = str(details)
-                self.txt_details.Visibility = getattr(forms, 'Visibility', None) and forms.Visibility.Visible
+                self.txt_details.Visibility = _Visibility.Visible
             else:
                 self.txt_details.Text = ""
+                self.txt_details.Visibility = _Visibility.Collapsed
 
         # Configure Style & Icon based on mode
         self._configure_appearance(mode, ok_text, cancel_text, danger)
@@ -105,9 +116,9 @@ class T3Dialog(_WPFWindow):
         if hasattr(self, 'btn_cancel') and self.btn_cancel:
             self.btn_cancel.Content = cancel_text
             if mode == self.MODE_CONFIRM:
-                self.btn_cancel.Visibility = 0  # Visible
+                self.btn_cancel.Visibility = _Visibility.Visible
             else:
-                self.btn_cancel.Visibility = 2  # Collapsed
+                self.btn_cancel.Visibility = _Visibility.Collapsed
 
         # Configure Icon Glyph and Color
         # Glyph codes from Segoe MDL2 Assets:

@@ -137,6 +137,7 @@ class LLMSettingWindow(T3WPFWindow):
 
     def __init__(self):
         self._ui_ready     = False   # guards tab_changed during XAML load
+        self._ai_mode_guard = False  # guards ai_mode_toggled re-entry
         self._action_guard  = False  # guards action_mode_toggled re-entry
         self._think_guard   = False  # guards extended_thinking_toggled re-entry
         self._quality_guard = False  # guards quality_mode_toggled re-entry
@@ -917,6 +918,15 @@ class LLMSettingWindow(T3WPFWindow):
             pass
         try:
             from config.settings import get_settings
+            self._ai_mode_guard = True
+            self.ai_mode_toggle.IsChecked = bool(
+                get_settings().is_ai_mode_enabled())
+        except Exception:
+            pass
+        finally:
+            self._ai_mode_guard = False
+        try:
+            from config.settings import get_settings
             self._action_guard = True
             self.action_mode_toggle.IsChecked = (
                 get_settings().get_action_mode() == 'confirm')
@@ -965,6 +975,16 @@ class LLMSettingWindow(T3WPFWindow):
             self._flash_hint(self.username_saved_hint)
         except Exception as ex:
             logger.debug("save_username_clicked error: {}".format(ex))
+
+    def ai_mode_toggled(self, sender, e):
+        """Persist the global AI Mode state for tools."""
+        if getattr(self, '_ai_mode_guard', False):
+            return
+        try:
+            from config.settings import get_settings
+            get_settings().set_ai_mode_enabled(bool(self.ai_mode_toggle.IsChecked))
+        except Exception as ex:
+            logger.debug("ai_mode_toggled error: {}".format(ex))
 
     def action_mode_toggled(self, sender, e):
         """Persist 'ask before model edits' (confirm) vs 'auto'."""

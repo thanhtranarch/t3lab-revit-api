@@ -102,31 +102,36 @@ class AssistantPaneProvider(IDockablePaneProvider):
     def SetupDockablePane(self, data):
         _log_pane(u"SetupDockablePane invoked by Revit")
         try:
-            # Load the pushbutton script.py as a module to get T3LabAssistantWindow
-            tab_dir = os.path.join(_EXT_DIR, 'T3Lab.tab')
-            script_path = os.path.join(
-                tab_dir, 'Support.panel', 'T3LabAssistant.pushbutton', 'script.py'
-            )
-            if os.path.isfile(script_path):
-                if _LIB_DIR not in sys.path:
-                    sys.path.insert(0, _LIB_DIR)
-                if _EXT_DIR not in sys.path:
-                    sys.path.insert(0, _EXT_DIR)
+            if _LIB_DIR not in sys.path:
+                sys.path.insert(0, _LIB_DIR)
+            if _EXT_DIR not in sys.path:
+                sys.path.insert(0, _EXT_DIR)
 
-                try:
-                    import importlib.util
-                    spec = importlib.util.spec_from_file_location('t3lab_assistant_full', script_path)
-                    mod = importlib.util.module_from_spec(spec)
-                    sys.modules['t3lab_assistant_full'] = mod
-                    spec.loader.exec_module(mod)
-                except Exception:
-                    import imp
-                    mod = imp.load_source('t3lab_assistant_full', script_path)
-                if hasattr(mod, 'T3LabAssistantWindow'):
-                    # Instantiate on UI thread as docked
-                    win = mod.T3LabAssistantWindow(is_docked=True)
+            win = None
+            try:
+                from GUI.T3LabAssistantDialog import T3LabAssistantWindow
+                win = T3LabAssistantWindow(is_docked=True)
+            except Exception as ex_import:
+                _log_pane(u"Direct import failed, attempting script fallback: {}".format(ex_import))
+                tab_dir = os.path.join(_EXT_DIR, 'T3Lab.tab')
+                script_path = os.path.join(
+                    tab_dir, 'Support.panel', 'T3LabAssistant.pushbutton', 'script.py'
+                )
+                if os.path.isfile(script_path):
+                    try:
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location('t3lab_assistant_full', script_path)
+                        mod = importlib.util.module_from_spec(spec)
+                        sys.modules['t3lab_assistant_full'] = mod
+                        spec.loader.exec_module(mod)
+                    except Exception:
+                        import imp
+                        mod = imp.load_source('t3lab_assistant_full', script_path)
+                    if hasattr(mod, 'T3LabAssistantWindow'):
+                        win = mod.T3LabAssistantWindow(is_docked=True)
 
-                    # Detach visual content
+            if win is not None:
+                # Detach visual content
                     content = win.Content
                     win.Content = None
 

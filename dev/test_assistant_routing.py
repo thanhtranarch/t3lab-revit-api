@@ -220,8 +220,10 @@ def test_tools_are_launched_through_the_api_context():
     Reader, ManaLoca, BatchOut). Every launcher call must go through
     _launch_tool → run_in_api_context."""
     import re as _re
-    path = os.path.join(TAB, 'Support.panel', 'T3LabAssistant.pushbutton',
-                        'script.py')
+    path = os.path.join(LIB, 'GUI', 'T3LabAssistantDialog.py')
+    if not os.path.exists(path):
+        path = os.path.join(TAB, 'Support.panel', 'T3LabAssistant.pushbutton',
+                            'script.py')
     with io.open(path, encoding='utf-8') as f:
         src = f.read()
 
@@ -1637,9 +1639,12 @@ def test_slash_boilerplate_has_three_distinct_modes():
     collapsing modifying skills back onto the read-only text is exactly the
     regression this whole section exists for."""
     import io as _io
-    with _io.open(os.path.join(
+    _t3_path = os.path.join(LIB, 'GUI', 'T3LabAssistantDialog.py')
+    if not os.path.exists(_t3_path):
+        _t3_path = os.path.join(
             REPO, 'T3Lab.extension', 'T3Lab.tab', 'Support.panel',
-            'T3LabAssistant.pushbutton', 'script.py'), encoding='utf-8') as f:
+            'T3LabAssistant.pushbutton', 'script.py')
+    with _io.open(_t3_path, encoding='utf-8') as f:
         src = f.read()
     check('reference mode still exists', 'is_reference_skill(_sid)' in src)
     check('modifying mode is consulted', 'modifies_model(_sid)' in src)

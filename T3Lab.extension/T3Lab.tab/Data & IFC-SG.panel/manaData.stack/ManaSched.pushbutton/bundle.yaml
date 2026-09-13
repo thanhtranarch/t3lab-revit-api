@@ -1,5 +1,5 @@
 title: "Mana\nSched"
-tooltip: "Schedule Manager — Export/Import Excel and duplicate schedules."
+tooltip: "Schedule Manager - Export/Import Excel and duplicate schedules."
 description: |
   Export schedule data to Excel with column formatting preserved
   Import updated values from Excel back into schedule rows

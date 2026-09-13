@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- ba be day net khac nhau -->
-  <rect x="3.5" y="5.5" width="25" height="21" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
-  <rect x="6" y="9" width="20" height="1" fill="#999999"/>
-  <rect x="6" y="13" width="20" height="2" fill="#4D4D4D"/>
-  <rect x="6" y="18" width="20" height="3" fill="#FFAA00"/>
+  <rect x="3.5" y="5.5" width="25" height="21" fill="#F3F3F3" stroke="#000000" stroke-width="1"/>
+  <rect x="6" y="9" width="20" height="1" fill="#858585"/>
+  <rect x="6" y="13" width="20" height="2" fill="#3C3C3C"/>
+  <rect x="6" y="18" width="20" height="3" fill="#E07B00"/>
 </svg>

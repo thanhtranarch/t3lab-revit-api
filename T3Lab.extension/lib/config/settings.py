@@ -167,6 +167,12 @@ class T3LabAISettings(object):
             'skills': {
                 'disabled': [],
             },
+            'ai_mode': {
+                'enabled': True,
+                'fast_provider': 'auto',
+                'reasoning_provider': 'auto',
+                'tool_toggles': {},
+            },
         }
 
     def get_window_state(self):
@@ -472,6 +478,49 @@ class T3LabAISettings(object):
         def _m(s):
             s['active_project'] = project_id
         return self._update(_m)
+
+    # ------------------------------------------------------------------
+    # AI Mode (Tool Copilot & Augmented Features)
+    # ------------------------------------------------------------------
+
+    def is_ai_mode_enabled(self):
+        """Return True if global AI Mode is enabled."""
+        return bool(self._settings.get('ai_mode', {}).get('enabled', True))
+
+    def set_ai_mode_enabled(self, enabled):
+        """Enable or disable global AI Mode."""
+        def _m(s):
+            s.setdefault('ai_mode', {})['enabled'] = bool(enabled)
+        return self._update(_m)
+
+    def is_tool_ai_enabled(self, tool_name=None):
+        """Return True if AI mode is enabled for a specific tool.
+        If tool not explicitly configured, defaults to the global AI Mode state.
+        """
+        if not self.is_ai_mode_enabled():
+            return False
+        if not tool_name:
+            return True
+        toggles = self._settings.get('ai_mode', {}).get('tool_toggles', {})
+        return bool(toggles.get(tool_name, True))
+
+    def set_tool_ai_enabled(self, tool_name, enabled):
+        """Set AI mode state for a specific tool."""
+        def _m(s):
+            s.setdefault('ai_mode', {}).setdefault('tool_toggles', {})[tool_name] = bool(enabled)
+        return self._update(_m)
+
+    def get_ai_mode_config(self):
+        """Return the entire ai_mode configuration dictionary."""
+        defaults = {
+            'enabled': True,
+            'fast_provider': 'auto',
+            'reasoning_provider': 'auto',
+            'tool_toggles': {},
+        }
+        saved = self._settings.get('ai_mode', {})
+        defaults.update(saved)
+        return defaults
 
     def log_model_usage(self, action, provider, model):
         """Log model usage/setup to a log file for audit and fast setup verification."""

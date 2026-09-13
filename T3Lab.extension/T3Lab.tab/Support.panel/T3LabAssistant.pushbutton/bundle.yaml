@@ -1,5 +1,5 @@
 title: "T3Lab\nAssistant"
-tooltip: "T3Lab AI Assistant — run T3Lab tools quickly using natural language"
+tooltip: "T3Lab AI Assistant - run T3Lab tools quickly using natural language"
 description: |
   Open and control BatchOut (batch sheet export)
   Run ParaSync, LoadFamily, ProjectName, and other tools

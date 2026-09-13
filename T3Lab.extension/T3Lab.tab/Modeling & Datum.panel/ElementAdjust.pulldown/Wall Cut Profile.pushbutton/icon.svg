@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- tier B - tuong bi khoet lo tu duoi len -->
-  <rect x="3.5" y="6.5" width="25" height="20" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
-  <rect x="11" y="16" width="8" height="11" fill="#FFAA00"/>
+  <rect x="3.5" y="6.5" width="25" height="20" fill="#F3F3F3" stroke="#000000" stroke-width="1"/>
+  <rect x="11" y="16" width="8" height="11" fill="#E07B00"/>
 </svg>

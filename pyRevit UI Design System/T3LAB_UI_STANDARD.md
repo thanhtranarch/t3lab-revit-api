@@ -234,9 +234,32 @@ Bảng glyph chuẩn — **một khái niệm, một glyph, toàn dự án**:
 | `E946` Info | `E7BA` Warning | `E783` Error | `E713` Settings |
 | `E70D` ChevronDown | `E70E` ChevronUp | `E76B` ChevronLeft | `E76C` ChevronRight |
 | `E74E` Save | `E8E5` OpenFile | `E774` Globe | `E7A7` Undo |
+| `E8A3` Zoom | `E7B3` Isolate | `E7C9` Pick | |
 
 Cần glyph chưa có trong bảng → thêm vào bảng này **và** vào comment đầu khối ICON
 trong `T3Lab.Styles.xaml`, đừng dùng lẻ.
+
+**Hai cái bẫy khi chọn glyph mới** (học được lúc thêm Zoom/Isolate/Pick, 2026-09-12):
+
+1. **Đừng chọn glyph TRÔNG GIỐNG glyph đã có.** `E71E` cũng là kính lúp và vẽ ra
+   gần như y hệt `E721` Search — đặt Zoom bằng `E71E` là hai khái niệm khác nhau
+   cùng một hình. Zoom dùng `E8A3` (kính lúp có dấu +) để phân biệt được.
+2. **Kiểm tra codepoint CÓ THẬT trong font.** Glyph không tồn tại render ra ô vuông
+   tofu, và `audit_t3.py` không bắt được — nó chỉ grep chuỗi trong source. `E7AE` và
+   `E92B` chẳng hạn là KHÔNG có trong Segoe MDL2 Assets. Cách kiểm nhanh, không cần
+   mở Revit:
+
+   ```powershell
+   $tf = New-Object Windows.Media.Typeface('Segoe MDL2 Assets'); $gt = $null
+   $tf.TryGetGlyphTypeface([ref]$gt) | Out-Null
+   $gt.CharacterToGlyphMap.ContainsKey([Convert]::ToInt32('E8A3', 16))   # True = có thật
+   ```
+
+> **Nợ hiện có:** 14 glyph lẻ ngoài bảng vẫn còn trong `T3LabAssistant.xaml` (`E81C`
+> `E723` `E8BD` `E74C` `ED25` `E8B7`), `ParameterSelector.xaml` (`E74A` `E74B`),
+> `AutoJoin.xaml` (`E8AB`), `BCFReader.xaml` (`EA3A`), `ManaGroup.xaml` (`E9A6`),
+> `PointCloud.xaml` (`E753`), `PropertyLine.xaml` (`E707`). Chưa khai vào bảng vì
+> chưa rõ khái niệm chủ ý của từng cái — ai sửa tool đó thì khai luôn.
 
 Gate: `python3 dev/audit_t3.py` bắt cả hai vi phạm (FontFamily inline · ký tự Unicode).
 Miễn trừ: `DWGManagement.xaml` (thiết kế riêng đã chốt) và `T3LabAssistant.xaml`

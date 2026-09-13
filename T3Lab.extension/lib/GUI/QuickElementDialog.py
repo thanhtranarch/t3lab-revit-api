@@ -352,7 +352,16 @@ class QuickSelectWindow(T3WPFWindow):
         self.all_items = []
         self.filtered_items = []
         self.categories_list = []
-        
+
+        # Revit API context bridge. Stays None when this window runs on its own
+        # (it is modal then, so it already holds the API context). ManaSelect
+        # mounts this grid inside a MODELESS window and sets this to its
+        # ExternalEvent dispatcher — without it every button below that touches
+        # uidoc/doc throws "Attempting to access Revit API outside of API
+        # context". See _defer().
+        self._api_dispatch = None
+        self._in_api_call = False
+
         # Get UI controls
         self._get_controls()
         self._setup_events()
@@ -361,6 +370,34 @@ class QuickSelectWindow(T3WPFWindow):
         if self.collector:
             self._load_data()
     
+    def _defer(self, handler, sender, args):
+        """Re-enter `handler` inside the Revit API context.
+
+        Returns True when the call was queued — the caller must return
+        immediately, the real work happens on the second pass.
+
+        Standalone (modal): `_api_dispatch` is None, this returns False at once
+        and the handler body runs exactly as it always has. Nothing changes.
+
+        Mounted in ManaSelect (modeless): the host set `_api_dispatch` to its
+        ExternalEvent dispatcher. First pass queues, second pass has
+        `_in_api_call` set so it falls straight through and runs the body — now
+        inside the API context.
+        """
+        dispatch = getattr(self, '_api_dispatch', None)
+        if dispatch is None or self._in_api_call:
+            return False
+
+        def run():
+            self._in_api_call = True
+            try:
+                handler(sender, args)
+            finally:
+                self._in_api_call = False
+
+        dispatch(run)
+        return True
+
     def _find(self, name):
         """Helper to find control by name"""
         ctrl = getattr(self, name, None)
@@ -633,10 +670,14 @@ class QuickSelectWindow(T3WPFWindow):
     
     def _on_display_changed(self, sender, args):
         """Handle display mode change"""
+        if self._defer(self._on_display_changed, sender, args):
+            return
         self._load_data()
     
     def _on_filter_changed(self, sender, args):
         """Handle filter type change"""
+        if self._defer(self._on_filter_changed, sender, args):
+            return
         self._load_data()
     
     def _on_search_changed(self, sender, args):
@@ -729,6 +770,8 @@ class QuickSelectWindow(T3WPFWindow):
     
     def _on_double_click(self, sender, args):
         """Handle double-click to zoom"""
+        if self._defer(self._on_double_click, sender, args):
+            return
         if self.dataGrid.SelectedItem:
             item = self.dataGrid.SelectedItem
             self._zoom_to_element(item.id)
@@ -756,6 +799,8 @@ class QuickSelectWindow(T3WPFWindow):
     
     def _on_zoom(self, sender, args):
         """Zoom to checked elements"""
+        if self._defer(self._on_zoom, sender, args):
+            return
         checked = [item for item in self.filtered_items if item.is_checked]
         if not checked:
             if self.dataGrid.SelectedItem:
@@ -769,6 +814,8 @@ class QuickSelectWindow(T3WPFWindow):
     
     def _on_select(self, sender, args):
         """Select checked elements in Revit"""
+        if self._defer(self._on_select, sender, args):
+            return
         checked = [item for item in self.filtered_items if item.is_checked]
         if not checked:
             forms.alert("Please check elements first.", title="Quick Select")
@@ -791,6 +838,8 @@ class QuickSelectWindow(T3WPFWindow):
     
     def _on_isolate(self, sender, args):
         """Isolate checked elements in view"""
+        if self._defer(self._on_isolate, sender, args):
+            return
         checked = [item for item in self.filtered_items if item.is_checked]
         if not checked:
             forms.alert("Please check elements first.", title="Quick Select")
@@ -818,6 +867,8 @@ class QuickSelectWindow(T3WPFWindow):
     
     def _on_show(self, sender, args):
         """Show element - find view and zoom"""
+        if self._defer(self._on_show, sender, args):
+            return
         checked = [item for item in self.filtered_items if item.is_checked]
         if not checked:
             if self.dataGrid.SelectedItem:
@@ -841,6 +892,8 @@ class QuickSelectWindow(T3WPFWindow):
     
     def _on_refresh(self, sender, args):
         """Refresh data"""
+        if self._defer(self._on_refresh, sender, args):
+            return
         doc, _ = resolve_doc()
         uidoc = resolve_uidoc()
         if doc and uidoc:

@@ -1,9 +1,9 @@
 title: "Mana\nLoca"
-tooltip: "List and adjust the location of elements in the current view or by level. Modeless — stays open while you work."
+tooltip: "List and adjust the location of elements in the current view or by level. Modeless - stays open while you work."
 description: |
   List all elements in the active view or filtered by level
   Read and edit XYZ coordinates directly in a data grid
   Commit location changes back to the model in one transaction
-  Persistent window — no need to reopen between edits
+  Persistent window - no need to reopen between edits
 author: "Tran Tien Thanh"
 version: "1.4.0"

@@ -69,7 +69,8 @@ def TempMemory(tool_name, bool):
     output = []
 
     # main dir
-    memory_folder = r"C:\MEOS_Temp"
+    _appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or os.path.expanduser("~")
+    memory_folder = os.path.join(_appdata, "T3Lab", "Cache")
     memory_clear_folder = os.path.join(memory_folder, userName)
 
     # temp folder

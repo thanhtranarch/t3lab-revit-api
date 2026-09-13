@@ -1,5 +1,5 @@
 title: "Mana\nPara"
-tooltip: "Parameter Manager — Transfer values, text-to-element, and values-to-region tools."
+tooltip: "Parameter Manager - Transfer values, text-to-element, and values-to-region tools."
 description: |
   Parameter Transfer: copy parameter values between elements by rule
   Text to Element: assign Text Note content to element parameters via spatial overlap

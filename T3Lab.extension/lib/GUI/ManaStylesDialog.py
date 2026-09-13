@@ -6,6 +6,7 @@ import sys
 import re
 import random
 import time
+import json
 import System
 from collections import OrderedDict
 
@@ -33,7 +34,7 @@ from Autodesk.Revit.DB import (
 
 from pyrevit import forms, revit
 from GUI.WPF_Base import T3WPFWindow
-from System.Windows import WindowState, Thickness, CornerRadius, GridLength, GridUnitType, MessageBox, MessageBoxButton, MessageBoxImage, MessageBoxResult, Rect, Point
+from System.Windows import WindowState, Visibility, Thickness, CornerRadius, GridLength, GridUnitType, MessageBox, MessageBoxButton, MessageBoxImage, MessageBoxResult, Rect, Point
 from System.Windows.Media import SolidColorBrush, Color, DoubleCollection, DrawingBrush, GeometryDrawing, GeometryGroup, LineGeometry, Pen, TileMode, BrushMappingMode
 from System.Windows.Controls import (
     Grid,
@@ -73,6 +74,10 @@ def _make_double_collection(values):
         dc = DoubleCollection()
         for v in values:
             dc.Add(float(v))
+        try:
+            dc.Freeze()
+        except Exception:
+            pass
         return dc
     except Exception:
         return None
@@ -135,6 +140,10 @@ class FillPatternItem(_Reactive):
             
         if is_solid or "solid" in self._name.lower():
             self._wpf_brush = SolidColorBrush(Color.FromRgb(161, 161, 170)) # Zinc-400
+            try:
+                self._wpf_brush.Freeze()
+            except Exception:
+                pass
         else:
             try:
                 db = DrawingBrush()
@@ -144,6 +153,10 @@ class FillPatternItem(_Reactive):
                 
                 group = GeometryGroup()
                 pen = Pen(SolidColorBrush(Color.FromRgb(161, 161, 170)), 1)
+                try:
+                    pen.Freeze()
+                except Exception:
+                    pass
                 
                 if self._settings == "Parallel lines":
                     group.Children.Add(LineGeometry(Point(0, 5), Point(10, 5)))
@@ -154,9 +167,17 @@ class FillPatternItem(_Reactive):
                     group.Children.Add(LineGeometry(Point(0, 0), Point(10, 10)))
                     
                 db.Drawing = GeometryDrawing(None, pen, group)
+                try:
+                    db.Freeze()
+                except Exception:
+                    pass
                 self._wpf_brush = db
             except Exception:
                 self._wpf_brush = SolidColorBrush(Color.FromRgb(228, 228, 231))
+                try:
+                    self._wpf_brush.Freeze()
+                except Exception:
+                    pass
 
     @property
     def wpf_brush(self): return self._wpf_brush
@@ -204,20 +225,31 @@ class LineStyleItem(_Reactive):
         self._is_selected = False
         try:
             self._name = category.Name if category.Name else "Unnamed"
-        except:
+        except Exception:
             self._name = "Unnamed"
         self._id = _eid_int(category.Id)
         
+        c_red = 24
+        c_green = 24
+        c_blue = 27
+        has_color = False
         try:
             color = category.LineColor
-            self._color = "RGB({},{},{})".format(color.Red, color.Green, color.Blue)
-        except:
+            if color and (not hasattr(color, 'IsValid') or color.IsValid):
+                c_red = color.Red
+                c_green = color.Green
+                c_blue = color.Blue
+                self._color = "RGB({},{},{})".format(c_red, c_green, c_blue)
+                has_color = True
+            else:
+                self._color = "N/A"
+        except Exception:
             self._color = "N/A"
             
         try:
             weight = category.GetLineWeight(GraphicsStyleType.Projection)
             self._weight = str(weight) if weight else "N/A"
-        except:
+        except Exception:
             self._weight = "N/A"
             
         try:
@@ -227,28 +259,44 @@ class LineStyleItem(_Reactive):
                 self._pattern = pat.Name if pat else "Solid"
             else:
                 self._pattern = "Solid"
-        except:
+        except Exception:
             self._pattern = "Solid"
             
         self._is_system = self._name.startswith('<') and self._name.endswith('>')
         self._usage_count = 0
 
-        # Construct wpf_brush
+        # Construct color_hex & wpf_brush
+        if has_color:
+            if c_red > 240 and c_green > 240 and c_blue > 240:
+                self._color_hex = "#A1A1AA"
+            else:
+                self._color_hex = "#{:02X}{:02X}{:02X}".format(c_red, c_green, c_blue)
+        else:
+            self._color_hex = "#18181B"
+
         try:
-            color = category.LineColor
-            self._wpf_brush = SolidColorBrush(Color.FromRgb(color.Red, color.Green, color.Blue))
-        except:
-            self._wpf_brush = SolidColorBrush(Color.FromRgb(24, 24, 27))
+            r = int(self._color_hex[1:3], 16)
+            g = int(self._color_hex[3:5], 16)
+            b = int(self._color_hex[5:7], 16)
+            brush = SolidColorBrush(Color.FromRgb(r, g, b))
+            try:
+                brush.Freeze()
+            except Exception:
+                pass
+            self._wpf_brush = brush
+        except Exception:
+            self._wpf_brush = None
             
         # Construct thickness_val
         try:
             w = float(self._weight)
-            self._thickness_val = max(1.0, min(6.0, 0.6 * w))
-        except:
+            self._thickness_val = max(1.0, min(8.0, 0.75 * w + 0.5))
+        except Exception:
             self._thickness_val = 1.5
             
-        # Construct dash_array
+        # Construct dash_array & dash_str
         self._dash_array = None
+        self._dash_str = ""
         try:
             pattern_id = category.GetLinePatternId(GraphicsStyleType.Projection)
             if pattern_id and _eid_int(pattern_id) != _eid_int(_get_invalid_element_id()):
@@ -261,23 +309,34 @@ class LineStyleItem(_Reactive):
                             dash_list = []
                             for seg in segs:
                                 val = float(seg.Length * 304.8) # mm
-                                val = max(1.0, val * 1.5)
+                                val = max(1.0, round(val * 1.5, 2))
                                 dash_list.append(val)
+                            if len(dash_list) % 2 == 1:
+                                dash_list.append(2.0)
                             self._dash_array = _make_double_collection(dash_list)
-        except:
+                            self._dash_str = " ".join(str(v) for v in dash_list)
+        except Exception:
             pass
             
-        if not self._dash_array and self._pattern != "Solid":
+        if not self._dash_str and self._pattern != "Solid":
             p = self._pattern.lower()
+            vals = None
             if "dash dot dot" in p:
-                self._dash_array = _make_double_collection([4.0, 2.0, 1.0, 2.0, 1.0, 2.0])
+                vals = [6.0, 3.0, 1.5, 3.0, 1.5, 3.0]
             elif "dash dot" in p:
-                self._dash_array = _make_double_collection([4.0, 2.0, 1.0, 2.0])
+                vals = [6.0, 3.0, 1.5, 3.0]
             elif "dash" in p:
-                self._dash_array = _make_double_collection([4.0, 2.0])
+                vals = [6.0, 3.0]
             elif "dot" in p:
-                self._dash_array = _make_double_collection([1.0, 2.0])
+                vals = [1.5, 3.0]
+            if vals:
+                self._dash_array = _make_double_collection(vals)
+                self._dash_str = " ".join(str(v) for v in vals)
 
+    @property
+    def color_hex(self): return self._color_hex
+    @property
+    def dash_str(self): return self._dash_str
     @property
     def wpf_brush(self): return self._wpf_brush
     @property
@@ -338,7 +397,7 @@ class LinePatternItem(_Reactive):
         self._is_selected = False
         try:
             self._name = element.Name if element.Name else "Unnamed"
-        except:
+        except Exception:
             self._name = "Unnamed"
         self._id = _eid_int(element.Id)
         
@@ -359,16 +418,28 @@ class LinePatternItem(_Reactive):
                 self._segment_count = 0
                 self._segments_type = "Solid"
                 self._segments_value = "-"
-        except:
+        except Exception:
             self._segment_count = 0
             self._segments_type = "Solid"
             self._segments_value = "-"
             
         self._is_system = self._name in self.SYSTEM_PATTERNS
 
-        # Construct wpf_brush & dash_array
-        self._wpf_brush = SolidColorBrush(Color.FromRgb(24, 24, 27))
+        # Construct color_hex, wpf_brush, thickness_val & dash_array / dash_str
+        self._color_hex = "#18181B"
+        try:
+            brush = SolidColorBrush(Color.FromRgb(24, 24, 27))
+            try:
+                brush.Freeze()
+            except Exception:
+                pass
+            self._wpf_brush = brush
+        except Exception:
+            self._wpf_brush = None
+
+        self._thickness_val = 2.0
         self._dash_array = None
+        self._dash_str = ""
         if element:
             try:
                 line_pattern = element.GetLinePattern()
@@ -378,12 +449,36 @@ class LinePatternItem(_Reactive):
                         dash_list = []
                         for seg in segments:
                             val = float(seg.Length * 304.8) # mm
-                            val = max(1.0, val * 1.5)
+                            val = max(1.0, round(val * 1.5, 2))
                             dash_list.append(val)
+                        if len(dash_list) % 2 == 1:
+                            dash_list.append(2.0)
                         self._dash_array = _make_double_collection(dash_list)
-            except:
+                        self._dash_str = " ".join(str(v) for v in dash_list)
+            except Exception:
                 pass
 
+        if not self._dash_str and self._name != "Solid":
+            p = self._name.lower()
+            vals = None
+            if "dash dot dot" in p:
+                vals = [6.0, 3.0, 1.5, 3.0, 1.5, 3.0]
+            elif "dash dot" in p:
+                vals = [6.0, 3.0, 1.5, 3.0]
+            elif "dash" in p:
+                vals = [6.0, 3.0]
+            elif "dot" in p:
+                vals = [1.5, 3.0]
+            if vals:
+                self._dash_array = _make_double_collection(vals)
+                self._dash_str = " ".join(str(v) for v in vals)
+
+    @property
+    def color_hex(self): return self._color_hex
+    @property
+    def thickness_val(self): return self._thickness_val
+    @property
+    def dash_str(self): return self._dash_str
     @property
     def wpf_brush(self): return self._wpf_brush
     @property
@@ -1052,6 +1147,18 @@ class ManaStylesWindow(T3WPFWindow):
         # Load style data and initialize splasher
         self._load_style_manager_data()
         self._init_color_splasher()
+        self._init_ai_mode()
+
+    def _init_ai_mode(self):
+        try:
+            if hasattr(self, 'is_ai_mode_active') and self.is_ai_mode_active():
+                if hasattr(self, 'ai_mode_badge') and self.ai_mode_badge:
+                    self.ai_mode_badge.Visibility = Visibility.Visible
+                if hasattr(self, 'txt_ai_status') and self.txt_ai_status:
+                    info = self.get_ai_status_info()
+                    self.txt_ai_status.Text = "AI Mode: {}".format(info.get('model', 'Ready'))
+        except Exception:
+            pass
 
     # ========================================================================
     # MAIN WINDOW NAVIGATION & CHROME CONTROLS
@@ -1207,6 +1314,101 @@ class ManaStylesWindow(T3WPFWindow):
 
     def _on_style_refresh(self, s, e):
         self._load_line_styles()
+
+    def ai_clean_styles_clicked(self, sender, e):
+        """AI Clean: Detect CAD junk line styles ($0$*) and suggest consolidation to standard line styles."""
+        btn = getattr(self, 'btn_ai_clean_styles', None)
+        orig_content = "✨ AI Clean CAD Styles"
+
+        def _restore_btn():
+            if btn:
+                btn.Content = orig_content
+                btn.IsEnabled = True
+
+        try:
+            cad_patterns = [r'^\$0\$', r'^A-', r'^C-', r'^S-', r'^M-', r'^E-', r'^P-', r'^I-', r'^DEFPOINTS', r'^0_']
+            cad_items = []
+            for item in self.line_styles:
+                if getattr(item, 'is_system', False):
+                    continue
+                name = getattr(item, 'name', '')
+                if any(re.search(pat, name, re.IGNORECASE) for pat in cad_patterns):
+                    cad_items.append(item)
+
+            if not cad_items:
+                forms.alert(
+                    "No imported CAD line styles detected (patterns: $0$*, A-*, DEFPOINTS, etc.).",
+                    title="AI Clean Styles"
+                )
+                return
+
+            def _apply_classic():
+                for item in cad_items:
+                    item.is_selected = True
+                self._filter_line_styles()
+                forms.alert(
+                    "Detected {} CAD line styles (e.g. $0$, DEFPOINTS, CAD layer prefixes).\n\n"
+                    "They have been selected in the DataGrid for batch deletion or renaming.".format(len(cad_items)),
+                    title="Clean CAD Styles"
+                )
+                _restore_btn()
+
+            if not hasattr(self, 'is_ai_mode_active') or not self.is_ai_mode_active():
+                _apply_classic()
+                return
+
+            if btn:
+                btn.Content = "⏳ Analyzing..."
+                btn.IsEnabled = False
+
+            cad_names = [getattr(it, 'name', '') for it in cad_items[:25]]
+            standard_styles = ["<Thin Lines>", "<Medium Lines>", "<Wide Lines>", "<Hidden>", "<Overhead>", "<Centerline>", "<Demolished>"]
+
+            prompt = (
+                "You are an expert BIM Specialist auditing AutoCAD imported line styles in Autodesk Revit.\n"
+                "The following CAD line styles were imported from DWGs:\n{}\n\n"
+                "Target Revit standard styles:\n{}\n\n"
+                "For each CAD style, propose the best Revit standard style mapping, or 'DELETE' if obsolete/junk.\n"
+                "Return JSON ONLY with keys: {{\"mappings\": [{{\"source\": string, \"target\": string, \"reason\": string}}], \"summary\": string}}"
+            ).format(json.dumps(cad_names), json.dumps(standard_styles))
+
+            def _worker():
+                return self.ai_bridge.ask_json(prompt, fast=True)
+
+            def _callback(res, err):
+                try:
+                    if err or not res or not isinstance(res, dict) or 'mappings' not in res:
+                        _apply_classic()
+                        return
+
+                    mappings = res.get('mappings', [])
+                    summary = res.get('summary', 'CAD style consolidation recommended.')
+
+                    # Select detected items in the grid
+                    for item in cad_items:
+                        item.is_selected = True
+                    self._filter_line_styles()
+
+                    lines_msg = ["AI CAD Line Styles Consolidation Plan:"]
+                    lines_msg.append(summary)
+                    lines_msg.append("")
+                    for m in mappings[:12]:
+                        lines_msg.append(u"• {} → {} ({})".format(
+                            m.get('source', ''), m.get('target', ''), m.get('reason', '')
+                        ))
+                    if len(mappings) > 12:
+                        lines_msg.append(u"... and {} more".format(len(mappings) - 12))
+                    lines_msg.append("\nAll {} CAD line styles are now selected in the table.".format(len(cad_items)))
+
+                    forms.alert("\n".join(lines_msg), title="AI Clean Styles Recommendation")
+                finally:
+                    _restore_btn()
+
+            self.run_ai_async(_worker, _callback)
+
+        except Exception as ex:
+            _restore_btn()
+            forms.alert("Error analyzing CAD line styles: {}".format(ex), title="AI Clean Styles Error")
 
     def _on_style_calc_usage(self, s, e):
         for item in self.line_styles:

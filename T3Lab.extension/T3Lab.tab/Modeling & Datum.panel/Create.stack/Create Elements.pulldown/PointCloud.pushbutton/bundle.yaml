@@ -1,8 +1,8 @@
-title: "Point Cloud to Model"
+title: "Point Cloud\nto Model"
 tooltip: "Detect and create all building elements from a point cloud scan"
 description: |
   2-step Scan-to-BIM wizard. Select a point cloud and sampling density,
-  then click Analyze — the tool auto-detects Walls, Floors, Ceilings,
+  then click Analyze - the tool auto-detects Walls, Floors, Ceilings,
   Doors, Windows, Columns, Stairs, and Roof planes. Review results and
   click Generate to create all elements at once.
 author: "Tran Tien Thanh"

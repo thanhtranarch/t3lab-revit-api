@@ -224,6 +224,13 @@
                  E946 Info        E7BA Warning    E783 Error      E713 Settings
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
+                 E8A3 Zoom        E7B3 Isolate    E7C9 Pick
+
+               Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
+                 1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
+                    Search, nên Zoom phải là E8A3 (kính lúp có dấu +).
+                 2. Codepoint có thật trong font — glyph không tồn tại ra ô vuông tofu và
+                    audit_t3.py không bắt được, nó chỉ grep source.
           -->
 
           <!-- Icon nền: cỡ Label (11), màu thừa kế từ control chứa nó. -->
@@ -978,6 +985,137 @@
             </Setter>
           </Style>
 
+          <!-- ══════════════════ 11b · TREEVIEW ══════════════════
+               Cây phân cấp có đếm (Category → Family → Type). Thêm 2026-09-12 cho
+               ManaSelect Explore; trước đó ManaFami/IFCSG dùng TreeView trần nên ra
+               vệt xanh Windows và hàng cao lệch khỏi thang T3.
+
+               Chevron xoay 90° khi mở — CÙNG một ngôn ngữ với T3.Expander, không dùng
+               ô +/− của Windows. Hover/selected bằng token nên không còn vệt xanh.
+
+               Virtualization bật ở CẢ HAI style (TreeView và TreeViewItem): cây của
+               model lớn có hàng nghìn node, không bật là WPF realize hết và treo Revit.
+               Đây là ràng buộc kỹ thuật thắng Design System theo mục 3 của
+               docs/ui-governance/08-design-system-authority.md.
+
+               LƯU Ý cho code Python: khi tự dựng `TreeViewItem()` rồi Add vào
+               `.Items`, item CHÍNH LÀ container nên `ItemContainerStyle` KHÔNG áp vào
+               nó. Phải gán tay `item.Style = win.FindResource("T3.TreeViewItem")`.
+               ══════════════════ -->
+          <Style x:Key="T3.TreeViewItem" TargetType="TreeViewItem">
+            <Setter Property="FontFamily" Value="{StaticResource T3.Font}"/>
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Body}"/>
+            <Setter Property="Foreground" Value="{StaticResource T3.Text}"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="ItemsPanel">
+              <Setter.Value>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+              </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="TreeViewItem">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="16"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto"/>
+                      <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Chevron mở/đóng: ẩn (Hidden, không Collapsed) khi node là lá,
+                         để cột 16px vẫn giữ đúng bậc thang thụt đầu dòng. -->
+                    <ToggleButton x:Name="tgl" Grid.Row="0" Grid.Column="0"
+                                  Width="16" MinHeight="{StaticResource T3.H.Row}"
+                                  Cursor="Hand" Focusable="False" ClickMode="Press"
+                                  IsChecked="{Binding IsExpanded, Mode=TwoWay,
+                                              RelativeSource={RelativeSource TemplatedParent}}">
+                      <ToggleButton.Template>
+                        <ControlTemplate TargetType="ToggleButton">
+                          <Border Background="Transparent">
+                            <Path x:Name="chev" Data="M8 5 L14 11 L8 17"
+                                  Stroke="{StaticResource T3.TextMuted}" StrokeThickness="2"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Width="8" Height="8" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  RenderTransformOrigin="0.5,0.5"/>
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                              <Setter TargetName="chev" Property="RenderTransform">
+                                <Setter.Value><RotateTransform Angle="90"/></Setter.Value>
+                              </Setter>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                              <Setter TargetName="chev" Property="Stroke" Value="{StaticResource T3.Ink}"/>
+                            </Trigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </ToggleButton.Template>
+                    </ToggleButton>
+
+                    <Border x:Name="row" Grid.Row="0" Grid.Column="1"
+                            Background="Transparent"
+                            BorderBrush="Transparent" BorderThickness="1"
+                            CornerRadius="{StaticResource T3.R.Pill}"
+                            MinHeight="{StaticResource T3.H.Row}" Padding="4,0">
+                      <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <ItemsPresenter x:Name="host" Grid.Row="1" Grid.Column="1"/>
+                  </Grid>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsExpanded" Value="False">
+                      <Setter TargetName="host" Property="Visibility" Value="Collapsed"/>
+                    </Trigger>
+                    <Trigger Property="HasItems" Value="False">
+                      <Setter TargetName="tgl" Property="Visibility" Value="Hidden"/>
+                    </Trigger>
+                    <!-- SourceName="row": IsMouseOver của TreeViewItem còn đúng khi trỏ
+                         vào node CON, sẽ sáng cả hàng cha. Chỉ soi đúng border hàng. -->
+                    <Trigger SourceName="row" Property="IsMouseOver" Value="True">
+                      <Setter TargetName="row" Property="Background" Value="{StaticResource T3.SurfaceSunken}"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                      <Setter TargetName="row" Property="Background"  Value="{StaticResource T3.Canvas}"/>
+                      <Setter TargetName="row" Property="BorderBrush" Value="{StaticResource T3.BorderStrong}"/>
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+
+          <Style x:Key="T3.TreeView" TargetType="TreeView">
+            <Setter Property="FontFamily" Value="{StaticResource T3.Font}"/>
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Body}"/>
+            <Setter Property="Foreground" Value="{StaticResource T3.Text}"/>
+            <Setter Property="Background" Value="{StaticResource T3.Surface}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource T3.Border}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource T3.TreeViewItem}"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="ItemsPanel">
+              <Setter.Value>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+
           <!-- ══════════════════ 12 · CHROME: CALLOUT, FOOTER, TITLE BAR ══════════════════ -->
           <Style x:Key="T3.Callout" TargetType="Border">
             <Setter Property="Background"  Value="{StaticResource T3.SurfaceSunken}"/>
@@ -1513,8 +1651,16 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal"
+                    <!-- AI Mode Status Pill & Window controls -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
                         <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
                             <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
                         </Button>
@@ -1552,7 +1698,16 @@
                     <Separator Style="{StaticResource T3.Rule}" Margin="0,0,0,12"/>
 
                     <!-- Section: Target Selection -->
-                    <TextBlock Text="TARGET SPECIFICATION" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="TARGET SPECIFICATION" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
+                        <Button x:Name="btn_ai_detect_target" Grid.Column="1"
+                                Content="✨ AI Detect Target" Style="{StaticResource T3.Button.Secondary}"
+                                Height="26" Padding="8,0" ToolTip="AI Auto-Detect: Analyze text notes in view and recommend target category and parameter"/>
+                    </Grid>
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="140"/>

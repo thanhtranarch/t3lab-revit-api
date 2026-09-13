@@ -3,7 +3,7 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="MCP Control"
-        Width="480" Height="740"
+        Width="480" Height="820"
         MinWidth="420" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="False"
@@ -220,6 +220,13 @@
                  E946 Info        E7BA Warning    E783 Error      E713 Settings
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
+                 E8A3 Zoom        E7B3 Isolate    E7C9 Pick
+
+               Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
+                 1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
+                    Search, nên Zoom phải là E8A3 (kính lúp có dấu +).
+                 2. Codepoint có thật trong font — glyph không tồn tại ra ô vuông tofu và
+                    audit_t3.py không bắt được, nó chỉ grep source.
           -->
 
           <!-- Icon nền: cỡ Label (11), màu thừa kế từ control chứa nó. -->
@@ -974,6 +981,137 @@
             </Setter>
           </Style>
 
+          <!-- ══════════════════ 11b · TREEVIEW ══════════════════
+               Cây phân cấp có đếm (Category → Family → Type). Thêm 2026-09-12 cho
+               ManaSelect Explore; trước đó ManaFami/IFCSG dùng TreeView trần nên ra
+               vệt xanh Windows và hàng cao lệch khỏi thang T3.
+
+               Chevron xoay 90° khi mở — CÙNG một ngôn ngữ với T3.Expander, không dùng
+               ô +/− của Windows. Hover/selected bằng token nên không còn vệt xanh.
+
+               Virtualization bật ở CẢ HAI style (TreeView và TreeViewItem): cây của
+               model lớn có hàng nghìn node, không bật là WPF realize hết và treo Revit.
+               Đây là ràng buộc kỹ thuật thắng Design System theo mục 3 của
+               docs/ui-governance/08-design-system-authority.md.
+
+               LƯU Ý cho code Python: khi tự dựng `TreeViewItem()` rồi Add vào
+               `.Items`, item CHÍNH LÀ container nên `ItemContainerStyle` KHÔNG áp vào
+               nó. Phải gán tay `item.Style = win.FindResource("T3.TreeViewItem")`.
+               ══════════════════ -->
+          <Style x:Key="T3.TreeViewItem" TargetType="TreeViewItem">
+            <Setter Property="FontFamily" Value="{StaticResource T3.Font}"/>
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Body}"/>
+            <Setter Property="Foreground" Value="{StaticResource T3.Text}"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="ItemsPanel">
+              <Setter.Value>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+              </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="TreeViewItem">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="16"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto"/>
+                      <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Chevron mở/đóng: ẩn (Hidden, không Collapsed) khi node là lá,
+                         để cột 16px vẫn giữ đúng bậc thang thụt đầu dòng. -->
+                    <ToggleButton x:Name="tgl" Grid.Row="0" Grid.Column="0"
+                                  Width="16" MinHeight="{StaticResource T3.H.Row}"
+                                  Cursor="Hand" Focusable="False" ClickMode="Press"
+                                  IsChecked="{Binding IsExpanded, Mode=TwoWay,
+                                              RelativeSource={RelativeSource TemplatedParent}}">
+                      <ToggleButton.Template>
+                        <ControlTemplate TargetType="ToggleButton">
+                          <Border Background="Transparent">
+                            <Path x:Name="chev" Data="M8 5 L14 11 L8 17"
+                                  Stroke="{StaticResource T3.TextMuted}" StrokeThickness="2"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Width="8" Height="8" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  RenderTransformOrigin="0.5,0.5"/>
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                              <Setter TargetName="chev" Property="RenderTransform">
+                                <Setter.Value><RotateTransform Angle="90"/></Setter.Value>
+                              </Setter>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                              <Setter TargetName="chev" Property="Stroke" Value="{StaticResource T3.Ink}"/>
+                            </Trigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </ToggleButton.Template>
+                    </ToggleButton>
+
+                    <Border x:Name="row" Grid.Row="0" Grid.Column="1"
+                            Background="Transparent"
+                            BorderBrush="Transparent" BorderThickness="1"
+                            CornerRadius="{StaticResource T3.R.Pill}"
+                            MinHeight="{StaticResource T3.H.Row}" Padding="4,0">
+                      <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <ItemsPresenter x:Name="host" Grid.Row="1" Grid.Column="1"/>
+                  </Grid>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsExpanded" Value="False">
+                      <Setter TargetName="host" Property="Visibility" Value="Collapsed"/>
+                    </Trigger>
+                    <Trigger Property="HasItems" Value="False">
+                      <Setter TargetName="tgl" Property="Visibility" Value="Hidden"/>
+                    </Trigger>
+                    <!-- SourceName="row": IsMouseOver của TreeViewItem còn đúng khi trỏ
+                         vào node CON, sẽ sáng cả hàng cha. Chỉ soi đúng border hàng. -->
+                    <Trigger SourceName="row" Property="IsMouseOver" Value="True">
+                      <Setter TargetName="row" Property="Background" Value="{StaticResource T3.SurfaceSunken}"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                      <Setter TargetName="row" Property="Background"  Value="{StaticResource T3.Canvas}"/>
+                      <Setter TargetName="row" Property="BorderBrush" Value="{StaticResource T3.BorderStrong}"/>
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+
+          <Style x:Key="T3.TreeView" TargetType="TreeView">
+            <Setter Property="FontFamily" Value="{StaticResource T3.Font}"/>
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Body}"/>
+            <Setter Property="Foreground" Value="{StaticResource T3.Text}"/>
+            <Setter Property="Background" Value="{StaticResource T3.Surface}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource T3.Border}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource T3.TreeViewItem}"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="ItemsPanel">
+              <Setter.Value>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+
           <!-- ══════════════════ 12 · CHROME: CALLOUT, FOOTER, TITLE BAR ══════════════════ -->
           <Style x:Key="T3.Callout" TargetType="Border">
             <Setter Property="Background"  Value="{StaticResource T3.SurfaceSunken}"/>
@@ -1631,13 +1769,35 @@
                     <TextBlock Text="4. MCP CONFIGURATION SNIPPET" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                     <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
                             BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,16">
-                        <TextBox x:Name="config_box" IsReadOnly="True"
-                                 Height="120"
-                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                                 FontFamily="Consolas" FontSize="12.5"
-                                 Background="{StaticResource T3.Surface}"
-                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                 Padding="8" AcceptsReturn="True" TextWrapping="NoWrap"/>
+                        <StackPanel>
+                            <!-- Format picker: same bridge, two config syntaxes -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Paste into the client config file"
+                                           Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="2" x:Name="snippet_format_cb"
+                                          Style="{StaticResource T3.ComboBox}"
+                                          Height="28" Width="240"
+                                          ToolTip="Choose the syntax your AI client expects">
+                                    <ComboBoxItem Style="{StaticResource T3.ComboBoxItem}" IsSelected="True"
+                                                  Content="JSON — Claude / Antigravity"/>
+                                    <ComboBoxItem Style="{StaticResource T3.ComboBoxItem}"
+                                                  Content="TOML — ChatGPT (Codex)"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <TextBox x:Name="config_box" IsReadOnly="True"
+                                     Height="120"
+                                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas" FontSize="12.5"
+                                     Background="{StaticResource T3.Surface}"
+                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
+                                     Padding="8" AcceptsReturn="True" TextWrapping="NoWrap"/>
+                        </StackPanel>
                     </Border>
 
                     <!-- 5. Auto-Configure AI Clients Card -->
@@ -1645,45 +1805,101 @@
                     <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
                             BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,16">
                         <StackPanel>
-                            <!-- Header Row -->
-                            <Grid Margin="0,0,0,8">
+                            <!-- Claude Desktop -->
+                            <Grid Margin="0,0,0,4">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Width="16" Height="16" CornerRadius="4"
-                                        Background="{StaticResource T3.Ink}"
-                                        VerticalAlignment="Center" Margin="0,0,8,0">
-                                    <TextBlock Text="C" Style="{StaticResource T3.Caption}" FontWeight="Bold"
-                                               Foreground="{StaticResource T3.Surface}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Claude Desktop" Style="{StaticResource T3.BodyStrong}"
-                                           VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="claude_cfg_indicator" Width="8" Height="8" CornerRadius="4"
+                                            Background="{StaticResource T3.Border}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Claude Desktop" Style="{StaticResource T3.BodyStrong}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" x:Name="configure_claude_btn"
+                                        Content="Configure" Style="{StaticResource T3.Button.Secondary}"
+                                        Height="28" Padding="12,0"
+                                        ToolTip="Write the t3lab-revit entry into claude_desktop_config.json"/>
                             </Grid>
+                            <TextBlock x:Name="claude_cfg_label" Text="Checking..."
+                                       Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="16,0,0,4"/>
+                            <TextBlock x:Name="claude_cfg_path" Style="{StaticResource T3.Mono}"
+                                       TextTrimming="CharacterEllipsis" Margin="16,0,0,0"
+                                       ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
 
-                            <!-- Status Row -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <Border x:Name="claude_cfg_indicator" Width="8" Height="8" CornerRadius="4"
-                                        Background="{StaticResource T3.Border}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock x:Name="claude_cfg_label" Text="Checking..."
-                                           Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
-                            </StackPanel>
+                            <Border Height="1" Background="{StaticResource T3.Border}" Margin="0,12,0,12"/>
 
-                            <!-- Path + Configure Button -->
+                            <!-- ChatGPT (Codex) -->
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="chatgpt_cfg_indicator" Width="8" Height="8" CornerRadius="4"
+                                            Background="{StaticResource T3.Border}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="ChatGPT (Codex)" Style="{StaticResource T3.BodyStrong}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" x:Name="configure_chatgpt_btn"
+                                        Content="Configure" Style="{StaticResource T3.Button.Secondary}"
+                                        Height="28" Padding="12,0"
+                                        ToolTip="Write [mcp_servers.t3lab-revit] into the Codex config.toml"/>
+                            </Grid>
+                            <TextBlock x:Name="chatgpt_cfg_label" Text="Checking..."
+                                       Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="16,0,0,4"/>
+                            <TextBlock x:Name="chatgpt_cfg_path" Style="{StaticResource T3.Mono}"
+                                       TextTrimming="CharacterEllipsis" Margin="16,0,0,4"
+                                       ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                            <TextBlock Text="The ChatGPT app's own Connectors need a public https URL — a local server is reached through Codex."
+                                       Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="16,0,0,0"/>
+
+                            <Border Height="1" Background="{StaticResource T3.Border}" Margin="0,12,0,12"/>
+
+                            <!-- Antigravity -->
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="antigravity_cfg_indicator" Width="8" Height="8" CornerRadius="4"
+                                            Background="{StaticResource T3.Border}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Antigravity" Style="{StaticResource T3.BodyStrong}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <Button Grid.Column="2" x:Name="configure_antigravity_btn"
+                                        Content="Configure" Style="{StaticResource T3.Button.Secondary}"
+                                        Height="28" Padding="12,0"
+                                        ToolTip="Write the t3lab-revit entry into Antigravity's mcp_config.json"/>
+                            </Grid>
+                            <TextBlock x:Name="antigravity_cfg_label" Text="Checking..."
+                                       Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="16,0,0,4"/>
+                            <TextBlock x:Name="antigravity_cfg_path" Style="{StaticResource T3.Mono}"
+                                       TextTrimming="CharacterEllipsis" Margin="16,0,0,0"
+                                       ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+
+                            <Border Height="1" Background="{StaticResource T3.Border}" Margin="0,12,0,12"/>
+
+                            <!-- Configure every client at once -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="8"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="claude_cfg_path" Grid.Column="0"
-                                           Style="{StaticResource T3.Mono}"
-                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                                <Button Grid.Column="2" x:Name="configure_claude_btn"
-                                        Content="Configure" Style="{StaticResource T3.Button.Secondary}"
-                                        Height="28" Padding="12,0"/>
+                                <TextBlock x:Name="configure_all_label" Grid.Column="0"
+                                           Text="Restart the client after configuring."
+                                           Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                           VerticalAlignment="Center"/>
+                                <Button Grid.Column="2" x:Name="configure_all_btn"
+                                        Content="Configure All" Style="{StaticResource T3.Button.Secondary}"
+                                        Height="28" Padding="12,0"
+                                        ToolTip="Write the entry into every client config at once"/>
                             </Grid>
                         </StackPanel>
                     </Border>

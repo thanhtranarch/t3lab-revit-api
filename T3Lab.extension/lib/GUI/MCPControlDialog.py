@@ -40,6 +40,13 @@ except Exception as _svc_err:
     HAS_SERVICE  = False
     _SVC_ERR_MSG = str(_svc_err)
 
+# Auto-configurable MCP clients, in the order their rows appear in the XAML.
+# Read from the service so adding a client there needs no change here.
+try:
+    CLIENT_KEYS = [key for key, _label, _fmt in MCPService.clients()]
+except Exception:
+    CLIENT_KEYS = ['claude', 'chatgpt', 'antigravity']
+
 logger = script.get_logger()
 
 
@@ -108,6 +115,16 @@ def apply_server_status(status, indicator, label, btn, resources=None):
         color, text = '#D23B3B', 'Error: {}'.format(status['error'])
         btn_content, btn_style_key = 'Start Server', 'T3.Button.Primary'
         enabled = True
+    elif status.get('running') and status.get('foreign'):
+        # Live and serving, but owned by another pyRevit engine in this Revit
+        # session — its Python object is not callable from here, so Stop would
+        # only throw. Say who owns it and what actually releases it.
+        color       = '#157038'
+        text        = ('Connected — port {} (started by another pyRevit engine; '
+                       'restart Revit to stop it)').format(status.get('port', 48884))
+        btn_content = 'Stop Server'
+        btn_style_key = 'T3.Button.Danger'
+        enabled     = False
     elif status.get('running'):
         color       = '#157038'
         text        = 'Connected — port {}'.format(status.get('port', 48884))
@@ -211,13 +228,42 @@ class MCPControlWindow(T3WPFWindow):
         if open_dir_btn:
             open_dir_btn.Click += self._on_open_dir
 
-        # Claude Desktop auto-configure widgets
-        self._claude_cfg_indicator = self.FindName('claude_cfg_indicator')
-        self._claude_cfg_label     = self.FindName('claude_cfg_label')
-        self._claude_cfg_path      = self.FindName('claude_cfg_path')
-        configure_claude_btn       = self.FindName('configure_claude_btn')
-        if configure_claude_btn:
-            configure_claude_btn.Click += self._on_configure_claude
+        # AI client auto-configure widgets — one row per client key, plus the
+        # "Configure All" button. Widget names follow <key>_cfg_* so a client
+        # added to MCPService.AI_CLIENTS only needs its three XAML rows.
+        self._client_widgets = {}
+        # Strong refs to the per-client closures: PythonNet wraps each one in a
+        # .NET delegate, and a closure kept alive only by the event can be
+        # collected — the button then silently stops responding.
+        self._client_handlers = []
+        for key in CLIENT_KEYS:
+            btn = self.FindName('configure_{}_btn'.format(key))
+            self._client_widgets[key] = {
+                'indicator': self.FindName('{}_cfg_indicator'.format(key)),
+                'label':     self.FindName('{}_cfg_label'.format(key)),
+                'path':      self.FindName('{}_cfg_path'.format(key)),
+                'button':    btn,
+            }
+            if btn:
+                handler = self._make_configure_handler(key)
+                self._client_handlers.append(handler)
+                btn.Click += handler
+
+        # Legacy aliases — kept so existing callers/tests keep working.
+        _claude = self._client_widgets.get('claude', {})
+        self._claude_cfg_indicator = _claude.get('indicator')
+        self._claude_cfg_label     = _claude.get('label')
+        self._claude_cfg_path      = _claude.get('path')
+
+        self._configure_all_label = self.FindName('configure_all_label')
+        configure_all_btn         = self.FindName('configure_all_btn')
+        if configure_all_btn:
+            configure_all_btn.Click += self._on_configure_all
+
+        # Snippet format picker (JSON for Claude/Antigravity, TOML for Codex)
+        self._snippet_format_cb = self.FindName('snippet_format_cb')
+        if self._snippet_format_cb:
+            self._snippet_format_cb.SelectionChanged += self._on_snippet_format_changed
 
         # Teaching capture widgets
         self._teaching_toggle    = self.FindName('teaching_toggle')
@@ -271,9 +317,9 @@ class MCPControlWindow(T3WPFWindow):
         except Exception as ex:
             logger.debug("Error refreshing watcher: {}".format(ex))
         try:
-            self._refresh_claude_config()
+            self._refresh_clients()
         except Exception as ex:
-            logger.debug("Error refreshing Claude config: {}".format(ex))
+            logger.debug("Error refreshing AI client configs: {}".format(ex))
         try:
             self._refresh_teaching()
         except Exception as ex:
@@ -297,11 +343,7 @@ class MCPControlWindow(T3WPFWindow):
             self.toggle_btn,
             self.Resources,
         )
-        if self.config_box:
-            port_text = self.port_tb.Text if self.port_tb else None
-            self.config_box.Text = MCPService.config_snippet(
-                port=port_text or status.get('port')
-            )
+        self._refresh_snippet()
 
     def _refresh_documents(self):
         if not self._doc_label:
@@ -399,58 +441,118 @@ class MCPControlWindow(T3WPFWindow):
         if not ok:
             logger.error('Could not open data dir: {}'.format(err))
 
-    def _refresh_claude_config(self):
+    def _refresh_clients(self):
+        """Refresh every AI client row (Claude Desktop, ChatGPT/Codex, Antigravity)."""
         if not HAS_SERVICE:
-            if self._claude_cfg_indicator:
-                b = _brush('#94A3B8')
-                if b: self._claude_cfg_indicator.Background = b
-            if self._claude_cfg_label:
-                self._claude_cfg_label.Text = 'Service unavailable'
+            for widgets in self._client_widgets.values():
+                if widgets.get('indicator'):
+                    b = _brush('#94A3B8')
+                    if b: widgets['indicator'].Background = b
+                if widgets.get('label'):
+                    widgets['label'].Text = 'Service unavailable'
+                if widgets.get('button'):
+                    widgets['button'].IsEnabled = False
             return
-        try:
-            status = MCPService.claude_desktop_status()
-        except Exception as ex:
-            status = {'error': str(ex)}
-        if status.get('error'):
-            color = '#EF4444'
-            text  = 'Error: {}'.format(status['error'])
-        elif not status.get('file_exists'):
-            color = '#F59E0B'
-            text  = 'Config not found — will be created on Configure'
-        elif status.get('configured'):
-            color = '#10B981'
-            text  = 'Configured — t3lab-revit entry present'
-        else:
-            color = '#EF4444'
-            text  = 'Not configured — click Configure to add entry'
-        if self._claude_cfg_indicator:
-            b = _brush(color)
-            if b: self._claude_cfg_indicator.Background = b
-        if self._claude_cfg_label:
-            self._claude_cfg_label.Text = text
-        if self._claude_cfg_path:
-            self._claude_cfg_path.Text = status.get('path', '')
 
-    def _on_configure_claude(self, sender, e):
+        for key, widgets in self._client_widgets.items():
+            try:
+                status = MCPService.client_status(key)
+            except Exception as ex:
+                status = {'error': str(ex)}
+
+            if status.get('error'):
+                color = '#EF4444'
+                text  = 'Error: {}'.format(status['error'])
+            elif not status.get('file_exists'):
+                color = '#F59E0B'
+                text  = 'Config not found — will be created on Configure'
+            elif status.get('configured'):
+                color = '#10B981'
+                text  = 'Configured — t3lab-revit entry present'
+            else:
+                color = '#EF4444'
+                text  = 'Not configured — click Configure to add entry'
+
+            if widgets.get('indicator'):
+                b = _brush(color)
+                if b: widgets['indicator'].Background = b
+            if widgets.get('label'):
+                widgets['label'].Text = text
+            if widgets.get('path'):
+                widgets['path'].Text = status.get('path', '')
+
+    def _current_port(self):
+        """Port typed in the box, or None to let the service decide."""
+        try:
+            return int(self.port_tb.Text.strip()) if self.port_tb else None
+        except Exception:
+            return None
+
+    def _make_configure_handler(self, key):
+        """Per-client Click handler — `key` is captured for the closure."""
+        def _handler(sender, e):
+            self._configure_one(key)
+        return _handler
+
+    def _configure_one(self, key):
         if not HAS_SERVICE:
             return
-        try:
-            port = int(self.port_tb.Text.strip()) if self.port_tb else None
-        except Exception:
-            port = None
-        ok, msg = MCPService.configure_claude_desktop(port=port)
+        ok, msg = MCPService.configure_client(key, port=self._current_port())
         if ok:
-            logger.info('Claude Desktop configured: {}'.format(msg))
+            logger.info('{} configured: {}'.format(key, msg))
         else:
-            logger.error('Claude Desktop configure error: {}'.format(msg))
-        self._refresh_claude_config()
+            logger.error('{} configure error: {}'.format(key, msg))
+        if self._configure_all_label:
+            self._configure_all_label.Text = (
+                'Wrote {} — restart the client to pick it up.'.format(key) if ok
+                else '{} failed: {}'.format(key, msg))
+        self._refresh_clients()
+
+    def _on_configure_all(self, sender, e):
+        if not HAS_SERVICE:
+            return
+        results = MCPService.configure_all_clients(port=self._current_port())
+        done   = [r['label'] for r in results if r['ok']]
+        failed = [r for r in results if not r['ok']]
+        for r in failed:
+            logger.error('{} configure error: {}'.format(r['label'], r['message']))
+        if self._configure_all_label:
+            if not failed:
+                self._configure_all_label.Text = (
+                    'Configured {} clients — restart them to pick it up.'.format(len(done)))
+            else:
+                self._configure_all_label.Text = (
+                    'Configured {} of {} — failed: {}'.format(
+                        len(done), len(results),
+                        ', '.join('{} ({})'.format(r['label'], r['message']) for r in failed)))
+        self._refresh_clients()
+
+    # ── Snippet ────────────────────────────────────────────────────────────────
+
+    def _snippet_fmt(self):
+        """'toml' when the Codex row is picked in the format combo, else 'json'."""
+        try:
+            if self._snippet_format_cb is not None:
+                return 'toml' if self._snippet_format_cb.SelectedIndex == 1 else 'json'
+        except Exception:
+            pass
+        return 'json'
+
+    def _refresh_snippet(self):
+        if not (HAS_SERVICE and self.config_box):
+            return
+        port_text = self.port_tb.Text if self.port_tb else None
+        try:
+            self.config_box.Text = MCPService.config_snippet(
+                port=port_text or None, fmt=self._snippet_fmt())
+        except Exception as ex:
+            logger.error('Snippet error: {}'.format(ex))
+
+    def _on_snippet_format_changed(self, sender, e):
+        self._refresh_snippet()
 
     def _on_port_changed(self, sender, e):
-        if HAS_SERVICE and self.config_box:
-            port_text = self.port_tb.Text if self.port_tb else None
-            self.config_box.Text = MCPService.config_snippet(
-                port=port_text or None
-            )
+        self._refresh_snippet()
 
     # ── Teaching capture ────────────────────────────────────────────────────────
 

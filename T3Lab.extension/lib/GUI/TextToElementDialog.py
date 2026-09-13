@@ -120,8 +120,12 @@ class TextToElementDialog(T3WPFWindow):
         self.rb_from_view.Checked += self._on_source_mode_changed
         self.rb_pick_items.Checked += self._on_source_mode_changed
 
+        if hasattr(self, "btn_ai_detect_target"):
+            self.btn_ai_detect_target.Click += self._on_ai_detect_target
+
         self._populate_categories()
         self._update_source_info()
+        self._init_ai_mode()
 
     # -------------------------------------------------------------------------
     # Window chrome
@@ -164,6 +168,116 @@ class TextToElementDialog(T3WPFWindow):
                 self.txt_source_info.Text = "Could not count text notes: {}".format(str(ex))
         else:
             self.txt_source_info.Text = "Click 'Find Intersections' to pick text notes"
+
+    def _init_ai_mode(self):
+        """Initialize AI Mode status pill if AI is active."""
+        try:
+            if hasattr(self, "ai_mode_badge"):
+                if self.is_ai_mode_active():
+                    self.ai_mode_badge.Visibility = System.Windows.Visibility.Visible
+                    info = self.get_ai_status_info()
+                    provider = info.get("provider", "Ready")
+                    model = info.get("model", "")
+                    label = "AI: {}".format(provider)
+                    if model:
+                        label = "AI: {} ({})".format(provider, model)
+                    if hasattr(self, "txt_ai_status"):
+                        self.txt_ai_status.Text = label
+                else:
+                    self.ai_mode_badge.Visibility = System.Windows.Visibility.Collapsed
+        except Exception:
+            pass
+
+    def _on_ai_detect_target(self, sender, args):
+        """Analyze sample text notes from the active view and recommend target category and parameter."""
+        if not self.is_ai_mode_active():
+            forms.alert("AI Mode is disabled or not configured. Please enable AI Mode in LLMs Setting.", title="AI Mode Inactive")
+            return
+
+        try:
+            view = self._doc.ActiveView
+            collector = FilteredElementCollector(self._doc, view.Id).OfClass(TextNote).ToElements()
+            samples = []
+            for tn in list(collector)[:20]:
+                txt = tn.Text.strip()
+                if txt and len(txt) > 1 and txt not in samples:
+                    samples.append(txt)
+        except Exception as ex:
+            samples = []
+
+        if not samples:
+            forms.alert("No text notes found in the active view to analyze.", title="No Text Notes")
+            return
+
+        self.txt_status.Text = "AI analyzing {} sample text notes in view...".format(len(samples))
+        btn = getattr(self, "btn_ai_detect_target", None)
+        orig_content = "✨ AI Detect Target"
+
+        def _restore_btn():
+            if btn:
+                btn.Content = orig_content
+                btn.IsEnabled = True
+
+        if btn:
+            btn.Content = "⏳ Detecting..."
+            btn.IsEnabled = False
+
+        system_prompt = (
+            "You are an expert Autodesk Revit BIM specialist. "
+            "Given sample text note annotations from an architectural or engineering drawing view, "
+            "recommend the most likely Revit target category from: "
+            "['Walls', 'Floors', 'Doors', 'Windows', 'Rooms', 'Structural Framing', 'Structural Columns', "
+            "'Mechanical Equipment', 'Plumbing Fixtures', 'Generic Models', 'Detail Items'] "
+            "and the target parameter name (e.g. 'Comments', 'Description', 'Mark', 'Type Mark'). "
+            "Return JSON: {\"category\": \"<CategoryName>\", \"parameter\": \"<ParamName>\", \"confidence\": 0.0-1.0, \"reasoning\": \"<1-sentence explanation>\"}."
+        )
+        prompt = (
+            "Sample text annotations in active view:\n{}\n\n"
+            "Identify the target Revit category and parameter for these text annotations."
+        ).format("\n".join("- " + s for s in samples[:15]))
+
+        def _worker():
+            return self.ai_bridge.ask_json(prompt, system_prompt=system_prompt)
+
+        def _on_success(result):
+            try:
+                if not result or not isinstance(result, dict) or "category" not in result:
+                    self.txt_status.Text = "AI analysis completed: No confident target match."
+                    return
+
+                cat_name = result.get("category", "")
+                param_name = result.get("parameter", "")
+                confidence = result.get("confidence", 0.0)
+                reasoning = result.get("reasoning", "")
+
+                matched_cat = False
+                for item in self.cmb_category.Items:
+                    if str(item).lower() == str(cat_name).lower():
+                        self.cmb_category.SelectedItem = item
+                        matched_cat = True
+                        break
+
+                if matched_cat and param_name:
+                    for p in self.cmb_parameter.Items:
+                        if str(p).lower() == str(param_name).lower():
+                            self.cmb_parameter.SelectedItem = p
+                            break
+
+                try:
+                    conf_pct = float(confidence) * 100
+                except:
+                    conf_pct = 90.0
+                self.txt_status.Text = "AI suggested: {} -> {} ({:.0f}% - {})".format(
+                    cat_name, param_name, conf_pct, reasoning
+                )
+            finally:
+                _restore_btn()
+
+        def _on_error(err):
+            _restore_btn()
+            self.txt_status.Text = "AI detection error: {}".format(err)
+
+        self.run_ai_async(_worker, on_success=_on_success, on_error=_on_error)
 
     # -------------------------------------------------------------------------
     # Event handlers
@@ -261,12 +375,8 @@ class TextToElementDialog(T3WPFWindow):
                 text_content = self._get_text_content(tn)
                 if not text_content:
                     continue
-                tn_bb = tn.get_BoundingBox(view)
-                if tn_bb is None:
-                    continue
                 for elem in elements:
-                    elem_bb = elem.get_BoundingBox(view)
-                    if self._boxes_intersect(tn_bb, elem_bb, tolerance_feet):
+                    if self._text_note_intersects_element(tn, elem, view, tolerance_feet):
                         elem_name = self._get_element_name(elem)
                         elem_id = self._get_element_id_str(elem)
                         rows.append(PreviewRow(text_content, elem_name, elem_id))
@@ -393,6 +503,44 @@ class TextToElementDialog(T3WPFWindow):
             bb1.Max.Y + tolerance_feet >= bb2.Min.Y
         )
         return x_overlap and y_overlap
+
+    def _point_in_box(self, pt, bb, tolerance_feet):
+        """Return True if 2D point (X, Y) falls within bounding box plus tolerance."""
+        if pt is None or bb is None:
+            return False
+        return (
+            bb.Min.X - tolerance_feet <= pt.X <= bb.Max.X + tolerance_feet and
+            bb.Min.Y - tolerance_feet <= pt.Y <= bb.Max.Y + tolerance_feet
+        )
+
+    def _text_note_intersects_element(self, tn, elem, view, tolerance_feet):
+        """Check if a TextNote touches or points to an element via BB, Coord, or Leaders."""
+        elem_bb = elem.get_BoundingBox(view)
+        if elem_bb is None:
+            return False
+
+        # 1. Direct bounding box overlap
+        tn_bb = tn.get_BoundingBox(view)
+        if tn_bb is not None and self._boxes_intersect(tn_bb, elem_bb, tolerance_feet):
+            return True
+
+        # 2. Text Note insertion coordinate
+        if hasattr(tn, "Coord") and tn.Coord is not None:
+            if self._point_in_box(tn.Coord, elem_bb, tolerance_feet):
+                return True
+
+        # 3. Leader arrowheads pointing to the element
+        try:
+            leaders = tn.GetLeaders()
+            if leaders:
+                for leader in leaders:
+                    if hasattr(leader, "End") and leader.End is not None:
+                        if self._point_in_box(leader.End, elem_bb, tolerance_feet):
+                            return True
+        except Exception:
+            pass
+
+        return False
 
     def _get_text_content(self, text_note):
         """Return stripped text content of a TextNote."""

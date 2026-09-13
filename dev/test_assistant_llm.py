@@ -763,9 +763,11 @@ def test_prompt_paths_carry_project_scope():
     """
     print('[assistant: project scope reaches both prompt paths]')
     import io as _io
-    src = _io.open(os.path.join(
+    _dlg = os.path.join(REPO, 'T3Lab.extension', 'lib', 'GUI', 'T3LabAssistantDialog.py')
+    _script = _dlg if os.path.exists(_dlg) else os.path.join(
         REPO, 'T3Lab.extension', 'T3Lab.tab', 'Support.panel',
-        'T3LabAssistant.pushbutton', 'script.py'), encoding='utf-8').read()
+        'T3LabAssistant.pushbutton', 'script.py')
+    src = _io.open(_script, encoding='utf-8').read()
 
     check('shared helper exists', 'def _project_prompt_blocks' in src)
     check('legacy path applies it',
@@ -784,9 +786,11 @@ def test_single_edit_surface():
     """The chat panel is read-only; editing lives in LLMs Setting."""
     print('[assistant: one edit surface]')
     import io as _io
-    src = _io.open(os.path.join(
+    _dlg = os.path.join(REPO, 'T3Lab.extension', 'lib', 'GUI', 'T3LabAssistantDialog.py')
+    _script = _dlg if os.path.exists(_dlg) else os.path.join(
         REPO, 'T3Lab.extension', 'T3Lab.tab', 'Support.panel',
-        'T3LabAssistant.pushbutton', 'script.py'), encoding='utf-8').read()
+        'T3LabAssistant.pushbutton', 'script.py')
+    src = _io.open(_script, encoding='utf-8').read()
     panel = src.split('def _build_project_panel', 1)[1]
     panel = panel.split('def _start_schedule_timer', 1)[0]
 

@@ -209,7 +209,13 @@ def _t3_alert(msg, title=None, sub_msg=None, expanded=None, footer='',
     try:
         from GUI.T3Dialog import show_info, show_warning, confirm
         if yes or no or cancel:
-            answer = bool(confirm(msg, title=caption, details=details))
+            # Label the buttons the way the caller asked the question: a
+            # yes/no prompt answered by "Proceed"/"Cancel" reads as a different
+            # question than the one on screen.
+            ok_text = 'Yes' if (yes or no) else 'OK'
+            cancel_text = 'No' if (yes or no) else 'Cancel'
+            answer = bool(confirm(msg, title=caption, details=details,
+                                  ok_text=ok_text, cancel_text=cancel_text))
         elif warn_icon:
             show_warning(msg, title=caption, details=details)
         else:

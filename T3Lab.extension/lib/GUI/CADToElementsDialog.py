@@ -2801,6 +2801,24 @@ class CADToElementsWindow(T3WPFWindow):
         self.btn_close.Click += self._on_close
         self.PreviewKeyDown += self._on_key_down
 
+        # Wire AI layer matching helpers
+        if hasattr(self, "btn_wall_ai"):
+            self.btn_wall_ai.Click += self._on_wall_ai
+        if hasattr(self, "btn_floor_ai"):
+            self.btn_floor_ai.Click += self._on_floor_ai
+        if hasattr(self, "btn_beam_ai"):
+            self.btn_beam_ai.Click += self._on_beam_ai
+        mep_labels = {
+            "duct": "HVAC Duct Lines",
+            "pipe": "Plumbing / Mechanical Pipe Lines",
+            "tray": "Cable Tray Lines",
+            "conduit": "Electrical Conduit Lines"
+        }
+        for key, lbl in mep_labels.items():
+            btn = getattr(self, "btn_{}_ai".format(key), None)
+            if btn is not None:
+                btn.Click += self._make_mep_ai_handler(key, lbl)
+
         # Populate shared combos and type-specific combos
         self._populate_cad_files()
         self._populate_levels()
@@ -2818,6 +2836,9 @@ class CADToElementsWindow(T3WPFWindow):
         self._switch_type("wall")
         self._set_status("Ready. Select a CAD file and click Refresh to scan layers.")
 
+        # AI Mode initialization
+        self._init_ai_mode()
+
     # ------------------------------------------------------------------
     # Status helper
     # ------------------------------------------------------------------
@@ -2827,6 +2848,161 @@ class CADToElementsWindow(T3WPFWindow):
             self.txt_status.Text = str(msg)
         except Exception:
             pass
+
+    # ------------------------------------------------------------------
+    # AI Mode Helpers
+    # ------------------------------------------------------------------
+
+    def _init_ai_mode(self):
+        """Initialize AI Mode status pill and tool capabilities if AI is active."""
+        try:
+            if hasattr(self, "ai_mode_badge"):
+                if self.is_ai_mode_active():
+                    self.ai_mode_badge.Visibility = Visibility.Visible
+                    info = self.get_ai_status_info()
+                    provider = info.get("provider", "Ready")
+                    model = info.get("model", "")
+                    label = "AI: {}".format(provider)
+                    if model:
+                        label = "AI: {} ({})".format(provider, model)
+                    if hasattr(self, "txt_ai_status"):
+                        self.txt_ai_status.Text = label
+                else:
+                    self.ai_mode_badge.Visibility = Visibility.Collapsed
+        except Exception:
+            pass
+
+    def _on_wall_ai(self, sender, e):
+        def _apply(matched_names):
+            count = 0
+            matched_lower = {m.lower().strip() for m in matched_names}
+            for name, cb in self._wall_layer_checkboxes.items():
+                if name.lower().strip() in matched_lower:
+                    cb.IsChecked = System.Nullable[System.Boolean](True)
+                    count += 1
+            return count
+        self._ai_match_category_layers("wall", "Walls / Partitions",
+                                       lambda: list(self._wall_layer_checkboxes.keys()),
+                                       _apply)
+
+    def _on_floor_ai(self, sender, e):
+        def _apply(matched_names):
+            count = 0
+            matched_lower = {m.lower().strip() for m in matched_names}
+            for cb, ld in self._floor_layer_checkboxes:
+                if ld.name.lower().strip() in matched_lower:
+                    try:
+                        cb.IsChecked = True
+                    except Exception:
+                        pass
+                    ld.is_selected = True
+                    count += 1
+            return count
+        self._ai_match_category_layers("floor", "Floors / Slabs",
+                                       lambda: [ld.name for _, ld in self._floor_layer_checkboxes],
+                                       _apply)
+
+    def _on_beam_ai(self, sender, e):
+        def _apply(matched_names):
+            count = 0
+            matched_lower = {m.lower().strip() for m in matched_names}
+            for name, cb in self._beam_layer_checkboxes.items():
+                if name.lower().strip() in matched_lower:
+                    cb.IsChecked = System.Nullable[System.Boolean](True)
+                    count += 1
+            return count
+        self._ai_match_category_layers("beam", "Structural Beams / Framing",
+                                       lambda: list(self._beam_layer_checkboxes.keys()),
+                                       _apply)
+
+    def _make_mep_ai_handler(self, key, label):
+        def handler(sender, e):
+            mep_dict = self._mep_layer_checkboxes.get(key, {})
+            def _apply(matched_names):
+                count = 0
+                matched_lower = {m.lower().strip() for m in matched_names}
+                for name, cb in mep_dict.items():
+                    if name.lower().strip() in matched_lower:
+                        cb.IsChecked = System.Nullable[System.Boolean](True)
+                        count += 1
+                return count
+            self._ai_match_category_layers(key, label, lambda: list(mep_dict.keys()), _apply)
+        return handler
+
+    def _ai_match_category_layers(self, category_key, category_label, get_names_fn, apply_fn):
+        """Asynchronously call AI to match CAD layers for a specific element category."""
+        if not self.is_ai_mode_active():
+            MessageBox.Show(
+                "AI Mode is currently disabled or no LLM provider is configured.\n"
+                "Please enable AI Mode in LLMs Setting to use smart layer auto-matching.",
+                "AI Mode Inactive",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information
+            )
+            return
+
+        layer_names = get_names_fn()
+        if not layer_names:
+            MessageBox.Show(
+                "No CAD layers found. Please select a CAD file and click Refresh first.",
+                "No Layers",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning
+            )
+            return
+
+        btn = getattr(self, "btn_{}_ai".format(category_key), None)
+        orig_content = btn.Content if btn else "✨ AI Select"
+
+        def _restore_btn():
+            if btn:
+                btn.Content = orig_content
+                btn.IsEnabled = True
+
+        if btn:
+            btn.Content = "⏳ Analyzing..."
+            btn.IsEnabled = False
+
+        self._set_status("AI analyzing {} CAD layers for {}...".format(len(layer_names), category_label))
+
+        system_prompt = (
+            "You are an expert BIM Manager and CAD/Revit specialist. "
+            "You analyze AutoCAD/DWG layer names and identify which layers correspond to a specific building element category. "
+            "Return JSON: {\"matched_layers\": [\"LAYER1\", \"LAYER2\"], \"confidence\": 0.0-1.0, \"reasoning\": \"<1-sentence explanation>\"}."
+        )
+        prompt = (
+            "Element Category: {}\n"
+            "CAD Layer Names in Drawing:\n{}\n\n"
+            "Identify all layer names that represent {}. Return only valid matching names from the list."
+        ).format(category_label, "\n".join("- " + l for l in layer_names[:120]), category_label)
+
+        def _worker():
+            return self.ai_bridge.ask_json(prompt, system_prompt=system_prompt)
+
+        def _on_success(result):
+            try:
+                if not result or not isinstance(result, dict) or "matched_layers" not in result:
+                    self._set_status("AI layer analysis completed: No confident matches found.")
+                    return
+                matched = result.get("matched_layers", [])
+                confidence = result.get("confidence", 0.0)
+                reasoning = result.get("reasoning", "")
+                count = apply_fn(matched)
+                try:
+                    conf_pct = float(confidence) * 100
+                except:
+                    conf_pct = 90.0
+                self._set_status("AI selected {} layer(s) for {} ({:.0f}% - {})".format(
+                    count, category_label, conf_pct, reasoning
+                ))
+            finally:
+                _restore_btn()
+
+        def _on_error(err):
+            _restore_btn()
+            self._set_status("AI layer selection error: {}".format(err))
+
+        self.run_ai_async(_worker, on_success=_on_success, on_error=_on_error)
 
     # ------------------------------------------------------------------
     # Initial population helpers

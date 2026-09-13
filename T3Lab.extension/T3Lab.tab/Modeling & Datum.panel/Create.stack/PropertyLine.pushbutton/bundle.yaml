@@ -1,5 +1,5 @@
 title: "Property\nLine"
-tooltip: "Draw property lines anywhere in the world — just type the address."
+tooltip: "Draw property lines anywhere in the world - just type the address."
 description: |
   Type any address on earth and pick the matching boundary
   Uses OpenStreetMap worldwide (no API key) and LightBox cadastral parcels for US addresses

@@ -2,6 +2,6 @@
      Nguon: icon.svg . Bang mau: dev/icons/tokens.json -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- tier B - ranh gioi thua dat + cong trinh -->
-  <polygon points="3,10 20,4 29,14 24,28 6,25" fill="#D9D9D9" stroke="#D9D9D9" stroke-width="1"/>
-  <rect x="12" y="13" width="8" height="8" fill="#FFD580"/>
+  <polygon points="3,10 20,4 29,14 24,28 6,25" fill="#EDEDED" stroke="#EDEDED" stroke-width="1"/>
+  <rect x="12" y="13" width="8" height="8" fill="#FFC14D"/>
 </svg>

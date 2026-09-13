@@ -19,7 +19,7 @@ Three layers form a self-sustaining ecosystem for architectural intelligence:
 |-------|-------------|
 | **Intelligence** | T3Lab Assistant — bilingual VI/EN language analysis, graph-based agent orchestration, RAG over project + Revit API knowledge, and multi-provider LLM routing (Ollama, LM Studio, Claude, OpenAI, DeepSeek). **Local-first**: a new install defaults to Qwen on Ollama, with an optional self-study loop that distils the office's own successful commands back into the local model. |
 | **Execution** | 42 ribbon-integrated tools organized by discipline across 7 panels |
-| **Data Fabric** | MCP server bridge for external agents (Claude Desktop can drive Revit); Vercel cloud API for family metadata; hybrid local/cloud storage |
+| **Data Fabric** | MCP server bridge for external agents (Claude Desktop, ChatGPT/Codex and Antigravity can drive Revit); Vercel cloud API for family metadata; hybrid local/cloud storage |
 
 ---
 
@@ -89,7 +89,7 @@ The tab exposes **7 panels**. Buttons marked *(DQT)* were developed in collabora
 |------|-------------|
 | **T3Lab Assistant** | Natural-language AI assistant — drive T3Lab tools via Vietnamese/English chat. |
 | **PDF Import** | Import PDF pages into selected Revit views sequentially. |
-| **Assistant Tools** (stack) | **MCP Control** (start/stop the MCP server, connection settings), **LLMs Setting** (provider, model, API key), **Feedback**. |
+| **Assistant Tools** (stack) | **MCP Control** (start/stop the MCP server, connection settings, one-click auto-configure for Claude Desktop / ChatGPT (Codex) / Antigravity), **LLMs Setting** (provider, model, API key), **Feedback**. |
 | **UI Theme & Tabs** (stack) | **BG Theme** (HSV picker with eyedropper, gradient 3D backgrounds, Light/Dark UI for Revit 2024+), **Mana Tabs** (hide/show ribbon tabs), **Ribbon Names** (shorten/restore tab names). |
 | **Cloud Links** (stack) | Autodesk Forma, Autodesk Health, Bluebeam Status. |
 

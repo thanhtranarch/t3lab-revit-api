@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- tier B - file CAD + huy hieu link -->
-  <rect x="2.5" y="6.5" width="16" height="19" fill="#F3F3F3" stroke="#464646" stroke-width="1"/>
-  <rect x="5" y="10" width="11" height="2" fill="#999999"/>
-  <rect x="5" y="15" width="8" height="2" fill="#999999"/>
-  <rect x="20" y="12" width="9" height="9" fill="#FFAA00"/>
+  <rect x="2.5" y="6.5" width="16" height="19" fill="#F3F3F3" stroke="#000000" stroke-width="1"/>
+  <rect x="5" y="10" width="11" height="2" fill="#858585"/>
+  <rect x="5" y="15" width="8" height="2" fill="#858585"/>
+  <rect x="20" y="12" width="9" height="9" fill="#E07B00"/>
 </svg>

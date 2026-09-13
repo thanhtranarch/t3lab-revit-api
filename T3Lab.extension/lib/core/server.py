@@ -42,15 +42,37 @@ except ImportError:
 _PROCESS_SINGLETON_KEY = '_t3lab_mcp_server_singleton'
 
 
+def _anchor_usable(inst):
+    """
+    True only when `inst` is a server object THIS engine can actually call.
+
+    pyRevit runs startup.py and a `#! python3` pushbutton in DIFFERENT Python
+    engines inside one Revit process (IronPython vs CPython). AppDomain data is
+    shared by all of them, so an instance anchored by one engine comes back to
+    the other as an opaque CLR object — IronPython surfaces its Python classes
+    as `IronPython.NewTypes.System.Object_1$1`, whose Python attributes are not
+    reachable from Python.NET. Handing such an object to a caller produced
+    "'Object_1$1' object has no attribute 'get_server_stats'" and, worse, left
+    the other engine free to bind a SECOND port in the same process.
+    """
+    if inst is None:
+        return False
+    for name in ('get_server_stats', 'start_server', 'stop_server'):
+        if not callable(getattr(inst, name, None)):
+            return False
+    return True
+
+
 def _get_process_anchor():
     try:
         from System import AppDomain
         existing = AppDomain.CurrentDomain.GetData(_PROCESS_SINGLETON_KEY)
-        if existing is not None:
+        if _anchor_usable(existing):
             return existing
     except Exception:
         pass
-    return getattr(sys, _PROCESS_SINGLETON_KEY, None)
+    fallback = getattr(sys, _PROCESS_SINGLETON_KEY, None)
+    return fallback if _anchor_usable(fallback) else None
 
 
 def _set_process_anchor(inst):

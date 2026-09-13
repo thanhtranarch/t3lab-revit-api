@@ -24,7 +24,8 @@ import os
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(
+_dialog = os.path.join(REPO, 'T3Lab.extension', 'lib', 'GUI', 'PointCloudDialog.py')
+SCRIPT = _dialog if os.path.exists(_dialog) else os.path.join(
     REPO, 'T3Lab.extension', 'T3Lab.tab', 'Modeling & Datum.panel',
     'Create.stack', 'Create Elements.pulldown', 'PointCloud.pushbutton',
     'script.py')

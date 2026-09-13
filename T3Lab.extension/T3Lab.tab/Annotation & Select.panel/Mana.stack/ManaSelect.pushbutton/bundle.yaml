@@ -1,10 +1,13 @@
 title: "Mana\nSelect"
-tooltip: Unified element selection, matching, and quick filter manager.
+tooltip: Element explorer, unified selection, matching and warning browser.
 description: |
-  Consolidated smart selection manager with 4 modes:
+  Consolidated selection manager with 5 modes:
+  - Explore: counted tree of every element (Category > Family > Type), with
+    Display scope, Sort by, Filter presets and search; tick any level to
+    select, zoom, isolate, export or delete
   - Quick Select: filter elements by parameter value or text content
   - Select Similar: select elements matching type, family, or category
   - Select on Sheets: locate title blocks and CAD imports across sheets
-  - Quick Filters sidebar: instantly narrow selection by link, in-place, category, group, or material
+  - Warnings: browse model warnings by kind and select the elements they flag
 
 author: Tran Tien Thanh

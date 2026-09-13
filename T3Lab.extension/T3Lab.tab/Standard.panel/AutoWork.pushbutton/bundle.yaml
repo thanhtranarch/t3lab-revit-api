@@ -1,5 +1,5 @@
-title: "Auto Work"
-tooltip: "Automate repetitive actions — quick click or record & replay"
+title: "Auto\nWork"
+tooltip: "Automate repetitive actions - quick click or record & replay"
 description: |
   Quick Click: simulate automated clicks at a fixed screen coordinate.
   Record & Replay: record any sequence of mouse actions and replay them

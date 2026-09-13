@@ -53,7 +53,7 @@ Bộ icon hiện tại (gọi là "Direction B") dùng ngôn ngữ hình hoàn t
 | | T3Lab hiện tại | Revit 2026 (đo thực tế) |
 |---|---|---|
 | Kiểu | khối đặc nhiều lớp, bo góc `rx=3..4`, có `opacity` | line-art: nét 1px + mảng nền phẳng |
-| Màu nét | không có nét — chỉ mảng | `#666666` (ta dùng `#464646`, xem §2.2) |
+| Màu nét | không có nét — chỉ mảng | `#666666` (ta dùng `#000000`, xem §2.2) |
 | Màu nền hình | navy `#182A3E` (71 lần) | `#F3F3F3` |
 | Accent | cam `#D07818` (41 lần) | xanh `#178FE6` · hổ phách `#FFAA00` · lục `#82D99F` |
 | Số màu / icon | 4–16 | **2–3** |
@@ -101,45 +101,62 @@ Lấy đúng giá trị Revit 2026 đang dùng:
 
 | Token | Light | Dark | Dùng cho |
 |-------|-------|------|----------|
-| `line` | `#464646` | `#D9D9D9` | mọi đường viền — **đã bù độ nhạt**, xem dưới |
-| `surface` | `#F3F3F3` | `#D9D9D9` | nền của hình |
-| `detail` | `#999999` | `#949494` | chi tiết phụ, dòng kẻ giả, witness line |
-| `deep` | `#4D4D4D` | `#F3F3F3` | nhấn tối, hiếm khi cần |
-| `accent.amber` | `#FFAA00` | `#FFD580` | **accent mặc định của T3Lab** |
+| `line` | `#000000` | `#EDEDED` | mọi đường viền — **đen tuyệt đối**, xem dưới |
+| `surface` | `#F3F3F3` | `#EDEDED` | nền của hình |
+| `detail` | `#858585` | `#A8A8A8` | chi tiết phụ, mảng đặc cấp hai, witness line |
+| `deep` | `#3C3C3C` | `#FFFFFF` | mảng đặc nhấn mạnh — tối hơn `detail`, nhạt hơn nét |
+| `accent.amber` | `#E07B00` | `#FFC14D` | **accent mặc định của T3Lab** |
 | `accent.blue` | `#178FE6` | `#89CBFA` | đối tượng "view / thông tin" |
-| `accent.green` | `#82D99F` | `#BFDCBF` | hành động "tạo mới / thêm" |
+| `accent.green` | `#57B97A` | `#A8D9B8` | hành động "tạo mới / thêm" |
 
-#### `line` là chỗ duy nhất cố ý lệch khỏi Revit
+> **Đổi ngày 2026-09-11 — bảng màu rời khỏi giá trị Revit.** Trước đó mọi giá trị
+> light lấy đúng của Revit 2026 (nét `#666666` bù thành `#464646`, amber `#FFAA00`,
+> lục `#82D99F`). Yêu cầu mới là icon phải **đọc rõ chức năng ngay trên ribbon**,
+> nên nét chuyển sang **đen**, `detail` bù hết độ nhạt, amber và lục đậm lên.
+> Giá trị Revit gốc vẫn ghi ở §1 để đối chiếu — nó là **gốc đo được**, không còn là
+> **đích phải bám**.
 
-Revit vẽ nét icon bằng `#666666`. Ta vẽ bằng `#464646` — tối hơn — và **đó là có ý**.
+#### `line` — đen tuyệt đối, và vì sao màn hình vẫn không ra đen
 
-Revit ship ảnh 32px gốc nên không bị thu. pyRevit thì decode PNG 64px rồi để WPF thu
-2:1 lúc vẽ, nên nét 1 unit bị trộn với nền. Đo thực tế trên chính bộ icon này:
+Revit vẽ nét icon bằng `#666666`. Ta vẽ bằng `#000000`, và **đó là có ý**: đích là
+nét đen, không phải nét giống Revit.
 
-| | nguồn 64px | sau khi thu về 32px |
+Vẫn phải hiểu cơ chế cũ vì nó không biến mất. Revit ship ảnh 32px gốc nên không bị
+thu. pyRevit thì decode PNG 64px rồi để WPF thu 2:1 lúc vẽ, nên nét 1 unit bị trộn
+với nền — độ phủ còn lại đo được là **0.810**. Trên nền ribbon `#EFEFEF` (lum 239):
+
+> nét nguồn lum `L` → hiện ra lum `239 + 0.81 × (L − 239)`
+
+| nguồn 64px | sau khi thu về 32px | trông như |
 |---|---|---|
-| nét `#666666` | luminance 102 | luminance **128–134** — trông như `#868686` |
-| nét `#464646` | luminance 70 | luminance **104–109** ✅ |
+| `#666666` (lum 102) — Revit | lum 128 | `#868686` |
+| `#464646` (lum 70) — cũ | lum 102 | `#666666` |
+| `#000000` (lum 0) — **nay** | lum 45 | `#2D2D2D` |
 
-Độ phủ còn lại của nét sau khi thu là **0.810**. Giải ngược: để nét rơi đúng vào
-luminance 102 thì nguồn phải có luminance 70 = `#464646`.
+Tức là `#000000` là mức **đen nhất đường ống này cho phép**. Muốn đậm hơn nữa thì
+chỉ còn cách tăng `stroke-width`, không phải đổi màu.
 
-Nên đổi giá trị này là **để nét trông giống Revit hơn**, không phải để đậm hơn Revit.
-Ai thấy `#464646` "không phải màu Revit" thì nhớ: màu trên đĩa khác màu trên màn hình
-khi ở giữa có một lần thu ảnh.
+Cùng lý do đó, `detail` đổi `#999999` → `#858585`: `#999999` hiện ra `#A9A9A9` (chìm),
+`#858585` hiện ra đúng `#999999` — đúng sắc xám mà icon được thiết kế. `detail` là
+**mảng đặc cấp hai**, phải nằm dưới nét đen; đã thử `#767676` và mảng đặc trở nên
+nặng, tranh chấp với nét.
 
-Bản dark **không cần bù** — icon dark là silhouette đặc, nét gộp luôn vào mảng nền
-nên không có nét 1px nào để mà nhạt.
+Bản dark đi ngược chiều: **sáng lên** (`#D9D9D9` → `#EDEDED`) để cùng tăng tương
+phản. Icon dark vẫn là silhouette đặc — nét và mảng nền dùng chung một màu, nên
+không có nét 1px nào để mà bù.
 
-**Chỉ một accent cho mỗi icon, ≤ 20% diện tích.** Hổ phách `#FFAA00` được chọn làm
-accent mặc định vì (a) nó nằm sẵn trong bảng accent của Revit nên không lạc quẻ, và
-(b) nó gần nhất với cam thương hiệu `#D07818` — giữ được nhận diện T3Lab mà vẫn
-Revit-native. Navy `#182A3E` **bị loại khỏi icon ribbon** (vẫn giữ trong UI cửa sổ).
+**Chỉ một accent cho mỗi icon, ≤ 20% diện tích.** Hổ phách được chọn làm accent mặc
+định vì nó gần nhất với cam thương hiệu `#D07818` — giữ được nhận diện T3Lab. Giá trị
+Revit `#FFAA00` sau khi thu 2:1 hiện ra `#FCB72D`: vàng nhạt, chìm trên nền ribbon
+sáng. Nay dùng `#E07B00` → hiện ra `#E38F2D`, cam đậm rõ, bật tốt cạnh nét đen.
+Lục `#82D99F` cũng nhạt cùng kiểu nên đậm lên `#57B97A`.
+
+Navy `#182A3E` **bị loại khỏi icon ribbon** (vẫn giữ trong UI cửa sổ).
 
 ### 2.3 Dark theme — silhouette, không phải đảo màu
 
 Revit không vẽ lại icon cho dark; nó **gộp nét và nền thành một tông sáng**, rồi
-dùng tông xám tối hơn (`#949494`) để khoét chi tiết. Kiểm chứng trên
+dùng tông xám tối hơn (`#A8A8A8`, Revit dùng `#949494`) để khoét chi tiết. Kiểm chứng trên
 `family_open_32_dark.png`: bản light là nét `#666666` + nền `#F3F3F3`, bản dark là
 **một khối đặc `#D9D9D9` duy nhất**.
 
@@ -270,7 +287,7 @@ Xoá `icon.svg` / `icon.png` mồ côi, chuẩn hoá 3 PNG lệch size, xoá 3 s
 
 | Rủi ro | Xử lý |
 |--------|-------|
-| Mất nhận diện T3Lab khi bỏ navy + cam | Giữ accent hổ phách `#FFAA00` ở **mọi** icon — nó là sợi chỉ đỏ xuyên suốt |
+| Mất nhận diện T3Lab khi bỏ navy + cam | Giữ accent hổ phách `#E07B00` ở **mọi** icon — nó là sợi chỉ đỏ xuyên suốt |
 | Tier B nhoè ở 24px | Luật chi tiết ≥ 2 unit (§2.4); pilot bắt buộc có 1 icon tier B |
 | Revit 2023 không có dark | Bản light phải tự đứng vững; QA riêng trên 2023 |
 | Icon "quá Revit" đến mức không nhận ra panel T3Lab | Accent hổ phách + tên panel giữ nguyên; đánh giá lại sau pilot |

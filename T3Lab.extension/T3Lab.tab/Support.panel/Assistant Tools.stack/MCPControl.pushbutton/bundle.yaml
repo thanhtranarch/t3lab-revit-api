@@ -1,5 +1,5 @@
 title: "MCP\nControl"
-tooltip: "AI Connection & MCP Control Panel — Start/Stop the MCP server and manage connection settings."
+tooltip: "AI Connection & MCP Control Panel - Start/Stop the MCP server and manage connection settings."
 description: |
   Start or stop the local MCP server process
   View server status and active connection info

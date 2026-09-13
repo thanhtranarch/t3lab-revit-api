@@ -2,7 +2,7 @@
      Nguon: icon.svg . Bang mau: dev/icons/tokens.json -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- tier B - room o tren thanh san o duoi -->
-  <rect x="3.5" y="4.5" width="25" height="11" fill="#D9D9D9" stroke="#D9D9D9" stroke-width="1"/>
-  <polygon points="12,17 20,17 16,21" fill="#FFD580"/>
-  <rect x="3.5" y="22.5" width="25" height="6" fill="#949494" stroke="#D9D9D9" stroke-width="1"/>
+  <rect x="3.5" y="4.5" width="25" height="11" fill="#EDEDED" stroke="#EDEDED" stroke-width="1"/>
+  <polygon points="12,17 20,17 16,21" fill="#FFC14D"/>
+  <rect x="3.5" y="22.5" width="25" height="6" fill="#A8A8A8" stroke="#EDEDED" stroke-width="1"/>
 </svg>

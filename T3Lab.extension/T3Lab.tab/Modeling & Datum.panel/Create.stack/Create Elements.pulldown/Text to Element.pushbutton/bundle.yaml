@@ -5,6 +5,6 @@ description: |
   Maps the note's text content to a chosen instance or type parameter
   Supports bounding-box intersection matching for accurate spatial assignment
   Batch-processes all matching notes in a single operation
-  No selection required — runs across the entire active view
+  No selection required - runs across the entire active view
 author: "Tran Tien Thanh"
 version: "1.0.0"

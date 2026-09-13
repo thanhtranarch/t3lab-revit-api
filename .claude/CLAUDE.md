@@ -105,6 +105,7 @@ Agent definitions: `.claude/agents/`
 | **UI gate** | `python3 dev/audit_t3.py --quiet` (`--legacy` xem nợ migration) |
 | **Ribbon icon standard** | `docs/ui-governance/09-ribbon-icon-standard.md` |
 | **Icon gate + build** | `python3 dev/audit_icons.py --quiet` · `python3 dev/build_icons.py` |
+| **API-context gate (dialog modeless)** | `python3 dev/audit_api_context.py --quiet` |
 | **Icon colour tokens** | `dev/icons/tokens.json` |
 | **Stylesheet sync** | `python3 dev/sync_t3_styles.py` (`--check`) |
 | Revit theme palette (legacy Revit-native) | `T3Lab.extension/lib/GUI/RevitTheme.py` |

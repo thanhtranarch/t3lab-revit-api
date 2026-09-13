@@ -6,8 +6,8 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="Selection Manager"
-        Width="1080" Height="740"
-        MinWidth="920" MinHeight="600"
+        Width="560" Height="840"
+        MinWidth="460" MinHeight="560"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="False"
         Background="{DynamicResource T3.Surface}"
@@ -224,6 +224,13 @@
                  E946 Info        E7BA Warning    E783 Error      E713 Settings
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
+                 E8A3 Zoom        E7B3 Isolate    E7C9 Pick
+
+               Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
+                 1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
+                    Search, nên Zoom phải là E8A3 (kính lúp có dấu +).
+                 2. Codepoint có thật trong font — glyph không tồn tại ra ô vuông tofu và
+                    audit_t3.py không bắt được, nó chỉ grep source.
           -->
 
           <!-- Icon nền: cỡ Label (11), màu thừa kế từ control chứa nó. -->
@@ -978,6 +985,137 @@
             </Setter>
           </Style>
 
+          <!-- ══════════════════ 11b · TREEVIEW ══════════════════
+               Cây phân cấp có đếm (Category → Family → Type). Thêm 2026-09-12 cho
+               ManaSelect Explore; trước đó ManaFami/IFCSG dùng TreeView trần nên ra
+               vệt xanh Windows và hàng cao lệch khỏi thang T3.
+
+               Chevron xoay 90° khi mở — CÙNG một ngôn ngữ với T3.Expander, không dùng
+               ô +/− của Windows. Hover/selected bằng token nên không còn vệt xanh.
+
+               Virtualization bật ở CẢ HAI style (TreeView và TreeViewItem): cây của
+               model lớn có hàng nghìn node, không bật là WPF realize hết và treo Revit.
+               Đây là ràng buộc kỹ thuật thắng Design System theo mục 3 của
+               docs/ui-governance/08-design-system-authority.md.
+
+               LƯU Ý cho code Python: khi tự dựng `TreeViewItem()` rồi Add vào
+               `.Items`, item CHÍNH LÀ container nên `ItemContainerStyle` KHÔNG áp vào
+               nó. Phải gán tay `item.Style = win.FindResource("T3.TreeViewItem")`.
+               ══════════════════ -->
+          <Style x:Key="T3.TreeViewItem" TargetType="TreeViewItem">
+            <Setter Property="FontFamily" Value="{StaticResource T3.Font}"/>
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Body}"/>
+            <Setter Property="Foreground" Value="{StaticResource T3.Text}"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="ItemsPanel">
+              <Setter.Value>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+              </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="TreeViewItem">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="16"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto"/>
+                      <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Chevron mở/đóng: ẩn (Hidden, không Collapsed) khi node là lá,
+                         để cột 16px vẫn giữ đúng bậc thang thụt đầu dòng. -->
+                    <ToggleButton x:Name="tgl" Grid.Row="0" Grid.Column="0"
+                                  Width="16" MinHeight="{StaticResource T3.H.Row}"
+                                  Cursor="Hand" Focusable="False" ClickMode="Press"
+                                  IsChecked="{Binding IsExpanded, Mode=TwoWay,
+                                              RelativeSource={RelativeSource TemplatedParent}}">
+                      <ToggleButton.Template>
+                        <ControlTemplate TargetType="ToggleButton">
+                          <Border Background="Transparent">
+                            <Path x:Name="chev" Data="M8 5 L14 11 L8 17"
+                                  Stroke="{StaticResource T3.TextMuted}" StrokeThickness="2"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Width="8" Height="8" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  RenderTransformOrigin="0.5,0.5"/>
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                              <Setter TargetName="chev" Property="RenderTransform">
+                                <Setter.Value><RotateTransform Angle="90"/></Setter.Value>
+                              </Setter>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                              <Setter TargetName="chev" Property="Stroke" Value="{StaticResource T3.Ink}"/>
+                            </Trigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </ToggleButton.Template>
+                    </ToggleButton>
+
+                    <Border x:Name="row" Grid.Row="0" Grid.Column="1"
+                            Background="Transparent"
+                            BorderBrush="Transparent" BorderThickness="1"
+                            CornerRadius="{StaticResource T3.R.Pill}"
+                            MinHeight="{StaticResource T3.H.Row}" Padding="4,0">
+                      <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <ItemsPresenter x:Name="host" Grid.Row="1" Grid.Column="1"/>
+                  </Grid>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsExpanded" Value="False">
+                      <Setter TargetName="host" Property="Visibility" Value="Collapsed"/>
+                    </Trigger>
+                    <Trigger Property="HasItems" Value="False">
+                      <Setter TargetName="tgl" Property="Visibility" Value="Hidden"/>
+                    </Trigger>
+                    <!-- SourceName="row": IsMouseOver của TreeViewItem còn đúng khi trỏ
+                         vào node CON, sẽ sáng cả hàng cha. Chỉ soi đúng border hàng. -->
+                    <Trigger SourceName="row" Property="IsMouseOver" Value="True">
+                      <Setter TargetName="row" Property="Background" Value="{StaticResource T3.SurfaceSunken}"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                      <Setter TargetName="row" Property="Background"  Value="{StaticResource T3.Canvas}"/>
+                      <Setter TargetName="row" Property="BorderBrush" Value="{StaticResource T3.BorderStrong}"/>
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+
+          <Style x:Key="T3.TreeView" TargetType="TreeView">
+            <Setter Property="FontFamily" Value="{StaticResource T3.Font}"/>
+            <Setter Property="FontSize"   Value="{StaticResource T3.Size.Body}"/>
+            <Setter Property="Foreground" Value="{StaticResource T3.Text}"/>
+            <Setter Property="Background" Value="{StaticResource T3.Surface}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource T3.Border}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource T3.TreeViewItem}"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="ItemsPanel">
+              <Setter.Value>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+
           <!-- ══════════════════ 12 · CHROME: CALLOUT, FOOTER, TITLE BAR ══════════════════ -->
           <Style x:Key="T3.Callout" TargetType="Border">
             <Setter Property="Background"  Value="{StaticResource T3.SurfaceSunken}"/>
@@ -1483,7 +1621,6 @@
         <!-- ═══ HẾT T3 STYLES ═══ -->
         </ResourceDictionary>
     </Window.Resources>
-
     <!-- ═══ Outer Window Border ═══ -->
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1.5"
             CornerRadius="12" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
@@ -1502,14 +1639,16 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,0"
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Image x:Name="logo_image" Height="28" Margin="0,0,12,0"
+                        <Image x:Name="logo_image" Height="28" Margin="0,0,8,0"
                                VerticalAlignment="Center"
                                RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Orientation="Vertical" VerticalAlignment="Center">
                             <TextBlock Text="Selection Manager" Style="{StaticResource T3.Title}"/>
-                            <TextBlock Text="Advanced filtering and multi-category element selection" Style="{StaticResource T3.Subtitle}"/>
+                            <TextBlock x:Name="txt_mode_subtitle"
+                                       Text="Counted tree of every element in scope"
+                                       Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -1532,142 +1671,449 @@
             <!-- ══════════════════ ROW 1: WORKSPACE WITH REFINED SIDEBAR ══════════════════ -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="58"/>    <!-- Col 0: Left Sidebar Rail -->
+                    <ColumnDefinition Width="48"/>    <!-- Col 0: Left Sidebar Rail -->
                     <ColumnDefinition Width="*"/>     <!-- Col 1: Main Content Views -->
                 </Grid.ColumnDefinitions>
 
                 <!-- ── Col 0: Left Sidebar Rail ── -->
                 <Border Grid.Column="0"
-                    Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                <Grid Margin="0,12,0,12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/> <!-- Nav: Quick Select -->
-                        <RowDefinition Height="Auto"/> <!-- Nav: Select Similar -->
-                        <RowDefinition Height="Auto"/> <!-- Nav: Select on Sheets -->
-                        <RowDefinition Height="*"/>    <!-- Spacer -->
-                    </Grid.RowDefinitions>
+                        Background="{StaticResource T3.SurfaceSunken}"
+                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
+                    <Grid Margin="0,8,0,8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Nav: Explore -->
+                            <RowDefinition Height="Auto"/> <!-- Nav: Quick Select -->
+                            <RowDefinition Height="Auto"/> <!-- Nav: Select Similar -->
+                            <RowDefinition Height="Auto"/> <!-- Nav: Select on Sheets -->
+                            <RowDefinition Height="Auto"/> <!-- Nav: Warnings -->
+                            <RowDefinition Height="*"/>    <!-- Spacer -->
+                        </Grid.RowDefinitions>
 
-                    <!-- Nav: Quick Select -->
-                    <ToggleButton x:Name="nav_toggle_quick_select" Grid.Row="0"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8" IsChecked="True"
-                                  ToolTip="Quick Select">
-                        <Path Data="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
+                        <!-- Nav: Explore — cây phân cấp, mode mặc định -->
+                        <ToggleButton x:Name="nav_toggle_explore" Grid.Row="0"
+                                      Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4" IsChecked="True"
+                                      ToolTip="Explore — counted tree of every element">
+                            <Path Data="M3 5h6l2 3h10v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5z M8 12h9 M8 16h6"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Width="18" Height="18" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </ToggleButton>
 
-                    <!-- Nav: Select Similar -->
-                    <ToggleButton x:Name="nav_toggle_select_similar" Grid.Row="1"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  ToolTip="Select Similar">
-                        <Path Data="M9 9h11v11H9z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
+                        <!-- Nav: Quick Select -->
+                        <ToggleButton x:Name="nav_toggle_quick_select" Grid.Row="1"
+                                      Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4"
+                                      ToolTip="Quick Select — table of elements (needs a wider window)">
+                            <Path Data="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Width="18" Height="18" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </ToggleButton>
 
-                    <!-- Nav: Select on Sheets -->
-                    <ToggleButton x:Name="nav_toggle_select_sheets" Grid.Row="2"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  ToolTip="Select on Sheets">
-                        <Path Data="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-                </Grid>
-            </Border>
+                        <!-- Nav: Select Similar -->
+                        <ToggleButton x:Name="nav_toggle_select_similar" Grid.Row="2"
+                                      Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4"
+                                      ToolTip="Select Similar">
+                            <Path Data="M9 9h11v11H9z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Width="18" Height="18" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </ToggleButton>
+
+                        <!-- Nav: Select on Sheets -->
+                        <ToggleButton x:Name="nav_toggle_select_sheets" Grid.Row="3"
+                                      Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4"
+                                      ToolTip="Select on Sheets">
+                            <Path Data="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Width="18" Height="18" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </ToggleButton>
+
+                        <!-- Nav: Warnings -->
+                        <ToggleButton x:Name="nav_toggle_warnings" Grid.Row="4"
+                                      Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4"
+                                      ToolTip="Warnings — browse and select flagged elements">
+                            <Path Data="M12 3 L22 20 H2 Z M12 9v5 M12 17h0.01"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Width="18" Height="18" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </ToggleButton>
+                    </Grid>
+                </Border>
 
                 <!-- ── Col 1: Main Content Views ── -->
-                <!-- ══════════════════ ROW 1: CONTENT TABS (Col 1) ══════════════════ -->
-            <Border Grid.Column="1" Background="{DynamicResource T3.Surface}">
-                <TabControl x:Name="main_tab_control" BorderThickness="0" Background="Transparent">
-                    <!-- Tab 1: Quick Select (Mount point) -->
-                    <TabItem Style="{StaticResource T3.TabItem.Hidden}">
-                        <Grid x:Name="grid_quick_select"/>
-                    </TabItem>
+                <Border Grid.Column="1" Background="{DynamicResource T3.Surface}">
+                    <TabControl x:Name="main_tab_control" BorderThickness="0" Background="Transparent">
 
-                    <!-- Tab 2: Select Similar -->
-                    <TabItem Style="{StaticResource T3.TabItem.Hidden}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel Margin="24,16,24,16">
-                                <TextBlock Text="SELECT SIMILAR ELEMENTS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                <TextBlock Text="Select similar elements by matching property criteria." Style="{StaticResource T3.Caption}" Margin="0,0,0,16"/>
+                        <!-- ══════════ Tab 0: EXPLORE ══════════ -->
+                        <TabItem Style="{StaticResource T3.TabItem.Hidden}">
+                            <Grid Margin="12">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>  <!-- scope / sort / filter / search -->
+                                    <RowDefinition Height="Auto"/>  <!-- icon action bar -->
+                                    <RowDefinition Height="*"/>     <!-- tree + tally -->
+                                    <RowDefinition Height="Auto"/>  <!-- info panel -->
+                                </Grid.RowDefinitions>
 
-                                <!-- Seed Element Box -->
-                                <TextBlock Text="SEED ELEMENT" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1" Background="{StaticResource T3.SurfaceSunken}" CornerRadius="4" Padding="12,8" Margin="0,0,0,16">
+                                <!-- ── Query block: 2x2 để vừa cửa sổ hẹp ── -->
+                                <Border Grid.Row="0" Style="{StaticResource T3.Panel}" Padding="12"
+                                        Margin="0,0,0,8">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <Button x:Name="btn_pick_similar_seed" Grid.Column="0"
-                                                Style="{StaticResource T3.Button.Secondary}"
-                                                Content="Pick Element in Model" Height="28" Padding="12,0" Margin="0,0,16,0"/>
-                                        <TextBlock x:Name="txt_similar_seed_status" Grid.Column="1"
-                                                   Text="No element picked — uses current Revit selection if any"
-                                                   Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,8">
+                                            <TextBlock Text="DISPLAY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                            <ComboBox x:Name="cbo_explore_scope" Style="{StaticResource T3.ComboBox}"
+                                                      ToolTip="Which elements to browse"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
+                                            <TextBlock Text="SORT BY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                            <ComboBox x:Name="cbo_explore_group" Style="{StaticResource T3.ComboBox}"
+                                                      ToolTip="How the tree is grouped"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,8,0">
+                                            <TextBlock Text="FILTER" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                            <ComboBox x:Name="cbo_explore_filter" Style="{StaticResource T3.ComboBox}"
+                                                      ToolTip="Narrow the tree to one kind of element"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1" Grid.Column="1">
+                                            <TextBlock Text="SEARCH" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                            <TextBox x:Name="txt_explore_search" Style="{StaticResource T3.Search}"
+                                                     Tag="Category, family or type"/>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
 
-                                <!-- Match Mode Box -->
-                                <TextBlock Text="MATCH MODE" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1" Background="{StaticResource T3.SurfaceSunken}" CornerRadius="4" Padding="12,12" Margin="0,0,0,16">
-                                    <StackPanel Orientation="Horizontal">
-                                        <RadioButton x:Name="rb_similar_mode_type" Style="{StaticResource T3.RadioButton}" Content="Type" IsChecked="True" Margin="0,0,24,0"/>
-                                        <RadioButton x:Name="rb_similar_mode_family" Style="{StaticResource T3.RadioButton}" Content="Family" Margin="0,0,24,0"/>
-                                        <RadioButton x:Name="rb_similar_mode_category" Style="{StaticResource T3.RadioButton}" Content="Category"/>
+                                <!-- ── Icon action bar: chỉ icon để vừa bề ngang hẹp ── -->
+                                <Grid Grid.Row="1" Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                        <Button x:Name="btn_explore_refresh" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0" Margin="0,0,4,0"
+                                                ToolTip="Refresh — re-read the model">
+                                            <TextBlock Text="&#xE72C;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                        <Button x:Name="btn_explore_expand" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0" Margin="0,0,4,0"
+                                                ToolTip="Expand every group">
+                                            <TextBlock Text="&#xE70D;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                        <Button x:Name="btn_explore_collapse" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0"
+                                                ToolTip="Collapse back to the top level">
+                                            <TextBlock Text="&#xE70E;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
                                     </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                        <Button x:Name="btn_explore_pick" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0" Margin="0,0,4,0"
+                                                ToolTip="Pick elements in the model, then browse just those">
+                                            <TextBlock Text="&#xE7C9;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                        <Button x:Name="btn_explore_zoom" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0" Margin="0,0,4,0"
+                                                ToolTip="Zoom the active view to the checked elements">
+                                            <TextBlock Text="&#xE8A3;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                        <Button x:Name="btn_explore_isolate" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0" Margin="0,0,4,0"
+                                                ToolTip="Temporarily isolate the checked elements">
+                                            <TextBlock Text="&#xE7B3;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                        <Button x:Name="btn_explore_export" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0" Margin="0,0,4,0"
+                                                ToolTip="Save the tree as shown to a CSV file">
+                                            <TextBlock Text="&#xE74E;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                        <Button x:Name="btn_explore_delete" Style="{StaticResource T3.Button.Danger}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0"
+                                                ToolTip="Delete the checked elements from the model">
+                                            <TextBlock Text="&#xE74D;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- ── Tree + tally: MỘT border, không khe hở (luật 19) ── -->
+                                <Border Grid.Row="2" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="1"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <Grid Grid.Row="0">
+                                            <TreeView x:Name="tree_explore" Style="{StaticResource T3.TreeView}"/>
+                                            <TextBlock x:Name="txt_explore_empty" Style="{StaticResource T3.Empty}"
+                                                       Visibility="Collapsed" Margin="16"
+                                                       Text="No elements match this Display, Filter and Search.&#x0a;Switch Display to Entire Model, or clear the search box."/>
+                                        </Grid>
+
+                                        <Border Grid.Row="1" Background="{StaticResource T3.Border}"/>
+
+                                        <!-- All/None sống cạnh con số đếm, không ở footer: cửa sổ hẹp
+                                             không còn chỗ, và đặt ở đây thì nó thuộc về đúng cái cây
+                                             mà nó tác động. -->
+                                        <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}" Padding="8,4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,12,0">
+                                                    <Button x:Name="btn_explore_all" Content="All"
+                                                            Style="{StaticResource T3.Button.Ghost}"
+                                                            MinWidth="48" Height="26" Padding="8,0" Margin="0,0,4,0"
+                                                            ToolTip="Check every group in the tree"/>
+                                                    <Button x:Name="btn_explore_none" Content="None"
+                                                            Style="{StaticResource T3.Button.Ghost}"
+                                                            MinWidth="48" Height="26" Padding="8,0"
+                                                            ToolTip="Clear every check in the tree"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                            VerticalAlignment="Center">
+                                                    <TextBlock x:Name="txt_explore_tally_elements" Style="{StaticResource T3.Tally}"
+                                                               Text="0 elements"/>
+                                                    <TextBlock x:Name="txt_explore_tally_groups" Style="{StaticResource T3.Tally}"
+                                                               Text="0 groups"/>
+                                                    <TextBlock x:Name="txt_explore_tally_checked" Style="{StaticResource T3.Tally}"
+                                                               Text="0 checked"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
                                 </Border>
 
-                                <!-- Search Scope Box -->
-                                <TextBlock Text="SEARCH SCOPE" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1" Background="{StaticResource T3.SurfaceSunken}" CornerRadius="4" Padding="12,12" Margin="0,0,0,24">
-                                    <StackPanel Orientation="Horizontal">
-                                        <RadioButton x:Name="rb_similar_scope_view" Style="{StaticResource T3.RadioButton}" Content="Active View" IsChecked="True" Margin="0,0,24,0"/>
-                                        <RadioButton x:Name="rb_similar_scope_model" Style="{StaticResource T3.RadioButton}" Content="Entire Model"/>
+                                <!-- ── Info panel: chi tiết node đang trỏ ── -->
+                                <Border Grid.Row="3" Style="{StaticResource T3.Callout}" Margin="0,8,0,0" Padding="12,8">
+                                    <StackPanel>
+                                        <TextBlock x:Name="txt_explore_info_title" Style="{StaticResource T3.BodyStrong}"
+                                                   Text="Nothing highlighted" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="txt_explore_info_detail" Style="{StaticResource T3.Caption}"
+                                                   Margin="0,4,0,0" TextWrapping="Wrap"
+                                                   Text="Click a row to read its details. Double-click to show it in the model."/>
                                     </StackPanel>
                                 </Border>
+                            </Grid>
+                        </TabItem>
 
-                                <Button x:Name="btn_run_select_similar" Style="{StaticResource T3.Button.Primary}"
-                                        HorizontalAlignment="Left" Width="180" Height="28" Content="Apply Selection" IsDefault="True"/>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
+                        <!-- ══════════ Tab 1: QUICK SELECT (mount point) ══════════ -->
+                        <TabItem Style="{StaticResource T3.TabItem.Hidden}">
+                            <Grid x:Name="grid_quick_select"/>
+                        </TabItem>
 
-                    <!-- Tab 3: Select on Sheets -->
-                    <TabItem Style="{StaticResource T3.TabItem.Hidden}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel Margin="24,16,24,16">
-                                <TextBlock Text="SELECT ON SHEETS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                <TextBlock Text="Select imported CAD files or title blocks placed across sheets." Style="{StaticResource T3.Caption}" Margin="0,0,0,16"/>
+                        <!-- ══════════ Tab 2: SELECT SIMILAR ══════════ -->
+                        <TabItem Style="{StaticResource T3.TabItem.Hidden}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Margin="12">
+                                    <TextBlock Text="SELECT SIMILAR ELEMENTS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Select similar elements by matching property criteria."
+                                               Style="{StaticResource T3.Caption}" Margin="0,0,0,16" TextWrapping="Wrap"/>
 
-                                <!-- Target Elements Box -->
-                                <TextBlock Text="TARGET ELEMENTS" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1" Background="{StaticResource T3.SurfaceSunken}" CornerRadius="4" Padding="12,12" Margin="0,0,0,24">
-                                    <StackPanel Orientation="Horizontal">
-                                        <RadioButton x:Name="rb_sheet_target_dwg" Style="{StaticResource T3.RadioButton}" Content="CAD Imports (DWGs)" IsChecked="True" Margin="0,0,24,0"/>
-                                        <RadioButton x:Name="rb_sheet_target_tb" Style="{StaticResource T3.RadioButton}" Content="Title Blocks"/>
+                                    <!-- Seed Element Box -->
+                                    <TextBlock Text="SEED ELEMENT" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <Border Style="{StaticResource T3.Callout}" Margin="0,0,0,16" Padding="12,8">
+                                        <StackPanel>
+                                            <Button x:Name="btn_pick_similar_seed"
+                                                    Style="{StaticResource T3.Button.Secondary}"
+                                                    Content="Pick Element in Model" Height="28" Padding="12,0"
+                                                    HorizontalAlignment="Left"/>
+                                            <TextBlock x:Name="txt_similar_seed_status"
+                                                       Text="No element picked — uses current Revit selection if any"
+                                                       Style="{StaticResource T3.Body.Secondary}" Margin="0,8,0,0"
+                                                       TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Match Mode Box -->
+                                    <TextBlock Text="MATCH MODE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <Border Style="{StaticResource T3.Callout}" Margin="0,0,0,16" Padding="12">
+                                        <StackPanel>
+                                            <RadioButton x:Name="rb_similar_mode_type" Style="{StaticResource T3.RadioButton}" Content="Type" IsChecked="True"/>
+                                            <RadioButton x:Name="rb_similar_mode_family" Style="{StaticResource T3.RadioButton}" Content="Family" Margin="0,8,0,0"/>
+                                            <RadioButton x:Name="rb_similar_mode_category" Style="{StaticResource T3.RadioButton}" Content="Category" Margin="0,8,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Search Scope Box -->
+                                    <TextBlock Text="SEARCH SCOPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <Border Style="{StaticResource T3.Callout}" Margin="0,0,0,16" Padding="12">
+                                        <StackPanel>
+                                            <RadioButton x:Name="rb_similar_scope_view" Style="{StaticResource T3.RadioButton}" Content="Active View" IsChecked="True"/>
+                                            <RadioButton x:Name="rb_similar_scope_model" Style="{StaticResource T3.RadioButton}" Content="Entire Model" Margin="0,8,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <TextBlock Text="Press the action button in the footer to apply the match."
+                                               Style="{StaticResource T3.Caption}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ══════════ Tab 3: SELECT ON SHEETS ══════════ -->
+                        <TabItem Style="{StaticResource T3.TabItem.Hidden}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Margin="12">
+                                    <TextBlock Text="SELECT ON SHEETS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Select imported CAD files or title blocks placed across sheets."
+                                               Style="{StaticResource T3.Caption}" Margin="0,0,0,16" TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="TARGET ELEMENTS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <Border Style="{StaticResource T3.Callout}" Margin="0,0,0,16" Padding="12">
+                                        <StackPanel>
+                                            <RadioButton x:Name="rb_sheet_target_dwg" Style="{StaticResource T3.RadioButton}" Content="CAD Imports (DWGs)" IsChecked="True"/>
+                                            <RadioButton x:Name="rb_sheet_target_tb" Style="{StaticResource T3.RadioButton}" Content="Title Blocks" Margin="0,8,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <TextBlock Text="Press the action button in the footer to run the selection. Sheets already selected in Revit are used; otherwise you are asked to pick them."
+                                               Style="{StaticResource T3.Caption}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- ══════════ Tab 4: WARNINGS ══════════ -->
+                        <TabItem Style="{StaticResource T3.TabItem.Hidden}">
+                            <Grid Margin="12">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>  <!-- search -->
+                                    <RowDefinition Height="Auto"/>  <!-- icon action bar -->
+                                    <RowDefinition Height="*"/>     <!-- tree + tally -->
+                                    <RowDefinition Height="Auto"/>  <!-- info panel -->
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Margin="0,0,0,8">
+                                    <TextBlock Text="SEARCH WARNINGS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="txt_warning_search" Style="{StaticResource T3.Search}"
+                                             Tag="Warning text, category or type"/>
+                                </StackPanel>
+
+                                <Grid Grid.Row="1" Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                        <Button x:Name="btn_warning_refresh" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0" Margin="0,0,4,0"
+                                                ToolTip="Refresh — re-read the model warnings">
+                                            <TextBlock Text="&#xE72C;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                        <Button x:Name="btn_warning_expand" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0"
+                                                ToolTip="Expand every warning group">
+                                            <TextBlock Text="&#xE70D;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
                                     </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                        <Button x:Name="btn_warning_zoom" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0" Margin="0,0,4,0"
+                                                ToolTip="Zoom the active view to the checked elements">
+                                            <TextBlock Text="&#xE8A3;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                        <Button x:Name="btn_warning_export" Style="{StaticResource T3.Button.Ghost}"
+                                                Width="30" MinWidth="30" Height="30" Padding="0"
+                                                ToolTip="Save the warning list to a CSV file">
+                                            <TextBlock Text="&#xE74E;" Style="{StaticResource T3.Icon}"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Border Grid.Row="2" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="1"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <Grid Grid.Row="0">
+                                            <TreeView x:Name="tree_warnings" Style="{StaticResource T3.TreeView}"/>
+                                            <TextBlock x:Name="txt_warning_empty" Style="{StaticResource T3.Empty}"
+                                                       Visibility="Collapsed" Margin="16"
+                                                       Text="No warnings in this model.&#x0a;Nothing to review here."/>
+                                        </Grid>
+
+                                        <Border Grid.Row="1" Background="{StaticResource T3.Border}"/>
+
+                                        <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}" Padding="8,4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,12,0">
+                                                    <Button x:Name="btn_warning_all" Content="All"
+                                                            Style="{StaticResource T3.Button.Ghost}"
+                                                            MinWidth="48" Height="26" Padding="8,0" Margin="0,0,4,0"
+                                                            ToolTip="Check every warning group"/>
+                                                    <Button x:Name="btn_warning_none" Content="None"
+                                                            Style="{StaticResource T3.Button.Ghost}"
+                                                            MinWidth="48" Height="26" Padding="8,0"
+                                                            ToolTip="Clear every check"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                            VerticalAlignment="Center">
+                                                    <Ellipse x:Name="warning_dot" Style="{StaticResource T3.Dot}"
+                                                             Fill="{StaticResource T3.Warning.Accent}"/>
+                                                    <TextBlock x:Name="txt_warning_tally_total" Style="{StaticResource T3.Tally}"
+                                                               Text="0 warnings"/>
+                                                    <TextBlock x:Name="txt_warning_tally_kinds" Style="{StaticResource T3.Tally}"
+                                                               Text="0 kinds"/>
+                                                    <TextBlock x:Name="txt_warning_tally_checked" Style="{StaticResource T3.Tally}"
+                                                               Text="0 checked"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
                                 </Border>
 
-                                <Button x:Name="btn_run_select_sheets" Style="{StaticResource T3.Button.Secondary}"
-                                        HorizontalAlignment="Left" Width="180" Height="28" Content="Select Elements"/>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-                </TabControl>
-            </Border>
-
-            <!-- ══════════════════ ROW 2: FOOTER BAR (Col 1) ══════════════════ -->
+                                <Border Grid.Row="3" Style="{StaticResource T3.Callout}" Margin="0,8,0,0" Padding="12,8">
+                                    <StackPanel>
+                                        <TextBlock x:Name="txt_warning_info_title" Style="{StaticResource T3.BodyStrong}"
+                                                   Text="Nothing highlighted" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="txt_warning_info_detail" Style="{StaticResource T3.Caption}"
+                                                   Margin="0,4,0,0" TextWrapping="Wrap"
+                                                   Text="Click a warning to read its text. Double-click to show it in the model."/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+                    </TabControl>
+                </Border>
             </Grid>
 
             <!-- ══════════════════ ROW 2: FULL-WIDTH FOOTER BAR ══════════════════ -->
@@ -1678,15 +2124,30 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource T3.Copyright}"/>
-                        <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="12,0"/>
-                        <TextBlock x:Name="status_text" Text="Ready" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                    </StackPanel>
+                    <!-- Grid, KHÔNG StackPanel ngang: StackPanel cho con chiều rộng
+                         vô hạn nên TextTrimming của câu trạng thái không bao giờ
+                         kích hoạt — ở cửa sổ 460px nó tràn xuống dưới nút bấm
+                         thay vì thu lại thành dấu ba chấm. -->
+                    <Grid Grid.Column="0" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource T3.Copyright}"/>
+                        <Border Grid.Column="1" Width="1" Height="16" Margin="8,0"
+                                Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" x:Name="status_text" Text="Ready"
+                                   Style="{StaticResource T3.Body.Secondary}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    </Grid>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="Close" Style="{StaticResource T3.Button.Secondary}"
-                                Click="_close_chrome" IsCancel="True"/>
+                        <Button x:Name="btn_close_footer" Content="Close" Style="{StaticResource T3.Button.Secondary}"
+                                Height="28" Padding="12,0" Margin="0,0,8,0"/>
+                        <Button x:Name="btn_apply" Content="Select" Style="{StaticResource T3.Button.Primary}"
+                                Height="28" Padding="16,0" IsDefault="True"
+                                ToolTip="Apply the current mode to the Revit selection"/>
                     </StackPanel>
                 </Grid>
             </Border>

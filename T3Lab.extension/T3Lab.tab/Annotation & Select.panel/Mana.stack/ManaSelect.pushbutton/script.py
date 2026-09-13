@@ -3,15 +3,22 @@
 """ManaSelect — Unified smart selection manager.
 
 Consolidates:
+  - Explore (counted tree: Category > Family > Type, with scope/sort/filter)
   - Quick Select (Query by parameters/text)
   - Select Similar (Match type/family/category)
   - Select on Sheets (Title blocks & CAD imports)
-  - Sidebar Quick Filters (Linked, In-place, Category, Grouped, Material)
+  - Warnings (model warnings and the elements they flag)
+
+Cửa sổ chạy MODELESS để người dùng bấm chọn trong model mà tool vẫn mở. Điều
+đó cần engine thường trú, nên `__persistentengine__ = True` ở dưới; nếu engine
+chưa được kích hoạt (chưa reload pyRevit sau khi thêm cờ này), `show_dialog()`
+tự rơi về modal thay vì mở ra một cửa sổ chết.
 
 Author: T3Lab
 """
 __title__ = "Mana\nSelect"
 __author__ = "T3Lab"
+__persistentengine__ = True
 
 import os
 import sys
@@ -60,4 +67,5 @@ if lib_dir not in sys.path:
 import GUI.ManaSelectDialog as ManaSelectDialog
 
 if __name__ == '__main__':
+    # modal=None: show_dialog() tự dò engine thường trú và chọn modeless/modal.
     ManaSelectDialog.show_dialog()

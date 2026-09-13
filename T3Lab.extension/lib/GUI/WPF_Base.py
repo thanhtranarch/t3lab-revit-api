@@ -1147,6 +1147,96 @@ class T3WPFWindow(Window):
         else:
             header_cb.IsChecked = None      # indeterminate
 
+    # ── AI Mode Helpers ──────────────────────────────────────────────────
+    @property
+    def ai_bridge(self):
+        """Return the AIModeBridge singleton instance, or None if unavailable."""
+        if not hasattr(self, '_ai_bridge_inst') or self._ai_bridge_inst is None:
+            try:
+                from Intelligence.ai_bridge import ai_bridge
+                self._ai_bridge_inst = ai_bridge
+            except Exception:
+                self._ai_bridge_inst = None
+        return self._ai_bridge_inst
+
+    def is_ai_mode_active(self, tool_name=None):
+        """True if AI mode is enabled and a provider is available."""
+        b = self.ai_bridge
+        return bool(b and b.is_ai_mode_active(tool_name))
+
+    def get_ai_status_info(self):
+        """Return active AI provider and model status info dict."""
+        b = self.ai_bridge
+        if not b:
+            return {"available": False, "provider": "None", "model": "", "label": "AI Offline"}
+        return b.get_active_provider_info()
+
+    def run_ai_async(self, worker_func, on_done=None, on_error=None, **kwargs):
+        """Run an AI query on a background thread and invoke callbacks on the UI thread.
+        
+        Supports:
+        - 2-callback pattern: on_done(result) and on_error(exception)
+        - 1-callback dual pattern: callback(result, error)
+        - Keyword args: on_success, on_error
+        """
+        if on_done is None and 'on_success' in kwargs:
+            on_done = kwargs['on_success']
+        if on_error is None and 'on_error' in kwargs:
+            on_error = kwargs['on_error']
+
+        disp = self._pp_dispatcher()
+
+        def _invoke_ui(fn):
+            if disp and not disp.HasShutdownStarted and Action is not None:
+                try:
+                    disp.BeginInvoke(Action(fn))
+                except Exception:
+                    fn()
+            else:
+                fn()
+
+        def _safe_on_done(res):
+            if not on_done:
+                return
+            def _run():
+                try:
+                    on_done(res)
+                except TypeError:
+                    try:
+                        on_done(res, None)
+                    except Exception:
+                        raise
+            _invoke_ui(_run)
+
+        def _safe_on_error(err):
+            if on_error:
+                def _run_err():
+                    on_error(err)
+                _invoke_ui(_run_err)
+            elif on_done:
+                def _run_dual():
+                    try:
+                        on_done(None, err)
+                    except TypeError:
+                        pass
+                _invoke_ui(_run_dual)
+
+        b = self.ai_bridge
+        if b:
+            return b.run_async(worker_func, _safe_on_done, _safe_on_error)
+        else:
+            def _fallback():
+                try:
+                    r = worker_func()
+                    _safe_on_done(r)
+                except Exception as ex:
+                    _safe_on_error(ex)
+            import threading
+            t = threading.Thread(target=_fallback)
+            t.daemon = True
+            t.start()
+            return t
+
 
 class my_WPF(T3WPFWindow):
     """Legacy alias for backward compatibility."""

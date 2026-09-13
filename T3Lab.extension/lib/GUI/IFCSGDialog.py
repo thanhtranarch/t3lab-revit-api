@@ -1053,6 +1053,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
         self.cmbSubtype = self.FindName("cmbSubtype")
         self.btnApply = self.FindName("btnApply")
         self.btnApplyAll = self.FindName("btnApplyAll")
+        self.btn_ai_auto_match = self.FindName("btn_ai_auto_match")
         self.dgTypes = self.FindName("dgTypes")
         self.chkApplyType = self.FindName("chkApplyType")
         self.chkApplyEntity = self.FindName("chkApplyEntity")
@@ -1065,9 +1066,12 @@ class IFCSGSuiteWindow(T3WPFWindow):
         self.lstComponents.SelectionChanged += self._on_comp_selected
         self.btnLoadExcel.Click += self._on_load_excel
         self.btnAutoAssign.Click += self._on_auto_assign
+        if self.btn_ai_auto_match is not None:
+            self.btn_ai_auto_match.Click += self._on_ai_auto_match
         self.btnApply.Click += self._on_apply_selected
         self.btnApplyAll.Click += self._on_apply_all
         self.txtFilter.TextChanged += self._on_filter_changed
+        self._update_ai_status()
 
         # State variables for Tab 1
         self.mapping = {}
@@ -1415,6 +1419,119 @@ class IFCSGSuiteWindow(T3WPFWindow):
             sel_str = sel_str[5:]
         is_ud = sel_str.startswith("*")
         return sel_str, is_ud
+
+    def _update_ai_status(self):
+        try:
+            txt = getattr(self, 'txt_ai_status', None) or self.FindName('txt_ai_status')
+            if txt is not None:
+                if self.is_ai_mode_active("IFCSG"):
+                    info = self.get_ai_status_info()
+                    txt.Text = "AI Mode: " + info.get("label", "Active")
+                else:
+                    txt.Text = "AI Mode: Offline"
+        except Exception:
+            pass
+
+    def _on_ai_auto_match(self, sender=None, args=None):
+        """Predict best matching IFC-SG Subtype for selected types using AI Mode."""
+        if not self.is_ai_mode_active("IFCSG"):
+            forms.alert(
+                "AI Mode is currently offline or no API Key is configured.\n\n"
+                "Please configure an API Key in LLMs Setting to enable AI Subtype Predictions.",
+                title="AI Mode Offline"
+            )
+            return
+
+        if not self.cmbSubtype or not self.cmbSubtype.Items or self.cmbSubtype.Items.Count == 0:
+            forms.alert("No subtypes available for the selected component.", title="No Subtypes")
+            return
+
+        candidates = [str(item) for item in self.cmbSubtype.Items if str(item).strip()]
+        if not candidates:
+            return
+
+        sel_items = []
+        if self.dgTypes and self.dgTypes.SelectedItems and self.dgTypes.SelectedItems.Count > 0:
+            sel_items = list(self.dgTypes.SelectedItems)
+        elif self.current_rows:
+            sel_items = self.current_rows[:1]
+
+        if not sel_items:
+            forms.alert("Please select at least one type in the grid to predict subtype.", title="Selection Required")
+            return
+
+        target_row = sel_items[0]
+        type_name = getattr(target_row, "TypeName", "") or getattr(target_row, "Type", "") or str(target_row)
+        comp_name = getattr(self, "current_comp", "") or "BIM Component"
+
+        btn = getattr(self, 'btn_ai_auto_match', None)
+        orig_content = "✨ AI Predict"
+
+        def _restore_btn():
+            if btn:
+                btn.Content = orig_content
+                btn.IsEnabled = True
+
+        if btn:
+            btn.Content = "⏳ Predicting..."
+            btn.IsEnabled = False
+
+        # Backup current selection for undo/safety
+        self._prev_subtype_idx = self.cmbSubtype.SelectedIndex
+
+        # Smart candidate pre-filter if candidate list is very long
+        filtered_candidates = candidates
+        if len(candidates) > 35:
+            tokens = set(re.findall(r'\w+', (type_name + " " + comp_name).lower()))
+            scored = []
+            for c in candidates:
+                c_tokens = set(re.findall(r'\w+', c.lower()))
+                common = len(tokens.intersection(c_tokens))
+                scored.append((common, c))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            filtered_candidates = [c for _, c in scored[:30]]
+
+        def _bg():
+            b = self.ai_bridge
+            if not b:
+                return None
+            return b.classify(
+                input_text="Revit Type: {} | Component: {}".format(type_name, comp_name),
+                candidate_categories=filtered_candidates,
+                context="Singapore BCA CORENET X IFC-SG classification"
+            )
+
+        def _on_done(res):
+            try:
+                if res and isinstance(res, dict) and "selected_category" in res:
+                    pred = res["selected_category"]
+                    conf = res.get("confidence", 0.9)
+                    ratio = res.get("rationale", "")
+
+                    matched_idx = -1
+                    for i in range(self.cmbSubtype.Items.Count):
+                        if str(self.cmbSubtype.Items[i]).strip().lower() == pred.strip().lower():
+                            matched_idx = i
+                            break
+
+                    if matched_idx >= 0:
+                        self.cmbSubtype.SelectedIndex = matched_idx
+                        forms.alert(
+                            "Predicted Subtype: {}\nConfidence: {:.0%}\n\nRationale:\n{}".format(pred, float(conf), ratio),
+                            title="✨ AI Subtype Prediction"
+                        )
+                    else:
+                        forms.alert("AI predicted: {}, but not in current subtype list.".format(pred), title="Prediction Note")
+                else:
+                    forms.alert("Could not determine a matching subtype. Please select manually.", title="Prediction Inconclusive")
+            finally:
+                _restore_btn()
+
+        def _on_err(err):
+            _restore_btn()
+            forms.alert("AI Error:\n" + str(err), title="AI Error")
+
+        self.run_ai_async(_bg, _on_done, _on_err)
 
     def _on_apply_selected(self, sender, args):
         sel_indices = set()

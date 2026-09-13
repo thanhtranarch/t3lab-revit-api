@@ -69,6 +69,14 @@ except ImportError:
     geoparcel = None
     HAS_GEOPARCEL = False
 
+# VN-2000 Vietnamese Cadastral Coordinate System
+try:
+    from Snippets import _vn2000 as vn2000
+    HAS_VN2000 = True
+except ImportError:
+    vn2000 = None
+    HAS_VN2000 = False
+
 # ╦  ╦╔═╗╦═╗╦╔═╗╔╗ ╦  ╔═╗╔═╗
 # ╚╗╔╝╠═╣╠╦╝║╠═╣╠╩╗║  ║╣ ╚═╗
 #  ╚╝ ╩ ╩╩╚═╩╩ ╩╚═╝╩═╝╚═╝╚═╝ VARIABLES
@@ -95,6 +103,7 @@ EARTH_RADIUS_FT = 20902231.0
 SOURCE_AUTO     = "Auto (recommended)"
 SOURCE_OSM      = "OpenStreetMap (worldwide, no key)"
 SOURCE_LIGHTBOX = "LightBox (US parcels, API key)"
+SOURCE_VN2000   = "VN-2000 (Vietnam Cadastral)"
 
 # Elevation input units -> feet.  Must match cmb_elev_unit in the XAML.
 ELEV_UNITS = {
@@ -781,8 +790,39 @@ def search_primary(address, api_key=None, source=SOURCE_AUTO, language=None):
     if not address:
         raise ValueError(u"Please enter an address.")
 
-    use_lightbox = (source == SOURCE_LIGHTBOX or
-                    (source == SOURCE_AUTO and api_key and
+    # ── VN-2000 Cadastral Coordinate Parsing ──────────────────────────────────
+    if HAS_VN2000:
+        pts = []
+        clean_addr = address.strip('\"\'')
+        if os.path.isfile(clean_addr):
+            try:
+                with open(clean_addr, 'r', encoding='utf-8', errors='ignore') as f:
+                    file_content = f.read()
+                pts = vn2000.parse_coordinate_table(file_content)
+            except Exception as ex:
+                logger.warning("Failed to read file as VN-2000: {}".format(ex))
+        if not pts:
+            pts = vn2000.parse_coordinate_table(address)
+
+        is_vn_source = (source == SOURCE_VN2000 or "VN-2000" in source)
+        if len(pts) >= 3 or is_vn_source:
+            if len(pts) < 3:
+                raise ValueError(
+                    u"VN-2000 format requires at least 3 coordinate points (ID, X, Y).\n"
+                    u"Example: 1 1185420.25 594230.12; 2 1185450.10 594235.40; 3 1185445.00 594280.00"
+                )
+            detected_province = "Hà Nội"
+            for prov in vn2000.PROVINCE_MERIDIANS:
+                if prov.lower() in address.lower():
+                    detected_province = prov
+                    break
+            parcel_name = os.path.basename(clean_addr) if os.path.isfile(clean_addr) else "Thửa đất VN-2000"
+            parcel = vn2000.create_vn2000_parcel(pts, name=parcel_name, province=detected_province)
+            if parcel:
+                return [parcel], None
+
+    use_lightbox = (source == SOURCE_LIGHTBOX or "LightBox" in source or
+                    ((source == SOURCE_AUTO or "Auto" in source) and api_key and
                      looks_like_us_address(address)))
 
     if use_lightbox:
@@ -1212,7 +1252,8 @@ def get_survey_point(doc):
 
 def create_property_lines_in_revit(doc, coordinates, elevation_ft=0.0,
                                    line_category=LINE_CAT_PROPERTY,
-                                   origin_mode="Project Base Point"):
+                                   origin_mode="Project Base Point",
+                                   vn2000_points=None):
     """
     Create the property boundary in the Revit document.
 
@@ -1222,24 +1263,35 @@ def create_property_lines_in_revit(doc, coordinates, elevation_ft=0.0,
         elevation_ft  - Z elevation in feet
         line_category - "Property Line" | "Model Lines" | "Detail Lines"
         origin_mode   - where to place the centroid
+        vn2000_points - optional list of raw VN-2000 points [{'x': Northing, 'y': Easting}, ...]
+                        If present, uses direct sub-millimeter metric planar mapping.
 
-    Returns (count, kind) where *kind* names what was actually created, so the
-    caller can report it honestly - "Property Line" falls back to model lines
-    on the Property Line style wherever Revit exposes no PropertyLine factory,
-    which is every shipping version to date.
+    Returns (count, kind) where *kind* names what was actually created.
     """
     if len(coordinates) < 2:
         raise ValueError("Need at least 2 coordinates to create lines")
 
-    # Compute centroid for coordinate origin
-    centroid_lat, centroid_lon = compute_centroid(coordinates)
-
-    # Convert all coords to Revit XYZ (feet)
     revit_pts = []
-    for c in coordinates:
-        lon, lat = c[0], c[1]
-        x_ft, y_ft = latlon_to_feet(lat, lon, centroid_lat, centroid_lon)
-        revit_pts.append(DB.XYZ(x_ft, y_ft, elevation_ft))
+    if vn2000_points and len(vn2000_points) >= 2:
+        # Direct metric planar coordinates
+        # X in VN-2000 is Northing (meters) -> Revit Y (feet)
+        # Y in VN-2000 is Easting (meters) -> Revit X (feet)
+        c_north = sum(p['x'] for p in vn2000_points) / float(len(vn2000_points))
+        c_east  = sum(p['y'] for p in vn2000_points) / float(len(vn2000_points))
+        M2FT = 3.280839895013123
+        for p in vn2000_points:
+            dx_ft = (p['y'] - c_east) * M2FT   # Easting delta -> Revit X
+            dy_ft = (p['x'] - c_north) * M2FT  # Northing delta -> Revit Y
+            revit_pts.append(DB.XYZ(dx_ft, dy_ft, elevation_ft))
+    else:
+        # Compute centroid for coordinate origin
+        centroid_lat, centroid_lon = compute_centroid(coordinates)
+
+        # Convert all coords to Revit XYZ (feet)
+        for c in coordinates:
+            lon, lat = c[0], c[1]
+            x_ft, y_ft = latlon_to_feet(lat, lon, centroid_lat, centroid_lon)
+            revit_pts.append(DB.XYZ(x_ft, y_ft, elevation_ft))
 
     # Determine insertion offset (project base / survey / world origin)
     if origin_mode == "Survey Point":
@@ -1463,6 +1515,7 @@ class ParcelItem(object):
         self.is_approximate    = bool(data.get("is_approximate", False))
         self.lat               = data.get("lat", 0.0)
         self.lon               = data.get("lon", 0.0)
+        self.vn2000_points     = data.get("vn2000_points", None)
         self.subtitle          = data.get(
             "subtitle",
             u"{}  ·  {}".format(self.boundary_kind,
@@ -2072,9 +2125,10 @@ class PropertyLineDialog(T3WPFWindow):
         self._set_status("Creating property lines in Revit...", busy=True)
         self.btn_create.IsEnabled = False
 
+        vn_pts = getattr(self._selected_parcel, "vn2000_points", None)
         try:
             count, kind = create_property_lines_in_revit(
-                doc, coords, elevation_ft, line_cat, origin_mode
+                doc, coords, elevation_ft, line_cat, origin_mode, vn2000_points=vn_pts
             )
             logger.info("Boundary created: {} segments as {}".format(count, kind))
 

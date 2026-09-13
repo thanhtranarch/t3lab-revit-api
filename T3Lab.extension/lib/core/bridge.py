@@ -64,7 +64,7 @@ import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 
-BRIDGE_VERSION = '2.3.0'
+BRIDGE_VERSION = '2.4.0'
 
 PORT_MIN, PORT_MAX = 48884, 48894
 PROBE_TIMEOUT = 1.0    # /health probe per port (run in parallel)
@@ -722,12 +722,27 @@ def _revit_down_response(request_id):
     })
 
 
+# Capability probes some clients send at startup even though `initialize`
+# advertises tools only (Codex and Antigravity both do). Answering them here
+# with an empty list keeps the handshake clean; forwarding them to Revit would
+# either surface an "unknown method" from the in-Revit server or — with Revit
+# closed — turn a routine probe into a connection error during attach.
+EMPTY_LIST_METHODS = {
+    'resources/list':           'resources',
+    'resources/templates/list': 'resourceTemplates',
+    'prompts/list':             'prompts',
+}
+
+
 def _handle(request, current, token):
     method = request.get('method')
     if method == 'initialize':
         return _handle_initialize_local(request)
     if method == 'ping':
         return {'jsonrpc': '2.0', 'id': request.get('id'), 'result': {}}
+    if method in EMPTY_LIST_METHODS:
+        return {'jsonrpc': '2.0', 'id': request.get('id'),
+                'result': {EMPTY_LIST_METHODS[method]: []}}
     if method == 'tools/list':
         return _handle_tools_list(request, current, token)
     if method == 'tools/call':
@@ -746,7 +761,14 @@ def _handle(request, current, token):
             if _is_conn_refused(e):
                 return _revit_down_response(request.get('id'))
             raise
-    return _forward(request, current, token)
+
+    # Anything else: the in-Revit server implements tools/list + tools/call
+    # only, so forwarding an unknown method just trades a clean protocol answer
+    # for a connection error whenever Revit happens to be closed. -32601 is what
+    # the spec asks for and every client already knows how to ignore it.
+    return _rpc_error(request.get('id'),
+                      'Method not supported by the T3Lab Revit bridge: {}'.format(method),
+                      code=-32601)
 
 
 def main():
