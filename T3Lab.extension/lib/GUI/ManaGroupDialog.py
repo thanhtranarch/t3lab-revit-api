@@ -636,8 +636,9 @@ class ManaGroupDialog(T3WPFWindow):
                 self.doc, pairs,
                 progress=lambda i, t, label: self._step_busy("Renaming groups", i, t, label))
         except Exception as exc:
-            self._end_busy("Rename failed — nothing was changed.")
-            t3_warning("The rename was rolled back, so the model is unchanged.",
+            self._end_busy("Rename failed — review the error before retrying.")
+            t3_warning("The rename did not complete successfully. Resolve any Revit failure "
+                       "dialog and check the model before retrying.",
                        title="Rename failed", details=str(exc), owner=self)
             return
 
@@ -704,8 +705,9 @@ class ManaGroupDialog(T3WPFWindow):
                 include_members=include_members,
                 progress=lambda i, t, label: self._step_busy("Setting worksets", i, t, label))
         except Exception as exc:
-            self._end_busy("Workset change failed — nothing was changed.")
-            t3_warning("The workset change was rolled back, so the model is unchanged.",
+            self._end_busy("Workset change failed — review the error before retrying.")
+            t3_warning("The workset change did not complete successfully. Resolve any Revit "
+                       "failure dialog and check the model before retrying.",
                        title="Workset change failed", details=str(exc), owner=self)
             return
 
@@ -768,8 +770,9 @@ class ManaGroupDialog(T3WPFWindow):
                 self.doc, [r.record for r in unused],
                 progress=lambda i, t, label: self._step_busy("Purging group types", i, t, label))
         except Exception as exc:
-            self._end_busy("Purge failed — nothing was deleted.")
-            t3_warning("The purge was rolled back, so the model is unchanged.",
+            self._end_busy("Purge failed — review the error before retrying.")
+            t3_warning("The purge did not complete successfully. Resolve any Revit failure "
+                       "dialog and check the model before retrying.",
                        title="Purge failed", details=str(exc), owner=self)
             return
 
@@ -810,8 +813,9 @@ class ManaGroupDialog(T3WPFWindow):
                 self.doc, [r.record for r in placed],
                 progress=lambda i, t, label: self._step_busy("Ungrouping", i, t, label))
         except Exception as exc:
-            self._end_busy("Ungroup failed — nothing was changed.")
-            t3_warning("The ungroup was rolled back, so the model is unchanged.",
+            self._end_busy("Ungroup failed — review the error before retrying.")
+            t3_warning("The ungroup did not complete successfully. Resolve any Revit failure "
+                       "dialog and check the model before retrying.",
                        title="Ungroup failed", details=str(exc), owner=self)
             return
 

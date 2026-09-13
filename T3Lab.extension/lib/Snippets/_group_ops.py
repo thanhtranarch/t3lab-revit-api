@@ -25,6 +25,7 @@ from Autodesk.Revit.DB import (
     Group,
     GroupType,
     Transaction,
+    TransactionStatus,
     WorksetKind,
 )
 
@@ -392,6 +393,22 @@ def plan_rename(pairs):
     return rejected, parked, writes
 
 
+def _commit_transaction(transaction):
+    """Only a completed commit makes per-item results authoritative."""
+    options = transaction.GetFailureHandlingOptions()
+    options.SetForcedModalHandling(True)
+    transaction.SetFailureHandlingOptions(options)
+    status = transaction.Commit()
+    if status != TransactionStatus.Committed:
+        raise RuntimeError("Transaction was not committed: {}. Resolve any Revit failure dialog before retrying.".format(status))
+
+
+def _rollback_started(transaction):
+    """Failure processing owns Pending transactions; do not roll them back."""
+    if transaction.GetStatus() == TransactionStatus.Started:
+        transaction.RollBack()
+
+
 def rename_group_types(doc, pairs, progress=None):
     """Rename group types in one transaction.
 
@@ -411,9 +428,9 @@ def rename_group_types(doc, pairs, progress=None):
     # would be announced as "T3TMP-0-Bath Pod".
     labels = dict((id(record), record.name) for record, _wanted in writes)
 
-    transaction = Transaction(doc, "T3Lab — Rename Groups")
-    transaction.Start()
+    transaction = Transaction(doc, "T3Lab: Rename Groups")
     try:
+        transaction.Start()
         # Phase 1 — park the names somebody else is about to take.
         original = {}
         for offset, record in enumerate(parked):
@@ -426,12 +443,14 @@ def rename_group_types(doc, pairs, progress=None):
                 original.pop(id(record), None)   # still on its own name
 
         # Phase 2 — write the names the user asked for.
+        finalized = set()
         for index, (record, wanted) in enumerate(writes, 1):
             if progress:
                 progress(index, total, labels.get(id(record), record.name))
             try:
                 record.group_type.Name = wanted
                 record.name = wanted
+                finalized.add(id(record))
                 results.append((record, True, "Renamed"))
             except Exception as exc:
                 results.append((record, False, _short_error(exc, "Rename failed")))
@@ -440,18 +459,22 @@ def rename_group_types(doc, pairs, progress=None):
         # "T3TMP-...", which is worse than the rename simply not happening.
         for record in parked:
             was = original.get(id(record))
-            if was is None or not (record.name or "").startswith(TEMP_NAME_PREFIX):
+            if was is None or id(record) in finalized:
                 continue
             try:
                 record.group_type.Name = was
                 record.name = was
-            except Exception:
-                pass
+            except Exception as exc:
+                raise RuntimeError("Could not restore temporary group name for '{}': {}".format(was, exc))
 
-        transaction.Commit()
+        _commit_transaction(transaction)
     except Exception:
-        if transaction.HasStarted() and not transaction.HasEnded():
-            transaction.RollBack()
+        _rollback_started(transaction)
+        # The UI caches record names independently from the Revit model.
+        # Restore that cache only when failure processing is no longer pending.
+        if transaction.GetStatus() != TransactionStatus.Pending:
+            for record, _wanted in writes:
+                record.name = labels[id(record)]
         raise
     return results
 
@@ -474,7 +497,8 @@ def _set_workset(element, workset_value):
     except Exception:
         pass
     try:
-        param.Set(System.Int32(int(workset_value)))
+        if not param.Set(System.Int32(int(workset_value))):
+            return False, "Workset parameter rejected the value"
         return True, "Moved"
     except Exception as exc:
         return False, _short_error(exc, "Set failed")
@@ -494,9 +518,9 @@ def apply_workset(doc, records, workset_value, include_members=False, progress=N
         return results
 
     total = len(records)
-    transaction = Transaction(doc, "T3Lab — Set Group Workset")
-    transaction.Start()
+    transaction = Transaction(doc, "T3Lab: Set Group Workset")
     try:
+        transaction.Start()
         for index, record in enumerate(records, 1):
             if progress:
                 progress(index, total, record.name)
@@ -537,10 +561,9 @@ def apply_workset(doc, records, workset_value, include_members=False, progress=N
             else:
                 message = "Already there"
             results.append((record, moved, skipped, failed, message))
-        transaction.Commit()
+        _commit_transaction(transaction)
     except Exception:
-        if transaction.HasStarted() and not transaction.HasEnded():
-            transaction.RollBack()
+        _rollback_started(transaction)
         raise
     return results
 
@@ -557,9 +580,9 @@ def purge_group_types(doc, records, progress=None):
         return results
 
     total = len(records)
-    transaction = Transaction(doc, "T3Lab — Purge Group Types")
-    transaction.Start()
+    transaction = Transaction(doc, "T3Lab: Purge Group Types")
     try:
+        transaction.Start()
         for index, record in enumerate(records, 1):
             if progress:
                 progress(index, total, record.name)
@@ -571,10 +594,9 @@ def purge_group_types(doc, records, progress=None):
                 results.append((record, True, "Purged"))
             except Exception as exc:
                 results.append((record, False, _short_error(exc, "Delete failed")))
-        transaction.Commit()
+        _commit_transaction(transaction)
     except Exception:
-        if transaction.HasStarted() and not transaction.HasEnded():
-            transaction.RollBack()
+        _rollback_started(transaction)
         raise
     return results
 
@@ -589,9 +611,9 @@ def ungroup_instances(doc, records, progress=None):
         return results
 
     total = len(records)
-    transaction = Transaction(doc, "T3Lab — Ungroup Groups")
-    transaction.Start()
+    transaction = Transaction(doc, "T3Lab: Ungroup Groups")
     try:
+        transaction.Start()
         for index, record in enumerate(records, 1):
             if progress:
                 progress(index, total, record.name)
@@ -614,10 +636,9 @@ def ungroup_instances(doc, records, progress=None):
             else:
                 message = "Ungrouped %d" % ungrouped
             results.append((record, ungrouped, failed, message))
-        transaction.Commit()
+        _commit_transaction(transaction)
     except Exception:
-        if transaction.HasStarted() and not transaction.HasEnded():
-            transaction.RollBack()
+        _rollback_started(transaction)
         raise
     return results
 

@@ -21,6 +21,7 @@ except Exception:
 try:
     from Autodesk.Revit.DB import (
         Transaction,
+        TransactionStatus,
         FilteredElementCollector,
         BuiltInCategory,
         JoinGeometryUtils,
@@ -31,10 +32,13 @@ try:
         FailureSeverity,
     )
 except Exception:
-    Transaction = FilteredElementCollector = BuiltInCategory = JoinGeometryUtils = None
+    Transaction = TransactionStatus = FilteredElementCollector = BuiltInCategory = JoinGeometryUtils = None
     BoundingBoxIntersectsFilter = Outline = IFailuresPreprocessor = FailureProcessingResult = FailureSeverity = None
 
 logger = script.get_logger()
+JOIN_CANCELLED_MESSAGE = (
+    "Cancelled by user; completed changes were committed. Use Undo to revert this run."
+)
 
 # ==================================================
 # CATEGORY DEFINITIONS
@@ -149,6 +153,13 @@ def _get_intersecting_elements(doc, el, target_bic, scope, view_id=None):
         return []
 
 
+def _commit_join(transaction):
+    status = transaction.Commit()
+    if status != TransactionStatus.Committed:
+        raise RuntimeError("Join transaction was not committed: {}. "
+                           "Resolve any Revit failure dialog before running again.".format(status))
+
+
 def run_join(rules, scope="Active View", mode="Join", switch_order=False,
              progress_callback=None, cancel_check=None, doc=None, uidoc=None):
     """Execute join/unjoin operations based on rules."""
@@ -178,14 +189,16 @@ def run_join(rules, scope="Active View", mode="Join", switch_order=False,
     total_errors  = 0
     total_rules = len(rules)
 
-    t = Transaction(document, "Auto {} Elements".format(mode))
-    fho = t.GetFailureHandlingOptions()
-    fho.SetFailuresPreprocessor(JoinFailuresPreprocessor())
-    fho.SetForcedModalHandling(False)
-    t.SetFailureHandlingOptions(fho)
-    t.Start()
-
+    t = None
     try:
+        t = Transaction(document, "T3Lab: Auto {} Elements".format(mode))
+        t.Start()
+        fho = t.GetFailureHandlingOptions()
+        fho.SetFailuresPreprocessor(JoinFailuresPreprocessor())
+        # This service returns a final count synchronously. Revit must finish
+        # failure processing before that count can describe saved changes.
+        fho.SetForcedModalHandling(True)
+        t.SetFailureHandlingOptions(fho)
         for rule_idx, rule in enumerate(rules):
             priority_name = rule.get("priority", "")
             joinwith_name = rule.get("join_with", "")
@@ -211,8 +224,9 @@ def run_join(rules, scope="Active View", mode="Join", switch_order=False,
 
             for el in priority_elements:
                 if cancel_check and cancel_check():
-                    t.Commit()
-                    return (total_joined, total_skipped, total_errors, "Cancelled by user.")
+                    _commit_join(t)
+                    return (total_joined, total_skipped, total_errors,
+                            JOIN_CANCELLED_MESSAGE)
 
                 candidates = _get_intersecting_elements(
                     document, el, joinwith_bic, scope, view_id
@@ -256,9 +270,11 @@ def run_join(rules, scope="Active View", mode="Join", switch_order=False,
                         logger.debug("Join operation error: {}".format(ex))
                         total_errors += 1
 
-        t.Commit()
+        _commit_join(t)
         return (total_joined, total_skipped, total_errors, None)
 
     except Exception as ex:
-        t.RollBack()
-        return (total_joined, total_skipped, total_errors, str(ex))
+        if t is not None and t.GetStatus() == TransactionStatus.Started:
+            t.RollBack()
+        # Attempted joins are not saved joins after rollback or while Pending.
+        return (0, total_skipped, total_errors + 1, str(ex))

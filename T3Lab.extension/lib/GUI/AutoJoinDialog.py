@@ -44,8 +44,41 @@ from Services.join_service import (
     BIC_INT_TO_NAME,
     CATEGORY_NAMES,
     DEFAULT_RULES,
+    JOIN_CANCELLED_MESSAGE,
     run_join,
 )
+
+
+def _join_result_text(mode, elapsed, joined, skipped, errors, err_msg, quick=False):
+    """Describe the service result, including a stop whose partial commit succeeded."""
+    stopped = err_msg == JOIN_CANCELLED_MESSAGE
+    prefix = "Quick Auto" if quick else "Auto"
+    if err_msg and not stopped:
+        outcome = "stopped with an error"
+        status = "Needs attention — review the result before retrying."
+    elif stopped:
+        outcome = "stopped by request"
+        status = "Stopped — {} pair(s) committed, {} error(s).".format(joined, errors)
+    elif errors:
+        outcome = "completed with errors"
+        status = "Completed with errors — {} pair(s) committed, {} error(s).".format(joined, errors)
+    else:
+        outcome = "completed"
+        status = "Done — {} pair(s) committed.".format(joined)
+
+    message = (
+        "{} {} {} in {:.1f}s\n\n"
+        "Confirmed {}ed pairs: {}\n"
+        "Skipped pairs: {}\n"
+        "Errors: {}"
+    ).format(prefix, mode, outcome, elapsed, mode.lower(), joined, skipped, errors)
+    if stopped:
+        message += ("\n\nThe changes completed before the stop were committed. "
+                    "Use Undo to revert this run.")
+    elif err_msg:
+        message += ("\n\n{}\n\nResolve any Revit failure dialog and check the model "
+                    "before retrying.").format(err_msg)
+    return status, message
 
 
 class RuleItem(object):
@@ -278,36 +311,13 @@ class AutoJoinWindow(T3WPFWindow):
 
         save_rules_to_file(self._rules)
 
-        cancelled = self.is_cancelled
         self.end_progress()
-
-        if cancelled:
-            self.status_text.Text = u"Cancelled – {}ed {} pair(s)".format(
-                mode.lower(), joined
-            )
-            self.rule_count_text.Text = "{} rule(s)".format(len(self._rules))
-            return
-
-        result_msg = (
-            "Auto {} completed in {:.1f}s\n\n"
-            u"✓ {}ed: {}\n"
-            u"⊘ Already {}ed (skipped): {}\n"
-            u"✗ Errors: {}"
-        ).format(
-            mode, elapsed,
-            mode, joined,
-            mode.lower(), skipped,
-            errors
+        status, result_msg = _join_result_text(
+            mode, elapsed, joined, skipped, errors, err_msg
         )
-
-        if err_msg:
-            result_msg += u"\n\n⚠ {}".format(err_msg)
-
-        self.status_text.Text = u"Done – {}ed {} element pair(s)".format(
-            mode.lower(), joined
-        )
-        self.rule_count_text.Text = "{} rule(s) | Last run: {} {}ed".format(
-            len(self._rules), joined, mode.lower()
+        self.status_text.Text = status
+        self.rule_count_text.Text = "{} rule(s) | Last run: {} pair(s) confirmed".format(
+            len(self._rules), joined
         )
 
         forms.alert(result_msg, title="Auto {} Results".format(mode))
@@ -334,15 +344,9 @@ def quick_join(doc=None, uidoc=None):
     )
     elapsed = time.time() - start
 
-    msg = (
-        "Quick Auto Join completed in {:.1f}s\n\n"
-        "✓ Joined: {}\n"
-        "⊘ Already joined (skipped): {}\n"
-        "✗ Errors: {}"
-    ).format(elapsed, joined, skipped, errors)
-
-    if err_msg:
-        msg += "\n\n⚠ {}".format(err_msg)
+    _status, msg = _join_result_text(
+        "Join", elapsed, joined, skipped, errors, err_msg, quick=True
+    )
 
     TaskDialog.Show("Auto Join Results", msg)
 

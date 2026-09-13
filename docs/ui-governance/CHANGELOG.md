@@ -1,5 +1,25 @@
 # CHANGE HISTORY — lịch sử các cycle
 
+## Review và debug tools — 2026-09-14
+
+```text
+DATE:                   2026-09-14 (review bắt đầu 2026-09-13)
+CYCLE:                  Review chức năng và UX, không phải migration giao diện
+TOOLS AUDITED:          44 pushbutton và 59 XAML qua static scan; review sâu chọn lọc
+ISSUES FOUND:           6 nhóm R01–R06 và backlog trong REVIEW-2026-09-13.md
+ISSUES FIXED:           Selection scope/single-select/empty state, reorder guard,
+                        Workset transaction/caller/Pending, Purge result, baseline
+ISSUES REMAINING:       Backlog logic và UI; Revit runtime NEEDS VERIFICATION
+REGRESSIONS:            32 test mới qua; T3/static xanh; 59/59 WPF parse ngoài Revit
+DESIGN SYSTEM GAPS:     Không thay đổi design system trong đợt này
+NEXT PRIORITIES:        Revit smoke tests; AutoJoin, Advanced Purge, Group, BatchOut
+COMMIT:                 Mã sửa đã có trong checkout khi tiếp tục; không tạo commit mới
+```
+
+Kết luận 100/100 UX trong lịch sử bên dưới không phải điểm được xác minh của
+snapshot hiện tại. Xem [báo cáo và phương án](REVIEW-2026-09-13.md) và
+[baseline theo phép đo](BASELINE.md). CPython audit còn 444 P1 cần phân loại.
+
 > Entry mới nhất ở **trên cùng**. Mỗi cycle một entry, đủ 11 trường
 > (xem `06-baseline-tracking.md` §8). Không sửa entry cũ — sai thì thêm entry đính chính.
 

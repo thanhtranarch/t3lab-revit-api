@@ -8,7 +8,11 @@ Copyright © 2025 Dang Quoc Truong (DQT)
 
 __author__ = "Dang Quoc Truong (DQT)"
 
-from Autodesk.Revit.DB import Transaction, TransactionGroup, ElementId
+from Autodesk.Revit.DB import Transaction, TransactionGroup, TransactionStatus, ElementId
+
+
+class _PendingTransactionError(RuntimeError):
+    """No further transactions may run until Revit resolves its failures."""
 
 
 class AdvancedPurgeExecutor(object):
@@ -23,6 +27,15 @@ class AdvancedPurgeExecutor(object):
         """
         self.doc = doc
         self.dry_run = True  # Always start in dry run mode
+        self.progress_errors = []
+
+    def _report_progress(self, callback, current, total, message):
+        """A failed UI update must not change transaction results."""
+        if callback:
+            try:
+                callback(current, total, message)
+            except Exception as exc:
+                self.progress_errors.append(str(exc))
         
     def execute_purge(self, items_by_category, progress_callback=None):
         """
@@ -37,19 +50,19 @@ class AdvancedPurgeExecutor(object):
         """
         deleted = []
         failed = []
+        self.progress_errors = []
         
         total_items = sum(len(items) for items in items_by_category.values())
         current = 0
         
         # Create transaction group for all operations
-        tg = TransactionGroup(self.doc, "Advanced Purge")
-        tg.Start()
+        tg = TransactionGroup(self.doc, "T3Lab: Advanced Purge")
         
         try:
+            tg.Start()
             for category, items in items_by_category.items():
-                if progress_callback:
-                    progress_callback(current, total_items, 
-                                    "Processing {}...".format(category.name))
+                self._report_progress(progress_callback, current, total_items,
+                                      "Processing {}...".format(category.name))
                 
                 # Process items in this category
                 cat_deleted, cat_failed = self._execute_category(
@@ -63,21 +76,21 @@ class AdvancedPurgeExecutor(object):
             # Rollback if dry run, commit if real
             if self.dry_run:
                 tg.RollBack()
-                if progress_callback:
-                    progress_callback(total_items, total_items, 
-                                    "Dry run complete - no changes made")
+                self._report_progress(progress_callback, total_items, total_items,
+                                      "Dry run complete - no changes made")
             else:
-                tg.Assimilate()
-                if progress_callback:
-                    progress_callback(total_items, total_items, 
-                                    "Purge complete!")
+                status = tg.Assimilate()
+                if status != TransactionStatus.Committed:
+                    raise RuntimeError("Transaction group was not committed: {}".format(status))
+                self._report_progress(progress_callback, total_items, total_items,
+                                      "Purge complete!")
             
             return deleted, failed
             
         except Exception as e:
-            tg.RollBack()
-            if progress_callback:
-                progress_callback(0, total_items, "Error: {}".format(str(e)))
+            if not isinstance(e, _PendingTransactionError) and tg.GetStatus() == TransactionStatus.Started:
+                tg.RollBack()
+            self._report_progress(progress_callback, 0, total_items, "Error: {}".format(str(e)))
             raise
     
     def _execute_category(self, category, items, progress_callback, 
@@ -99,13 +112,14 @@ class AdvancedPurgeExecutor(object):
         failed = []
         
         # Create transaction for this category
-        t = Transaction(self.doc, "Purge {}".format(category.name))
-        t.Start()
+        t = Transaction(self.doc, "T3Lab: Purge {}".format(category.name))
         
         try:
+            t.Start()
             for i, item in enumerate(items):
                 if progress_callback and i % 10 == 0:
-                    progress_callback(
+                    self._report_progress(
+                        progress_callback,
                         current_base + i, 
                         total_items,
                         "Processing {} ({}/{})".format(
@@ -141,17 +155,28 @@ class AdvancedPurgeExecutor(object):
             if self.dry_run:
                 t.RollBack()
             else:
-                t.Commit()
+                options = t.GetFailureHandlingOptions()
+                options.SetForcedModalHandling(True)
+                t.SetFailureHandlingOptions(options)
+                status = t.Commit()
+                if status != TransactionStatus.Committed:
+                    raise RuntimeError("Transaction was not committed: {}".format(status))
                 
         except Exception as e:
-            t.RollBack()
-            # All items failed
+            if t.GetStatus() == TransactionStatus.Pending:
+                raise _PendingTransactionError(
+                    "Purge is awaiting Revit failure resolution; stop and resolve the Revit dialog.")
+            if t.GetStatus() == TransactionStatus.Started:
+                t.RollBack()
+            deleted = []
+            failed_item_ids = set(id(entry['item']) for entry in failed)
             for item in items:
-                if item not in deleted and item not in [f['item'] for f in failed]:
+                if id(item) not in failed_item_ids:
                     failed.append({
                         'item': item,
                         'error': str(e)
                     })
+                    failed_item_ids.add(id(item))
         
         return deleted, failed
     
