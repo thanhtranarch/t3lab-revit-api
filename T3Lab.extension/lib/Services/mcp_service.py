@@ -261,6 +261,8 @@ def _antigravity_candidates():
     alternative layouts; whichever exists first wins.
     """
     return [
+        os.path.join(_home(), '.gemini', 'config', 'mcp_config.json'),
+        os.path.join(_home(), '.gemini', 'antigravity', 'mcp_config.json'),
         os.path.join(_home(), '.gemini', 'antigravity-ide', 'mcp_config.json'),
         os.path.join(_home(), '.antigravity', 'mcp_config.json'),
         os.path.join(_appdata(), 'Antigravity', 'User', 'globalStorage', 'mcp_config.json'),
