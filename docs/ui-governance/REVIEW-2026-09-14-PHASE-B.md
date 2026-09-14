@@ -36,6 +36,30 @@ Các test thực thi source đang ship với transaction/model/control doubles, 
 phải bản sao logic. Bao phủ Commit=Committed/RolledBack/Pending, exception,
 Start failure, partial success, hủy, tên hoán đổi và callback lỗi.
 
+Kết quả kiểm tra cuối ngày 2026-09-14:
+
+| Lệnh | Kết quả |
+|---|---|
+| `python3 dev/test_join_transactions.py` | 11 passed |
+| `python3 dev/test_advanced_purge_transactions.py` | 11 passed |
+| `python3 dev/test_group_transactions.py` | 10 passed, gồm ma trận trạng thái cho cả 4 thao tác Group |
+| `python3 dev/test_auto_join_results.py` | 5 passed |
+| `python3 dev/test_group_manager.py` | 61 passed |
+| `python3 dev/test_service_transactions.py` | 22 passed |
+| `python3 dev/test_selection_dialogs.py` | 10 passed |
+| `python3 dev/audit_t3.py --quiet` | 59 T3, 0 vi phạm |
+| `python3 dev/audit_tools.py --quiet` | clean |
+| `python3 dev/audit_cpython.py --quiet` | 0 P0, 444 P1 chưa xử lý trong phạm vi đợt B |
+| `python3 dev/audit_api_context.py` | 5 dialog, 0 vi phạm |
+| `python3 dev/sync_t3_styles.py --check` | 59 file, 0 lệch |
+| `python3 dev/audit_icons.py --quiet` / `python3 dev/build_icons.py --check` | 45 bundle qua, build đồng bộ |
+
+Tổng cộng **37 test mới đợt B**, cộng 93 test hồi quy có sẵn = **130 passed**.
+Không sửa XAML trong đợt B; lần nạp 59/59 WPF gần nhất được ghi trong báo cáo A.
+Review chéo đã kiểm tra Group Manager và thông báo UI; phần sửa thứ tự cấu hình
+failure options sau `Transaction.Start()` của AutoJoin đã được kiểm tra source
+và test tái hiện việc Start reset options.
+
 **NEEDS VERIFICATION trong Revit:** failure dialog/finalizer, Undo, Partial Stop
 với model thật, worksharing ownership, tên group trùng/hoán đổi và refresh sau
 Pending. Đợt này không chạy thao tác ghi lên model của người dùng.

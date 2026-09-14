@@ -1,17 +1,19 @@
-# PRIORITY QUEUE — cập nhật 2026-09-13
+# PRIORITY QUEUE — cập nhật 2026-09-14
 
 Hàng đợi hiện tại dựa trên [review có bằng chứng](REVIEW-2026-09-13.md).
+Các sửa transaction P1 đã hoàn tất ở mức source/test trong [đợt B](REVIEW-2026-09-14-PHASE-B.md).
 Không migrate lại 59 XAML đã đạt T3. Các checkbox migration bên dưới giữ làm lịch sử.
 
 | Thứ tự | Mức | Hạng mục | Điều kiện hoàn thành |
 |---|---|---|---|
 | 1 | P1 | Verify các sửa SelectFromDict, ParameterSelector, Workset, Smart Purge trong Revit | Happy path, failure, Cancel, Undo, click lần 2; ghi kết quả thực |
-| 2 | P1 | AutoJoin / Advanced Purge / Group Manager: kết quả sau commit/rollback | Test lỗi transaction và không báo thành công sai |
+| 2 | P1 | Verify AutoJoin / Advanced Purge / Group Manager trong Revit; mã sửa và 37 test mới đã qua | Failure dialog, Pending, Undo, hủy giữa chừng và tên hoán đổi trên model thật |
 | 3 | P2 | BatchOut: 0 file, partial export, cancel | Kết quả khớp artifact thực tế |
 | 4 | P2 | ManaSheets / ManaViews / SheetGen: preview, validation, recovery | Preview khớp dữ liệu sau thao tác và thông báo lỗi theo item |
 | 5 | P2 | Modeless và hình học | Đổi/đóng document, dữ liệu lớn, progress và cancel |
 | 6 | P3 | Phân loại 444 cảnh báo C5/C6 | Xác minh từng nhóm, không nới gate |
 | 7 | P3 | Chấm UX theo rubric | Test keyboard và DPI 100/125%, không gán điểm từ static gate |
+| 8 | P2 | ManaFami selection count, ParameterSelector/AutoJoin empty state, RibbonNames đổi tên lần hai | Phạm vi hiển thị khớp thao tác; dữ liệu rỗng có hướng dẫn; đổi short name không mất mapping |
 
 ---
 

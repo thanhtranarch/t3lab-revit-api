@@ -1,5 +1,23 @@
 # CHANGE HISTORY — lịch sử các cycle
 
+## Đợt B — transaction và phản hồi lỗi — 2026-09-14
+
+```text
+DATE:                   2026-09-14
+CYCLE:                  B — xử lý backlog transaction P1
+TOOLS AUDITED:          AutoJoin/Quick Join, Advanced Purge, Group Manager
+ISSUES FOUND:           Commit status, count sau rollback, tên tạm, phản hồi Pending
+ISSUES FIXED:           Checked commit, Started-only rollback, restore name/cache,
+                        Parameter.Set(False), lỗi callback và thông báo kết quả
+ISSUES REMAINING:       Revit runtime NEEDS VERIFICATION; BatchOut và backlog UX
+REGRESSIONS:            37 test mới + 93 test có sẵn = 130 passed; UI/static xanh
+DESIGN SYSTEM GAPS:     Không thay đổi XAML/design system
+NEXT PRIORITIES:        Revit smoke tests A/B; BatchOut; selection/empty state UX
+COMMIT:                 Không tạo hoặc amend commit trong lần chốt kiểm tra
+```
+
+Chi tiết: [báo cáo đợt B](REVIEW-2026-09-14-PHASE-B.md).
+
 ## Review và debug tools — 2026-09-14
 
 ```text

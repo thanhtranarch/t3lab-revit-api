@@ -1,128 +1,134 @@
 [
   {
-    "timestamp": "2026-07-02 13:47:53", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-02 13:47:53",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-02 13:51:39", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-02 13:51:39",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 15:13:20", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 15:13:20",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:12:07", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:12:07",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:12:55", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:12:55",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:13:13", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:13:13",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:14:24", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:14:24",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:16:21", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:16:21",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:19:51", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:19:51",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:23:19", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:23:19",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:25:26", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:25:26",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:27:37", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:27:37",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:28:16", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:28:16",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:33:44", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:33:44",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:36:24", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:36:24",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 16:39:43", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 16:39:43",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 20:13:37", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 20:13:37",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-03 20:20:59", 
-    "rag": "Green", 
-    "grade": "B", 
+    "timestamp": "2026-07-03 20:20:59",
+    "rag": "Green",
+    "grade": "B",
     "score": 86.0
-  }, 
+  },
   {
-    "grade": "B", 
-    "timestamp": "2026-07-06 08:52:25", 
-    "rag": "Green", 
+    "grade": "B",
+    "timestamp": "2026-07-06 08:52:25",
+    "rag": "Green",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-16 15:09:44", 
-    "grade": "B", 
-    "rag": "Green", 
+    "timestamp": "2026-07-16 15:09:44",
+    "grade": "B",
+    "rag": "Green",
     "score": 86.0
-  }, 
+  },
   {
-    "timestamp": "2026-07-22 08:51:51", 
-    "score": 86.0, 
-    "grade": "B", 
+    "timestamp": "2026-07-22 08:51:51",
+    "score": 86.0,
+    "grade": "B",
+    "rag": "Green"
+  },
+  {
+    "timestamp": "2026-09-14 00:52:40",
+    "score": 86.1,
+    "grade": "B",
     "rag": "Green"
   }
 ]
