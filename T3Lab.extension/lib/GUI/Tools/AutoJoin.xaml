@@ -1786,9 +1786,9 @@
                             </DataGrid.Columns>
                         </DataGrid>
 
-                        <TextBlock Style="{StaticResource T3.Empty}"
+                        <TextBlock x:Name="rules_grid_empty" Style="{StaticResource T3.Empty}"
                                    Text="No join rules defined. Click 'Add' to specify categories."
-                                   Visibility="{Binding HasItems, ElementName=rules_grid, Converter={x:Null}}"/>
+                                   Visibility="Collapsed"/>
                     </Grid>
 
                     <!-- Tip Line -->

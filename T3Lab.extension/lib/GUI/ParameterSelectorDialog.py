@@ -25,7 +25,7 @@ clr.AddReference('System.Windows.Forms')
 clr.AddReference('System')
 
 import System
-from System.Windows import Window, WindowStartupLocation, WindowStyle
+from System.Windows import Window, WindowStartupLocation, WindowStyle, Visibility
 from System.Windows.Markup import XamlReader
 from System.Windows.Controls import ListBox
 from System.Collections.ObjectModel import ObservableCollection
@@ -140,6 +140,9 @@ class ParameterSelectorDialog(T3WPFWindow):
 
         self.list_available.ItemsSource = self.available_params
         self.list_selected.ItemsSource = self.selected_params
+        self.available_params.CollectionChanged += self._update_parameter_empty_states
+        self.selected_params.CollectionChanged += self._update_parameter_empty_states
+        self._update_parameter_empty_states()
 
         # Load parameters
         self.load_parameters()
@@ -375,6 +378,23 @@ class ParameterSelectorDialog(T3WPFWindow):
             self.selected_params.Add(sep_param)
             self.txt_custom_separator.Text = ''
         self.update_preview(sender, e)
+
+    def _update_parameter_empty_states(self, sender=None, e=None):
+        """Keep both overlays current through load, cache restore, and transfers."""
+        self.empty_available.Visibility = (
+            Visibility.Collapsed if len(self.available_params) else Visibility.Visible
+        )
+        self.empty_available.Text = (
+            "No parameters are available.\n"
+            "Remove a selected parameter or click Reset to reload."
+        )
+        self.empty_selected.Visibility = (
+            Visibility.Collapsed if len(self.selected_params) else Visibility.Visible
+        )
+        self.empty_selected.Text = (
+            "No parameters are selected.\n"
+            "Select parameters on the left, then use the right arrow to add them."
+        )
 
     def update_preview(self, sender, e):
         """Update the preview text based on current selection."""

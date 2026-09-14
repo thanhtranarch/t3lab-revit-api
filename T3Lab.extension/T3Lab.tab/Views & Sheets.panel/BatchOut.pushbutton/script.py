@@ -29,7 +29,7 @@ try:
 except Exception:
     pass
 
-from GUI.BatchOutDialog import show_batchout_dialog
+from GUI.BatchOutDialog import ExportManagerWindow, show_batchout_dialog
 
 if __name__ == '__main__':
     show_batchout_dialog()

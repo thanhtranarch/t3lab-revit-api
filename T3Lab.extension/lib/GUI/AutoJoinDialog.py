@@ -21,7 +21,7 @@ clr.AddReference('PresentationCore')
 clr.AddReference('WindowsBase')
 clr.AddReference('System')
 
-from System.Windows import WindowState
+from System.Windows import WindowState, Visibility
 from Autodesk.Revit.DB import (
     Transaction,
     FilteredElementCollector,
@@ -161,6 +161,7 @@ class AutoJoinWindow(T3WPFWindow):
         self.rules_grid.ItemsSource = None
         self.rules_grid.ItemsSource = to_items_source(items)
         self.rule_count_text.Text = "{} rule(s) defined".format(len(self._rules))
+        self.rules_grid_empty.Visibility = Visibility.Collapsed if items else Visibility.Visible
 
     def minimize_button_clicked(self, sender, e):
         self.WindowState = WindowState.Minimized

@@ -1,5 +1,24 @@
 # CHANGE HISTORY — lịch sử các cycle
 
+## Đợt C — BatchOut và trạng thái lựa chọn — 2026-09-14
+
+```text
+DATE:                   2026-09-14
+CYCLE:                  C — export integration và UI state
+TOOLS AUDITED:          BatchOut/Assistant, ManaFami, ParameterSelector, AutoJoin
+ISSUES FOUND:           Missing class export, sai API context/run setup, false success,
+                        callback/Stop lifecycle, hidden selection và empty overlays
+ISSUES FIXED:           Strict API queue, per-run setup/cleanup, partial counts,
+                        file freshness, Stop/turn ownership và ba UI states
+ISSUES REMAINING:       Runtime NEEDS VERIFICATION; native exporters/ribbon, RibbonNames
+REGRESSIONS:            46 test mới qua; existing routing/UI checks qua; 59/59 WPF
+DESIGN SYSTEM GAPS:     Không thay đổi design system
+NEXT PRIORITIES:        Runtime A/B/C; native export; RibbonNames; Sheets/Views UX
+COMMIT:                 Không tạo commit trong đợt này
+```
+
+Chi tiết: [báo cáo đợt C](REVIEW-2026-09-14-PHASE-C.md).
+
 ## Đợt B — transaction và phản hồi lỗi — 2026-09-14
 
 ```text

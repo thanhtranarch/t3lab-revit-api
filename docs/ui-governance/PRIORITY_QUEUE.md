@@ -2,18 +2,19 @@
 
 Hàng đợi hiện tại dựa trên [review có bằng chứng](REVIEW-2026-09-13.md).
 Các sửa transaction P1 đã hoàn tất ở mức source/test trong [đợt B](REVIEW-2026-09-14-PHASE-B.md).
+Đường BatchOut từ Assistant và selection/empty state đã sửa ở [đợt C](REVIEW-2026-09-14-PHASE-C.md); còn cần runtime verification.
 Không migrate lại 59 XAML đã đạt T3. Các checkbox migration bên dưới giữ làm lịch sử.
 
 | Thứ tự | Mức | Hạng mục | Điều kiện hoàn thành |
 |---|---|---|---|
 | 1 | P1 | Verify các sửa SelectFromDict, ParameterSelector, Workset, Smart Purge trong Revit | Happy path, failure, Cancel, Undo, click lần 2; ghi kết quả thực |
 | 2 | P1 | Verify AutoJoin / Advanced Purge / Group Manager trong Revit; mã sửa và 37 test mới đã qua | Failure dialog, Pending, Undo, hủy giữa chừng và tên hoán đổi trên model thật |
-| 3 | P2 | BatchOut: 0 file, partial export, cancel | Kết quả khớp artifact thực tế |
+| 3 | P2 | Verify BatchOut direct/configured sau đợt C; review native exporters/ribbon còn lại | File thật khớp kết quả; Stop, PDF gộp/IFC, cấu hình không bị ghi đè |
 | 4 | P2 | ManaSheets / ManaViews / SheetGen: preview, validation, recovery | Preview khớp dữ liệu sau thao tác và thông báo lỗi theo item |
 | 5 | P2 | Modeless và hình học | Đổi/đóng document, dữ liệu lớn, progress và cancel |
 | 6 | P3 | Phân loại 444 cảnh báo C5/C6 | Xác minh từng nhóm, không nới gate |
 | 7 | P3 | Chấm UX theo rubric | Test keyboard và DPI 100/125%, không gán điểm từ static gate |
-| 8 | P2 | ManaFami selection count, ParameterSelector/AutoJoin empty state, RibbonNames đổi tên lần hai | Phạm vi hiển thị khớp thao tác; dữ liệu rỗng có hướng dẫn; đổi short name không mất mapping |
+| 8 | P2 | Runtime verify ManaFami selection count và ParameterSelector/AutoJoin empty state; sửa RibbonNames đổi tên lần hai | Ba state fixes đã qua mock/WPF ở đợt C; còn kiểm chứng binding/DPI và mapping RibbonNames |
 
 ---
 

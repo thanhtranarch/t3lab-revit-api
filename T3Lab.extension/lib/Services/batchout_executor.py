@@ -47,7 +47,7 @@ def configure_batchout_window(window, config):
         window: ExportManagerWindow instance (already __init__'d).
         config: dict with keys format, filter, combine, goto_create.
     """
-    fmt        = (config.get('format') or 'pdf').lower()
+    fmt        = _validated_format(config)
     filter_kw  = (config.get('filter') or '').lower().strip()
     combine    = config.get('combine', False)
     goto_create = config.get('goto_create', True)
@@ -66,24 +66,31 @@ def configure_batchout_window(window, config):
             pass
 
 
-def direct_export(batchout_mod, config, progress_cb=None):
+def direct_export(batchout_mod, config, progress_cb=None, cancel_check=None):
     """Export sheets without showing any UI.
 
     Args:
         batchout_mod : The loaded BatchOut script module (from _load_script).
         config       : dict with format, filter, folder, combine.
         progress_cb  : optional callable(message: str) for progress updates.
+        cancel_check : optional callable returning True to stop before the next
+                       export call. Existing output files are never removed.
 
     Returns:
-        (success: bool, exported_count: int, error_msg: str)
+        (complete_success: bool, exported_count: int, result_message: str).
+        Partial output returns False with its nonzero count. Must be called
+        inside Revit API context; a native export cannot be interrupted here.
     """
-    fmt        = (config.get('format') or 'pdf').lower()
-    filter_kw  = (config.get('filter') or '').lower().strip()
-    combine    = config.get('combine', False)
-    folder     = config.get('folder') or os.path.join(
-        os.path.expanduser('~'), 'Documents', 'Revit Exports')
-
+    window = None
+    count = 0
     try:
+        fmt = _validated_format(config)
+        if cancel_check and cancel_check():
+            return False, 0, "Export stopped before execution. No files were created."
+        filter_kw = (config.get('filter') or '').lower().strip()
+        combine = bool(config.get('combine', False))
+        folder = config.get('folder') or os.path.join(
+            os.path.expanduser('~'), 'Documents', 'Revit Exports')
         # Create window WITHOUT showing it — just to access all export logic
         window = batchout_mod.ExportManagerWindow()
 
@@ -94,35 +101,119 @@ def direct_export(batchout_mod, config, progress_cb=None):
         # Collect selected sheets
         selected = [s for s in window.all_sheets if s.IsSelected]
         if not selected:
-            msg = u"Không tìm thấy sheet nào{}. Kiểm tra lại filter.".format(
-                u" có prefix '{}'".format(filter_kw.upper()) if filter_kw else '')
-            if progress_cb:
-                progress_cb(msg)
+            msg = "No sheets match '{}'. Check the sheet filter.".format(filter_kw or 'all sheets')
+            _notify(progress_cb, msg)
             return False, 0, msg
 
-        if progress_cb:
-            progress_cb(u"Tìm thấy {} sheet. Đang xuất {}...".format(
-                len(selected), fmt.upper()))
+        _notify(progress_cb, "Exporting {} sheet(s) to {}...".format(len(selected), fmt.upper()))
 
         # Ensure output folder exists
-        export_folder = os.path.join(folder, _FMT_SUBFOLDER.get(fmt, fmt.upper()))
+        export_folder = os.path.join(folder, _FMT_SUBFOLDER[fmt])
         if not os.path.exists(export_folder):
             os.makedirs(export_folder)
 
-        # Dispatch to the correct export method
-        count = _run_export_method(window, fmt, selected, export_folder)
+        # start_export normally initializes these; the hidden path bypasses it.
+        window.output_folder.Text = folder
+        window.selection_mode = 'sheets'
+        window._ensure_titleblock_cache()
+        window._reset_run_state()
+        window._overall_counter = 0
+        window._overall_total = len(selected)
+        window._skipped_fatal = []
+        window._safe_applied = []
+        verify_extension = '.ifc' if fmt == 'ifc' else ('.pdf' if fmt == 'pdf' and combine else None)
+        before_files = _output_snapshot(export_folder, verify_extension) if verify_extension else None
 
-        msg = u"Xuất {} file {} thành công!\nThư mục: {}".format(
-            count, fmt.upper(), export_folder)
-        if progress_cb:
-            progress_cb(msg)
-        return True, count, msg
+        # Dispatch to the correct export method
+        combined = fmt == 'ifc' or (fmt == 'pdf' and combine)
+        batches = [[item] for item in selected] if cancel_check and not combined else [selected]
+        stopped = False
+        for batch in batches:
+            if cancel_check and cancel_check():
+                stopped = True
+                break
+            reported = _run_export_method(window, fmt, batch, export_folder)
+            if isinstance(reported, bool) or not isinstance(reported, int) or reported < 0:
+                raise RuntimeError("The exporter returned an invalid output count: {!r}".format(reported))
+            count += reported
+        if cancel_check and cancel_check():
+            stopped = True
+        failures = list(getattr(window, '_failed_items', []))
+        # IFC trusts the API return path; combined PDF can accept an existing
+        # filename. Neither a stale nor empty file proves this run produced it.
+        if verify_extension and count:
+            after_files = _output_snapshot(export_folder, verify_extension)
+            if not any(before_files.get(path) != stamp for path, stamp in after_files.items()):
+                count = 0
+                failures.append("No new or updated nonempty {} file could be verified.".format(fmt.upper()))
+        expected = 1 if combined else len(selected)
+        success = count == expected and not failures and not stopped
+        if stopped:
+            msg = "Export stopped. {} {} output(s) already created were kept.".format(count, fmt.upper())
+        elif success:
+            msg = "Export completed: {} {} output(s).".format(count, fmt.upper())
+        elif count:
+            msg = "Export incomplete: {} of {} expected {} output(s).".format(count, expected, fmt.upper())
+        else:
+            msg = "No {} outputs were confirmed. Check the export settings and Revit messages.".format(fmt.upper())
+        if failures:
+            msg += "\nDetails: " + "; ".join(str(item) for item in failures[:5])
+        msg += "\nFolder: {}".format(export_folder)
+        _notify(progress_cb, msg)
+        return success, count, msg
 
     except Exception as ex:
-        msg = u"Lỗi khi xuất: {}".format(ex)
-        if progress_cb:
-            progress_cb(msg)
-        return False, 0, msg
+        msg = "Export did not complete: {}".format(ex)
+        _notify(progress_cb, msg)
+        return False, count, msg
+    finally:
+        if window is not None:
+            _close_hidden_window(window)
+
+
+def _notify(callback, message):
+    """Progress reporting must not change an export's result."""
+    if callback:
+        try:
+            callback(message)
+        except Exception:
+            pass
+
+
+def _validated_format(config):
+    value = config.get('format', 'pdf')
+    if not isinstance(value, str) or value.strip().lower() not in _FMT_ATTRS:
+        raise ValueError("Choose one supported format: PDF, DWG, DWF, DGN, NWD, IFC or Images.")
+    fmt = value.strip().lower()
+    return 'img' if fmt == 'image' else fmt
+
+
+def _output_snapshot(folder, extension):
+    result = {}
+    for entry in os.scandir(folder):
+        if entry.name.lower().endswith(extension) and entry.is_file():
+            stat = entry.stat()
+            if stat.st_size:
+                result[entry.path] = (stat.st_size, stat.st_mtime_ns)
+    return result
+
+
+def _close_hidden_window(window):
+    """Dispose the hidden window without saving its temporary configuration."""
+    try:
+        window.Closing -= window._window_closing_save_setup
+    except Exception:
+        # Avoid Close when the save handler could still overwrite user defaults.
+        pass
+    else:
+        try:
+            window.Close()
+        except Exception:
+            pass
+    try:
+        window._window_closed_dispose(None, None)
+    except Exception:
+        pass
 
 
 # ─── Extract export params from natural language ──────────────────────────────
@@ -197,11 +288,12 @@ def _apply_sheet_filter(window, filter_kw):
 
 def _apply_format(window, fmt, combine=False):
     """Enable only the specified export format; disable all others."""
-    fmt = fmt.lower()
-    for name, attr in _FMT_ATTRS.items():
+    fmt = _validated_format({'format': fmt})
+    selected_attr = _FMT_ATTRS[fmt]
+    for attr in set(_FMT_ATTRS.values()):
         try:
             cb = getattr(window, attr)
-            cb.IsChecked = (name == fmt or (fmt == 'image' and name == 'img'))
+            cb.IsChecked = (attr == selected_attr)
         except Exception:
             pass
 
@@ -225,6 +317,7 @@ def _run_export_method(window, fmt, selected_items, output_folder):
         'img':   'export_to_images',
         'image': 'export_to_images',
     }
-    method_name = method_map.get(fmt, 'export_to_pdf')
+    method_name = method_map[_validated_format({'format': fmt})]
     method = getattr(window, method_name)
-    return method(selected_items, output_folder) or 0
+    result = method(selected_items, output_folder)
+    return 0 if result is None else result

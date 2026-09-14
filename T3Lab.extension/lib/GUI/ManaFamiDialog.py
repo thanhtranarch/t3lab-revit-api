@@ -793,8 +793,17 @@ class ManaFamiWindow(T3WPFWindow):
         try:
             count = len(self.filtered_families)
             self.txt_result_count.Text = "{} families found".format(count)
-            selected = sum(1 for f in self.filtered_families if f.IsChecked)
-            self.txt_selected_count.Text = "{} families selected".format(selected)
+            selected = sum(1 for f in self.all_families if f.IsChecked)
+            visible_selected = sum(1 for f in self.filtered_families if f.IsChecked)
+            hidden_selected = selected - visible_selected
+            text = "{} families selected".format(selected)
+            if hidden_selected:
+                text += " ({} hidden)".format(hidden_selected)
+            self.txt_selected_count.Text = text
+            self.txt_selected_count.ToolTip = (
+                "Load includes all selected families, including those hidden "
+                "by the current search or category filter."
+            )
             self.btn_load.IsEnabled = selected > 0
         except Exception as ex:
             logger.debug("Error counts: {}".format(ex))

@@ -542,7 +542,7 @@ def launch_batchout():
     try:
         mod = _load_batchout_mod()
         window = mod.ExportManagerWindow()
-        window.ShowDialog()
+        window.show(modal=not window.modeless)
         return True, u""
     except Exception as ex:
         logger.error("Error launching BatchOut: {}".format(_exc_text(ex)))
@@ -571,7 +571,7 @@ def launch_batchout_configured(config, progress_cb=None):
                 progress_cb(u"BatchOut selected{}, format {} — press Export to run.".format(
                     filt_s, fmt))
 
-        window.ShowDialog()
+        window.show(modal=not window.modeless)
         return True
     except Exception as ex:
         logger.error(u"Error launching configured BatchOut: {}".format(_exc_text(ex)))
@@ -3689,6 +3689,16 @@ class T3LabAssistantWindow(T3WPFWindow):
         Cancellation is checked BETWEEN steps — a Revit Transaction already in
         flight is never aborted — which is what the Stop tooltip promises.
         """
+        if rid is not None and rid != getattr(self, '_request_id', 0):
+            return
+        if getattr(self, '_batchout_request_id', None) == getattr(self, '_request_id', 0):
+            if getattr(self, '_batchout_running', False):
+                # The native export must return its retained-file count. A
+                # watchdog cannot truthfully discard that outcome mid-call.
+                return
+            # A queued request has not touched the model or written files.
+            # Its eventual API callback observes cancellation/the stale id.
+            self._batchout_request_id = None
         if not self._claim_turn(rid):
             return
 
@@ -3961,6 +3971,11 @@ class T3LabAssistantWindow(T3WPFWindow):
         message while the agent works — Enter queues it, and the queue
         drains automatically when the busy state releases.
         """
+        if (not busy and getattr(self, '_batchout_request_id', None)
+                == getattr(self, '_request_id', 0)):
+            # Generic routing finally blocks finish before the queued API
+            # event. BatchOut's completion callback owns this turn's release.
+            return
         self._busy = busy
         if busy:
             self._cancel_requested = False
@@ -7773,33 +7788,63 @@ class T3LabAssistantWindow(T3WPFWindow):
             self._set_busy(False)
             return
 
-        # ── Export directly — runs on background thread ───────────────────────
-        if intent == "export_direct":
-            confirm = message or u"Exporting, please wait..."
-            _bot(confirm)
-            _learn(confirm)
+        # Both paths construct Revit-bound windows and must run in API context.
+        if intent in ("export_direct", "open_batchout_configured"):
+            request_id = getattr(self, '_request_id', 0)
+            if getattr(self, '_batchout_request_id', None) == request_id:
+                return
+            # The LLM finish() claims a synchronous reply before handing its
+            # intent here. Transfer terminal ownership to the API callback.
+            self._replied = False
+            _bot("Export queued. Waiting for Revit..." if intent == "export_direct"
+                 else "BatchOut launch queued. Waiting for Revit...")
+            expected_doc = self.doc
+            self._batchout_request_id = request_id
+            self._batchout_running = False
 
-            def do_export():
-                ok = launch_export_direct(params, self._safe_append_bot)
-                if not ok:
-                    self._safe_append_bot(u"Export failed. Check the console for details.")
-                self.Dispatcher.Invoke(Action(lambda: self._set_busy(False)))
+            def _cancel_batchout():
+                return (self._cancelled() or request_id != getattr(self, '_request_id', 0))
 
-            t = Thread(ThreadStart(do_export))
-            t.IsBackground = True
-            t.SetApartmentState(ApartmentState.STA)
-            t.Start()
-            return
+            def _run_batchout():
+                if _cancel_batchout():
+                    return False, "BatchOut request stopped before execution. No files were created."
+                if (expected_doc is None or not expected_doc.IsValidObject
+                        or revit.doc != expected_doc):
+                    return False, "The active document changed or closed. Refresh the Assistant context before retrying."
+                self._batchout_running = True
+                if intent == "export_direct":
+                    if not HAS_EXECUTOR:
+                        return False, "The BatchOut executor is unavailable. Reload pyRevit before retrying."
+                    ok, count, details = direct_export(_load_batchout_mod(), params,
+                                                       cancel_check=_cancel_batchout)
+                    return ok, details
+                notices = []
+                ok = launch_batchout_configured(params, notices.append)
+                return ok, ("BatchOut was opened with the requested settings."
+                            if ok else (notices[-1] if notices else "Could not open configured BatchOut."))
 
-        # ── Open BatchOut pre-configured ──────────────────────────────────────
-        if intent == "open_batchout_configured":
-            confirm = message or u"Opening configured BatchOut..."
-            _bot(confirm)
-            _learn(confirm)
-            ok = launch_batchout_configured(params, self._safe_append_bot)
-            if not ok:
-                self._append_bot_message(u"Could not open BatchOut. Check the console.")
-            self._set_busy(False)
+            def _finished_batchout(ok, details):
+                def _finish_ui():
+                    if getattr(self, '_batchout_request_id', None) == request_id:
+                        self._batchout_request_id = None
+                        self._batchout_running = False
+                    if not self._claim_turn(request_id):
+                        return
+                    try:
+                        _bot(details or "BatchOut did not return a result. Check Revit before retrying.")
+                        if ok:
+                            _learn(details)
+                    finally:
+                        self._set_busy(False)
+                self._ui_invoke(_finish_ui)
+
+            if not HAS_API_CONTEXT:
+                _finished_batchout(False, "Revit API event support is unavailable. Reload pyRevit and reopen the Assistant.")
+                return
+            try:
+                run_in_api_context(_run_batchout, _finished_batchout, require_api_context=True)
+            except Exception as ex:
+                _finished_batchout(False, _exc_text(ex))
             return
 
         # ── Spell-check all Text Notes (deterministic DB scan + LLM proofread) ─
