@@ -1,5 +1,14 @@
 # CHANGE HISTORY — lịch sử các cycle
 
+## Đợt D — RibbonNames và export native — 2026-09-15
+
+Sửa danh tính tab qua nhiều lần đổi tên, restore, lưu JSON atomic và phản hồi lỗi
+ghi cấu hình. BatchOut xác minh file mới/nonempty, kiểm tra transaction IFC,
+không báo hoàn tất khi một format thiếu output; sửa mapping checkbox image.
+UI/static gates xanh; 59 T3 styles đồng bộ, CPython 0 P0/444 P1.
+Chưa kiểm thử thao tác native trên model Revit; cần Reload và runtime smoke test.
+Không tạo commit. Chi tiết và test: [báo cáo đợt D](REVIEW-2026-09-15-PHASE-D.md).
+
 ## Đợt C — BatchOut và trạng thái lựa chọn — 2026-09-14
 
 ```text

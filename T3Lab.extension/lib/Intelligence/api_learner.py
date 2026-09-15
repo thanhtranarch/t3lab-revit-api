@@ -333,9 +333,7 @@ class SmartAPIAdapter(object):
             options.FileName = filename
 
             # Always use the 3-parameter signature for PDF export (Revit 2022+)
-            self.doc.Export(folder, view_ids, options)
-
-            return True
+            return self.doc.Export(folder, view_ids, options)
         except Exception as ex:
             raise ex
 

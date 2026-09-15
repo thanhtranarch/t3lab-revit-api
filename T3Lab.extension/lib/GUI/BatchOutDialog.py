@@ -616,6 +616,10 @@ except Exception:
             return "T3Lab BatchOut Handler"
 
 
+class _PendingExportError(RuntimeError):
+    """Revit still owns a pending transaction; later exports must not run."""
+
+
 class ExportManagerWindow(T3WPFWindow):
     """Export Manager Window."""
 
@@ -2349,6 +2353,22 @@ class ExportManagerWindow(T3WPFWindow):
         self._failed_items = []
         self._verify_misses = 0
 
+    def _native_output_stamp(self, path):
+        """Snapshot one nonempty expected file, never a neighbouring export."""
+        try:
+            stat = os.stat(path)
+            if os.path.isfile(path) and stat.st_size > 0:
+                return stat.st_size, stat.st_mtime_ns
+        except OSError:
+            pass
+        return None
+
+    def _confirm_native_output(self, path, before):
+        previous_mtime = before[1] / 1000000000.0 if before is not None else None
+        self._wait_for_export_file(path, previous_mtime, 3.0)
+        after = self._native_output_stamp(path)
+        return after is not None and after != before
+
     def _reserve_filename(self, folder, base, ext):
         """Return a filename in `folder` that no earlier item in this run has
         already claimed, suffixing " (2)", " (3)", … on collision."""
@@ -2391,14 +2411,18 @@ class ExportManagerWindow(T3WPFWindow):
         try:
             import glob as _glob
             folder = os.path.dirname(expected_file)
+            used = getattr(self, '_used_filenames', set())
+            self._used_filenames = used
             for path in _glob.glob(os.path.join(folder, "*" + ext)):
-                if path.lower() in self._used_filenames:
+                if path.lower() == expected_file.lower() or path.lower() in used:
                     continue  # belongs to another item of this run
                 try:
-                    if os.path.getmtime(path) >= started_at - 1:
+                    if (os.path.isfile(path) and os.path.getsize(path) > 0
+                            and os.path.getmtime(path) >= started_at):
                         logger.warning("'{}' landed as '{}' (Revit renamed it).".format(
                             os.path.basename(expected_file), os.path.basename(path)))
                         self._verify_misses = 0
+                        used.add(path.lower())
                         return True
                 except Exception:
                     continue
@@ -2458,16 +2482,18 @@ class ExportManagerWindow(T3WPFWindow):
         first check — near-zero wait, versus the old fixed 0.3s sleep + two
         folder-wide globs (very slow on OneDrive-synced output folders)."""
         import time as _t
-        deadline = _t.time() + timeout
-        while _t.time() < deadline:
+        deadline = _t.monotonic() + max(0.0, timeout)
+        while True:
             try:
-                if os.path.exists(path):
+                if os.path.isfile(path) and os.path.getsize(path) > 0:
                     if prev_mtime is None or os.path.getmtime(path) > prev_mtime:
                         return True
             except Exception:
                 pass
-            _t.sleep(0.1)
-        return os.path.exists(path)
+            remaining = deadline - _t.monotonic()
+            if remaining <= 0:
+                return False
+            _t.sleep(min(0.1, remaining))
 
     def load_sheet_sets_for_filter(self):
         """Populate the multi-select sheet set dropdown with CheckBoxes."""
@@ -4104,6 +4130,7 @@ class ExportManagerWindow(T3WPFWindow):
 
     def start_export(self):
         """Start the export process."""
+        total_exported = 0
         try:
             self._ensure_titleblock_cache()
 
@@ -4169,12 +4196,19 @@ class ExportManagerWindow(T3WPFWindow):
             # Risky items last so a native crash cannot cost the rest of the batch
             selected_items = self._order_risky_last(selected_items)
 
+            def confirmed_count(format_name, count, expected):
+                if count < expected:
+                    self._failed_items.append(
+                        "{}: {} of {} expected output(s) confirmed".format(
+                            format_name, count, expected))
+                return count
+
             if self.export_dwg.IsChecked:
                 folder = os.path.join(output_folder, "DWG") if split_by_format else output_folder
                 if not os.path.exists(folder):
                     os.makedirs(folder)
                 count = self.export_to_dwg(selected_items, folder)
-                total_exported += count
+                total_exported += confirmed_count("DWG", count, len(selected_items))
 
                 # Free whatever the DWG phase allocated before the raster-heavy
                 # PDF phase begins — link-heavy sheets already push Revit hard.
@@ -4186,46 +4220,53 @@ class ExportManagerWindow(T3WPFWindow):
                 if not os.path.exists(folder):
                     os.makedirs(folder)
                 count = self.export_to_pdf(selected_items, folder)
-                total_exported += count
+                total_exported += confirmed_count(
+                    "PDF", count, 1 if self.combine_pdf.IsChecked else len(selected_items))
 
             if self.export_dwf.IsChecked:
                 folder = os.path.join(output_folder, "DWF") if split_by_format else output_folder
                 if not os.path.exists(folder):
                     os.makedirs(folder)
                 count = self.export_to_dwf(selected_items, folder)
-                total_exported += count
+                total_exported += confirmed_count("DWF", count, len(selected_items))
 
             if self.export_dgn.IsChecked:
                 folder = os.path.join(output_folder, "DGN") if split_by_format else output_folder
                 if not os.path.exists(folder):
                     os.makedirs(folder)
                 count = self.export_to_dgn(selected_items, folder)
-                total_exported += count
+                total_exported += confirmed_count("DGN", count, len(selected_items))
 
             if self.export_nwd.IsChecked:
                 folder = os.path.join(output_folder, "NWC") if split_by_format else output_folder
                 if not os.path.exists(folder):
                     os.makedirs(folder)
                 count = self.export_to_nwd(selected_items, folder)
-                total_exported += count
+                total_exported += confirmed_count("NWC", count, len(selected_items))
 
             if self.export_ifc.IsChecked:
                 folder = os.path.join(output_folder, "IFC") if split_by_format else output_folder
                 if not os.path.exists(folder):
                     os.makedirs(folder)
                 count = self.export_to_ifc(selected_items, folder)
-                total_exported += count
+                total_exported += confirmed_count("IFC", count, 1)
 
             if self.export_img.IsChecked:
                 folder = os.path.join(output_folder, "Images") if split_by_format else output_folder
                 if not os.path.exists(folder):
                     os.makedirs(folder)
                 count = self.export_to_images(selected_items, folder)
-                total_exported += count
+                total_exported += confirmed_count("Images", count, len(selected_items))
 
-            summary = "Export complete! {} files exported".format(total_exported)
+            if not total_exported:
+                outcome = "No exports confirmed"
+            elif self._failed_items or self._skipped_fatal:
+                outcome = "Export finished with issues"
+            else:
+                outcome = "Export complete"
+            summary = "{}: {} output(s) confirmed".format(outcome, total_exported)
             if self._failed_items:
-                summary += " ({} failed)".format(len(self._failed_items))
+                summary += " ({} issue report(s))".format(len(self._failed_items))
             if self._skipped_fatal:
                 summary += " ({} skipped)".format(len(self._skipped_fatal))
             self.status_text.Text = summary
@@ -4261,7 +4302,7 @@ class ExportManagerWindow(T3WPFWindow):
             fail_note = ""
             if self._failed_items:
                 shown = self._failed_items[:20]
-                fail_note = "\n\nNO FILE PRODUCED for:\n  {}".format("\n  ".join(shown))
+                fail_note = "\n\nEXPORT NOT CONFIRMED for:\n  {}".format("\n  ".join(shown))
                 if len(self._failed_items) > len(shown):
                     fail_note += "\n  ...and {} more".format(
                         len(self._failed_items) - len(shown))
@@ -4270,15 +4311,17 @@ class ExportManagerWindow(T3WPFWindow):
                               "(e.g. a schedule to DWG) and will always fail here.")
 
             # Ask if user wants to open output folder
-            if forms.alert("Export complete!{}{}{}\n\nDo you want to open the output folder?".format(
-                              fail_note, safe_note, skip_note),
-                          title="Export Complete",
+            if forms.alert("{}{}{}{}\n\nDo you want to open the output folder?".format(
+                              summary, fail_note, safe_note, skip_note),
+                          title=outcome,
                           yes=True, no=True):
                 os.startfile(output_folder)
 
         except Exception as ex:
             logger.error("Export failed: {}".format(ex))
-            forms.alert("Export failed: {}".format(ex), title="Export Error")
+            forms.alert("Export stopped: {}\n\n{} earlier output(s) were confirmed. "
+                        "Existing output files were kept; review the output folder before retrying.".format(
+                            ex, total_exported), title="Export Error")
             self.status_text.Text = "Export failed"
             self.next_button.IsEnabled = True
             self.back_button.IsEnabled = True
@@ -4566,38 +4609,8 @@ class ExportManagerWindow(T3WPFWindow):
 
             if combine_pdf:
                 # Export all items to a single PDF
+                included_items = []
                 try:
-                    # Mark all items as in-progress (orange) before combined export
-                    for item in items:
-                        self.update_export_item_progress(item.SheetNumber, "PDF", 50, "Exporting...")
-                    self._update_progress(
-                        int(self._overall_counter * 100.0 / max(1, self._overall_total)),
-                        "Exporting combined PDF with {} items...".format(len(items))
-                    )
-
-                    # Generate combined filename using live names
-                    if len(items) > 0:
-                        first_item = items[0]
-                        last_item = items[-1]
-                        # Get names from actual Revit elements
-                        if hasattr(first_item, 'Sheet'):
-                            first_name = first_item.Sheet.SheetNumber
-                            last_name = last_item.Sheet.SheetNumber
-                        else:
-                            first_name = first_item.View.Name[:20]  # Limit name length
-                            last_name = last_item.View.Name[:20]
-                        filename = "{}-{}_Combined".format(first_name, last_name)
-                    else:
-                        filename = "Combined_Export"
-
-                    # Remove extension if present
-                    if filename.lower().endswith('.pdf'):
-                        filename = filename[:-4]
-                    filename = self._reserve_filename(output_folder, filename, ".pdf")
-
-                    # Get list of existing PDF files before export
-                    existing_pdfs = set(glob.glob(os.path.join(output_folder, "*.pdf")))
-
                     # Get all element IDs as System.Collections.Generic.List.
                     # A combined export is ONE native call, so a single fatal
                     # sheet takes the entire job (and the Revit session) with it —
@@ -4616,10 +4629,28 @@ class ExportManagerWindow(T3WPFWindow):
                                                "row is neither a sheet nor a view")
                             continue
                         element_ids.Add(element.Id)
+                        included_items.append(item)
 
                     if element_ids.Count == 0:
                         logger.warning("Combined PDF skipped: nothing left to export.")
                         return 0
+
+                    # Only rows included in the native call can become successful.
+                    for item in included_items:
+                        self.update_export_item_progress(item.SheetNumber, "PDF", 50, "Exporting...")
+                    self._update_progress(
+                        int(self._overall_counter * 100.0 / max(1, self._overall_total)),
+                        "Exporting combined PDF with {} items...".format(len(included_items)))
+                    first_element, first_name = self._element_of(included_items[0])
+                    last_element, last_name = self._element_of(included_items[-1])
+                    if not hasattr(included_items[0], 'Sheet'):
+                        first_name = first_name[:20]
+                    if not hasattr(included_items[-1], 'Sheet'):
+                        last_name = last_name[:20]
+                    filename = "{}-{}_Combined".format(first_name, last_name)
+                    filename = self._reserve_filename(output_folder, filename, ".pdf")
+                    expected_file = os.path.join(output_folder, filename + ".pdf")
+                    before_output = self._native_output_stamp(expected_file)
 
                     # Create PDF export options
                     pdf_options = PDFExportOptions()
@@ -4708,45 +4739,39 @@ class ExportManagerWindow(T3WPFWindow):
                     # Use Smart API Adapter if available for intelligent export (handles method overload resolution)
                     if self.api_adapter:
                         # Smart adapter automatically handles version differences and method overload resolution
-                        self.api_adapter.export_pdf(output_folder, filename, element_ids, pdf_options)
+                        export_result = self.api_adapter.export_pdf(output_folder, filename, element_ids, pdf_options)
                     else:
                         # Fallback to direct export call
                         # Revit 2022-2026 signature: Export(String folder, IList<ElementId> viewIds, PDFExportOptions options)
                         # NOTE: PDF export does NOT take a filename parameter in the Export() method (unlike DWG/DXF)
                         # Instead, filename is set via PDFExportOptions.FileName property (learned from pyRevit)
-                        self.doc.Export(output_folder, element_ids, pdf_options)
+                        export_result = self.doc.Export(output_folder, element_ids, pdf_options)
 
                     # Export call returned -> Revit survived the combined job.
                     self._clear_crash_marker()
+                    if not export_result:
+                        raise RuntimeError(
+                            "Revit reported an incomplete combined PDF export. Any output file was kept.")
 
-                    # Wait briefly for file system to update
-                    time.sleep(0.5)
-
-                    # Get list of PDF files after export
-                    current_pdfs = set(glob.glob(os.path.join(output_folder, "*.pdf")))
-                    new_pdfs = current_pdfs - existing_pdfs
-
-                    # Verify file was created
-                    expected_file = os.path.join(output_folder, filename + ".pdf")
-                    if os.path.exists(expected_file) or new_pdfs:
+                    if self._confirm_native_output(expected_file, before_output):
                         exported_count = 1
-                        self._overall_counter += len(items)
+                        self._overall_counter += len(included_items)
                         self._update_progress(
                             int(self._overall_counter * 100.0 / max(1, self._overall_total)),
-                            "PDF combined: {} sheets exported".format(len(items))
+                            "PDF combined: {} sheets exported".format(len(included_items))
                         )
-                        for item in items:
+                        for item in included_items:
                             self.update_export_item_progress(item.SheetNumber, "PDF", 100)
                     else:
                         # One native call for every page: if no file landed, none
                         # of the selected items were exported. Name them all.
-                        for item in items:
+                        for item in included_items:
                             self._note_failure(getattr(item, 'SheetNumber', 'Unknown'),
-                                               "PDF", "combined PDF produced no file")
+                                               "PDF", "combined PDF produced no new or updated nonempty output")
 
                 except Exception as ex:
                     logger.error("Error exporting combined PDF: {}".format(ex))
-                    for item in items:
+                    for item in included_items:
                         self._note_failure(getattr(item, 'SheetNumber', 'Unknown'),
                                            "PDF", "combined PDF failed: {}".format(ex))
 
@@ -4915,17 +4940,20 @@ class ExportManagerWindow(T3WPFWindow):
                         # Use Smart API Adapter if available for intelligent export (handles method overload resolution)
                         if self.api_adapter:
                             # Smart adapter automatically handles version differences and method overload resolution
-                            self.api_adapter.export_pdf(output_folder, filename, element_ids, pdf_options)
+                            export_result = self.api_adapter.export_pdf(output_folder, filename, element_ids, pdf_options)
                         else:
                             # Fallback to direct export call
                             # Revit 2022-2026 signature: Export(String folder, IList<ElementId> viewIds, PDFExportOptions options)
                             # NOTE: PDF export does NOT take a filename parameter in the Export() method (unlike DWG/DXF)
                             # Instead, filename is set via PDFExportOptions.FileName property (learned from pyRevit)
-                            self.doc.Export(output_folder, element_ids, pdf_options)
+                            export_result = self.doc.Export(output_folder, element_ids, pdf_options)
 
                         # Export call returned -> Revit survived this sheet; drop
                         # the breadcrumb so it is not mistaken for a fresh crash.
                         self._clear_crash_marker()
+
+                        if not export_result:
+                            raise RuntimeError("Revit reported PDF export failure; any output file was kept for review")
 
                         # Confirm the file landed by polling for it (no fixed
                         # sleep, no folder-wide glob — much faster on OneDrive).
@@ -5147,6 +5175,7 @@ class ExportManagerWindow(T3WPFWindow):
             # For IFC, export the entire model once
             # Note: IFC export requires a transaction (unique requirement compared to other formats)
             if len(items) > 0:
+                trans = None
                 try:
                     for item in items:
                         self.update_export_item_progress(item.SheetNumber, "IFC", 50, "Exporting...")
@@ -5183,16 +5212,28 @@ class ExportManagerWindow(T3WPFWindow):
                     for char in invalid_chars:
                         filename = filename.replace(char, '_')
                     filename = filename.strip()
+                    filename = self._reserve_filename(output_folder, filename, ".ifc")
+                    expected_file = os.path.join(output_folder, filename + ".ifc")
+                    before_output = self._native_output_stamp(expected_file)
 
                     # IFC export needs to be wrapped in a transaction. One native
                     # call for the whole model, so the breadcrumb records the job
                     # rather than a single sheet.
                     self._write_crash_marker(filename, "IFC")
-                    with Transaction(self.doc, "Export IFC") as trans:
-                        trans.Start()
-                        self.doc.Export(output_folder, filename, ifc_options)
-                        trans.Commit()
+                    trans = Transaction(self.doc, "T3Lab: Export IFC")
+                    trans.Start()
+                    options = trans.GetFailureHandlingOptions()
+                    options.SetForcedModalHandling(True)
+                    trans.SetFailureHandlingOptions(options)
+                    exported = self.doc.Export(output_folder, filename, ifc_options)
                     self._clear_crash_marker()
+                    if not exported:
+                        raise RuntimeError("Revit reported that the IFC export failed")
+                    status = trans.Commit()
+                    if status != DB.TransactionStatus.Committed:
+                        raise RuntimeError("IFC transaction was not committed: {}".format(status))
+                    if not self._confirm_native_output(expected_file, before_output):
+                        raise RuntimeError("No new or updated nonempty IFC output was confirmed")
 
                     exported_count = 1
                     self._overall_counter += len(items)
@@ -5203,13 +5244,21 @@ class ExportManagerWindow(T3WPFWindow):
                     for item in items:
                         self.update_export_item_progress(item.SheetNumber, "IFC", 100)
                 except Exception as ex:
+                    if trans is not None and trans.GetStatus() == DB.TransactionStatus.Pending:
+                        raise _PendingExportError(
+                            "IFC export is awaiting Revit failure resolution. Later formats were stopped. "
+                            "Resolve the Revit dialog before retrying; any output files were kept.")
+                    if trans is not None and trans.GetStatus() == DB.TransactionStatus.Started:
+                        trans.RollBack()
                     logger.error("Error exporting to IFC: {}".format(ex))
                     for item in items:
                         self._note_failure(getattr(item, 'SheetNumber', 'Unknown'),
-                                           "IFC", "model IFC export failed: {}".format(ex))
+                                           "IFC", "model IFC export failed: {}. Any output files were kept.".format(ex))
 
             return exported_count
 
+        except _PendingExportError:
+            raise
         except Exception as ex:
             logger.error("IFC export failed: {}".format(ex))
             return 0

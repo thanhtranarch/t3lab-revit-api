@@ -27,8 +27,8 @@ _FMT_ATTRS = {
     'dgn': 'export_dgn',
     'nwd': 'export_nwd',
     'ifc': 'export_ifc',
-    'img': 'export_images',
-    'image': 'export_images',
+    'img': 'export_img',
+    'image': 'export_img',
 }
 
 _FMT_SUBFOLDER = {

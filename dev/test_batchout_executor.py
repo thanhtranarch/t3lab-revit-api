@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
+import xml.etree.ElementTree as ET
 from unittest.mock import Mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,7 +98,7 @@ class BatchOutExecutorTests(unittest.TestCase):
         for fmt in ('img', 'image', ' IMAGE '):
             with self.subTest(fmt=fmt):
                 executor.configure_batchout_window(self.window, {'format': fmt})
-                self.assertTrue(self.window.export_images.IsChecked)
+                self.assertTrue(self.window.export_img.IsChecked)
                 self.assertFalse(self.window.export_pdf.IsChecked)
 
     def test_no_matching_sheets_does_not_call_exporter(self):
@@ -153,6 +154,12 @@ class BatchOutExecutorTests(unittest.TestCase):
         names = {alias.name for node in tree.body if isinstance(node, ast.ImportFrom)
                  and node.module == 'GUI.BatchOutDialog' for alias in node.names}
         self.assertIn('ExportManagerWindow', names)
+
+    def test_format_controls_exist_in_shipped_xaml(self):
+        root = ET.parse(ROOT / 'T3Lab.extension/lib/GUI/Tools/ExportManager.xaml').getroot()
+        names = {node.get('{http://schemas.microsoft.com/winfx/2006/xaml}Name')
+                 for node in root.iter()}
+        self.assertTrue(set(executor._FMT_ATTRS.values()).issubset(names))
 
     def test_cancel_before_start_never_creates_window(self):
         result = executor.direct_export(self.mod, {}, cancel_check=lambda: True)

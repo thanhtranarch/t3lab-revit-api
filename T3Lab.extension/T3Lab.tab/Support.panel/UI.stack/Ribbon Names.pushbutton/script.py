@@ -110,42 +110,61 @@ DEFAULT_MAP = {
 def _read_json(path, default):
     if os.path.exists(path):
         try:
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8-sig") as f:
                 return json.load(f)
         except Exception:
             return default
     return default
 
 def _write_json(path, data):
+    import tempfile
+    temporary_path = None
     try:
-        with open(path, "w") as f:
+        # Replace only a complete JSON file; a failed write preserves settings.
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False,
+                                         dir=os.path.dirname(os.path.abspath(path)),
+                                         prefix=".ribbon-", suffix=".tmp") as f:
+            temporary_path = f.name
             json.dump(data, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary_path, path)
         return True
     except Exception:
         return False
+    finally:
+        if temporary_path and os.path.exists(temporary_path):
+            try:
+                os.remove(temporary_path)
+            except OSError:
+                pass
 
 def load_map():
     data = _read_json(MAP_PATH, None)
-    if data is None:
+    if not isinstance(data, dict):
         return dict(DEFAULT_MAP)
     merged = dict(DEFAULT_MAP)
-    merged.update(data)
+    merged.update({full: short for full, short in data.items()
+                   if isinstance(full, str) and full and isinstance(short, str)})
     return merged
 
 def save_map(m):
     return _write_json(MAP_PATH, m)
 
 def load_originals():
-    return _read_json(ORIG_PATH, {})
+    data = _read_json(ORIG_PATH, {})
+    return data if isinstance(data, dict) else {}
 
 def save_originals(m):
     return _write_json(ORIG_PATH, m)
 
 def load_state():
-    return _read_json(STATE_PATH, {"mode": "full"}).get("mode", "full")
+    data = _read_json(STATE_PATH, {"mode": "full"})
+    mode = data.get("mode") if isinstance(data, dict) else None
+    return mode if mode in ("full", "short", "mixed") else "full"
 
 def save_state(mode):
-    _write_json(STATE_PATH, {"mode": mode})
+    return _write_json(STATE_PATH, {"mode": mode})
 
 def get_ribbon_tabs():
     tabs = []
@@ -165,22 +184,8 @@ def main():
     short_map = load_map()
     originals = load_originals()
 
-    # Capture originals logic
-    short_to_full = {short: full for full, short in short_map.items()}
-    changed = False
-    for tab in live_tabs:
-        title = tab.Title
-        if title in short_to_full:
-            full = short_to_full[title]
-            if full not in originals:
-                originals[full] = full
-                changed = True
-        else:
-            if title not in originals:
-                originals[title] = title
-                changed = True
-    if changed:
-        save_originals(originals)
+    # The dialog captures stable tab IDs before editing names. Reverse-mapping
+    # titles here loses identity when more than one tab shares a short name.
 
     from GUI.RibbonNamesDialog import show_ribbon_names_dialog
 
