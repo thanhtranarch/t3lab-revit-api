@@ -1898,14 +1898,17 @@
                                                             ToolTip="Clear every check in the tree"/>
                                                 </StackPanel>
 
+                                                <!-- Số đếm dạt về mép phải; cái cuối bỏ margin phải của
+                                                     T3.Tally để khớp đúng 8px padding của dải. -->
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                            HorizontalAlignment="Right"
                                                             VerticalAlignment="Center">
                                                     <TextBlock x:Name="txt_explore_tally_elements" Style="{StaticResource T3.Tally}"
                                                                Text="0 elements"/>
                                                     <TextBlock x:Name="txt_explore_tally_groups" Style="{StaticResource T3.Tally}"
                                                                Text="0 groups"/>
                                                     <TextBlock x:Name="txt_explore_tally_checked" Style="{StaticResource T3.Tally}"
-                                                               Text="0 checked"/>
+                                                               Margin="0" Text="0 checked"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -2086,6 +2089,7 @@
                                                 </StackPanel>
 
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                            HorizontalAlignment="Right"
                                                             VerticalAlignment="Center">
                                                     <Ellipse x:Name="warning_dot" Style="{StaticResource T3.Dot}"
                                                              Fill="{StaticResource T3.Warning.Accent}"/>
@@ -2094,7 +2098,7 @@
                                                     <TextBlock x:Name="txt_warning_tally_kinds" Style="{StaticResource T3.Tally}"
                                                                Text="0 kinds"/>
                                                     <TextBlock x:Name="txt_warning_tally_checked" Style="{StaticResource T3.Tally}"
-                                                               Text="0 checked"/>
+                                                               Margin="0" Text="0 checked"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>

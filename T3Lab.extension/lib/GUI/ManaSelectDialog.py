@@ -1193,7 +1193,8 @@ class ManaSelectWindow(T3WPFWindow):
         except Exception as ex:
             T3Dialog.show_error(
                 'Could not apply the selection.\n\n%s\n\n'
-                'Elements from a linked model cannot be selected this way.' % ex,
+                'Elements that live in a linked model, or that were deleted '
+                'since the tree was built, cannot be selected — press Refresh and try again.' % ex,
                 title='Select in Revit', owner=self)
             return
         self._set_status('Selected %d element(s) in Revit' % len(ids))
@@ -1285,19 +1286,25 @@ class ManaSelectWindow(T3WPFWindow):
     # TAB 3: SELECT ON SHEETS
     # =========================================================================
     def _on_run_select_sheets(self, sender, e):
-        self._run_in_revit(self._run_select_sheets_impl)
+        """Hỏi sheet TRƯỚC khi vào API context.
 
-    def _run_select_sheets_impl(self):
-        """Execute selection on sheets based on target selection."""
+        `SelectFromList` là dialog modal của WPF và đợi người dùng bấm xong
+        mới trả về. Dựng nó bên trong `Execute()` là chặn vòng lặp idle của
+        Revit suốt thời gian đó — đúng lý do `_on_explore_delete` phải hỏi
+        xác nhận trước. Chỉ thao tác đặt selection mới đi qua ExternalEvent.
+        """
         use_dwg = bool(self.rb_sheet_target_dwg.IsChecked)
         if use_dwg:
             sheets = self._get_target_sheets('Select DWGs', 'On Sheets: CAD Imports')
-            if sheets:
-                self._select_dwgs(sheets)
+            if not sheets:
+                return
+            self._run_in_revit(lambda: self._select_dwgs(sheets))
         else:
-            sheets = self._get_target_sheets('Select Title Blocks', 'On Sheets: Title Blocks')
-            if sheets:
-                self._select_title_blocks(sheets)
+            sheets = self._get_target_sheets('Select Title Blocks',
+                                             'On Sheets: Title Blocks')
+            if not sheets:
+                return
+            self._run_in_revit(lambda: self._select_title_blocks(sheets))
 
     def _get_target_sheets(self, button_name, alert_title):
         sel_ids = self.uidoc.Selection.GetElementIds()

@@ -69,10 +69,23 @@ def to_element_id_list(ids):
     WPF / Revit selection APIs require a typed .NET list, a plain python
     list will not work for ``Selection.SetElementIds``.
 
-    :param ids: iterable of ElementId
+    Build it empty and ``Add`` each item -- do NOT pass a python list to the
+    constructor. Under PythonNet 3 (CPython) the python list no longer
+    converts to ``IEnumerable<ElementId>`` during overload resolution, so
+    ``List[ElementId]([...])`` raises
+    ``No method matches given arguments for List`1..ctor: (<class 'list'>)``.
+
+    :param ids: iterable of ElementId (or int element ids)
     :return: List[ElementId]
     """
-    return List[ElementId](list(ids))
+    out = List[ElementId]()
+    for value in ids:
+        if value is None:
+            continue
+        if not isinstance(value, ElementId):
+            value = make_eid(value)
+        out.Add(value)
+    return out
 
 
 def notify(message, title='DQT - Select'):

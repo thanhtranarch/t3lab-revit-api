@@ -25,6 +25,7 @@ from Autodesk.Revit.DB import (
     ImportInstance,
     RevitLinkInstance,
 )
+from System import Int64
 from System.Collections.Generic import List
 
 # -- Scope (ô "Display" trên UI) -------------------------------------------
@@ -93,18 +94,66 @@ def eid_int(element_id):
     return int(val)
 
 
+def make_eid(value):
+    """ElementId từ int, an toàn mọi phiên bản.
+
+    Revit 2024+ thêm overload `ElementId(Int64)` bên cạnh
+    `ElementId(BuiltInParameter)` / `ElementId(BuiltInCategory)`, nên một int
+    Python trần làm overload resolution nhập nhằng. Ép Int64 trước.
+    """
+    try:
+        return ElementId(Int64(value))
+    except (TypeError, OverflowError):
+        return ElementId(int(value))
+
+
 def to_id_list(ids):
-    """List[ElementId] của .NET — Selection.SetElementIds không nhận list Python."""
-    return List[ElementId](list(ids))
+    """List[ElementId] của .NET — Selection.SetElementIds không nhận list Python.
+
+    DỰNG RỖNG RỒI `Add`, KHÔNG truyền list vào constructor. PythonNet 3
+    (CPython) không còn tự ép `list` Python sang `IEnumerable<ElementId>` khi
+    phân giải overload, nên `List[ElementId]([...])` ném
+    `No method matches given arguments for List`1..ctor: (<class 'list'>)`.
+    Truyền thẳng một ICollection của .NET (`ToElementIds()`) thì vẫn chạy,
+    nhưng ở đây `ids` luôn là list Python dựng từ cây.
+
+    Nhận cả ElementId lẫn int để chỗ gọi không phải tự chứng.
+    """
+    out = List[ElementId]()
+    for value in ids:
+        if value is None:
+            continue
+        if not isinstance(value, ElementId):
+            value = make_eid(value)
+        out.Add(value)
+    return out
+
+
+def _bic_int(bic):
+    """int của một BuiltInCategory.
+
+    `int(bic)` KHÔNG chắc chạy: PythonNet 3 bọc enum .NET thành object riêng
+    và không phải build nào cũng cho `__int__`. Nếu để nó hỏng âm thầm thì
+    `_SKIP_CATEGORIES` thành rỗng và cây lòi ra cả Views / Sheets / Viewports.
+    Thử lần lượt ba đường, đường cuối (`ElementId(BuiltInCategory)`) là
+    API Revit nên luôn có.
+    """
+    for convert in (lambda: int(bic),
+                    lambda: int(bic.value__),
+                    lambda: eid_int(ElementId(bic))):
+        try:
+            return convert()
+        except Exception:
+            continue
+    return None
 
 
 def _skip_category_ids():
     out = set()
     for bic in _SKIP_CATEGORY_BICS:
-        try:
-            out.add(int(bic))
-        except Exception:
-            continue
+        value = _bic_int(bic)
+        if value is not None:
+            out.add(value)
     return frozenset(out)
 
 
