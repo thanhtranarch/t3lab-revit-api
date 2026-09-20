@@ -76,6 +76,21 @@ class BatchOutExecutorTests(unittest.TestCase):
     def test_full_count_is_success(self):
         self.assertEqual(self.run_export()[:2], (True, 2))
 
+    def test_nwc_and_legacy_nwd_use_actual_output_format(self):
+        for fmt in ('nwc', 'NWC', 'nwd'):
+            with self.subTest(fmt=fmt):
+                self.setUp()
+                ok, count, message = self.run_export(format=fmt)
+                self.assertTrue(ok)
+                self.assertEqual(count, 2)
+                self.assertIn('NWC output(s)', message)
+                self.assertEqual(Path(self.method.call_args.args[1]).name, 'NWC')
+                self.assertTrue(self.window.export_nwd.IsChecked)
+
+    def test_natural_language_nwc_request_does_not_default_to_pdf(self):
+        self.assertEqual(executor.parse_export_params('export all sheets to NWC'),
+                         {'format': 'nwc', 'filter': ''})
+
     def test_combined_pdf_expects_one_output_for_many_sheets(self):
         self.count = 1
         self.assertEqual(self.run_export(combine=True)[:2], (True, 1))

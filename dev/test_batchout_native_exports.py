@@ -320,6 +320,7 @@ class NativeExportTests(unittest.TestCase):
         w.back_button = SimpleNamespace(IsEnabled=True)
         w.status_text = SimpleNamespace(Text='')
         w.export_items = [object()]
+        w.build_export_preview = Mock()
         w._reset_run_state = Mock()
         w._ask_safe_mode = Mock()
         w._order_risky_last = lambda items: items

@@ -2866,14 +2866,16 @@ class ExportManagerWindow(T3WPFWindow):
             items = self.filtered_sheets if self.selection_mode == "sheets" else self.filtered_views
             total_count = len(items)
             selected_count = sum(1 for s in items if s.IsSelected)
+            all_items = self.all_sheets if self.selection_mode == "sheets" else self.all_views
+            total_selected = sum(1 for item in all_items if item.IsSelected)
+            hidden_selected = total_selected - selected_count
 
             if hasattr(self, 'selection_count_text'):
-                if self.selection_mode == "sheets":
-                    self.selection_count_text.Text = "{} sheets and 0 views selected. Total: {}".format(
-                        selected_count, total_count)
-                else:
-                    self.selection_count_text.Text = "0 sheets and {} views selected. Total: {}".format(
-                        selected_count, total_count)
+                label = "{} {} selected | {} shown".format(
+                    total_selected, self.selection_mode, total_count)
+                if hidden_selected:
+                    label += " | {} selected hidden by filters".format(hidden_selected)
+                self.selection_count_text.Text = label
 
             # Sync header checkbox (True = all, False = none, None = indeterminate)
             if hasattr(self, 'header_checkbox') and self.header_checkbox:
@@ -4132,6 +4134,13 @@ class ExportManagerWindow(T3WPFWindow):
         """Start the export process."""
         total_exported = 0
         try:
+            if not any(getattr(self, name).IsChecked for name in (
+                    'export_pdf', 'export_dwg', 'export_dwf', 'export_dgn',
+                    'export_nwd', 'export_ifc', 'export_img')):
+                self.status_text.Text = "Choose at least one export format"
+                forms.alert("Choose at least one format in Settings before exporting.",
+                            title="No Export Format Selected")
+                return
             self._ensure_titleblock_cache()
 
             # Get selected items based on mode
@@ -4173,14 +4182,9 @@ class ExportManagerWindow(T3WPFWindow):
             self.back_button.IsEnabled = False
             self.status_text.Text = "Exporting..."
 
-            # The Queue rows carry each item's status column, and _overall_total
-            # is read from them. Rebuild if they are missing (Queue tab never
-            # opened) so no item exports without a visible row.
-            if not self.export_items:
-                try:
-                    self.build_export_preview()
-                except Exception as preview_ex:
-                    logger.debug("Could not build export preview: {}".format(preview_ex))
+            # Rebuild for every run: a previous run leaves completed statuses,
+            # and selection or formats may have changed since the last preview.
+            self.build_export_preview()
 
             # Export to each format — overall progress tracked per-sheet via _overall_counter
             total_exported = 0

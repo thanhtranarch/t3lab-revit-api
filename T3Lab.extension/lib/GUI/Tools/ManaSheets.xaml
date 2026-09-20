@@ -1798,7 +1798,7 @@
                                         <StackPanel>
                                             <TextBlock Text="SEARCH" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                                             <TextBox x:Name="sheets_search_box" Style="{StaticResource T3.Search}"
-                                                     Tag="Search sheets..." Margin="0,0,0,16"/>
+                                                     Tag="Search sheets..." ToolTip="Search sheets, then use the column headers to refine filters. Edit cells and click Apply Changes to save amber pending edits." Margin="0,0,0,16"/>
 
                                             <TextBlock Text="FILTER BY GROUP" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                                             <ComboBox x:Name="sheets_filter_combo" Style="{StaticResource T3.ComboBox}"
@@ -1864,7 +1864,7 @@
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="NUMBER" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding sheet_number}" Width="120"
+Binding="{Binding sheet_number}" Width="100"
                                                                 ElementStyle="{StaticResource T3.Cell.Mono}">
                                                 <DataGridTextColumn.CellStyle>
                                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
@@ -1879,7 +1879,7 @@ Binding="{Binding sheet_number}" Width="120"
                                                 </DataGridTextColumn.CellStyle>
                                             </DataGridTextColumn>
                                             <DataGridTextColumn Header="SHEET NAME" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding sheet_name}" Width="*">
+Binding="{Binding sheet_name}" Width="*" MinWidth="140">
                                                 <DataGridTextColumn.CellStyle>
                                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
                                                         <Style.Triggers>
@@ -1956,8 +1956,20 @@ Binding="{Binding drawn_by}" Width="110"
                                     </DataGrid>
 
                                     <!-- Empty State -->
-                                    <TextBlock x:Name="sheets_grid_empty" Style="{StaticResource T3.Empty}"
-                                               Text="No matching sheets found" Visibility="Collapsed"/>
+                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Margin" Value="{StaticResource T3.Pad.Panel}"/>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=sheets_grid, Path=HasItems}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="sheets_grid_empty" Text="No sheets match the current filters.&#x0a;Clear the search, choose All Sheets, or refresh after creating sheets." Style="{StaticResource T3.Empty}"/>
+                                    </Grid>
                                 </Grid>
                             </Grid>
 
@@ -2080,8 +2092,20 @@ Binding="{Binding drawn_by}" Width="110"
                                     </DataGrid>
 
                                     <!-- Empty State -->
-                                    <TextBlock x:Name="renum_grid_empty" Style="{StaticResource T3.Empty}"
-                                               Text="No sheets available for renumbering" Visibility="Collapsed"/>
+                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Margin" Value="{StaticResource T3.Pad.Panel}"/>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=renum_grid, Path=HasItems}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="renum_grid_empty" Text="No sheets are available to renumber.&#x0a;Create sheets in Revit, then refresh the Sheets tab." Style="{StaticResource T3.Empty}"/>
+                                    </Grid>
                                 </Grid>
                             </Grid>
 

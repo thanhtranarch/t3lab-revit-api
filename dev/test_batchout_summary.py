@@ -28,7 +28,8 @@ class ExportSummaryTests(unittest.TestCase):
             back_button=SimpleNamespace(), status_text=SimpleNamespace(), export_items=[object()],
             _ensure_titleblock_cache=Mock(), save_latest_setup=Mock(), _ask_safe_mode=Mock(),
             _order_risky_last=lambda items: items, _update_progress=Mock(), _failed_items=[],
-            _crash_history_file='history.json', _reset_run_state=Mock())
+            _crash_history_file='history.json', _reset_run_state=Mock(),
+            build_export_preview=Mock())
         for fmt in ('dwg', 'pdf', 'dwf', 'dgn', 'nwd', 'ifc', 'img'):
             setattr(self.window, 'export_' + fmt, SimpleNamespace(IsChecked=fmt == 'pdf'))
             setattr(self.window, 'export_to_' + ('images' if fmt == 'img' else fmt), Mock(return_value=0))
@@ -37,6 +38,19 @@ class ExportSummaryTests(unittest.TestCase):
         self.run_export(self.window)
         self.assertIn('No exports confirmed', self.window.status_text.Text)
         self.assertNotIn('Export complete', self.alert.call_args.args[0])
+
+    def test_no_format_stops_before_saving_or_exporting(self):
+        self.window.export_pdf.IsChecked = False
+        self.run_export(self.window)
+        self.window.save_latest_setup.assert_not_called()
+        self.window.export_to_pdf.assert_not_called()
+        self.assertIn('Choose at least one', self.alert.call_args.args[0])
+        self.assertTrue(self.window.IsEnabled)
+        self.assertFalse(self.window._export_running)
+
+    def test_previous_queue_is_rebuilt_for_each_run(self):
+        self.run_export(self.window)
+        self.window.build_export_preview.assert_called_once()
 
     def test_partial_results_report_issues_and_count(self):
         self.window.export_to_pdf.return_value = 1

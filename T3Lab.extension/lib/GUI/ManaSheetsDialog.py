@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Sheet Manager Dialog
-Unified Sheet Manager including sheet lists and re-numbering inside a Lumina UI.
+Unified Sheet Manager including sheet lists and re-numbering with staged changes.
 """
 
 import os
@@ -196,6 +196,7 @@ class SheetManagerWindow(T3WPFWindow):
         self.btn_minimize.Click += self._minimize
         self.btn_maximize.Click += self._maximize
         self.btn_close.Click += self._close_chrome
+        self.Closing += self._on_closing
         
         # Radio Tab navigation
         self.nav_sheets.Checked += self._on_tab_changed
@@ -258,6 +259,57 @@ class SheetManagerWindow(T3WPFWindow):
         # handler was wired above and tab_control.SelectedIndex was never set.
         self.tab_control.SelectedIndex = 0
 
+    def _flush_edits(self):
+        from System.Windows.Controls import DataGridEditingUnit
+        for name in ['sheets_grid']:
+            grid = getattr(self, name, None)
+            if grid is not None:
+                if not grid.CommitEdit(DataGridEditingUnit.Cell, True):
+                    return False
+                if not grid.CommitEdit(DataGridEditingUnit.Row, True):
+                    return False
+        return True
+
+    def _on_closing(self, sender, args):
+        if getattr(self, "_mana_busy", False):
+            args.Cancel = True
+            self._set_status("Use Stop to finish the current operation before closing.")
+            return
+        if not self._flush_edits():
+            args.Cancel = True
+            return
+        count = sum(_pend.pending_count(getattr(self, name, [])) for name in ['all_sheets'])
+        if count:
+            args.Cancel = MessageBox.Show(
+                "Discard {} unapplied changes and close?".format(count),
+                "Unapplied changes", MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes
+
+    def begin_progress(self, maximum=100, disable=None):
+        self._mana_busy = True
+        controls = [self.tab_control, self.btn_close]
+        controls.extend(disable or [])
+        super(SheetManagerWindow, self).begin_progress(maximum, disable=controls)
+
+    def end_progress(self):
+        try:
+            super(SheetManagerWindow, self).end_progress()
+        finally:
+            self._mana_busy = False
+
+    def _row_state(self, rows):
+        return {str(getattr(row.id, "Value", row.id)):
+                (row.is_selected, _pend.pending_of(row)) for row in rows}
+
+    def _restore_state(self, rows, state):
+        for row in rows:
+            selected, pending = state.get(str(getattr(row.id, "Value", row.id)), (False, {}))
+            row.is_selected = selected
+            for field, value in pending.items():
+                if not _pend.same_text(value, row._mana_original.get(field)):
+                    setattr(row, field, value)
+                    _pend.stage(row, field, value)
+
     def _set_status(self, text):
         """Ghi một câu trạng thái ra footer."""
         try:
@@ -318,6 +370,7 @@ class SheetManagerWindow(T3WPFWindow):
         self.all_sheets = self.revit_service.get_all_sheets()
         for item in self.all_sheets:
             _pend.init_pending(item, SHEET_EDIT_FIELDS)
+            item._mana_original = {field: getattr(item, field) for field in SHEET_EDIT_FIELDS}
         self.change_tracker.clear_all()
         self._update_sheets_summary()
 
@@ -418,7 +471,8 @@ class SheetManagerWindow(T3WPFWindow):
             typed = _pend.editor_text(args.EditingElement)
             current = getattr(item, field, None)
 
-            if _pend.same_text(typed, current):
+            original = item._mana_original.get(field, current)
+            if _pend.same_text(typed, original):
                 _pend.unstage(item, field)      # typed it back to how it was
             elif field in ("sheet_number", "sheet_name") and not (typed or "").strip():
                 # Revit refuses both outright, so the cell is bounced here
@@ -475,6 +529,8 @@ class SheetManagerWindow(T3WPFWindow):
                 pass
 
     def _on_sheets_sets(self, sender, args):
+        if not self._flush_edits():
+            return
         if self.sheet_sets_service:
             try:
                 from Services.SheetManager.viewsheet_sets_dialog import ViewSheetSetsDialog
@@ -486,6 +542,8 @@ class SheetManagerWindow(T3WPFWindow):
                 MessageBox.Show("Error showing ViewSheet Sets dialog:\n{}".format(str(e)), "Error")
 
     def _on_sheets_place_views(self, sender, args):
+        if not self._flush_edits():
+            return
         if self.place_views_service:
             try:
                 from Services.SheetManager.place_views_dialog import PlaceViewsDialog
@@ -497,6 +555,8 @@ class SheetManagerWindow(T3WPFWindow):
                 MessageBox.Show("Error showing Place Views dialog:\n{}".format(str(e)), "Error")
 
     def _on_sheets_custom_params(self, sender, args):
+        if not self._flush_edits():
+            return
         if self.params_service:
             try:
                 from Services.SheetManager.custom_parameters_dialog import CustomParametersDialog
@@ -508,6 +568,8 @@ class SheetManagerWindow(T3WPFWindow):
                 MessageBox.Show("Error showing Custom Parameters dialog:\n{}".format(str(e)), "Error")
 
     def _on_sheets_excel(self, sender, args):
+        if not self._flush_edits():
+            return
         if not self.excel_service:
             MessageBox.Show("Excel Service is not initialized.", "Error")
             return
@@ -617,10 +679,14 @@ class SheetManagerWindow(T3WPFWindow):
                     MessageBox.Show("Error importing Excel: {}".format(str(ex)), "Error")
 
     def _on_sheets_refresh(self, sender, args):
+        if not self._flush_edits():
+            return
         self._load_sheets_data()
         self._apply_sheets_filters()
 
     def _on_sheets_apply(self, sender, args):
+        if not self._flush_edits():
+            return
         # Drive off the staged cells, not the tracker alone: the tracker is a
         # row-level flag, while what the user sees waiting on screen is the
         # amber cells. Keeping the two in step is what makes the counter honest.
@@ -694,6 +760,8 @@ class SheetManagerWindow(T3WPFWindow):
             self.renumber_items.Add(RenumberItem(s))
 
     def _on_renum_refresh(self, sender, args):
+        if not self._flush_edits():
+            return
         self._load_sheets_data()
         self._apply_sheets_filters()
         self._load_renumber_preview_data()
@@ -724,6 +792,8 @@ class SheetManagerWindow(T3WPFWindow):
             pass
 
     def _on_renum_run(self, sender, args):
+        if not self._flush_edits():
+            return
         selected_preview = [item for item in self.renumber_items if item.IsSelected]
         if not selected_preview:
             MessageBox.Show("Please select sheets in the preview grid to renumber.", "Info")

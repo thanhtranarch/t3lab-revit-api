@@ -6,7 +6,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="ManaViews"
-        Width="1200" Height="720" MinWidth="1080" MinHeight="640"
+        Width="1280" Height="720" MinWidth="1200" MinHeight="640"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="False"
         Background="{DynamicResource T3.Surface}"
@@ -1734,7 +1734,7 @@
                                         Padding="0">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="240"/>
+                                            <ColumnDefinition Width="208"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
@@ -1783,7 +1783,7 @@
                             <!-- 2. Filters & DataGrid: Docked flush in Row 1 -->
                             <Grid Grid.Row="1">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="240"/>
+                                    <ColumnDefinition Width="208"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
@@ -1796,7 +1796,7 @@
                                         <StackPanel>
                                             <TextBlock Text="SEARCH" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                                             <TextBox x:Name="views_search_box" Style="{StaticResource T3.Search}"
-                                                     Tag="Search views..." Margin="0,0,0,16"/>
+                                                     Tag="Search views..." ToolTip="Search views, then use the column headers to refine filters. Edit cells and click Apply Changes to save amber pending edits." Margin="0,0,0,16"/>
 
                                             <TextBlock Text="FILTER BY TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                                             <ComboBox x:Name="views_type_combo" Style="{StaticResource T3.ComboBox}"
@@ -1873,7 +1873,7 @@
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="VIEW NAME" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding name}" Width="*"
+Binding="{Binding name}" Width="*" MinWidth="140"
                                                                 ElementStyle="{StaticResource T3.Cell.Mono}">
                                                 <DataGridTextColumn.CellStyle>
                                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
@@ -1888,13 +1888,13 @@ Binding="{Binding name}" Width="*"
                                                 </DataGridTextColumn.CellStyle>
                                             </DataGridTextColumn>
                                             <DataGridTextColumn Header="TYPE" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding view_type}" Width="110" IsReadOnly="True"
+Binding="{Binding view_type}" Width="100" IsReadOnly="True"
                                                                 ElementStyle="{StaticResource T3.Cell.Muted}"/>
                                             <DataGridTextColumn Header="LEVEL" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding level_name}" Width="100" IsReadOnly="True"
+Binding="{Binding level_name}" Width="90" IsReadOnly="True"
                                                                 ElementStyle="{StaticResource T3.Cell.Muted}"/>
                                             <DataGridComboBoxColumn x:Name="col_template" Header="VIEW TEMPLATE" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Width="160"
+Width="144"
                                                                     SelectedItemBinding="{Binding view_template}">
                                                 <DataGridComboBoxColumn.CellStyle>
                                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
@@ -1939,7 +1939,7 @@ Width="100"
                                                 </DataGridComboBoxColumn.CellStyle>
                                             </DataGridComboBoxColumn>
                                             <DataGridTextColumn Header="TITLE ON SHEET" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding title_on_sheet}" Width="140" IsReadOnly="False">
+Binding="{Binding title_on_sheet}" Width="128" IsReadOnly="False">
                                                 <DataGridTextColumn.CellStyle>
                                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
                                                         <Style.Triggers>
@@ -1959,8 +1959,20 @@ Binding="{Binding sheet_number}" Width="90" IsReadOnly="True"
                                     </DataGrid>
 
                                     <!-- Empty State -->
-                                    <TextBlock x:Name="views_grid_empty" Style="{StaticResource T3.Empty}"
-                                               Text="No matching views found" Visibility="Collapsed"/>
+                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Margin" Value="{StaticResource T3.Pad.Panel}"/>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=views_grid, Path=HasItems}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="views_grid_empty" Text="No views match the current filters.&#x0a;Clear the search and reset filters, or refresh after creating views." Style="{StaticResource T3.Empty}"/>
+                                    </Grid>
                                 </Grid>
                             </Grid>
 
@@ -2009,7 +2021,7 @@ Binding="{Binding sheet_number}" Width="90" IsReadOnly="True"
                                     Padding="0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="240"/>
+                                        <ColumnDefinition Width="208"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
@@ -2060,7 +2072,7 @@ Binding="{Binding sheet_number}" Width="90" IsReadOnly="True"
                             <!-- 2. Filters & DataGrid: Docked flush in Row 1 -->
                             <Grid Grid.Row="1">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="240"/>
+                                    <ColumnDefinition Width="208"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
@@ -2138,7 +2150,7 @@ Binding="{Binding sheet_number}" Width="90" IsReadOnly="True"
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="TEMPLATE NAME" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding name}" Width="*"
+Binding="{Binding name}" Width="*" MinWidth="140"
                                                                 ElementStyle="{StaticResource T3.Cell.Mono}">
                                                 <DataGridTextColumn.CellStyle>
                                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
@@ -2170,8 +2182,20 @@ Binding="{Binding usage_percentage}" Width="80" IsReadOnly="True"
                                     </DataGrid>
 
                                     <!-- Empty State -->
-                                    <TextBlock x:Name="tmpl_grid_empty" Style="{StaticResource T3.Empty}"
-                                               Text="No matching templates found" Visibility="Collapsed"/>
+                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Margin" Value="{StaticResource T3.Pad.Panel}"/>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=tmpl_grid, Path=HasItems}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="tmpl_grid_empty" Text="No view templates match the current filters.&#x0a;Clear the search and reset filters, or create a view template in Revit." Style="{StaticResource T3.Empty}"/>
+                                    </Grid>
                                 </Grid>
                             </Grid>
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 View Manager Dialog
-Combines Advanced View Manager and View Template Manager into a single, unified Lumina UI.
+Combines Advanced View Manager and View Template Manager into one manager with staged changes.
 """
 
 import os
@@ -39,27 +39,44 @@ from core.advanced_view_manager import (
     _eid_int,
     EnhancedViewItem,
     build_viewport_map,
-    update_view_name,
-    update_view_template,
-    update_scale,
-    update_detail_level,
-    update_title_on_sheet,
-    duplicate_views,
-    delete_views,
     write_xlsx,
     read_xlsx
 )
 
-from core.view_template import (
-    calculate_viewtemplate_usage,
-    rename_template,
-    batch_rename_templates,
-    duplicate_templates,
-    delete_templates
-)
+from core.view_template import calculate_viewtemplate_usage
+from core.mana_views import (write_field, rename_template, duplicate_views,
+                             delete_views)
+duplicate_templates = duplicate_views
+delete_templates = delete_views
 
 # Import Batch Rename dialog
-from GUI.AdvancedViewManagerDialog import BatchRenameDialog
+from GUI.AdvancedViewManagerDialog import BatchRenameDialog as _BatchRenameDialog
+
+class BatchRenameDialog(_BatchRenameDialog):
+    def _apply_rename_rules(self, name):
+        result = name
+        if self.find_box.Text:
+            result = result.replace(self.find_box.Text, self.replace_box.Text or "")
+        result = (self.prefix_box.Text or "") + result + (self.suffix_box.Text or "")
+        option = self.case_combo.SelectedItem
+        option = str(getattr(option, "Content", option))
+        return {"UPPERCASE": str.upper, "lowercase": str.lower,
+                "Title Case": str.title}.get(option, lambda text: text)(result)
+
+    def _on_apply(self, sender, args):
+        pairs = [(item, self._apply_rename_rules(item.name)) for item in self.views]
+        if any(not name.strip() for _, name in pairs):
+            MessageBox.Show("A view or template name cannot be empty.", "Rename")
+            return
+        for item, name in pairs:
+            item.name = name
+            if _pend.same_text(name, item._mana_original["name"]):
+                _pend.unstage(item, "name")
+            else:
+                _pend.stage(item, "name", name)
+        self.DialogResult = True
+        self.Close()
+
 
 # `revit.doc` / `revit.uidoc` RAISE AttributeError (not return None) when no
 # UIDocument is active. At module scope that kills the import outright, so the
@@ -231,6 +248,7 @@ class ViewManagerWindow(T3WPFWindow):
         self.btn_minimize.Click += self._minimize
         self.btn_maximize.Click += self._maximize
         self.btn_close.Click += self._close_chrome
+        self.Closing += self._on_closing
         
         # Radio Tab navigation
         self.nav_views.Checked += self._on_tab_changed
@@ -324,6 +342,57 @@ class ViewManagerWindow(T3WPFWindow):
         # handler was wired above and tab_control.SelectedIndex was never set.
         self.tab_control.SelectedIndex = 0
 
+    def _flush_edits(self):
+        from System.Windows.Controls import DataGridEditingUnit
+        for name in ['views_grid', 'tmpl_grid']:
+            grid = getattr(self, name, None)
+            if grid is not None:
+                if not grid.CommitEdit(DataGridEditingUnit.Cell, True):
+                    return False
+                if not grid.CommitEdit(DataGridEditingUnit.Row, True):
+                    return False
+        return True
+
+    def _on_closing(self, sender, args):
+        if getattr(self, "_mana_busy", False):
+            args.Cancel = True
+            self._set_status("Use Stop to finish the current operation before closing.")
+            return
+        if not self._flush_edits():
+            args.Cancel = True
+            return
+        count = sum(_pend.pending_count(getattr(self, name, [])) for name in ['all_views', 'all_templates_data'])
+        if count:
+            args.Cancel = MessageBox.Show(
+                "Discard {} unapplied changes and close?".format(count),
+                "Unapplied changes", MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes
+
+    def begin_progress(self, maximum=100, disable=None):
+        self._mana_busy = True
+        controls = [self.tab_control, self.btn_close]
+        controls.extend(disable or [])
+        super(ViewManagerWindow, self).begin_progress(maximum, disable=controls)
+
+    def end_progress(self):
+        try:
+            super(ViewManagerWindow, self).end_progress()
+        finally:
+            self._mana_busy = False
+
+    def _row_state(self, rows):
+        return {str(getattr(row.id, "Value", row.id)):
+                (row.is_selected, _pend.pending_of(row)) for row in rows}
+
+    def _restore_state(self, rows, state):
+        for row in rows:
+            selected, pending = state.get(str(getattr(row.id, "Value", row.id)), (False, {}))
+            row.is_selected = selected
+            for field, value in pending.items():
+                if not _pend.same_text(value, row._mana_original.get(field)):
+                    setattr(row, field, value)
+                    _pend.stage(row, field, value)
+
     def _set_status(self, text):
         """Ghi một câu trạng thái ra footer (dùng chung cho cả 2 tab)."""
         try:
@@ -380,21 +449,33 @@ class ViewManagerWindow(T3WPFWindow):
 
     # ── VIEWS Tab Logics ──────────────────────────────────────────
     def _load_views_data(self):
+        state = self._row_state(self.all_views)
         self.all_views = []
         viewport_map = build_viewport_map(self.doc)
         collector = FilteredElementCollector(self.doc).OfClass(View).WhereElementIsNotElementType()
         for view in collector:
             if view.ViewType in [ViewType.ProjectBrowser, ViewType.SystemBrowser,
-                                 ViewType.Undefined, ViewType.Internal]:
+                                 ViewType.Undefined, ViewType.Internal, ViewType.DrawingSheet]:
                 continue
             if view.IsTemplate:
                 continue
             try:
                 item = EnhancedViewItem(view, self.doc, viewport_map)
+                parameter = view.get_Parameter(BuiltInParameter.VIEW_DESCRIPTION)
+                item.title_on_sheet = (parameter.AsString() or "") if parameter else ""
                 _pend.init_pending(item, VIEW_EDIT_FIELDS)
+                item._mana_original = {field: getattr(item, field) for field in VIEW_EDIT_FIELDS}
                 self.all_views.append(item)
             except:
                 pass
+
+        self._restore_state(self.all_views, state)
+        selected_type = self._get_combo_value(self.views_type_combo, "All Views")
+        types = ["All Views"] + sorted({item.view_type for item in self.all_views})
+        self.views_type_combo.Items.Clear()
+        for value in types:
+            self.views_type_combo.Items.Add(value)
+        self.views_type_combo.SelectedItem = selected_type if selected_type in types else "All Views"
 
     def _get_all_templates_names(self):
         templates = ["None"]
@@ -545,7 +626,8 @@ class ViewManagerWindow(T3WPFWindow):
             typed = _pend.editor_text(args.EditingElement)
             current = getattr(item, field, None)
 
-            if _pend.same_text(typed, current):
+            original = item._mana_original.get(field, current)
+            if _pend.same_text(typed, original):
                 _pend.unstage(item, field)      # typed it back to how it was
             elif field == "name" and not (typed or "").strip():
                 # An empty name is the one edit that cannot ever be applied, so
@@ -581,6 +663,8 @@ class ViewManagerWindow(T3WPFWindow):
                 pass
 
     def _on_views_excel(self, sender, args):
+        if not self._flush_edits():
+            return
         from System.Windows.Forms import SaveFileDialog, OpenFileDialog, DialogResult
         
         result = MessageBox.Show(
@@ -612,42 +696,27 @@ class ViewManagerWindow(T3WPFWindow):
                         MessageBox.Show("No valid updates found in Excel file.", "Import Excel")
                         return
                     
-                    t = Transaction(self.doc, "Excel Sync View Parameters")
-                    t.Start()
-                    success = 0
-                    failed = 0
-                    
-                    # Convert internal views to dict by ID for fast lookup
-                    views_dict = {v.id: v for v in self.all_views}
-
-                    self.begin_progress(len(updates))
-                    for _idx, (view_id, data) in enumerate(updates.items()):
-                        if self.is_cancelled:
-                            break
-                        self.step_progress(_idx, "Syncing view {}/{}...".format(_idx + 1, len(updates)))
-                        if view_id in views_dict:
-                            item = views_dict[view_id]
-                            try:
-                                if "name" in data:
-                                    update_view_name(self.doc, item, data["name"])
-                                if "view_template" in data:
-                                    update_view_template(self.doc, item, data["view_template"])
-                                if "scale" in data:
-                                    update_scale(self.doc, item, data["scale"])
-                                if "detail_level" in data:
-                                    update_detail_level(self.doc, item, data["detail_level"])
-                                if "title_on_sheet" in data:
-                                    update_title_on_sheet(self.doc, item, data["title_on_sheet"])
-                                success += 1
-                            except:
-                                failed += 1
-                                
-                    t.Commit()
-                    _cancelled = self.is_cancelled
-                    self.end_progress()
-                    _pfx = "Excel Sync Cancelled" if _cancelled else "Excel Sync Completed"
-                    MessageBox.Show("{}.\nUpdated: {}\nFailed: {}".format(_pfx, success, failed), "Excel Import")
-                    self._on_views_refresh(None, None)
+                    by_id = {_eid_int(item.id): item for item in self.all_views}
+                    staged = missing = 0
+                    for view_id, data in updates.items():
+                        item = by_id.get(int(view_id))
+                        if item is None:
+                            missing += 1
+                            continue
+                        for field in VIEW_EDIT_FIELDS:
+                            if field not in data:
+                                continue
+                            value = data[field]
+                            if not _pend.same_text(value, item._mana_original[field]):
+                                setattr(item, field, value)
+                                _pend.stage(item, field, value)
+                                staged += 1
+                            else:
+                                setattr(item, field, value)
+                                _pend.unstage(item, field)
+                    self._apply_views_filters()
+                    self.views_grid.Items.Refresh()
+                    self._set_status("Imported {} edited cells; {} unmatched rows. Review and Apply Changes.".format(staged, missing))
                 except Exception as ex:
                     self.end_progress()
                     MessageBox.Show("Error importing Excel: {}".format(str(ex)), "Error")
@@ -656,15 +725,12 @@ class ViewManagerWindow(T3WPFWindow):
     # One writer per field, so Apply stays a table lookup rather than a ladder
     # of ifs that has to be kept in step with the columns.
     def _view_writers(self):
-        return {
-            "name":           update_view_name,
-            "view_template":  update_view_template,
-            "scale":          update_scale,
-            "detail_level":   update_detail_level,
-            "title_on_sheet": update_title_on_sheet,
-        }
+        return {field: (lambda doc, item, value, field=field:
+                        write_field(doc, item, field, value)) for field in VIEW_EDIT_FIELDS}
 
     def _on_views_apply(self, sender, args):
+        if not self._flush_edits():
+            return
         """Write every staged cell on the Views tab, then clear the amber."""
         rows = _pend.pending_rows(self.all_views)
         if not rows:
@@ -688,7 +754,8 @@ class ViewManagerWindow(T3WPFWindow):
             for index, item in enumerate(rows):
                 if self.is_cancelled:
                     break
-                self.step_progress(index, "Applying {}/{}...".format(index + 1, len(rows)))
+                if not self.step_progress(index, "Applying {}/{}...".format(index + 1, len(rows))):
+                    break
                 for field, value in _pend.pending_of(item).items():
                     writer = writers.get(field)
                     if writer is None:
@@ -698,6 +765,7 @@ class ViewManagerWindow(T3WPFWindow):
                         # Each writer opens its own transaction, so one rejected
                         # cell cannot roll back the cells that already worked.
                         writer(self.doc, item, value)
+                        item._mana_original[field] = value
                         _pend.unstage(item, field)
                         applied += 1
                     except Exception as ex:
@@ -705,12 +773,15 @@ class ViewManagerWindow(T3WPFWindow):
                             getattr(item, "name", "?"), field,
                             str(ex).split("\n")[0][:60]))
         finally:
+            cancelled = self.is_cancelled
             self.end_progress()
 
         # Re-read the model: a rejected cell must go back to showing what Revit
         # actually holds, not the value that was refused.
         self._load_views_data()
+        self._load_templates_data()
         self._apply_views_filters()
+        self._apply_tmpl_filters()
 
         summary = "Applied {} cell{}".format(applied, "" if applied == 1 else "s")
         if failed:
@@ -720,11 +791,13 @@ class ViewManagerWindow(T3WPFWindow):
                 + "\n".join(failed[:12])
                 + ("\n..." if len(failed) > 12 else ""),
                 "Some edits were refused", MessageBoxButton.OK, MessageBoxImage.Warning)
-        if self.is_cancelled:
+        if cancelled:
             summary = "Cancelled — " + summary
         self._set_status(summary + ".")
 
     def _on_tmpl_apply(self, sender, args):
+        if not self._flush_edits():
+            return
         """Write every staged TEMPLATE NAME, then clear the amber."""
         rows = _pend.pending_rows(self.all_templates_data)
         if not rows:
@@ -755,7 +828,9 @@ class ViewManagerWindow(T3WPFWindow):
                 failed.append(u"{}: {}".format(item.name, str(ex).split("\n")[0][:60]))
 
         self._load_templates_data()
+        self._load_views_data()
         self._apply_tmpl_filters()
+        self._apply_views_filters()
 
         summary = "Renamed {} template{}".format(applied, "" if applied == 1 else "s")
         if failed:
@@ -765,12 +840,23 @@ class ViewManagerWindow(T3WPFWindow):
                 "Some renames were refused", MessageBoxButton.OK, MessageBoxImage.Warning)
         self._set_status(summary + ".")
 
+    def _selected_rows(self, rows, grid):
+        rows = list(rows)
+        checked = [item for item in rows if item.is_selected]
+        return checked or [item for item in grid.SelectedItems if item in rows]
+
     def _on_views_refresh(self, sender, args):
+        if not self._flush_edits():
+            return
         self._load_views_data()
+        self._load_templates_data()
         self._apply_views_filters()
+        self._apply_tmpl_filters()
 
     def _on_views_batch_rename(self, sender, args):
-        selected = [item for item in self.views_grid.SelectedItems]
+        if not self._flush_edits():
+            return
+        selected = self._selected_rows(self.filtered_views, self.views_grid)
         if not selected:
             MessageBox.Show("Please select at least one View to rename.", "Info")
             return
@@ -780,8 +866,9 @@ class ViewManagerWindow(T3WPFWindow):
             self._on_views_refresh(None, None)
 
     def _on_views_duplicate(self, sender, args):
-        checked = [item for item in self.all_views if item.is_selected]
-        selected = checked if checked else [item for item in self.views_grid.SelectedItems]
+        if not self._flush_edits():
+            return
+        selected = self._selected_rows(self.filtered_views, self.views_grid)
         if not selected:
             MessageBox.Show("Please select or check at least one View to duplicate.", "Info")
             return
@@ -802,8 +889,9 @@ class ViewManagerWindow(T3WPFWindow):
                 MessageBox.Show("Error: {}".format(str(ex)), "Error")
 
     def _on_views_delete(self, sender, args):
-        checked = [item for item in self.all_views if item.is_selected]
-        selected = checked if checked else [item for item in self.views_grid.SelectedItems]
+        if not self._flush_edits():
+            return
+        selected = self._selected_rows(self.filtered_views, self.views_grid)
         if not selected:
             MessageBox.Show("Please select or check at least one View to delete.", "Info")
             return
@@ -825,6 +913,7 @@ class ViewManagerWindow(T3WPFWindow):
 
     # ── TEMPLATES Tab Logics ──────────────────────────────────────
     def _load_templates_data(self):
+        state = self._row_state(self.all_templates_data)
         self.all_templates_data = []
         self.tmpl_types = set()
         
@@ -834,6 +923,7 @@ class ViewManagerWindow(T3WPFWindow):
                 if vt.IsTemplate:
                     item = ViewTemplateItem(vt)
                     _pend.init_pending(item, TMPL_EDIT_FIELDS)
+                    item._mana_original = {field: getattr(item, field) for field in TMPL_EDIT_FIELDS}
                     self.all_templates_data.append(item)
                     if item.view_type:
                         self.tmpl_types.add(item.view_type)
@@ -843,10 +933,15 @@ class ViewManagerWindow(T3WPFWindow):
         # Calculate template usage (updates items in-place)
         calculate_viewtemplate_usage(self.doc, self.all_templates_data)
         
-        # Populate tmpl_type_combo if first load
-        if self.tmpl_type_combo.Items.Count <= 1:
-            for vt_type in sorted(list(self.tmpl_types)):
-                self.tmpl_type_combo.Items.Add(vt_type)
+        self._restore_state(self.all_templates_data, state)
+        selected_type = self._get_combo_value(self.tmpl_type_combo, "All View Types")
+        types = ["All View Types"] + sorted(self.tmpl_types)
+        self.tmpl_type_combo.Items.Clear()
+        for value in types:
+            self.tmpl_type_combo.Items.Add(value)
+        self.tmpl_type_combo.SelectedItem = selected_type if selected_type in types else "All View Types"
+        self.template_items = self._get_all_templates_names()
+        self.col_template.ItemsSource = to_items_source(self.template_items)
 
     def _apply_tmpl_filters(self):
         self.filtered_templates.Clear()
@@ -938,11 +1033,17 @@ class ViewManagerWindow(T3WPFWindow):
         self.tmpl_selected_text.Text = str(len([t for t in self.filtered_templates if t.is_selected]))
 
     def _on_tmpl_refresh(self, sender, args):
+        if not self._flush_edits():
+            return
         self._load_templates_data()
+        self._load_views_data()
         self._apply_tmpl_filters()
+        self._apply_views_filters()
 
     def _on_tmpl_rename(self, sender, args):
-        selected = [item for item in self.tmpl_grid.SelectedItems]
+        if not self._flush_edits():
+            return
+        selected = self._selected_rows(self.filtered_templates, self.tmpl_grid)
         if len(selected) != 1:
             MessageBox.Show("Please select exactly one template to rename.", "Info")
             return
@@ -955,26 +1056,31 @@ class ViewManagerWindow(T3WPFWindow):
         )
         if new_name and new_name != item.name:
             try:
-                if rename_template(self.doc, item.view_template, new_name):
-                    item.name = new_name
-                    self._on_tmpl_refresh(None, None)
+                item.name = new_name
+                if _pend.same_text(new_name, item._mana_original["name"]):
+                    _pend.unstage(item, "name")
+                else:
+                    _pend.stage(item, "name", new_name)
+                self._on_tmpl_refresh(None, None)
             except Exception as e:
                 MessageBox.Show("Error renaming: {}".format(str(e)), "Error")
 
     def _on_tmpl_batch_rename(self, sender, args):
-        selected = [item for item in self.tmpl_grid.SelectedItems]
+        if not self._flush_edits():
+            return
+        selected = self._selected_rows(self.filtered_templates, self.tmpl_grid)
         if not selected:
             MessageBox.Show("Please select at least one template to rename.", "Info")
             return
             
-        from GUI.AdvancedViewManagerDialog import BatchRenameDialog
         dialog = BatchRenameDialog(selected, self.doc)
         if dialog.ShowDialog():
             self._on_tmpl_refresh(None, None)
 
     def _on_tmpl_duplicate(self, sender, args):
-        checked = [item for item in self.all_templates_data if item.is_selected]
-        selected = checked if checked else [item for item in self.tmpl_grid.SelectedItems]
+        if not self._flush_edits():
+            return
+        selected = self._selected_rows(self.filtered_templates, self.tmpl_grid)
         if not selected:
             MessageBox.Show("Please select or check at least one template to duplicate.", "Info")
             return
@@ -995,8 +1101,9 @@ class ViewManagerWindow(T3WPFWindow):
                 MessageBox.Show("Error: {}".format(str(ex)), "Error")
 
     def _on_tmpl_delete(self, sender, args):
-        checked = [item for item in self.all_templates_data if item.is_selected]
-        selected = checked if checked else [item for item in self.tmpl_grid.SelectedItems]
+        if not self._flush_edits():
+            return
+        selected = self._selected_rows(self.filtered_templates, self.tmpl_grid)
         if not selected:
             MessageBox.Show("Please select or check at least one template to delete.", "Info")
             return
@@ -1041,10 +1148,12 @@ class ViewManagerWindow(T3WPFWindow):
     def select_all_views_grid_clicked(self, sender, e):
         """Header checkbox: chon/bo chon moi dong dang hien thi cua views_grid."""
         self.toggle_all_rows(self.views_grid, "is_selected", sender.IsChecked)
+        self._update_views_summary()
 
     def select_all_tmpl_grid_clicked(self, sender, e):
         """Header checkbox: chon/bo chon moi dong dang hien thi cua tmpl_grid."""
         self.toggle_all_rows(self.tmpl_grid, "is_selected", sender.IsChecked)
+        self._update_tmpl_summary()
 
 
 # =====================================================

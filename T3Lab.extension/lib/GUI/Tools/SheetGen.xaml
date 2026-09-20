@@ -1766,10 +1766,10 @@
                                                     Click="select_none_clicked"/>
                                             <Border Width="1" Height="14" Background="{StaticResource T3.Border}"
                                                     Margin="0,0,12,0" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="txt_search" Style="{StaticResource T3.Search}"
-                                                     Width="200" Tag="Search rooms..."
-                                                     TextChanged="search_changed"/>
                                         </StackPanel>
+                                        <TextBox x:Name="txt_search" Grid.Column="1" Style="{StaticResource T3.Search}"
+                                                 Tag="Search rooms..." ToolTip="Filter rooms before selecting which rooms to generate plans for."
+                                                 TextChanged="search_changed"/>
                                     </Grid>
                                 </Border>
 
@@ -1811,8 +1811,20 @@
                                     </DataGrid>
 
                                     <!-- Empty State -->
-                                    <TextBlock x:Name="room_grid_empty" Style="{StaticResource T3.Empty}"
-                                               Text="No rooms found in active document" Visibility="Collapsed"/>
+                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Margin" Value="{StaticResource T3.Pad.Panel}"/>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=room_datagrid, Path=HasItems}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="room_grid_empty" Text="No rooms match the current search.&#x0a;Clear the search, or place rooms in Revit and reopen SheetGen." Style="{StaticResource T3.Empty}"/>
+                                    </Grid>
                                 </Grid>
                             </Grid>
 
@@ -2079,7 +2091,7 @@
                                         <Border Style="{StaticResource T3.Callout}">
                                             <StackPanel>
                                                 <TextBlock Text="Tips:" Style="{StaticResource T3.BodyStrong}" Margin="0,0,0,4"/>
-                                                <TextBlock Text="Views are automatically placed on sheets using the selected Title Block."
+                                                <TextBlock Text="Enable Place views on sheets and select a title block to create sheets. Generated sheets become available here after creation."
                                                            Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap"/>
                                             </StackPanel>
                                         </Border>
