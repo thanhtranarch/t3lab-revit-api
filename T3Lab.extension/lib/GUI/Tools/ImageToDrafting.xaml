@@ -194,6 +194,11 @@
           <Style x:Key="T3.Cell.Number" TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Mono}">
             <Setter Property="HorizontalAlignment" Value="Right"/>
           </Style>
+          <!-- Cột hẹp (đếm, trạng thái, nút): canh giữa thì ô và header không còn
+               lệch nhau một khoảng trắng 8px ở mép trái. -->
+          <Style x:Key="T3.Cell.Center" TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Mono}">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+          </Style>
 
           <!-- ══════════════════ 5 · SEPARATOR / RULE ══════════════════ -->
           <Style x:Key="T3.Rule" TargetType="Separator">
@@ -224,7 +229,8 @@
                  E946 Info        E7BA Warning    E783 Error      E713 Settings
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
-                 E8A3 Zoom        E7B3 Isolate    E7C9 Pick
+                 E8A3 Zoom        E7B3 Isolate    E7C9 Pick       E7C3 Document
+                 E896 Download    EA80 Insight
 
                Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
                  1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
@@ -621,6 +627,14 @@
             </Setter>
           </Style>
 
+          <!-- Dòng danh sách hai hàng chữ (tiêu đề + mô tả). T3.ListBoxItem ghim cứng
+               chiều cao 26px, nên list nào có item template nhiều hơn một dòng phải
+               khai ItemContainerStyle này, không thì hàng thứ hai bị cắt mất. -->
+          <Style x:Key="T3.ListBoxItem.Multiline" TargetType="ListBoxItem" BasedOn="{StaticResource T3.ListBoxItem}">
+            <Setter Property="Height"    Value="Auto"/>
+            <Setter Property="MinHeight" Value="{StaticResource T3.H.Row}"/>
+          </Style>
+
           <Style x:Key="T3.ListBox" TargetType="ListBox">
             <Setter Property="Background"  Value="{StaticResource T3.Surface}"/>
             <Setter Property="BorderBrush" Value="{StaticResource T3.Border}"/>
@@ -667,6 +681,10 @@
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="VerticalContentAlignment"   Value="Center"/>
+          </Style>
+          <!-- Header của cột canh giữa — đi kèm T3.Cell.Center. -->
+          <Style x:Key="T3.DataGridColumnHeader.Center" TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
           </Style>
 
           <Style x:Key="T3.DataGridRow" TargetType="DataGridRow">

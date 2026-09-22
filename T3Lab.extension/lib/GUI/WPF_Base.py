@@ -605,6 +605,7 @@ class T3WPFWindow(Window):
             pass
 
         # Bind event handlers dynamically
+        unresolved = []
         for elem_name, event_name, handler_name in event_bindings:
             try:
                 if elem_name == '__root__':
@@ -614,6 +615,7 @@ class T3WPFWindow(Window):
                     if ctrl is None:
                         ctrl = loaded_win.FindName(elem_name) or self.FindName(elem_name)
                 if ctrl is None:
+                    unresolved.append((elem_name, event_name, handler_name))
                     continue
                 handler = getattr(self, handler_name, None)
                 if handler is not None and callable(handler):
@@ -622,6 +624,10 @@ class T3WPFWindow(Window):
                         evt += handler
             except BaseException:
                 pass
+
+        # Nút nằm trong DataTemplate không có trong namescope của window nên
+        # vòng trên không nối được — xử lý riêng bằng routed event.
+        self._wire_templated_clicks(unresolved)
 
         # Wire title bar drag if an element named 'title_bar' or similar exists
         for tb_name in ('title_bar', 'titlebar', 'border_titlebar', 'TitleBar'):
@@ -637,6 +643,63 @@ class T3WPFWindow(Window):
 
         # Auto-wire window chrome controls (minimize, maximize, close)
         self._wire_window_controls()
+
+    def _wire_templated_clicks(self, unresolved):
+        """Nối `Click=` cho nút sinh ra từ DataTemplate / ControlTemplate.
+
+        Element do template sinh ra KHÔNG nằm trong namescope của window, nên
+        `FindName` ở vòng nối handler phía trên trả về None và cái
+        `Click="..."` khai trong template im lặng không bao giờ được nối:
+        bấm nút không có phản ứng gì và cũng không có lỗi nào được ném ra.
+
+        `_sanitize_xaml` đã gắn cho mọi tag mang event một `x:Name` sinh tự
+        động, và cái tên đó đi theo từng bản sao của template. Ở đây window
+        nghe `ButtonBase.ClickEvent` nổi lên, rồi đi ngược từ `OriginalSource`
+        lên cây để tìm element mang đúng tên đó và gọi handler với chính nút
+        vừa bấm làm `sender` — nhờ vậy handler vẫn đọc được `sender.DataContext`
+        như khi nối trực tiếp.
+
+        Cơ chế này TẮT mặc định và mỗi window tự bật bằng
+        `WIRE_TEMPLATED_CLICKS = True`. Lý do: vài tool (ManaGroup, BatchLink,
+        ExportManager…) đã tự bù bằng `AddHandler(CheckBox.ClickEvent, …)` trên
+        cả bảng; bật đại trà sẽ khiến handler của chúng chạy hai lần. Tool nào
+        muốn dùng thì bật rồi bỏ phần AddHandler thủ công.
+        """
+        if not getattr(self, 'WIRE_TEMPLATED_CLICKS', False):
+            return
+        clicks = {}
+        for elem_name, event_name, handler_name in (unresolved or []):
+            if event_name == 'Click':
+                clicks[elem_name] = handler_name
+        if not clicks:
+            return
+        try:
+            from System.Windows import RoutedEventHandler
+            from System.Windows.Controls.Primitives import ButtonBase
+            from System.Windows.Media import VisualTreeHelper
+        except BaseException:
+            return
+
+        def _dispatch(sender, args):
+            try:
+                node = getattr(args, 'OriginalSource', None)
+                while node is not None:
+                    handler_name = clicks.get(getattr(node, 'Name', None) or '')
+                    if handler_name:
+                        handler = getattr(self, handler_name, None)
+                        if handler is not None and callable(handler):
+                            handler(node, args)
+                        return
+                    node = VisualTreeHelper.GetParent(node)
+            except BaseException:
+                pass
+
+        try:
+            # Giữ tham chiếu tới delegate, nếu không GC thu mất và nút chết lại.
+            self._templated_click_handler = RoutedEventHandler(_dispatch)
+            self.AddHandler(ButtonBase.ClickEvent, self._templated_click_handler, True)
+        except BaseException:
+            pass
 
     def _wire_window_controls(self):
         """Auto-wires and standardizes window chrome buttons (minimize, maximize, close)."""

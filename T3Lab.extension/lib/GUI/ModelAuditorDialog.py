@@ -294,6 +294,20 @@ _STATUS_TOKENS = OrderedDict([
 _STATUS_ORDER = list(_STATUS_TOKENS)
 _STATUS_ATTENTION = ("Warning", "Concerning", "Critical", "Severe")
 
+# Tên họ màu cho DataTrigger trong XAML. Pill của bảng và của danh sách
+# khuyến nghị tô màu qua chuỗi này chứ không nhận Brush qua binding: dưới
+# PythonNet, Brush đặt trên thuộc tính của một đối tượng Python không đi qua
+# được binding tới Background/Foreground (chuỗi thì đi qua được), nên pill
+# hiện ra chữ mà không có nền.
+_STATUS_SEVERITY = OrderedDict([
+    ("Good",       "Success"),
+    ("Acceptable", "Success"),
+    ("Warning",    "Warning"),
+    ("Concerning", "Warning"),
+    ("Critical",   "Danger"),
+    ("Severe",     "Danger"),
+])
+
 _GRADE_TOKENS = {
     "A": ("T3.Success.Fill", "T3.Success.Text"),
     "B": ("T3.Success.Fill", "T3.Success.Text"),
@@ -838,6 +852,11 @@ class MetricDetailWindow(T3WPFWindow):
 # MAIN AUDITOR WINDOW
 # ============================================================================
 class ModelAuditorWindow(T3WPFWindow):
+    # Nút "Detail" nằm trong DataTemplate của bảng metric và của danh sách
+    # khuyến nghị. Element do template sinh ra không có trong namescope của
+    # window nên T3WPFWindow không nối được `Click=` cho chúng — bấm vào là
+    # không có gì xảy ra. Bật cờ này để T3WPFWindow nối qua routed event.
+    WIRE_TEMPLATED_CLICKS = True
 
     # Progress/Pause panel names consumed by T3WPFWindow
     PP_PANEL      = "ma_progress_panel"
@@ -1210,12 +1229,16 @@ class ModelAuditorWindow(T3WPFWindow):
 
         self.txt_health_grade.Text = grade
         self.txt_health_score.Text = str(score)
-        self.txt_health_badge_label.Text = "{} - {}".format(grade, desc)
+        # Grade chip beside the title. The word for the grade ("Excellent")
+        # is already in the title and the number is already in the circle, so
+        # the chip carries the letter and nothing else — the old "Weighted
+        # Score: x/100" and "Grade: A (Excellent)" lines said the same thing
+        # a third and fourth time.
+        self.txt_health_badge_label.Text = "Grade {}".format(grade)
         self.txt_health_badge_label.Foreground = brush_text
+        self.border_health_grade.Background = brush_fill
 
         self.txt_health_title.Text = "Model Health: {}".format(desc)
-        self.txt_health_weighted_score.Text = "Weighted Score: {}/100".format(score)
-        self.txt_health_weighted_grade.Text = "Grade: {} ({})".format(grade, desc)
 
         # RAG (Red/Amber/Green) status — Autodesk Model Analytics style
         rag_label, rag_fill, rag_text = _rag_status(score)
@@ -1266,7 +1289,6 @@ class ModelAuditorWindow(T3WPFWindow):
             status = _status_for(value, thresholds)
             counts[status] += 1
 
-            fill_token, text_token = _STATUS_TOKENS[status]
             unit = m_info["unit"]
             value_display = "{}{}".format(value, " " + unit if unit else "")
             stars = u"★" * m_info["weight"] + u"☆" * (5 - m_info["weight"])
@@ -1282,10 +1304,11 @@ class ModelAuditorWindow(T3WPFWindow):
                 label=m_info["label"],
                 value_display=value_display,
                 status=status,
-                bg_brush=self._brush(fill_token),
-                fg_brush=self._brush(text_token),
-                weight_stars="Weight: {} ({}/5)".format(stars, m_info["weight"]),
-                thresholds_text="Thresholds: " + " | ".join(str(x) for x in thresholds),
+                severity=_STATUS_SEVERITY[status],
+                # Bare values: the column headers already say WEIGHT and
+                # THRESHOLDS, and each cell is one 26px line high.
+                weight_stars="{} {}/5".format(stars, m_info["weight"]),
+                thresholds_text=" | ".join(str(x) for x in thresholds),
                 select_visibility="Visible" if selectable else "Collapsed",
                 recommendation=m_info["recommendation"],
             ))
@@ -1295,8 +1318,7 @@ class ModelAuditorWindow(T3WPFWindow):
                 recs_data.append(GridRow(
                     key=key,
                     status=status,
-                    bg_brush=self._brush(fill_token),
-                    fg_brush=self._brush(text_token),
+                    severity=_STATUS_SEVERITY[status],
                     headline="{} — {}".format(m_info["label"], value_display),
                     recommendation=m_info["recommendation"],
                     select_visibility="Visible" if selectable else "Collapsed",
@@ -1312,9 +1334,12 @@ class ModelAuditorWindow(T3WPFWindow):
             crit_severe, warn_concern,
             "Immediate attention needed." if crit_severe > 0 else "Model is in good shape.")
 
-        self.txt_health_summary_metrics.Text = "Total: {} metrics | {}".format(
-            len(grid_data),
-            " | ".join("{}: {}".format(name, counts[name]) for name in _STATUS_ORDER))
+        # The per-status numbers live in the coloured tally strip now; this
+        # line only carries the total.
+        self.txt_health_summary_metrics.Text = "{} metrics analysed".format(len(grid_data))
+        self.txt_tally_good.Text = str(counts["Good"] + counts["Acceptable"])
+        self.txt_tally_warning.Text = str(warn_concern)
+        self.txt_tally_critical.Text = str(crit_severe)
 
         # Worst first: a list you read top-down and stop when you run out of
         # time is worth more than one in metric order.
@@ -1323,6 +1348,7 @@ class ModelAuditorWindow(T3WPFWindow):
         self._set_rows(self.dg_health_metrics, 'empty_health_metrics', grid_data)
         self._set_rows(self.lst_health_recommendations,
                        'empty_health_recommendations', recs_data)
+        self.txt_health_rec_count.Text = str(len(recs_data))
 
         self.status_text.Text = "Health analysis complete. Score: {}".format(score)
 

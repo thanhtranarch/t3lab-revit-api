@@ -279,7 +279,8 @@ def load_dialog():
     # Module-level tables the handlers read; rebuild them by executing just
     # those assignments from the shipped source.
     wanted = {'METRIC_THRESHOLDS', '_STATUS_TOKENS', '_STATUS_ORDER',
-              '_STATUS_ATTENTION', '_GRADE_TOKENS', '_DETAIL_ROW_CAP'}
+              '_STATUS_ATTENTION', '_STATUS_SEVERITY', '_GRADE_TOKENS',
+              '_DETAIL_ROW_CAP'}
     consts = ast.parse(SOURCE, filename=str(DIALOG))
     consts.body = [n for n in consts.body
                    if isinstance(n, ast.Assign)
@@ -440,10 +441,10 @@ class HealthDashboardTests(unittest.TestCase):
     """Drives on_health_run end to end against a scripted model."""
 
     WIDGETS = ('txt_health_grade', 'txt_health_score', 'txt_health_badge_label',
-               'txt_health_title', 'txt_health_weighted_score',
-               'txt_health_weighted_grade', 'txt_health_rag', 'txt_health_trend',
+               'txt_health_title', 'txt_health_rag', 'txt_health_trend',
                'txt_health_doc_name', 'txt_health_last_run', 'txt_health_summary',
-               'txt_health_summary_metrics')
+               'txt_health_summary_metrics', 'txt_health_rec_count',
+               'txt_tally_good', 'txt_tally_warning', 'txt_tally_critical')
 
     def setUp(self):
         FakeCollector.passes = []
@@ -465,7 +466,8 @@ class HealthDashboardTests(unittest.TestCase):
                           lst_health_recommendations=_grid(),
                           ellipse_health_bg=SimpleNamespace(Fill=None),
                           ellipse_health_color=SimpleNamespace(Fill=None),
-                          border_health_rag=SimpleNamespace(Background=None))
+                          border_health_rag=SimpleNamespace(Background=None),
+                          border_health_grade=SimpleNamespace(Background=None))
         for name in self.WIDGETS:
             setattr(win, name, SimpleNamespace(Text='', Foreground=None))
         win.doc = doc
@@ -507,6 +509,30 @@ class HealthDashboardTests(unittest.TestCase):
         for field in set(re.findall(r'\{Binding (\w+)\}', grid)):
             self.assertTrue(hasattr(row, field),
                             'XAML binds {} but the row never sets it'.format(field))
+
+    def test_pills_never_bind_a_brush_from_python(self):
+        """PythonNet không đưa được Brush qua binding: pill phải tô bằng
+        DataTrigger trên `severity`, nếu không nó hiện chữ mà không có nền."""
+        self.assertNotIn('Binding bg_brush', XAML_SOURCE)
+        self.assertNotIn('Binding fg_brush', XAML_SOURCE)
+        for fam in ('Success', 'Warning', 'Danger'):
+            self.assertIn('<DataTrigger Binding="{Binding severity}" Value="%s">' % fam,
+                          XAML_SOURCE)
+
+    def test_every_row_carries_a_severity_the_xaml_knows(self):
+        win = self._window(FakeDoc())
+        win.on_health_run(SimpleNamespace(IsEnabled=True), None)
+        for row in win.dg_health_metrics.ItemsSource:
+            self.assertIn(row.severity, ('Success', 'Warning', 'Danger'))
+            self.assertEqual(row.severity, MOD._STATUS_SEVERITY[row.status])
+
+    def test_templated_detail_buttons_are_wired_through_the_opt_in(self):
+        """Nút trong DataTemplate không nằm trong namescope, chỉ chạy được
+        khi window bật WIRE_TEMPLATED_CLICKS."""
+        self.assertTrue(MOD.ModelAuditorWindow.WIRE_TEMPLATED_CLICKS)
+        for handler in ('on_health_metric_detail', 'on_recommendation_detail'):
+            self.assertIn('Click="%s"' % handler, XAML_SOURCE)
+            self.assertIn('def %s(' % handler, SOURCE)
 
     def test_status_colours_come_from_three_token_families(self):
         """Six status names, three T3 families — no hand-mixed gradient."""

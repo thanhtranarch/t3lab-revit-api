@@ -234,7 +234,8 @@ Bảng glyph chuẩn — **một khái niệm, một glyph, toàn dự án**:
 | `E946` Info | `E7BA` Warning | `E783` Error | `E713` Settings |
 | `E70D` ChevronDown | `E70E` ChevronUp | `E76B` ChevronLeft | `E76C` ChevronRight |
 | `E74E` Save | `E8E5` OpenFile | `E774` Globe | `E7A7` Undo |
-| `E8A3` Zoom | `E7B3` Isolate | `E7C9` Pick | |
+| `E8A3` Zoom | `E7B3` Isolate | `E7C9` Pick | `E7C3` Document |
+| `E896` Download | `EA80` Insight | | |
 
 Cần glyph chưa có trong bảng → thêm vào bảng này **và** vào comment đầu khối ICON
 trong `T3Lab.Styles.xaml`, đừng dùng lẻ.

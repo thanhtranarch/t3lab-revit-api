@@ -190,6 +190,11 @@
           <Style x:Key="T3.Cell.Number" TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Mono}">
             <Setter Property="HorizontalAlignment" Value="Right"/>
           </Style>
+          <!-- Cột hẹp (đếm, trạng thái, nút): canh giữa thì ô và header không còn
+               lệch nhau một khoảng trắng 8px ở mép trái. -->
+          <Style x:Key="T3.Cell.Center" TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Mono}">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+          </Style>
 
           <!-- ══════════════════ 5 · SEPARATOR / RULE ══════════════════ -->
           <Style x:Key="T3.Rule" TargetType="Separator">
@@ -220,7 +225,8 @@
                  E946 Info        E7BA Warning    E783 Error      E713 Settings
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
-                 E8A3 Zoom        E7B3 Isolate    E7C9 Pick
+                 E8A3 Zoom        E7B3 Isolate    E7C9 Pick       E7C3 Document
+                 E896 Download    EA80 Insight
 
                Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
                  1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
@@ -617,6 +623,14 @@
             </Setter>
           </Style>
 
+          <!-- Dòng danh sách hai hàng chữ (tiêu đề + mô tả). T3.ListBoxItem ghim cứng
+               chiều cao 26px, nên list nào có item template nhiều hơn một dòng phải
+               khai ItemContainerStyle này, không thì hàng thứ hai bị cắt mất. -->
+          <Style x:Key="T3.ListBoxItem.Multiline" TargetType="ListBoxItem" BasedOn="{StaticResource T3.ListBoxItem}">
+            <Setter Property="Height"    Value="Auto"/>
+            <Setter Property="MinHeight" Value="{StaticResource T3.H.Row}"/>
+          </Style>
+
           <Style x:Key="T3.ListBox" TargetType="ListBox">
             <Setter Property="Background"  Value="{StaticResource T3.Surface}"/>
             <Setter Property="BorderBrush" Value="{StaticResource T3.Border}"/>
@@ -663,6 +677,10 @@
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="VerticalContentAlignment"   Value="Center"/>
+          </Style>
+          <!-- Header của cột canh giữa — đi kèm T3.Cell.Center. -->
+          <Style x:Key="T3.DataGridColumnHeader.Center" TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
           </Style>
 
           <Style x:Key="T3.DataGridRow" TargetType="DataGridRow">
@@ -1747,34 +1765,89 @@
                     <TabItem>
                         <Grid x:Name="grid_health_check" Margin="0">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- Overview & Score Card -->
-                                <RowDefinition Height="Auto"/> <!-- Scale Legend -->
-                                <RowDefinition Height="*"/>    <!-- Metrics DataGrid -->
+                                <RowDefinition Height="Auto"/> <!-- Command bar: ngữ cảnh + 3 hành động -->
+                                <RowDefinition Height="Auto"/> <!-- Verdict: điểm số + việc cần làm -->
+                                <RowDefinition Height="Auto"/> <!-- Đếm metric theo trạng thái -->
+                                <RowDefinition Height="*"/>    <!-- Bảng metric -->
                             </Grid.RowDefinitions>
 
-                            <!-- Row 0: Summary Banner & Recommendations -->
-                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
+                            <!-- ── Row 0: COMMAND BAR ──────────────────────────────────────
+                                 Mọi hành động của tab gom về một dải duy nhất: trái là ngữ
+                                 cảnh (model nào, quét lúc nào), phải là 3 nút, nút chính
+                                 ngoài cùng phải. Không còn nút trôi giữa khối nội dung. -->
+                            <Border Grid.Row="0" Background="{StaticResource T3.Surface}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,12">
+                                    Padding="16,8">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="1"/>
-                                        <ColumnDefinition Width="340"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Left: Health score card -->
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="&#xE7C3;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0"/>
+                                        <TextBlock x:Name="txt_health_doc_name" Text="Model: --"
+                                                   Style="{StaticResource T3.BodyStrong}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="12,0"/>
+                                        <TextBlock x:Name="txt_health_last_run" Text="Last analyzed: --"
+                                                   Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button x:Name="btn_health_ai_summary" Style="{StaticResource T3.Button.Secondary}"
+                                                Click="ai_health_summary_clicked" Margin="0,0,8,0"
+                                                ToolTip="Ask the AI for an executive read of this health report">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                                <TextBlock Text="AI Summary" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="btn_health_export" Style="{StaticResource T3.Button.Secondary}"
+                                                Margin="0,0,8,0"
+                                                ToolTip="Save the metric table to a CSV report">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE896;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                                <TextBlock Text="Export Report" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="btn_health_run" Style="{StaticResource T3.Button.Primary}"
+                                                IsDefault="True"
+                                                ToolTip="Read the model again and rebuild every metric">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE72C;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                                <TextBlock Text="Re-Analyze" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- ── Row 1: VERDICT ──────────────────────────────────────────
+                                 Điểm số nói MỘT lần: vòng tròn là điểm có trọng số, chip kế
+                                 bên là grade và RAG. Hai dòng "Weighted Score" / "Grade" cũ
+                                 đã bỏ vì lặp lại đúng con số đó lần thứ ba. -->
+                            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
+                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                                    Padding="16,12">
+                                <Grid MinHeight="132">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="1"/>
+                                        <ColumnDefinition Width="360"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Left: the verdict -->
                                     <Grid Grid.Column="0" Margin="0,0,16,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="16"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <!-- Circular Score Badge -->
+                                        <!-- Weighted score badge -->
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Grid Width="64" Height="64">
+                                            <Grid Width="72" Height="72">
                                                 <Ellipse x:Name="ellipse_health_bg" Fill="{StaticResource T3.SurfaceSunken}"/>
                                                 <Ellipse x:Name="ellipse_health_color" Fill="{StaticResource T3.BorderStrong}" Margin="4"/>
                                                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -1782,46 +1855,54 @@
                                                     <TextBlock x:Name="txt_health_score" Text="--" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Surface}" HorizontalAlignment="Center"/>
                                                 </StackPanel>
                                             </Grid>
-                                            <TextBlock x:Name="txt_health_badge_label" Text="Pending" Style="{StaticResource T3.Caption}" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-                                            <Border x:Name="border_health_rag" Background="{StaticResource T3.Surface}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" HorizontalAlignment="Center" Margin="0,4,0,0">
-                                                <TextBlock x:Name="txt_health_rag" Text="RAG: --" Style="{StaticResource T3.Caption}"/>
-                                            </Border>
+                                            <TextBlock Text="WEIGHTED SCORE / 100" Style="{StaticResource T3.Label}"
+                                                       HorizontalAlignment="Center" Margin="0,8,0,0"/>
                                         </StackPanel>
 
-                                        <!-- Health Details -->
+                                        <!-- Verdict text -->
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                            <TextBlock x:Name="txt_health_title" Text="Model Health: Pending" Style="{StaticResource T3.Title}"/>
-                                            <TextBlock x:Name="txt_health_summary" Text="Run diagnostics to analyze model health." Style="{StaticResource T3.Body.Secondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                            <TextBlock x:Name="txt_health_summary_metrics" Text="" Style="{StaticResource T3.Caption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                            <TextBlock x:Name="txt_health_last_run" Text="Last analyzed: --" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextDisabled}" Margin="0,4,0,0"/>
-                                            <TextBlock x:Name="txt_health_doc_name" Text="Model: --" Style="{StaticResource T3.Caption}" Margin="0,4,0,0"/>
-                                        </StackPanel>
-
-                                        <!-- Run & Export Actions -->
-                                        <StackPanel Grid.Column="3" VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                <Button x:Name="btn_health_run" Style="{StaticResource T3.Button.Primary}" IsDefault="True" Content="Re-Analyze" Height="28" Padding="12,0" Margin="0,0,8,0"/>
-                                                <Button x:Name="btn_health_ai_summary" Style="{StaticResource T3.Button.Secondary}" Content="✨ AI Summary" Height="28" Padding="12,0" Margin="0,0,8,0" Click="ai_health_summary_clicked"/>
-                                                <Button x:Name="btn_health_export" Style="{StaticResource T3.Button.Secondary}" Content="Export Report" Height="28" Padding="12,0"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock x:Name="txt_health_title" Text="Model Health: Pending" Style="{StaticResource T3.Title}" VerticalAlignment="Center"/>
+                                                <Border x:Name="border_health_grade" Background="{StaticResource T3.Surface}"
+                                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
+                                                        CornerRadius="4" Padding="8,4" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="txt_health_badge_label" Text="Pending" Style="{StaticResource T3.Caption}" FontWeight="SemiBold"/>
+                                                </Border>
+                                                <Border x:Name="border_health_rag" Background="{StaticResource T3.Surface}"
+                                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
+                                                        CornerRadius="4" Padding="8,4" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="txt_health_rag" Text="RAG: --" Style="{StaticResource T3.Caption}" FontWeight="SemiBold"/>
+                                                </Border>
                                             </StackPanel>
-                                            <TextBlock x:Name="txt_health_weighted_score" Text="Weighted Score: --/100" Style="{StaticResource T3.Caption}" HorizontalAlignment="Right"/>
-                                            <TextBlock x:Name="txt_health_weighted_grade" Text="Grade: --" Style="{StaticResource T3.Caption}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                                            <TextBlock x:Name="txt_health_trend" Text="No previous run to compare" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextDisabled}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="txt_health_summary" Text="Run diagnostics to analyze model health."
+                                                       Style="{StaticResource T3.Body.Secondary}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                <TextBlock x:Name="txt_health_summary_metrics" Text="No metrics yet" Style="{StaticResource T3.Tally}"/>
+                                                <TextBlock x:Name="txt_health_trend" Text="No previous run to compare" Style="{StaticResource T3.Tally}"/>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Grid>
 
                                     <!-- Zero-Gap Divider -->
                                     <Border Grid.Column="1" Background="{StaticResource T3.Border}"/>
 
-                                    <!-- Right: Recommendations -->
+                                    <!-- Right: what to do about it -->
                                     <Grid Grid.Column="2" Margin="16,0,0,0">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="RECOMMENDATIONS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                            <TextBlock Text="WHAT NEEDS ATTENTION" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
+                                            <Border Background="{StaticResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
+                                                    BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="8,0,0,0">
+                                                <TextBlock x:Name="txt_health_rec_count" Text="0" Style="{StaticResource T3.Caption}" FontWeight="SemiBold"/>
+                                            </Border>
+                                        </StackPanel>
                                         <ListBox x:Name="lst_health_recommendations" Grid.Row="1"
                                                  Style="{StaticResource T3.ListBox}"
+                                                 ItemContainerStyle="{StaticResource T3.ListBoxItem.Multiline}"
+                                                 MaxHeight="124"
                                                  BorderThickness="0" Background="Transparent"
                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                                  HorizontalContentAlignment="Stretch">
@@ -1834,9 +1915,11 @@
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
-                                                        <Border Grid.Column="0" Background="{Binding bg_brush}" CornerRadius="4"
+                                                        <Border x:Name="rec_pill" Grid.Column="0" CornerRadius="4"
+                                                                Background="{StaticResource T3.SurfaceSunken}"
                                                                 Padding="8,4" VerticalAlignment="Top" MinWidth="72">
-                                                            <TextBlock Text="{Binding status}" Foreground="{Binding fg_brush}"
+                                                            <TextBlock x:Name="rec_pill_text" Text="{Binding status}"
+                                                                       Foreground="{StaticResource T3.TextMuted}"
                                                                        Style="{StaticResource T3.Caption}" FontWeight="SemiBold"
                                                                        HorizontalAlignment="Center"/>
                                                         </Border>
@@ -1847,12 +1930,27 @@
                                                                        Foreground="{StaticResource T3.TextMuted}"
                                                                        TextWrapping="Wrap" Margin="0,4,0,0"/>
                                                         </StackPanel>
-                                                        <Button Grid.Column="3" Content="Detail…" Height="24" Padding="8,0"
-                                                                Margin="8,0,0,0" VerticalAlignment="Top"
+                                                        <Button Grid.Column="3" Content="Detail" Height="24" Padding="8,0"
+                                                                MinWidth="0" Margin="8,0,0,0" VerticalAlignment="Top"
                                                                 Visibility="{Binding select_visibility}"
-                                                                Style="{StaticResource T3.Button.Secondary}" FontSize="11"
+                                                                Style="{StaticResource T3.Button.Ghost}" FontSize="11"
+                                                                ToolTip="Select the elements behind this metric"
                                                                 Click="on_recommendation_detail"/>
                                                     </Grid>
+                                                    <DataTemplate.Triggers>
+                                                        <DataTrigger Binding="{Binding severity}" Value="Success">
+                                                            <Setter TargetName="rec_pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
+                                                            <Setter TargetName="rec_pill_text" Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding severity}" Value="Warning">
+                                                            <Setter TargetName="rec_pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                            <Setter TargetName="rec_pill_text" Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding severity}" Value="Danger">
+                                                            <Setter TargetName="rec_pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
+                                                            <Setter TargetName="rec_pill_text" Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                                        </DataTrigger>
+                                                    </DataTemplate.Triggers>
                                                 </DataTemplate>
                                             </ListBox.ItemTemplate>
                                         </ListBox>
@@ -1863,65 +1961,107 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Row 1: Scale Legend Strip -->
-                            <Border Grid.Row="1" Background="{StaticResource T3.Surface}"
+                            <!-- ── Row 2: METRIC STATUS TALLY ──────────────────────────────
+                                 Sáu tên trạng thái chỉ có ba họ màu, nên dải này gom đúng ba
+                                 nhóm và gắn số đếm vào từng nhóm — thay cho bảng chú giải cũ
+                                 (Good và Acceptable cùng màu xanh, Critical và Severe cùng
+                                 màu đỏ, thiếu hẳn Concerning) vốn không nói được điều gì. -->
+                            <Border Grid.Row="2" Background="{StaticResource T3.Surface}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,4">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="Scale:" Style="{StaticResource T3.Label}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <Border Background="{StaticResource T3.Success.Fill}" CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
-                                        <TextBlock Text="Good" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Success.Text}" FontWeight="SemiBold"/>
-                                    </Border>
-                                    <Border Background="{StaticResource T3.Success.Fill}" CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
-                                        <TextBlock Text="Acceptable" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Success.Text}" FontWeight="SemiBold"/>
-                                    </Border>
-                                    <Border Background="{StaticResource T3.Warning.Fill}" CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
-                                        <TextBlock Text="Warning" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Warning.Text}" FontWeight="SemiBold"/>
-                                    </Border>
-                                    <Border Background="{StaticResource T3.Danger.Fill}" CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
-                                        <TextBlock Text="Critical" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Danger.Text}" FontWeight="SemiBold"/>
-                                    </Border>
-                                    <Border Background="{StaticResource T3.Danger.Fill}" CornerRadius="4" Padding="8,4">
-                                        <TextBlock Text="Severe" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Danger.Text}" FontWeight="SemiBold"/>
-                                    </Border>
-                                </StackPanel>
+                                    Padding="16,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="METRICS BY STATUS" Style="{StaticResource T3.Label}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                        <Border Background="{StaticResource T3.Success.Fill}" CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="6" Height="6" Fill="{StaticResource T3.Success.Accent}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Good · Acceptable" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Success.Text}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="txt_tally_good" Text="0" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Success.Text}" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Background="{StaticResource T3.Warning.Fill}" CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="6" Height="6" Fill="{StaticResource T3.Warning.Accent}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Warning · Concerning" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Warning.Text}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="txt_tally_warning" Text="0" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Warning.Text}" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Background="{StaticResource T3.Danger.Fill}" CornerRadius="4" Padding="8,4">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="6" Height="6" Fill="{StaticResource T3.Danger.Accent}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Critical · Severe" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Danger.Text}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="txt_tally_critical" Text="0" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Danger.Text}" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="WEIGHT shows how much a metric moves the score"
+                                               Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextDisabled}"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
                             </Border>
 
-                            <!-- Row 2: Metrics Table -->
-                            <Grid Grid.Row="2">
+                            <!-- ── Row 3: METRICS TABLE ────────────────────────────────────
+                                 WEIGHT và THRESHOLDS tách thành hai cột một dòng: trước đây
+                                 chúng chồng lên nhau trong ô cao 26px nên dòng dưới bị cắt. -->
+                            <Grid Grid.Row="3">
                                 <DataGrid x:Name="dg_health_metrics"
                                           Style="{StaticResource T3.DataGrid}"
                                           BorderThickness="0">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="METRIC" Binding="{Binding label}" Width="160"/>
-                                        <DataGridTextColumn Header="CURRENT VALUE" Binding="{Binding value_display}" Width="110"
-                                                            ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                        <DataGridTemplateColumn Header="HEALTH" Width="100">
+                                        <DataGridTextColumn Header="METRIC" Binding="{Binding label}" Width="200"/>
+                                        <DataGridTextColumn Header="CURRENT VALUE" Binding="{Binding value_display}" Width="120"
+                                                            ElementStyle="{StaticResource T3.Cell.Center}"
+                                                            HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"/>
+                                        <!-- Màu pill đến từ DataTrigger trên `severity`, KHÔNG bind Brush từ
+                                             Python: dưới PythonNet, Brush gán vào thuộc tính của một đối tượng
+                                             Python đi qua binding không tới được Background/Foreground (chuỗi
+                                             thì tới), nên pill trước đây hiện chữ mà không có nền. -->
+                                        <DataGridTemplateColumn Header="HEALTH" Width="120"
+                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{Binding bg_brush}" CornerRadius="4" Padding="8,4" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding status}" Foreground="{Binding fg_brush}" FontWeight="SemiBold" FontSize="11"/>
+                                                    <Border x:Name="health_pill" Background="{StaticResource T3.SurfaceSunken}"
+                                                            CornerRadius="4" Padding="8,4"
+                                                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock x:Name="health_pill_text" Text="{Binding status}"
+                                                                   Foreground="{StaticResource T3.TextMuted}"
+                                                                   FontWeight="SemiBold" FontSize="11"/>
                                                     </Border>
+                                                    <DataTemplate.Triggers>
+                                                        <DataTrigger Binding="{Binding severity}" Value="Success">
+                                                            <Setter TargetName="health_pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
+                                                            <Setter TargetName="health_pill_text" Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding severity}" Value="Warning">
+                                                            <Setter TargetName="health_pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                            <Setter TargetName="health_pill_text" Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding severity}" Value="Danger">
+                                                            <Setter TargetName="health_pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
+                                                            <Setter TargetName="health_pill_text" Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                                        </DataTrigger>
+                                                    </DataTemplate.Triggers>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="STATUS DETAILS" Width="*">
+                                        <DataGridTextColumn Header="WEIGHT" Binding="{Binding weight_stars}" Width="120"
+                                                            ElementStyle="{StaticResource T3.Cell.Center}"
+                                                            HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"/>
+                                        <DataGridTextColumn Header="THRESHOLDS" Binding="{Binding thresholds_text}" Width="*"
+                                                            ElementStyle="{StaticResource T3.Cell.Mono}"/>
+                                        <DataGridTemplateColumn Header="ACTION" Width="90"
+                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <StackPanel Margin="4" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding weight_stars}" FontSize="11" Foreground="{StaticResource T3.TextMuted}"/>
-                                                        <TextBlock Text="{Binding thresholds_text}" FontSize="11" Foreground="{StaticResource T3.TextDisabled}"/>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="ACTION" Width="100">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Button Content="Detail…" Visibility="{Binding select_visibility}"
+                                                    <Button Content="Detail" Visibility="{Binding select_visibility}"
                                                             Click="on_health_metric_detail"
-                                                            Style="{StaticResource T3.Button.Secondary}"
-                                                            Height="26" Padding="8,0" FontSize="11"
+                                                            Style="{StaticResource T3.Button.Ghost}"
+                                                            Height="22" Padding="8,0" MinWidth="0" FontSize="11"
+                                                            ToolTip="Select the elements behind this metric"
                                                             VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
@@ -1965,11 +2105,33 @@
                                 <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
                                         BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                         Padding="16,8">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button x:Name="btn_warning_reload" Style="{StaticResource T3.Button.Secondary}" Content="Reload List" Height="28" Margin="0,0,8,0"/>
-                                        <Button x:Name="btn_warning_autofix" Style="{StaticResource T3.Button.Danger}" Content="Resolve Duplicates" Height="28" Margin="0,0,8,0" Padding="12,0"/>
-                                        <Button x:Name="btn_warning_export" Style="{StaticResource T3.Button.Secondary}" Content="Export Warnings" Height="28"/>
-                                    </StackPanel>
+                                    <!-- Cùng một ngữ pháp với command bar của tab Health:
+                                         trái là việc phụ (đọc lại danh sách), phải là việc
+                                         có hậu quả, nút phá huỷ ngoài cùng phải. -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="btn_warning_reload" Grid.Column="0" Style="{StaticResource T3.Button.Ghost}"
+                                                HorizontalAlignment="Left" ToolTip="Read the warning list from the model again">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE72C;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                                <TextBlock Text="Reload List" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <Button x:Name="btn_warning_export" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
+                                                    ToolTip="Save every warning to a CSV file">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE896;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="Export Warnings" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="btn_warning_autofix" Style="{StaticResource T3.Button.Danger}" Content="Resolve Duplicates"
+                                                    ToolTip="Delete the duplicated elements behind the selected warning"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
                             </Grid>
 
@@ -1996,7 +2158,9 @@
                                 <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                         BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                         Padding="16,8">
-                                    <Button x:Name="btn_warning_select_elements" Style="{StaticResource T3.Button.Secondary}" Content="Select in Model" Height="28"/>
+                                    <Button x:Name="btn_warning_select_elements" Style="{StaticResource T3.Button.Secondary}"
+                                            Content="Select in Model" HorizontalAlignment="Right"
+                                            ToolTip="Select the highlighted elements in the Revit view"/>
                                 </Border>
                             </Grid>
                         </Grid>
@@ -2037,11 +2201,22 @@
                             <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                     Padding="16,8">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button x:Name="btn_smart_purge_check_all" Style="{StaticResource T3.Button.Secondary}" Content="Select All" Height="28" Margin="0,0,8,0"/>
-                                    <Button x:Name="btn_smart_purge_uncheck_all" Style="{StaticResource T3.Button.Secondary}" Content="Deselect All" Height="28" Margin="0,0,8,0"/>
-                                    <Button x:Name="btn_smart_purge_run" Style="{StaticResource T3.Button.Danger}" Content="Purge Selected" Height="28" Padding="16,0"/>
-                                </StackPanel>
+                                <!-- Hai nút chọn/bỏ chọn là thao tác trên bảng, không phải
+                                     hành động của tab — đẩy sang trái, để một mình nút phá
+                                     huỷ đứng bên phải. -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <Button x:Name="btn_smart_purge_check_all" Style="{StaticResource T3.Button.Ghost}" Content="Select All" Margin="0,0,4,0"/>
+                                        <Button x:Name="btn_smart_purge_uncheck_all" Style="{StaticResource T3.Button.Ghost}" Content="Deselect All"/>
+                                    </StackPanel>
+                                    <Button x:Name="btn_smart_purge_run" Grid.Column="1" Style="{StaticResource T3.Button.Danger}"
+                                            Content="Purge Selected" Padding="16,0"
+                                            ToolTip="Delete the ticked types from the model"/>
+                                </Grid>
                             </Border>
                         </Grid>
                     </TabItem>
