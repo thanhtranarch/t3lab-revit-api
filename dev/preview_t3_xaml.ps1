@@ -31,8 +31,13 @@ $win    = [Windows.Markup.XamlReader]::Load($xr)
 Write-Host "PARSED OK"
 
 if ($Tab -ge 0) {
-  $tc = $win.FindName('tab_control')
-  if ($tc) { $tc.SelectedIndex = $Tab; Write-Host "tab_control -> $Tab" }
+  # Tools name their main TabControl differently; try the known spellings.
+  $tc = $null
+  foreach ($n in @('tab_control', 'main_tab_control', 'tabs', 'MainTabControl')) {
+    $tc = $win.FindName($n)
+    if ($tc) { $tc.SelectedIndex = $Tab; Write-Host "$n -> $Tab"; break }
+  }
+  if (-not $tc) { Write-Host "no TabControl found to switch to tab $Tab" }
 }
 
 # detach content so it can lay out off-screen, carrying the window resources

@@ -1,9 +1,8 @@
 title: "Model\nAuditor"
-tooltip: "Consolidates model health check, warnings, in-place models, and material audit."
+tooltip: "Model health score, warning management and unused-item purge. The health scan starts on open."
 description: |
-  Model Check: verify model standards and quality rules
-  Warnings: review and address the Revit warning list
-  In-Place Models: list and manage in-place family instances
-  Material List: audit all materials used in the model
+  Health: scans on open — weighted score over 17 metrics, trend against the last run
+  Warnings: group, inspect, select in model and resolve duplicate-instance warnings
+  Smart Purge: scan 25 categories of unused items and delete the ones you tick
 author: "Tran Tien Thanh"
-version: "1.0.0"
+version: "2.1.0"

@@ -73,6 +73,7 @@ XAML_FILE = os.path.join(GUI_DIR, 'Tools', 'ManaSheets.xaml')
 from GUI.ProgressPauseMixin import ProgressPauseMixin
 from GUI.DataGridColumnFilter import ColumnFilterController
 from GUI import GridPendingEdits as _pend
+from core import mana_sheets as _sheets
 
 # Row fields the grid lets the user edit. Each needs a matching `dirty_<field>`
 # flag on the row and a CellStyle DataTrigger in ManaSheets.xaml bound to it,
@@ -96,9 +97,9 @@ class RenumberItem(_Reactive):
     def __init__(self, sheet_model):
         self._property_changed_handlers = []
         self.sheet_model = sheet_model
-        self.orig_number = sheet_model.sheet_number
+        self.orig_number = sheet_model.element.SheetNumber
         self.name = sheet_model.sheet_name
-        self._preview_number = sheet_model.sheet_number
+        self._preview_number = self.orig_number
         self._is_selected = False
 
     @property
@@ -306,9 +307,10 @@ class SheetManagerWindow(T3WPFWindow):
             selected, pending = state.get(str(getattr(row.id, "Value", row.id)), (False, {}))
             row.is_selected = selected
             for field, value in pending.items():
-                if not _pend.same_text(value, row._mana_original.get(field)):
-                    setattr(row, field, value)
-                    _pend.stage(row, field, value)
+                setattr(row, field, value)
+                _pend.stage(row, field, value)
+            if pending:
+                self.change_tracker.track_modification(row)
 
     def _set_status(self, text):
         """Ghi một câu trạng thái ra footer."""
@@ -367,11 +369,18 @@ class SheetManagerWindow(T3WPFWindow):
 
     # ── SHEETS Tab Logics ─────────────────────────────────────────
     def _load_sheets_data(self):
-        self.all_sheets = self.revit_service.get_all_sheets()
-        for item in self.all_sheets:
+        state = self._row_state(self.all_sheets)
+        rows = self.revit_service.get_all_sheets()
+        for item in rows:
+            values = _sheets.sheet_values(item.element)
+            for field, value in values.items():
+                setattr(item, field, value)
+            item.commit_changes()
             _pend.init_pending(item, SHEET_EDIT_FIELDS)
-            item._mana_original = {field: getattr(item, field) for field in SHEET_EDIT_FIELDS}
+            item._mana_original = values
+        self.all_sheets = rows
         self.change_tracker.clear_all()
+        self._restore_state(rows, state)
         self._update_sheets_summary()
 
     def _apply_sheets_filters(self):
@@ -541,13 +550,24 @@ class SheetManagerWindow(T3WPFWindow):
             except Exception as e:
                 MessageBox.Show("Error showing ViewSheet Sets dialog:\n{}".format(str(e)), "Error")
 
+    def _selected_sheet_elements(self):
+        """Prefer visible checked rows, falling back to current grid selection."""
+        rows = [row for row in self.filtered_sheets if row.is_selected]
+        if not rows:
+            rows = list(self.sheets_grid.SelectedItems)
+        return [row.element for row in rows]
+
     def _on_sheets_place_views(self, sender, args):
         if not self._flush_edits():
+            return
+        selected = self._selected_sheet_elements()
+        if not selected:
+            MessageBox.Show("Please select sheets to place views on.", "No Selection")
             return
         if self.place_views_service:
             try:
                 from Services.SheetManager.place_views_dialog import PlaceViewsDialog
-                dialog = PlaceViewsDialog(self.doc, self.place_views_service)
+                dialog = PlaceViewsDialog(self.place_views_service, self.doc, selected)
                 dialog.ShowDialog()
                 self._load_sheets_data()
                 self._apply_sheets_filters()
@@ -557,10 +577,14 @@ class SheetManagerWindow(T3WPFWindow):
     def _on_sheets_custom_params(self, sender, args):
         if not self._flush_edits():
             return
+        selected = self._selected_sheet_elements()
+        if not selected:
+            MessageBox.Show("Please select sheets to edit parameters.", "No Selection")
+            return
         if self.params_service:
             try:
                 from Services.SheetManager.custom_parameters_dialog import CustomParametersDialog
-                dialog = CustomParametersDialog(self.doc, self.params_service)
+                dialog = CustomParametersDialog(self.params_service, self.doc, selected)
                 dialog.ShowDialog()
                 self._load_sheets_data()
                 self._apply_sheets_filters()
@@ -705,53 +729,42 @@ class SheetManagerWindow(T3WPFWindow):
             modified, "" if modified == 1 else "s")
 
         result = MessageBox.Show(msg, "Confirm Changes", MessageBoxButton.YesNo, MessageBoxImage.Question)
-        if result == MessageBoxResult.Yes:
-            t = Transaction(self.doc, "Apply Sheet Manager Changes")
-            t.Start()
-            self.begin_progress(len(self.change_tracker.modified_items), disable=[sender])
-            try:
-                success = 0
-                failed = 0
-                for _idx, item in enumerate(self.change_tracker.modified_items):
-                    if self.is_cancelled:
-                        break
-                    self.step_progress(_idx, "Applying sheet {}/{}...".format(
-                        _idx + 1, len(self.change_tracker.modified_items)))
-                    try:
-                        # Update standard params in Revit
-                        element = item.element
-                        for val, p_name in [(item.designed_by, "Designed By"),
-                                            (item.checked_by, "Checked By"),
-                                            (item.drawn_by, "Drawn By"),
-                                            (item.approved_by, "Approved By")]:
-                            if val and val != "-":
-                                p = element.LookupParameter(p_name)
-                                if p and not p.IsReadOnly:
-                                    p.Set(val)
-                                    
-                        # Update Number & Name
-                        if self.revit_service.update_sheet(item):
-                            item.commit_changes()
-                            _pend.clear_pending(item)
-                            success += 1
-                        else:
-                            failed += 1
-                    except:
-                        failed += 1
-                        
-                t.Commit()
-                _pfx = "Cancelled — updated" if self.is_cancelled else "Successfully updated"
-                msg = "{}: {}".format(_pfx, success)
-                if failed > 0:
-                    msg += "\nFailed: {}".format(failed)
-                MessageBox.Show(msg, "Apply Complete", MessageBoxButton.OK, MessageBoxImage.Information)
-                self._load_sheets_data()
-                self._apply_sheets_filters()
-            except Exception as e:
-                t.RollBack()
-                MessageBox.Show("Error applying changes: {}".format(str(e)), "Error")
-            finally:
-                self.end_progress()
+        if result != MessageBoxResult.Yes:
+            return
+        self.begin_progress(len(staged), disable=[sender])
+        try:
+            success = 0
+            errors = []
+            for index, item in enumerate(staged):
+                if not self.step_progress(index, "Applying sheet {}/{}...".format(
+                        index + 1, len(staged))):
+                    break
+                changes = _pend.pending_of(item)
+                try:
+                    _sheets.update_sheet(self.doc, item.element, changes)
+                except Exception as ex:
+                    errors.append("{}: {}".format(item.sheet_number, ex))
+                    continue
+                # The core returns only after Revit confirms the row committed.
+                item.commit_changes()
+                item._mana_original.update(changes)
+                _pend.clear_pending(item)
+                self._untrack(item)
+                success += 1
+            cancelled = self.is_cancelled
+            self._load_sheets_data()
+            self._apply_sheets_filters()
+            msg = "{}: {}. Pending sheets: {}.".format(
+                "Stopped; updated" if cancelled else "Updated", success,
+                len(_pend.pending_rows(self.all_sheets)))
+            if errors:
+                msg += "\nFailed (edits retained):\n" + "\n".join(errors)
+            MessageBox.Show(msg, "Apply Complete", MessageBoxButton.OK,
+                            MessageBoxImage.Information)
+        except Exception as ex:
+            MessageBox.Show("Error applying changes: {}".format(ex), "Error")
+        finally:
+            self.end_progress()
 
     # ── RENUMBER Tab Logics ───────────────────────────────────────
     def _load_renumber_preview_data(self):
@@ -767,81 +780,52 @@ class SheetManagerWindow(T3WPFWindow):
         self._load_renumber_preview_data()
 
     def _on_renum_preview(self, sender, args):
-        selected_preview = [item for item in self.renumber_items if item.IsSelected]
-        if not selected_preview:
+        if not self._flush_edits():
+            return False
+        selected = [item for item in self.renumber_items if item.IsSelected]
+        if not selected:
             MessageBox.Show("Please select sheets in the preview grid first.", "Info")
-            return
-            
-        prefix = self.renum_prefix_box.Text or ""
-        suffix = self.renum_suffix_box.Text or ""
-        
+            return False
         try:
-            start_num = int(self.renum_start_box.Text)
-            step_num = int(self.renum_step_box.Text)
-        except ValueError:
-            MessageBox.Show("Starting Number and Increment Step must be integers.", "Error")
-            return
-
-        for index, item in enumerate(selected_preview):
-            new_num = "{}{}{}".format(prefix, start_num + index * step_num, suffix)
-            item.preview_number = new_num
-
-        try:
-            self.renum_grid.Items.Refresh()
-        except Exception:
-            pass
+            start = int(self.renum_start_box.Text)
+            step = int(self.renum_step_box.Text)
+            prefix = self.renum_prefix_box.Text or ""
+            suffix = self.renum_suffix_box.Text or ""
+            pairs = _sheets.validate_renumber(self.doc, [
+                (item.sheet_model.element, "{}{}{}".format(prefix, start + index * step, suffix))
+                for index, item in enumerate(selected)])
+        except (ValueError, TypeError) as ex:
+            MessageBox.Show("Invalid renumber preview: {}".format(ex), "Error")
+            return False
+        # Publish only a completely validated plan; Run never uses stale values.
+        for item, (_, number) in zip(selected, pairs):
+            item.preview_number = number
+        self.renum_grid.Items.Refresh()
+        return True
 
     def _on_renum_run(self, sender, args):
-        if not self._flush_edits():
+        if not self._on_renum_preview(None, None):
             return
-        selected_preview = [item for item in self.renumber_items if item.IsSelected]
-        if not selected_preview:
-            MessageBox.Show("Please select sheets in the preview grid to renumber.", "Info")
-            return
-            
-        # First preview them in case user hasn't previewed
-        self._on_renum_preview(None, None)
-        
+        selected = [item for item in self.renumber_items if item.IsSelected]
+        pairs = [(item.sheet_model.element, item.preview_number) for item in selected]
         result = MessageBox.Show(
-            "Renumber {} selected sheet(s)?".format(len(selected_preview)),
-            "Confirm Renumber", MessageBoxButton.YesNo, MessageBoxImage.Question
-        )
-        
-        if result == MessageBoxResult.Yes:
-            t = Transaction(self.doc, "Batch Renumber Sheets")
-            t.Start()
-            self.begin_progress(len(selected_preview), disable=[sender])
-            try:
-                success = 0
-                failed = 0
-                for _idx, item in enumerate(selected_preview):
-                    if self.is_cancelled:
-                        break
-                    self.step_progress(_idx, "Renumbering sheet {}/{}...".format(_idx + 1, len(selected_preview)))
-                    sheet = item.sheet_model.element
-                    new_num = item.preview_number
-                    try:
-                        sheet.SheetNumber = new_num
-                        item.sheet_model.sheet_number = new_num
-                        item.sheet_model.commit_changes()
-                        success += 1
-                    except Exception as ex:
-                        print("Renumber failed for sheet '{}': {}".format(item.name, ex))
-                        failed += 1
-                t.Commit()
-
-                _pfx = "Cancelled — renumbered" if self.is_cancelled else "Renumbered successfully"
-                msg = "{}: {}".format(_pfx, success)
-                if failed > 0:
-                    msg += "\nFailed: {}".format(failed)
-                MessageBox.Show(msg, "Renumber Complete", MessageBoxButton.OK, MessageBoxImage.Information)
-
-                self._on_renum_refresh(None, None)
-            except Exception as e:
-                t.RollBack()
-                MessageBox.Show("Error during renumbering: {}".format(str(e)), "Error")
-            finally:
-                self.end_progress()
+            "Renumber {} selected sheet(s)?".format(len(selected)),
+            "Confirm Renumber", MessageBoxButton.YesNo, MessageBoxImage.Question)
+        if result != MessageBoxResult.Yes:
+            return
+        self.begin_progress(len(pairs) * 2, disable=[sender])
+        try:
+            def progress(index, total):
+                return self.step_progress(index, "Renumbering {}/{}...".format(index, total))
+            count = _sheets.renumber_sheets(self.doc, pairs, progress=progress)
+        except Exception as ex:
+            MessageBox.Show("Renumber did not complete: {}".format(ex), "Error")
+        else:
+            # Reload committed values, retaining all independent staged edits.
+            self._on_renum_refresh(None, None)
+            MessageBox.Show("Renumbered successfully: {}".format(count), "Renumber Complete")
+        finally:
+            self.end_progress()
 
     # ── Select-all o header cot checkbox ────────────────────────────────
     # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi

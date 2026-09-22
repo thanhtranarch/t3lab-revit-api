@@ -318,6 +318,56 @@ class SheetGenTests(unittest.TestCase):
         self.module.show_sheet_gen_dialog()
         self.module.forms.alert.assert_called_once()
 
+    def test_missing_room_bounds_skips_only_that_room(self):
+        missing = NS(Name='Unplaced', Number='102', GenQty=1, Element=Mock())
+        missing.Element.get_BoundingBox.return_value = None
+        self.window._get_selected_rooms.return_value = [missing, self.room]
+        self.run_batch()
+        self.assertEqual(len(self.transactions), 1)
+        self.assertIn('1 view(s) created.', self.window.status_text.Text)
+        self.assertIn('1 error(s)', self.window.status_text.Text)
+
+    def test_zero_floor_quantity_still_creates_requested_ceiling(self):
+        self.room.GenQty = 0
+        self.window.chk_ceiling_plan.IsChecked = True
+        self.run_batch()
+        self.assertEqual([name for name, _ in self.transactions],
+                         ['T3Lab: Create Ceiling Plan'])
+        self.assertIn('1 view(s) created.', self.window.status_text.Text)
+
+    def test_all_failed_elevation_directions_rollback_parent_marker(self):
+        self.window.chk_floor_plan.IsChecked = False
+        self.window.chk_elevations.IsChecked = True
+        self.window._create_interior_elevation_view.side_effect = RuntimeError('crop failed')
+        self.run_batch()
+        self.assertEqual(len(self.transactions), 5)
+        self.assertTrue(all(tx.rollbacks == 1 and tx.disposed for _, tx in self.transactions))
+        self.assertIn('0 view(s) created.', self.window.status_text.Text)
+
+    def test_pending_elevation_subtransaction_aborts_parent_and_batch(self):
+        self.window.chk_floor_plan.IsChecked = False
+        self.window.chk_elevations.IsChecked = True
+        self.window._get_selected_rooms.return_value = [self.room, self.room]
+        self.outcomes['sub'] = STATUS.Pending
+        self.run_batch()
+        self.assertEqual(len(self.transactions), 2)
+        self.assertTrue(all(tx.rollbacks == 0 and not tx.disposed for _, tx in self.transactions))
+        self.assertIn('awaiting failure resolution', self.dialog.Show.call_args.args[1])
+
+    def test_later_layout_failure_preserves_prior_committed_sheet_results(self):
+        self.window.chk_layout_on_sheet.IsChecked = True
+        self.window._get_selected_rooms.return_value = [self.room, self.room]
+        sheet = Mock()
+        sheet.Name = 'Kitchen sheet'
+        sheet.get_Parameter.return_value.AsString.return_value = 'EPL-101'
+        self.window._layout_room_sheets = Mock(side_effect=[[sheet], RuntimeError('second room layout')])
+        self.run_batch()
+        self.assertEqual(self.window._generated_sheets, [sheet])
+        groups = [tx for name, tx in self.transactions if name == 'T3Lab: Layout room sheets']
+        self.assertEqual([tx.status for tx in groups], [STATUS.Committed, STATUS.RolledBack])
+        self.assertIn('1 sheet(s) created.', self.window.status_text.Text)
+        self.assertTrue(self.window.btn_open_sheet.IsEnabled)
+
 
 if __name__ == '__main__':
     unittest.main()

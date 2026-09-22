@@ -28,7 +28,7 @@ from System.Windows.Media import BrushConverter, SolidColorBrush
 import System.Windows.Controls as WPFControls
 
 from Autodesk.Revit.DB import (FilteredElementCollector, View, ViewType, Viewport,
-                                 XYZ, BoundingBoxUV, Transaction, ViewSheet)
+                                 XYZ, BoundingBoxUV, Transaction, TransactionStatus, ViewSheet)
 
 # ─── DQT Brand Colors ───────────────────────────────────────────────────────
 def _brush(hex_color):
@@ -658,19 +658,22 @@ class PlaceViewsDialog(Window):
             if confirm != System.Windows.MessageBoxResult.Yes:
                 return
 
-            t = Transaction(self._doc, "DQT - Place Views on Sheets")
+            t = Transaction(self._doc, "T3Lab: Place Views on Sheets")
             t.Start()
             try:
                 success = self._do_place(selected_views, mode, rows, cols)
-                t.Commit()
+                if t.Commit() != TransactionStatus.Committed:
+                    raise RuntimeError("Revit did not commit the viewport placement")
+                expected = len(selected_views) * (len(self._sheets) if mode == 'all_on_each' else 1)
                 MessageBox.Show(
-                    "Successfully placed {} viewport(s)!".format(success),
+                    "Placed {} of {} requested viewport(s).".format(success, expected),
                     "Done", MessageBoxButton.OK, MessageBoxImage.Information)
                 self._populate_sheet_grid()
 
             except Exception as ex:
-                t.RollBack()
-                raise ex
+                if t.GetStatus() == TransactionStatus.Started:
+                    t.RollBack()
+                raise
 
         except Exception as ex:
             MessageBox.Show("Error: {}".format(str(ex)), "Error",
@@ -682,73 +685,8 @@ class PlaceViewsDialog(Window):
                 pass
 
     def _do_place(self, views, mode, rows, cols):
-        """Core placement logic. Returns count of placed viewports."""
-        count = 0
-
-        # Margin from sheet border (feet)
-        margin = 0.5
-
-        if mode == 'one_per_sheet':
-            for i, sheet in enumerate(self._sheets):
-                if i < len(views):
-                    vp = self._place_single(sheet, views[i], margin)
-                    if vp:
-                        count += 1
-
-        elif mode == 'all_on_each':
-            for sheet in self._sheets:
-                placed = self._auto_arrange(sheet, views, rows, cols, margin)
-                count += placed
-
-        else:  # distribute
-            sheet_count = len(self._sheets)
-            for i, view in enumerate(views):
-                sheet = self._sheets[i % sheet_count]
-                vp = self._place_single(sheet, view, margin)
-                if vp:
-                    count += 1
-
-        return count
-
-    def _place_single(self, sheet, view, margin=0.5):
-        """Place one view on a sheet at centre. Returns Viewport or None."""
-        try:
-            if not Viewport.CanAddViewToSheet(self._doc, sheet.Id, view.Id):
-                return None
-            # Place at sheet centre (title block usually 841x594mm ~ 2.76x1.95 ft)
-            centre = XYZ(1.38, 0.97, 0)
-            vp = Viewport.Create(self._doc, sheet.Id, view.Id, centre)
-            return vp
-        except:
-            return None
-
-    def _auto_arrange(self, sheet, views, rows, cols, margin=0.5):
-        """Place views in a rows×cols grid on the sheet."""
-        count = 0
-        sheet_w = 2.76   # feet (≈841mm)
-        sheet_h = 1.95   # feet (≈594mm)
-
-        cell_w = (sheet_w - 2 * margin) / cols
-        cell_h = (sheet_h - 2 * margin) / rows
-
-        idx = 0
-        for r in range(rows):
-            for c in range(cols):
-                if idx >= len(views):
-                    break
-                view = views[idx]
-                idx += 1
-                if not Viewport.CanAddViewToSheet(self._doc, sheet.Id, view.Id):
-                    continue
-                x = margin + c * cell_w + cell_w / 2.0
-                y = sheet_h - margin - r * cell_h - cell_h / 2.0
-                pt = XYZ(x, y, 0)
-                try:
-                    Viewport.Create(self._doc, sheet.Id, view.Id, pt)
-                    count += 1
-                except:
-                    pass
-        return count
+        """Use the same placement geometry and capacity checks as the service."""
+        return len(self._svc.batch_place_views(self._sheets, views, mode, rows, cols))
 
 
 # ── Helper data class ─────────────────────────────────────────────────────────

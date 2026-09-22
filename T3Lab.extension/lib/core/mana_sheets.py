@@ -9,10 +9,20 @@ PARAMETERS = {
 }
 
 
+def sheet_values(element):
+    """Read language-independent values without display placeholders."""
+    values = {"sheet_number": element.SheetNumber, "sheet_name": element.Name}
+    for field, parameter_id in PARAMETERS.items():
+        parameter = element.get_Parameter(getattr(DB.BuiltInParameter, parameter_id))
+        values[field] = (parameter.AsString() or "") if parameter is not None else ""
+    return values
+
+
 def _write(doc, label, action):
     transaction = DB.Transaction(doc, "T3Lab: " + label)
     try:
-        transaction.Start()
+        if transaction.Start() != DB.TransactionStatus.Started:
+            raise RuntimeError("Revit did not start " + label)
         options = transaction.GetFailureHandlingOptions()
         options.SetForcedModalHandling(True)
         transaction.SetFailureHandlingOptions(options)
@@ -47,10 +57,10 @@ def update_sheet(doc, element, changes):
     _write(doc, "Update sheet", apply)
 
 
-def renumber_sheets(doc, pairs, progress=None):
-    """Atomic two-pass numbering permits swaps and rolls back on Stop."""
+def validate_renumber(doc, pairs):
+    """Return normalized pairs or reject an invalid plan without writing."""
     pairs = list(pairs)
-    targets = [str(number).strip() for _, number in pairs]
+    targets = ["" if number is None else str(number).strip() for _, number in pairs]
     if any(not number for number in targets):
         raise ValueError("Sheet numbers cannot be empty")
     if len({number.casefold() for number in targets}) != len(targets):
@@ -63,14 +73,24 @@ def renumber_sheets(doc, pairs, progress=None):
               if sheet.Id not in ids}
     if any(number.casefold() in others for number in targets):
         raise ValueError("A preview number belongs to an unselected sheet")
+    return [(sheet, number) for (sheet, _), number in zip(pairs, targets)]
+
+
+def renumber_sheets(doc, pairs, progress=None):
+    """Atomic two-pass numbering permits swaps and rolls back on Stop."""
+    pairs = validate_renumber(doc, pairs)
+    if not pairs:
+        return 0
     def apply():
         for index, (sheet, _) in enumerate(pairs):
             if progress is not None and not progress(index, len(pairs) * 2):
                 raise RuntimeError("Renumber cancelled; no sheet numbers changed")
             sheet.SheetNumber = "T3Lab-" + uuid.uuid4().hex
-        for index, ((sheet, _), number) in enumerate(zip(pairs, targets)):
+        for index, (sheet, number) in enumerate(pairs):
             if progress is not None and not progress(len(pairs) + index, len(pairs) * 2):
                 raise RuntimeError("Renumber cancelled; no sheet numbers changed")
             sheet.SheetNumber = number
+        if progress is not None and not progress(len(pairs) * 2, len(pairs) * 2):
+            raise RuntimeError("Renumber cancelled; no sheet numbers changed")
     _write(doc, "Renumber sheets", apply)
     return len(pairs)
