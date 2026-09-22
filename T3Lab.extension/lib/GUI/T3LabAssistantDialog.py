@@ -14,21 +14,8 @@ import io
 import os
 import sys
 # ─── CPython 3 & lib bootstrap ────────────────────────────────────────────────
-for _env in ('APPDATA', 'PROGRAMDATA'):
-    _base = os.environ.get(_env, '')
-    if _base:
-        for _clone in ('pyRevit-Master', 'pyRevit'):
-            _ceng = os.path.join(_base, _clone, 'bin', 'cengines', 'CPY3123')
-            if os.path.isdir(_ceng):
-                for _d in (_ceng, os.path.join(_ceng, 'Lib')):
-                    if hasattr(os, 'add_dll_directory'):
-                        try:
-                            os.add_dll_directory(_d)
-                        except Exception:
-                            pass
-                for _p in (_ceng, os.path.join(_ceng, 'Lib'), os.path.join(_ceng, 'python312.zip')):
-                    if os.path.exists(_p) and _p not in sys.path:
-                        sys.path.insert(0, _p)
+# CPython engine paths are injected by lib/_cpython_bootstrap.py below;
+# it discovers the engine whatever the pyRevit clone is called.
 
 _cur = os.path.dirname(os.path.abspath(__file__))
 while _cur and not os.path.exists(os.path.join(_cur, 'lib')):

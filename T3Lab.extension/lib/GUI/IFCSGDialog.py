@@ -190,8 +190,8 @@ def _get_group_type_id(pg_key):
 
 def read_excel_headers(filepath):
     """Read sheet names and column headers from Excel without full parse."""
-    clr.AddReference("Microsoft.Office.Interop.Excel")
-    import Microsoft.Office.Interop.Excel as Excel
+    from Services.office_interop import require_excel
+    Excel = require_excel()   # clear message when Excel is not installed
 
     app = Excel.ApplicationClass()
     app.Visible = False
@@ -319,8 +319,8 @@ def load_mapping_with_dialog(filepath):
     if not col_result.get("ok"):
         return None
 
-    clr.AddReference("Microsoft.Office.Interop.Excel")
-    import Microsoft.Office.Interop.Excel as Excel
+    from Services.office_interop import require_excel
+    Excel = require_excel()   # clear message when Excel is not installed
 
     app = Excel.ApplicationClass()
     app.Visible = False
@@ -655,8 +655,8 @@ class ParamCheckConfig:
         config.name = os.path.splitext(os.path.basename(filepath))[0]
         
         try:
-            clr.AddReference('Microsoft.Office.Interop.Excel')
-            from Microsoft.Office.Interop import Excel as ExcelInterop
+            from Services.office_interop import require_excel
+            ExcelInterop = require_excel()
             
             excel_app = ExcelInterop.ApplicationClass()
             excel_app.Visible = False
@@ -871,9 +871,9 @@ class ExcelReporter:
         return r + (g * 256) + (b * 256 * 256)
 
     def generate(self, config, results, filepath):
-        clr.AddReference('Microsoft.Office.Interop.Excel')
-        from Microsoft.Office.Interop import Excel as ExcelInterop
-        
+        from Services.office_interop import require_excel
+        ExcelInterop = require_excel()
+
         excel_app = ExcelInterop.ApplicationClass()
         excel_app.Visible = False
         excel_app.DisplayAlerts = False

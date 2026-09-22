@@ -343,7 +343,8 @@ def _server_entry(python, bridge, port):
     return {
         'type': 'stdio',
         'command': python,
-        'args': [bridge, str(port)],
+        'args': ['-E', bridge, str(port)],
+        'env': {'PYTHONPATH': ''},
     }
 
 

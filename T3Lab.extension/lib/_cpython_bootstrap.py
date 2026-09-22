@@ -3,15 +3,242 @@
 _cpython_bootstrap.py
 =====================
 Bootstraps Python 3 standard library paths and C-extension paths for CPython
-running inside pyRevit. In pyRevit's CPython engine, python312.zip, extracted Lib,
-and the engine root (containing .pyd files like _sqlite3.pyd and DLLs like sqlite3.dll)
-may not be in sys.path / DLL directory, causing 'No module named configparser',
-'No module named csv', or 'No module named _sqlite3'.
-This module locates and prepends all required paths to sys.path and DLL loaders.
+running inside pyRevit.
+
+pyRevit ships its CPython engine as ``<clone>/bin/cengines/CPY<ver>/``, holding
+``python3XX.zip`` (the stdlib), an extracted ``Lib/`` and the C extensions
+(``_sqlite3.pyd`` plus DLLs like ``sqlite3.dll``). Revit's embedded interpreter
+does not reliably put those on ``sys.path``, which surfaces as 'No module named
+configparser' / 'csv' / '_sqlite3' — and to the user as the generic
+"Command Failure for External Command" dialog with no details.
+
+Engine discovery is deliberately clone-agnostic, in order of reliability:
+
+  1. from the running interpreter itself — ``sys.path`` / ``sys.prefix`` already
+     point inside the clone, whatever it is named and wherever it was installed;
+  2. from pyRevit's own environment variables;
+  3. by scanning the conventional install roots for ANY folder whose name starts
+     with "pyrevit".
+
+Earlier versions hardcoded the clone names ``pyRevit-Master``/``pyRevit`` and
+the engine folder ``CPY3123``. That matched exactly one machine layout — the
+developer's — so a colleague with a differently named clone, another install
+root, or a pyRevit build shipping a different engine (4.8.x ships CPY387) got
+no stdlib injected at all and every tool died on its first import.
+
+An engine is injected only when its Python version equals the running
+interpreter's: mixing a 3.12 stdlib zip into a 3.8 engine (or a host 3.14 test
+runner) raises "bad magic number", because .pyc magic differs per minor version.
 """
 
 import os
 import sys
+
+
+# Probed by verify_stdlib(); these are the imports that actually broke tools.
+_STDLIB_PROBES = ('configparser', 'csv', 'json', 'email')
+
+# Filled in by init_cpython_paths(), read by describe_environment() and
+# dev/doctor.py. A tool dying on ModuleNotFoundError can be diagnosed from this
+# without digging through a Revit journal.
+ENGINE_DIAGNOSIS = {
+    'python': '%d.%d.%d' % sys.version_info[:3],
+    'clone_roots': [],
+    'engines_found': [],
+    'engines_used': [],
+    'stdlib_missing': [],
+    'status': 'not attempted',
+}
+
+_CLONE_ROOTS_CACHE = None
+_ENGINES_CACHE = None
+
+
+def _norm(p):
+    """Windows-normalised path with no trailing separator. Never raises."""
+    try:
+        return (p or '').replace('/', '\\').rstrip('\\')
+    except Exception:
+        return ''
+
+
+def _clone_root_from_path(entry):
+    """``<clone>\\bin\\cengines\\CPY3123\\Lib`` -> ``<clone>``.
+
+    Returns '' when the path is not inside a pyRevit clone. This is what makes
+    discovery work for a clone with any name in any location: the running
+    engine already carries such a path on sys.path.
+    """
+    norm = _norm(entry)
+    low = norm.lower()
+    for marker in ('\\bin\\cengines\\', '\\bin\\engines\\', '\\pyrevitlib'):
+        i = low.find(marker)
+        if i > 0:
+            return norm[:i]
+    return ''
+
+
+def _candidate_clone_roots(refresh=False):
+    """Every directory that might be a pyRevit clone, most reliable first."""
+    global _CLONE_ROOTS_CACHE
+    if _CLONE_ROOTS_CACHE is not None and not refresh:
+        return _CLONE_ROOTS_CACHE
+
+    roots = []
+    seen = set()
+
+    def add(path):
+        path = _norm(path)
+        if not path or path.lower() in seen:
+            return
+        try:
+            if not os.path.isdir(path):
+                return
+        except Exception:
+            return
+        seen.add(path.lower())
+        roots.append(path)
+
+    # 1 — the running engine knows where it lives.
+    probes = list(sys.path)
+    for attr in ('prefix', 'base_prefix', 'exec_prefix', 'executable'):
+        probes.append(getattr(sys, attr, ''))
+    for entry in probes:
+        add(_clone_root_from_path(entry))
+
+    # 2 — pyRevit's own environment variables (set by the CLI / installer).
+    for var in ('PYREVIT_CLONE', 'PYREVIT_HOME', 'PYREVIT_BIN'):
+        val = os.environ.get(var, '')
+        if val:
+            add(_clone_root_from_path(val) or val)
+
+    # 3 — conventional install roots, ANY clone folder name.
+    bases = [os.environ.get(v, '') for v in
+             ('APPDATA', 'PROGRAMDATA', 'LOCALAPPDATA',
+              'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432')]
+    bases += ['C:\\Program Files', 'C:\\Program Files (x86)']
+    for base in bases:
+        if not base:
+            continue
+        try:
+            names = os.listdir(base)
+        except Exception:
+            continue
+        for name in names:
+            if name.lower().startswith('pyrevit'):
+                add(os.path.join(base, name))
+
+    _CLONE_ROOTS_CACHE = roots
+    return roots
+
+
+def _engine_version(engine_dir, engine_name):
+    """``(major, minor)`` for a cengines folder, or None.
+
+    The stdlib zip is authoritative (``python312.zip`` -> 3.12); the folder name
+    is the fallback (``CPY3123`` -> 3.12, ``CPY387`` -> 3.8).
+    """
+    try:
+        for fn in os.listdir(engine_dir):
+            low = fn.lower()
+            if low.startswith('python') and low.endswith('.zip'):
+                digits = ''.join(c for c in low[6:-4] if c.isdigit())
+                if len(digits) >= 2:
+                    return (int(digits[0]), int(digits[1:]))
+    except Exception:
+        pass
+    digits = ''.join(c for c in (engine_name or '') if c.isdigit())
+    if len(digits) >= 2:
+        rest = digits[1:]
+        # 'CPY3123' -> 3.12.3 (3 digits left); 'CPY387' -> 3.8.7 (2 digits left)
+        minor = int(rest[:2]) if len(rest) >= 3 else int(rest[0])
+        return (int(digits[0]), minor)
+    return None
+
+
+def find_cpython_engines(refresh=False):
+    """``[(engine_dir, (major, minor))]`` for every CPython engine found."""
+    global _ENGINES_CACHE
+    if _ENGINES_CACHE is not None and not refresh:
+        return _ENGINES_CACHE
+
+    found = []
+    seen = set()
+    for root in _candidate_clone_roots(refresh=refresh):
+        ceng = os.path.join(root, 'bin', 'cengines')
+        try:
+            names = sorted(os.listdir(ceng))
+        except Exception:
+            continue
+        for name in names:
+            if not name.upper().startswith('CPY'):
+                continue
+            d = os.path.join(ceng, name)
+            key = d.lower()
+            if key in seen:
+                continue
+            try:
+                if not os.path.isdir(d):
+                    continue
+            except Exception:
+                continue
+            seen.add(key)
+            ver = _engine_version(d, name)
+            if ver:
+                found.append((d, ver))
+
+    _ENGINES_CACHE = found
+    return found
+
+
+def verify_stdlib():
+    """Return the stdlib modules that still cannot be imported (usually [])."""
+    missing = []
+    for mod in _STDLIB_PROBES:
+        if mod in sys.modules:
+            continue
+        try:
+            __import__(mod)
+        except Exception:
+            missing.append(mod)
+    ENGINE_DIAGNOSIS['stdlib_missing'] = missing
+    return missing
+
+
+def describe_environment():
+    """Human-readable bootstrap report — English, safe to show in a dialog."""
+    d = ENGINE_DIAGNOSIS
+    lines = [
+        'T3Lab CPython bootstrap',
+        '  Interpreter      : Python %s' % d.get('python', '?'),
+        '  Status           : %s' % d.get('status', '?'),
+        '  pyRevit clones   : %s' % (', '.join(d.get('clone_roots') or []) or '(none found)'),
+        '  Engines found    : %s' % (', '.join(d.get('engines_found') or []) or '(none found)'),
+        '  Engines injected : %s' % (', '.join(d.get('engines_used') or []) or '(none)'),
+    ]
+    missing = d.get('stdlib_missing') or []
+    if missing:
+        lines.append('  MISSING stdlib   : %s' % ', '.join(missing))
+        lines.append('  Fix: install or repair the pyRevit CPython engine, then '
+                     'pyRevit > Reload. See INSTALL.md.')
+    return '\n'.join(lines)
+
+
+def _log_diagnosis():
+    """Append the report to %APPDATA%/T3LabAI/bootstrap.log when something is
+    wrong. Silent on a healthy machine, so the log stays a signal."""
+    if not ENGINE_DIAGNOSIS.get('stdlib_missing'):
+        return
+    try:
+        base = os.environ.get('APPDATA', '') or os.path.expanduser('~')
+        d = os.path.join(base, 'T3LabAI')
+        if not os.path.isdir(d):
+            os.makedirs(d)
+        import io as _io
+        with _io.open(os.path.join(d, 'bootstrap.log'), 'a', encoding='utf-8') as f:
+            f.write(describe_environment() + u'\n\n')
+    except Exception:
+        pass
 
 
 def init_cpython_paths():
@@ -19,32 +246,40 @@ def init_cpython_paths():
     sys.dont_write_bytecode = True
     engine_dirs = []
     candidates = []
+    running = sys.version_info[:2]
 
-    # Only inject pyRevit CPY3123 paths if running under Python 3.12 (pyRevit CPython engine).
-    # Injecting Python 3.12 bytecode zip into a different Python version (e.g. host Python 3.14 test runner)
-    # causes "bad magic number in 'json'" because .pyc magic numbers differ across Python minor versions.
-    if sys.version_info[:2] == (3, 12):
-        # APPDATA & PROGRAMDATA paths
-        for env_var in ('APPDATA', 'PROGRAMDATA'):
-            base = os.environ.get(env_var, '')
-            if base:
-                for clone in ('pyRevit-Master', 'pyRevit'):
-                    ceng = os.path.join(base, clone, 'bin', 'cengines', 'CPY3123')
-                    if os.path.isdir(ceng):
-                        engine_dirs.append(ceng)
-                        candidates.append(ceng)                       # .pyd files (_sqlite3.pyd, etc.)
-                        candidates.append(os.path.join(ceng, 'Lib'))  # stdlib (.pyc files: csv, json, configparser)
-                        candidates.append(os.path.join(ceng, 'python312.zip'))
+    all_engines = find_cpython_engines()
+    ENGINE_DIAGNOSIS['clone_roots'] = list(_candidate_clone_roots())
+    ENGINE_DIAGNOSIS['engines_found'] = ['%s (%d.%d)' % (p, v[0], v[1])
+                                         for p, v in all_engines]
 
-        # Program Files paths
-        for pf in (r'C:\Program Files', r'C:\Program Files (x86)'):
-            for clone in ('pyRevit-Master', 'pyRevit'):
-                ceng = os.path.join(pf, clone, 'bin', 'cengines', 'CPY3123')
-                if os.path.isdir(ceng):
-                    engine_dirs.append(ceng)
-                    candidates.append(ceng)
-                    candidates.append(os.path.join(ceng, 'Lib'))
-                    candidates.append(os.path.join(ceng, 'python312.zip'))
+    for eng_dir, ver in all_engines:
+        # Version gate: a 3.12 stdlib zip inside a 3.8 interpreter is worse than
+        # nothing ("bad magic number in 'json'").
+        if ver != running:
+            continue
+        engine_dirs.append(eng_dir)
+        candidates.append(eng_dir)                                   # .pyd / .dll
+        candidates.append(os.path.join(eng_dir, 'Lib'))              # extracted stdlib
+        candidates.append(os.path.join(eng_dir, 'Lib', 'site-packages'))
+        try:
+            for fn in os.listdir(eng_dir):                           # python3XX.zip
+                low = fn.lower()
+                if low.startswith('python') and low.endswith('.zip'):
+                    candidates.append(os.path.join(eng_dir, fn))
+        except Exception:
+            pass
+
+    ENGINE_DIAGNOSIS['engines_used'] = list(engine_dirs)
+    if engine_dirs:
+        ENGINE_DIAGNOSIS['status'] = 'engine matched'
+    elif all_engines:
+        ENGINE_DIAGNOSIS['status'] = (
+            'no engine matches Python %d.%d - pyRevit ships %s'
+            % (running[0], running[1],
+               ', '.join(sorted(set('%d.%d' % v for _, v in all_engines)))))
+    else:
+        ENGINE_DIAGNOSIS['status'] = 'no pyRevit CPython engine found'
 
     # Configure DLL search path for C extensions (e.g. sqlite3.dll, libffi-8.dll, libssl-3.dll)
     for ed in engine_dirs:
@@ -60,7 +295,7 @@ def init_cpython_paths():
             os.environ['PATH'] = ed + os.pathsep + _lib_d + os.pathsep + path_env
 
     # Also make sure this extension's lib directory is in sys.path
-    ext_lib = os.path.dirname(__file__)
+    ext_lib = os.path.dirname(os.path.abspath(__file__))
     if ext_lib not in sys.path:
         sys.path.insert(0, ext_lib)
 
@@ -68,6 +303,9 @@ def init_cpython_paths():
     for c in reversed(candidates):
         if os.path.exists(c) and c not in sys.path:
             sys.path.insert(0, c)
+
+    verify_stdlib()
+    _log_diagnosis()
 
     # Force reload of GUI.WPF_Base if cached, and monkeypatch forms.WPFWindow
     try:
@@ -505,6 +743,10 @@ def install_forms_shim():
     already-imported (cached) modules are fixed.
 
     Only fills genuine gaps: anything the engine already provides is left alone.
+    Newer pyRevit builds also ship `pyrevit/forms/_cpy.py`, whose
+    `ask_for_string`, `pick_file`, `pick_folder`, `SelectFromList`,
+    `CommandSwitchWindow` and `ProgressBar` EXIST but only raise
+    PyRevitCPythonNotSupported when called — those count as gaps too.
     """
     try:
         import pyrevit.forms as _forms
@@ -515,10 +757,11 @@ def install_forms_shim():
 
     def _missing(name):
         try:
-            getattr(_forms, name)
-            return False
+            attr = getattr(_forms, name)
         except Exception:
             return True
+        # A stub from pyRevit's CPython backend is not an implementation.
+        return getattr(attr, '__module__', '') == 'pyrevit.forms._cpy'
 
     for name, impl in (('alert', _t3_alert),
                        ('pick_file', _t3_pick_file),

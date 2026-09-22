@@ -273,12 +273,21 @@ Legacy, frozen. Shared button styles of the retired Lumina system, still embedde
 
 ## Setup & Installation
 
-1. Clone this repository into your pyRevit extensions folder:
+Full procedure, environment checks and a symptom → cause table:
+**[`INSTALL.md`](INSTALL.md)**.
+
+Short version:
+
+1. Clone this repository to a short local path, e.g. `C:\T3Lab`.
+2. Run the installer, which verifies the machine before registering anything:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\Install-T3Lab.ps1
    ```
-   %APPDATA%\pyRevit\Extensions\T3Lab.extension
-   ```
-2. Ensure **pyRevit 4.8+** is installed.
-3. Reload pyRevit — the **T3Lab** tab will appear in the Revit ribbon.
+   It needs **pyRevit with a CPython engine** (`bin\cengines\CPY3*`); it reports
+   FAIL and explains the fix when that is missing. Use `-CheckOnly` to inspect a
+   machine without changing it.
+3. Start Revit, then **pyRevit → Reload** (required once) — the **T3Lab** tab
+   appears in the ribbon.
 4. *(Assistant, optional)* Install [Ollama](https://ollama.com) and pull the
    recommended local model — no API key needed, nothing leaves the machine:
    ```

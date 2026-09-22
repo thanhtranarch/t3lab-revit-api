@@ -1027,8 +1027,8 @@ class RequirementParser(object):
     def from_excel(filepath, column_map):
         """Parse Excel with user-specified column mapping dict."""
         try:
-            clr.AddReference('Microsoft.Office.Interop.Excel')
-            from Microsoft.Office.Interop import Excel as ExcelInterop
+            from Services.office_interop import require_excel
+            ExcelInterop = require_excel()
 
             sheet_name = column_map.get("sheet_name")
             col_param = column_map.get("col_param", 1)
@@ -1372,8 +1372,8 @@ class ExcelColumnMapper(object):
         self._build_ui()
 
     def _read_excel_headers(self, filepath):
-        clr.AddReference('Microsoft.Office.Interop.Excel')
-        from Microsoft.Office.Interop import Excel as ExcelInterop
+        from Services.office_interop import require_excel
+        ExcelInterop = require_excel()
 
         excel_app = ExcelInterop.ApplicationClass()
         excel_app.Visible = False
