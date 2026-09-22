@@ -32,6 +32,16 @@ class BatchOutEventHandler(IExternalEventHandler):
     def add(self, action):
         self._queue.append(action)
 
+    def remove(self, action):
+        """Discard only the request whose Raise failed."""
+        for index in range(len(self._queue) - 1, -1, -1):
+            if self._queue[index] is action:
+                del self._queue[index]
+                break
+
+    def clear(self):
+        self._queue = []
+
     def Execute(self, uiapp):
         try:
             actions = self._queue

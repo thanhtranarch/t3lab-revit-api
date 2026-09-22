@@ -1,27 +1,24 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        mc:Ignorable="d"
-        Title="ManaViews"
-        Width="1280" Height="720" MinWidth="1200" MinHeight="640"
-        WindowStartupLocation="CenterScreen"
+        Title="Metric Detail"
+        Width="820" Height="560"
+        MinWidth="720" MinHeight="460"
+        WindowStartupLocation="CenterOwner"
         WindowStyle="None" AllowsTransparency="False"
-        Background="{DynamicResource T3.Surface}"
-        FontFamily="Segoe UI"
-        FontSize="13"
-        UseLayoutRounding="True"
-        SnapsToDevicePixels="True"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False"
+        Background="{DynamicResource T3.Canvas}"
+        FontFamily="Segoe UI" FontSize="13"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
 
     <WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="48"
-                            ResizeBorderThickness="6"
-                            CornerRadius="0"
-                            GlassFrameThickness="0"
-                            UseAeroCaptionButtons="False"/>
+        <WindowChrome CaptionHeight="48"
+                      ResizeBorderThickness="6"
+                      GlassFrameThickness="0"
+                      CornerRadius="0"
+                      UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -1621,621 +1618,99 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <!-- ═══ Outer Window Border ═══ -->
-    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1.5"
-            CornerRadius="12" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
+    <Border Background="{StaticResource T3.Surface}"
+            BorderBrush="{StaticResource T3.BorderStrong}"
+            BorderThickness="1.5"
+            CornerRadius="12" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title Bar -->
-                <RowDefinition Height="*"/>       <!-- Row 1: Main Content & Sidebar -->
-                <RowDefinition Height="48"/>      <!-- Row 2: Full-width Footer Bar -->
+                <RowDefinition Height="48"/>     <!-- title bar -->
+                <RowDefinition Height="Auto"/>   <!-- what to do -->
+                <RowDefinition Height="*"/>      <!-- element table -->
+                <RowDefinition Height="48"/>     <!-- footer -->
             </Grid.RowDefinitions>
 
-            <!-- ══════════════════ ROW 0: FULL-WIDTH TITLE BAR ══════════════════ -->
+            <!-- ── TITLE BAR ── -->
             <Border Grid.Row="0" Style="{StaticResource T3.TitleBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,0"
-                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                                WindowChrome.IsHitTestVisibleInChrome="True">
                         <Image x:Name="logo_image" Height="28" Margin="0,0,12,0"
                                VerticalAlignment="Center"
                                RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Orientation="Vertical" VerticalAlignment="Center">
-                            <TextBlock Text="View Manager" Style="{StaticResource T3.Title}"/>
-                            <TextBlock Text="Manage project views, view templates and viewports" Style="{StaticResource T3.Subtitle}"/>
+                            <TextBlock x:Name="txt_detail_title" Text="Metric Detail" Style="{StaticResource T3.Title}"/>
+                            <TextBlock x:Name="txt_detail_subtitle" Text="Elements behind this metric" Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                     </StackPanel>
+
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0"
-                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
-                            <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
-                        </Button>
-                        <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize">
-                            <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
-                        </Button>
-                        <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close"
-                                IsCancel="True">
+                                WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Border x:Name="border_detail_status" Background="{StaticResource T3.SurfaceSunken}"
+                                CornerRadius="4" Padding="8,4" Margin="0,0,16,0">
+                            <TextBlock x:Name="txt_detail_status" Text="--" Style="{StaticResource T3.Caption}"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </Border>
+                        <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}"
+                                Click="close_button_clicked" IsCancel="True" ToolTip="Close">
                             <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- ══════════════════ ROW 1: WORKSPACE WITH REFINED SIDEBAR ══════════════════ -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="58"/>    <!-- Col 0: Refined Sidebar Rail -->
-                    <ColumnDefinition Width="*"/>     <!-- Col 1: Main Content Area -->
-                </Grid.ColumnDefinitions>
-
-                <!-- ── Col 0: Left Navigation Icon Rail ── -->
-                <Border Grid.Column="0"
-                        Background="{StaticResource T3.SurfaceSunken}"
-                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                    <Grid Margin="0,12,0,12">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/> <!-- Nav 1: Views List -->
-                            <RowDefinition Height="Auto"/> <!-- Nav 2: View Templates -->
-                            <RowDefinition Height="*"/>    <!-- Spacer -->
-                        </Grid.RowDefinitions>
-
-                        <!-- Nav 1: Views -->
-                        <RadioButton x:Name="nav_views" Grid.Row="0"
-                                     GroupName="ViewNav" IsChecked="True"
-                                     Style="{StaticResource T3.Rail.Tile}"
-                                     ToolTip="Views Inventory"
-                                     HorizontalAlignment="Center" Margin="0,0,0,8">
-                            <Path Data="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"
-                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                  Width="18" Height="18" Stretch="Uniform"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </RadioButton>
-
-                        <!-- Nav 2: Templates -->
-                        <RadioButton x:Name="nav_templates" Grid.Row="1"
-                                     GroupName="ViewNav"
-                                     Style="{StaticResource T3.Rail.Tile}"
-                                     ToolTip="View Templates"
-                                     HorizontalAlignment="Center" Margin="0,0,0,8">
-                            <Path Data="M4 2 h10 l6 6 v14 h-16 z M14 2 v6 h6 M7 12 h10 M7 16 h6"
-                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                  Width="18" Height="18" Stretch="Uniform"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </RadioButton>
-                    </Grid>
-                </Border>
-
-                <!-- ── Col 1: Main View TabControl ── -->
-                <Border Grid.Column="1" Background="{StaticResource T3.Surface}"
-                        BorderThickness="0" ClipToBounds="True">
-                    <TabControl x:Name="tab_control"
-                                Margin="0" Padding="0" Background="Transparent" BorderThickness="0">
-                        <TabControl.ItemContainerStyle>
-                            <Style TargetType="TabItem" BasedOn="{StaticResource T3.TabItem.Hidden}"/>
-                        </TabControl.ItemContainerStyle>
-
-                        <!-- ══════════ TAB 1: VIEWS ══════════ -->
-                        <TabItem x:Name="tab_views_item">
-                            <Grid Margin="0" Background="{StaticResource T3.Surface}">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/> <!-- Metrics Strip -->
-                                    <RowDefinition Height="*"/>    <!-- Filter Panel & DataGrid -->
-                                    <RowDefinition Height="Auto"/> <!-- Bottom Actions Bar -->
-                                </Grid.RowDefinitions>
-
-                                <!-- 1. Metrics Strip: Docked flush at top with 1px bottom border -->
-                                <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                        Padding="0">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="208"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <!-- Col 0: Top-Left Metric Card (Aligned with Filter Panel below) -->
-                                        <Border Grid.Column="0" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                                            <StackPanel Margin="16,12">
-                                                <TextBlock Text="TOTAL VIEWS" Style="{StaticResource T3.Caption}"/>
-                                                <TextBlock x:Name="views_total_text" Text="0" Style="{StaticResource T3.Display}"/>
-                                            </StackPanel>
-                                        </Border>
-
-                                        <!-- Col 1: Remaining Metric Cards (Aligned with DataGrid area) -->
-                                        <Grid Grid.Column="1">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="1"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="1"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <StackPanel Grid.Column="0" Margin="16,12">
-                                                <TextBlock Text="SELECTED" Style="{StaticResource T3.Caption}"
-                                                           Foreground="{StaticResource T3.Success.Text}"/>
-                                                <TextBlock x:Name="views_selected_text" Text="0" Style="{StaticResource T3.Display}"
-                                                           Foreground="{StaticResource T3.Success.Text}"/>
-                                            </StackPanel>
-
-                                            <Border Grid.Column="1" Background="{StaticResource T3.Border}" Margin="0,4"/>
-
-                                            <StackPanel Grid.Column="2" Margin="16,12">
-                                                <TextBlock Text="VIEW TYPES" Style="{StaticResource T3.Caption}"/>
-                                                <TextBlock x:Name="views_types_text" Text="0" Style="{StaticResource T3.Display}"/>
-                                            </StackPanel>
-
-                                            <Border Grid.Column="3" Background="{StaticResource T3.Border}" Margin="0,4"/>
-
-                                            <StackPanel Grid.Column="4" Margin="16,12">
-                                                <TextBlock Text="FILTERS ACTIVE" Style="{StaticResource T3.Caption}"/>
-                                                <TextBlock x:Name="views_filters_text" Text="No" Style="{StaticResource T3.Display}"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Grid>
-                                </Border>
-
-                            <!-- 2. Filters & DataGrid: Docked flush in Row 1 -->
-                            <Grid Grid.Row="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="208"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Left Filters Panel: Docked flush with 1px right border -->
-                                <Border Grid.Column="0" Background="{StaticResource T3.Surface}"
-                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0"
-                                        Padding="0" ClipToBounds="True">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                                  Padding="16,16,12,16">
-                                        <StackPanel>
-                                            <TextBlock Text="SEARCH" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                            <TextBox x:Name="views_search_box" Style="{StaticResource T3.Search}"
-                                                     Tag="Search views..." ToolTip="Search views, then use the column headers to refine filters. Edit cells and click Apply Changes to save amber pending edits." Margin="0,0,0,16"/>
-
-                                            <TextBlock Text="FILTER BY TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                            <ComboBox x:Name="views_type_combo" Style="{StaticResource T3.ComboBox}"
-                                                      ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                                                      SelectedIndex="0" Margin="0,0,0,16">
-                                                <ComboBoxItem Content="All Views"/>
-                                                <ComboBoxItem Content="Floor Plan"/>
-                                                <ComboBoxItem Content="Ceiling Plan"/>
-                                                <ComboBoxItem Content="Section"/>
-                                                <ComboBoxItem Content="Elevation"/>
-                                                <ComboBoxItem Content="3D View"/>
-                                                <ComboBoxItem Content="Detail"/>
-                                            </ComboBox>
-
-                                            <TextBlock Text="QUICK SELECT" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                            <Grid Margin="0,0,0,16">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="8"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Button x:Name="views_select_all_btn" Grid.Column="0" Content="All"
-                                                        Style="{StaticResource T3.Button.Ghost}"/>
-                                                <Button x:Name="views_clear_btn" Grid.Column="2" Content="Clear"
-                                                        Style="{StaticResource T3.Button.Ghost}"/>
-                                            </Grid>
-
-                                            <TextBlock Text="ADDITIONAL FILTERS" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                            <TextBlock Text="HAS TEMPLATE" Style="{StaticResource T3.Caption}" Margin="0,0,0,4"/>
-                                            <ComboBox x:Name="views_template_combo" Style="{StaticResource T3.ComboBox}"
-                                                      ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                                                      SelectedIndex="0" Margin="0,0,0,12">
-                                                <ComboBoxItem Content="All Views"/>
-                                                <ComboBoxItem Content="With Template"/>
-                                                <ComboBoxItem Content="Without Template"/>
-                                            </ComboBox>
-
-                                            <TextBlock Text="ON SHEETS" Style="{StaticResource T3.Caption}" Margin="0,0,0,4"/>
-                                            <ComboBox x:Name="views_sheets_combo" Style="{StaticResource T3.ComboBox}"
-                                                      ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                                                      SelectedIndex="0"/>
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </Border>
-
-                                <!-- Right Views DataGrid: Docked flush, fills 100% -->
-                                <Grid Grid.Column="1">
-                                    <DataGrid x:Name="views_grid" Style="{StaticResource T3.DataGrid}"
-                                              BorderThickness="0"
-                                              AutoGenerateColumns="False" IsReadOnly="False"
-                                              SelectionMode="Extended" CanUserSortColumns="True"
-                                              HorizontalScrollBarVisibility="Disabled"
-                                              EnableRowVirtualization="True">
-                                        <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
-                                                <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_all_views_grid" Style="{StaticResource T3.CheckBox}"
-                                                              Click="select_all_views_grid_clicked"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                              ToolTip="Select all rows"/>
-                                                </DataGridTemplateColumn.Header>
-                                                <DataGridTemplateColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Setter Property="Padding" Value="0"/>
-                                                    </Style>
-                                                </DataGridTemplateColumn.CellStyle>
-                                                <DataGridTemplateColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <CheckBox IsChecked="{Binding is_selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                  Padding="0" Margin="0"/>
-                                                    </DataTemplate>
-                                                </DataGridTemplateColumn.CellTemplate>
-                                            </DataGridTemplateColumn>
-                                            <DataGridTextColumn Header="VIEW NAME" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding name}" Width="*" MinWidth="140"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}">
-                                                <DataGridTextColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding dirty_name}" Value="True">
-                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
-                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </DataGridTextColumn.CellStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="TYPE" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding view_type}" Width="100" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="LEVEL" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding level_name}" Width="90" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridComboBoxColumn x:Name="col_template" Header="VIEW TEMPLATE" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Width="144"
-                                                                    SelectedItemBinding="{Binding view_template}">
-                                                <DataGridComboBoxColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding dirty_view_template}" Value="True">
-                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
-                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </DataGridComboBoxColumn.CellStyle>
-                                            </DataGridComboBoxColumn>
-                                            <DataGridTextColumn Header="SCALE 1:" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding scale}" Width="70" IsReadOnly="False"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}">
-                                                <DataGridTextColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding dirty_scale}" Value="True">
-                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
-                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </DataGridTextColumn.CellStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridComboBoxColumn x:Name="col_detail" Header="DETAIL LEVEL" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Width="100"
-                                                                    SelectedItemBinding="{Binding detail_level}">
-                                                <DataGridComboBoxColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding dirty_detail_level}" Value="True">
-                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
-                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </DataGridComboBoxColumn.CellStyle>
-                                            </DataGridComboBoxColumn>
-                                            <DataGridTextColumn Header="TITLE ON SHEET" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding title_on_sheet}" Width="128" IsReadOnly="False">
-                                                <DataGridTextColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding dirty_title_on_sheet}" Value="True">
-                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
-                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </DataGridTextColumn.CellStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="SHEET NO." HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding sheet_number}" Width="90" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-
-                                    <!-- Empty State -->
-                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1">
-                                        <Grid.Style>
-                                            <Style TargetType="Grid">
-                                                <Setter Property="Margin" Value="{StaticResource T3.Pad.Panel}"/>
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding ElementName=views_grid, Path=HasItems}" Value="False">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Grid.Style>
-                                        <TextBlock x:Name="views_grid_empty" Text="No views match the current filters.&#x0a;Clear the search and reset filters, or refresh after creating views." Style="{StaticResource T3.Empty}"/>
-                                    </Grid>
-                                </Grid>
-                            </Grid>
-
-                            <!-- 3. Bottom Actions Bar: Docked flush at bottom with 1px top border -->
-                            <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                    Padding="16,8">
-                                <Grid>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                                        <Button x:Name="views_refresh_btn" Content="Refresh"
-                                                Style="{StaticResource T3.Button.Ghost}" Margin="0,0,8,0"/>
-                                        <Button x:Name="views_excel_btn" Content="Excel Export/Import"
-                                                Style="{StaticResource T3.Button.Secondary}"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <Button x:Name="views_dup_btn" Content="Duplicate Views"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <Button x:Name="views_del_btn" Content="Delete Views"
-                                                Style="{StaticResource T3.Button.Danger}" Margin="0,0,8,0"/>
-                                        <Button x:Name="views_close_btn" Content="Close"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <Button x:Name="views_rename_btn" Content="Batch Rename"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <Button x:Name="views_apply_btn" Content="Apply Changes"
-                                                Style="{StaticResource T3.Button.Primary}" IsDefault="True"
-                                                IsEnabled="False"
-                                                ToolTip="Write every amber cell to the model"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </TabItem>
-
-                    <!-- ══════════ TAB 2: TEMPLATES ══════════ -->
-                    <TabItem x:Name="tab_templates_item">
-                        <Grid Margin="0" Background="{StaticResource T3.Surface}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- Metrics Strip -->
-                                <RowDefinition Height="*"/>    <!-- Filter Panel & DataGrid -->
-                                <RowDefinition Height="Auto"/> <!-- Bottom Actions Bar -->
-                            </Grid.RowDefinitions>
-
-                            <!-- 1. Metrics Strip: Docked flush at top with 1px bottom border -->
-                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="0">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="208"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- Col 0: Top-Left Metric Card (Aligned with Filter Panel below) -->
-                                    <Border Grid.Column="0" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                                        <StackPanel Margin="16,12">
-                                            <TextBlock Text="TOTAL TEMPLATES" Style="{StaticResource T3.Caption}"/>
-                                            <TextBlock x:Name="tmpl_total_text" Text="0" Style="{StaticResource T3.Display}"/>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- Col 1: Remaining Metric Cards (Aligned with DataGrid area) -->
-                                    <Grid Grid.Column="1">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="1"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="1"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0" Margin="16,12">
-                                            <TextBlock Text="SELECTED" Style="{StaticResource T3.Caption}"
-                                                       Foreground="{StaticResource T3.Success.Text}"/>
-                                            <TextBlock x:Name="tmpl_selected_text" Text="0" Style="{StaticResource T3.Display}"
-                                                       Foreground="{StaticResource T3.Success.Text}"/>
-                                        </StackPanel>
-
-                                        <Border Grid.Column="1" Background="{StaticResource T3.Border}" Margin="0,4"/>
-
-                                        <StackPanel Grid.Column="2" Margin="16,12">
-                                            <TextBlock Text="IN USE" Style="{StaticResource T3.Caption}"/>
-                                            <TextBlock x:Name="tmpl_used_text" Text="0" Style="{StaticResource T3.Display}"/>
-                                        </StackPanel>
-
-                                        <Border Grid.Column="3" Background="{StaticResource T3.Border}" Margin="0,4"/>
-
-                                        <StackPanel Grid.Column="4" Margin="16,12">
-                                            <TextBlock Text="UNUSED" Style="{StaticResource T3.Caption}"
-                                                       Foreground="{StaticResource T3.Warning.Text}"/>
-                                            <TextBlock x:Name="tmpl_unused_text" Text="0" Style="{StaticResource T3.Display}"
-                                                       Foreground="{StaticResource T3.Warning.Text}"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Grid>
-                            </Border>
-
-                            <!-- 2. Filters & DataGrid: Docked flush in Row 1 -->
-                            <Grid Grid.Row="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="208"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Left Filters Panel: Docked flush with 1px right border -->
-                                <Border Grid.Column="0" Background="{StaticResource T3.Surface}"
-                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0"
-                                        Padding="0" ClipToBounds="True">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                                  Padding="16,16,12,16">
-                                        <StackPanel>
-                                            <TextBlock Text="SEARCH TEMPLATES" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                            <TextBox x:Name="tmpl_search_box" Style="{StaticResource T3.Search}"
-                                                     Tag="Search templates..." Margin="0,0,0,16"/>
-
-                                            <TextBlock Text="FILTER BY USAGE" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                            <ComboBox x:Name="tmpl_usage_combo" Style="{StaticResource T3.ComboBox}"
-                                                      ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                                                      SelectedIndex="0" Margin="0,0,0,16">
-                                                <ComboBoxItem Content="All Templates"/>
-                                                <ComboBoxItem Content="In Use Only"/>
-                                                <ComboBoxItem Content="Unused Only"/>
-                                            </ComboBox>
-
-                                            <TextBlock Text="FILTER BY VIEW TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                            <ComboBox x:Name="tmpl_type_combo" Style="{StaticResource T3.ComboBox}"
-                                                      ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                                                      SelectedIndex="0" Margin="0,0,0,16">
-                                                <ComboBoxItem Content="All View Types"/>
-                                            </ComboBox>
-
-                                            <TextBlock Text="QUICK SELECT" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="8"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Button x:Name="tmpl_select_all_btn" Grid.Column="0" Content="All"
-                                                        Style="{StaticResource T3.Button.Ghost}"/>
-                                                <Button x:Name="tmpl_clear_btn" Grid.Column="2" Content="Clear"
-                                                        Style="{StaticResource T3.Button.Ghost}"/>
-                                            </Grid>
-                                            <Button x:Name="tmpl_select_unused_btn" Content="Select Unused"
-                                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,0,16"/>
-
-                                            <TextBlock Text="PREVIEW FILTER" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                            <CheckBox x:Name="tmpl_preview_unused_chk" Content="Unused templates only"
-                                                      Style="{StaticResource T3.CheckBox}" Margin="0,0,0,8"/>
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </Border>
-
-                                <!-- Right Templates DataGrid: Docked flush, fills 100% -->
-                                <Grid Grid.Column="1">
-                                    <DataGrid x:Name="tmpl_grid" Style="{StaticResource T3.DataGrid}"
-                                              BorderThickness="0"
-                                              AutoGenerateColumns="False" IsReadOnly="False"
-                                              SelectionMode="Extended" CanUserSortColumns="True"
-                                              HorizontalScrollBarVisibility="Disabled"
-                                              EnableRowVirtualization="True">
-                                        <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
-                                                <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_all_tmpl_grid" Style="{StaticResource T3.CheckBox}"
-                                                              Click="select_all_tmpl_grid_clicked"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                              ToolTip="Select all rows"/>
-                                                </DataGridTemplateColumn.Header>
-                                                <DataGridTemplateColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <CheckBox IsChecked="{Binding is_selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </DataTemplate>
-                                                </DataGridTemplateColumn.CellTemplate>
-                                            </DataGridTemplateColumn>
-                                            <DataGridTextColumn Header="TEMPLATE NAME" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding name}" Width="*" MinWidth="140"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}">
-                                                <DataGridTextColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding dirty_name}" Value="True">
-                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
-                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
-                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </DataGridTextColumn.CellStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="VIEW TYPE" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding view_type}" Width="130" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="SCALE 1:" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding scale}" Width="80" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                            <DataGridTextColumn Header="USAGE" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding usage_count}" Width="70" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                            <DataGridTextColumn Header="USAGE %" HeaderStyle="{StaticResource T3.DataGridColumnHeader.Filter}"
-Binding="{Binding usage_percentage}" Width="80" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                            <DataGridTextColumn Header="ID" Binding="{Binding id}" Width="80" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-
-                                    <!-- Empty State -->
-                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1">
-                                        <Grid.Style>
-                                            <Style TargetType="Grid">
-                                                <Setter Property="Margin" Value="{StaticResource T3.Pad.Panel}"/>
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding ElementName=tmpl_grid, Path=HasItems}" Value="False">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Grid.Style>
-                                        <TextBlock x:Name="tmpl_grid_empty" Text="No view templates match the current filters.&#x0a;Clear the search and reset filters, or create a view template in Revit." Style="{StaticResource T3.Empty}"/>
-                                    </Grid>
-                                </Grid>
-                            </Grid>
-
-                            <!-- 3. Bottom Actions Bar: Docked flush at bottom with 1px top border -->
-                            <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                    Padding="16,8">
-                                <Grid>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                                        <Button x:Name="tmpl_refresh_btn" Content="Refresh"
-                                                Style="{StaticResource T3.Button.Ghost}"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <Button x:Name="tmpl_rename_btn" Content="Rename"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <Button x:Name="tmpl_batch_btn" Content="Batch Rename"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <Button x:Name="tmpl_dup_btn" Content="Duplicate Templates"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <Button x:Name="tmpl_del_btn" Content="Delete Unused"
-                                                Style="{StaticResource T3.Button.Danger}" Margin="0,0,8,0"/>
-                                        <Button x:Name="tmpl_close_btn" Content="Close"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <!-- Secondary, not Primary: the window already carries its one
-                                             T3.Button.Primary on the Views tab footer. -->
-                                        <Button x:Name="tmpl_apply_btn" Content="Apply Changes"
-                                                Style="{StaticResource T3.Button.Secondary}"
-                                                IsEnabled="False"
-                                                ToolTip="Write every amber cell to the model"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </TabItem>
-                </TabControl>
+            <!-- ── WHAT TO DO ── -->
+            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
+                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                    Padding="16,12">
+                <StackPanel>
+                    <TextBlock Text="RECOMMENDED ACTION" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="txt_detail_recommendation" Style="{StaticResource T3.Body}"
+                               TextWrapping="Wrap"/>
+                    <TextBlock x:Name="txt_detail_thresholds" Style="{StaticResource T3.Caption}"
+                               Foreground="{StaticResource T3.TextMuted}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                </StackPanel>
             </Border>
-        </Grid>
 
-            <!-- ══════════════════ ROW 2: FULL-WIDTH FOOTER BAR ══════════════════ -->
-            <Border Grid.Row="2" Style="{StaticResource T3.FooterBar}">
+            <!-- ── ELEMENT TABLE ── -->
+            <Grid Grid.Row="2">
+                <DataGrid x:Name="dg_detail_elements"
+                          Style="{StaticResource T3.DataGrid}"
+                          BorderThickness="0"
+                          EnableRowVirtualization="True"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          SelectionMode="Extended">
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Binding="{Binding is_selected}" Width="92">
+                            <DataGridCheckBoxColumn.Header>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <CheckBox x:Name="chk_all_dg_detail_elements" Style="{StaticResource T3.CheckBox}"
+                                              Click="select_all_dg_detail_elements_clicked"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              ToolTip="Select all rows"/>
+                                    <TextBlock Text="PICK" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataGridCheckBoxColumn.Header>
+                        </DataGridCheckBoxColumn>
+                        <DataGridTextColumn Header="ID" Binding="{Binding id}" Width="110" IsReadOnly="True"
+                                            ElementStyle="{StaticResource T3.Cell.Number}"/>
+                        <DataGridTextColumn Header="CATEGORY" Binding="{Binding category}" Width="200" IsReadOnly="True"
+                                            ElementStyle="{StaticResource T3.Body.Secondary}"/>
+                        <DataGridTextColumn Header="NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <TextBlock x:Name="empty_detail_elements"
+                           Text="This metric has no elements to list."
+                           Style="{StaticResource T3.Empty}"/>
+            </Grid>
+
+            <!-- ── FOOTER ── -->
+            <Border Grid.Row="3" Style="{StaticResource T3.FooterBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -2244,40 +1719,20 @@ Binding="{Binding usage_percentage}" Width="80" IsReadOnly="True"
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource T3.Copyright}"/>
-                        <Border Width="1" Height="16" Margin="12,0"
-                                Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
-                        <Ellipse Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.Success.Accent}"/>
-                        <TextBlock x:Name="txt_status_bar" Text="Ready"
-                                   Style="{StaticResource T3.Body.Secondary}"/>
+                        <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="12,0"/>
+                        <TextBlock x:Name="status_text" Text="Ready" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- Progress panel: bar + Pause + Stop (ProgressPauseMixin) -->
-                    <Grid x:Name="mv_progress_panel" Grid.Column="1" Visibility="Collapsed" VerticalAlignment="Center">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="160"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <ProgressBar x:Name="mv_pb" Grid.Column="0" Style="{StaticResource T3.ProgressBar}"
-                                     Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center"/>
-                        <Button x:Name="mv_btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="8,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="mv_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                <TextBlock x:Name="mv_btn_pause_label" Text="Pause" Style="{StaticResource T3.Caption}"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="mv_btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}"
-                                Height="28" Padding="8,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                <TextBlock Text="Stop" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </Grid>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="btn_detail_check_all" Style="{StaticResource T3.Button.Secondary}"
+                                Content="Select All" Height="28" Margin="0,0,8,0"/>
+                        <Button x:Name="btn_detail_uncheck_all" Style="{StaticResource T3.Button.Secondary}"
+                                Content="Deselect All" Height="28" Margin="0,0,8,0"/>
+                        <Button x:Name="btn_detail_export" Style="{StaticResource T3.Button.Secondary}"
+                                Content="Export CSV" Height="28" Margin="0,0,8,0" Padding="12,0"/>
+                        <Button x:Name="btn_detail_select" Style="{StaticResource T3.Button.Primary}"
+                                IsDefault="True" Content="Select in Model" Height="28" Padding="16,0"/>
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

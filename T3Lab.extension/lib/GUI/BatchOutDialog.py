@@ -1056,6 +1056,8 @@ class ExportManagerWindow(T3WPFWindow):
         stale handler/WPF proxy is destroyed mid-teardown — the 0xc0000005
         'Invalid WPFWndProxy' exit crash (journal.0090, 2026-07-15).
         """
+        if getattr(self, '_api_handler', None) is not None:
+            self._api_handler.clear()
         try:
             if self._api_event is not None:
                 self._api_event.Dispose()
@@ -1076,12 +1078,27 @@ class ExportManagerWindow(T3WPFWindow):
         """
         if self.modeless:
             if self._api_event is None:
-                return  # window already closed and event disposed
+                self.status_text.Text = "Revit connection is closed. Reopen BatchOut."
+                return False
             self._api_handler.add(action)
-            self._api_event.Raise()
+            try:
+                outcome = str(self._api_event.Raise())
+                if outcome not in ('Accepted', 'Pending'):
+                    raise RuntimeError("Revit rejected the request: " + outcome)
+            except Exception as ex:
+                self._api_handler.remove(action)
+                self.status_text.Text = "Could not queue the action. Try again when Revit is ready."
+                logger.error("BatchOut could not queue action: {}".format(ex))
+                return False
         else:
-            self.Dispatcher.BeginInvoke(DispatcherPriority.Background,
-                                        Action(action))
+            try:
+                self.Dispatcher.BeginInvoke(DispatcherPriority.Background,
+                                            Action(action))
+            except Exception as ex:
+                self.status_text.Text = "Could not queue the action. Reopen BatchOut and retry."
+                logger.error("BatchOut dispatcher failed: {}".format(ex))
+                return False
+        return True
 
     def get_current_settings_as_profile(self):
         """Capture current UI settings as a profile."""
@@ -2853,14 +2870,16 @@ class ExportManagerWindow(T3WPFWindow):
             items = self.filtered_sheets if self.selection_mode == "sheets" else self.filtered_views
             total_count = len(items)
             selected_count = sum(1 for s in items if s.IsSelected)
+            all_items = self.all_sheets if self.selection_mode == "sheets" else self.all_views
+            total_selected = sum(1 for item in all_items if item.IsSelected)
+            hidden_selected = total_selected - selected_count
 
             if hasattr(self, 'selection_count_text'):
-                if self.selection_mode == "sheets":
-                    self.selection_count_text.Text = "{} sheets and 0 views selected. Total: {}".format(
-                        selected_count, total_count)
-                else:
-                    self.selection_count_text.Text = "0 sheets and {} views selected. Total: {}".format(
-                        selected_count, total_count)
+                label = "{} {} selected | {} shown".format(
+                    total_selected, self.selection_mode, total_count)
+                if hidden_selected:
+                    label += " | {} selected hidden by filters".format(hidden_selected)
+                self.selection_count_text.Text = label
 
             # Sync header checkbox (True = all, False = none, None = indeterminate)
             if hasattr(self, 'header_checkbox') and self.header_checkbox:
@@ -3801,7 +3820,9 @@ class ExportManagerWindow(T3WPFWindow):
             # Modeless window: export must run inside API context. If Revit is
             # busy (user mid-command), the event fires once Revit is idle.
             self.status_text.Text = "Export queued — waiting for Revit..."
-            self._run_in_api_context(self.start_export)
+            if not self._run_in_api_context(self.start_export):
+                self._export_running = False
+                self.IsEnabled = True
 
     def build_export_preview(self):
         """Build the export preview list."""
@@ -4119,6 +4140,13 @@ class ExportManagerWindow(T3WPFWindow):
         """Start the export process."""
         total_exported = 0
         try:
+            if not any(getattr(self, name).IsChecked for name in (
+                    'export_pdf', 'export_dwg', 'export_dwf', 'export_dgn',
+                    'export_nwd', 'export_ifc', 'export_img')):
+                self.status_text.Text = "Choose at least one export format"
+                forms.alert("Choose at least one format in Settings before exporting.",
+                            title="No Export Format Selected")
+                return
             self._ensure_titleblock_cache()
 
             # Get selected items based on mode
@@ -4160,14 +4188,9 @@ class ExportManagerWindow(T3WPFWindow):
             self.back_button.IsEnabled = False
             self.status_text.Text = "Exporting..."
 
-            # The Queue rows carry each item's status column, and _overall_total
-            # is read from them. Rebuild if they are missing (Queue tab never
-            # opened) so no item exports without a visible row.
-            if not self.export_items:
-                try:
-                    self.build_export_preview()
-                except Exception as preview_ex:
-                    logger.debug("Could not build export preview: {}".format(preview_ex))
+            # Rebuild for every run: a previous run leaves completed statuses,
+            # and selection or formats may have changed since the last preview.
+            self.build_export_preview()
 
             # Export to each format — overall progress tracked per-sheet via _overall_counter
             total_exported = 0

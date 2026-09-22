@@ -1890,10 +1890,20 @@
                             </Grid.RowDefinitions>
 
                             <Grid Grid.Row="0">
-                                <TextBlock x:Name="sheets_empty_state"
-                                           Style="{StaticResource T3.Empty}"
-                                           Visibility="Collapsed"
-                                           Text="No sheets match the current filter.&#x0a;Clear the search box, or pick a different Sheet Set above."/>
+                                <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Margin" Value="{StaticResource T3.Pad.Panel}"/>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=sheets_listview, Path=HasItems}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="sheets_empty_state" Text="No sheets or views match the current filters.&#x0a;Clear the search, choose All Sheets/Views, or click Refresh." Style="{StaticResource T3.Empty}"/>
+                                    </Grid>
 
                                 <ListView VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -1959,7 +1969,7 @@
                                             </GridViewColumn>
                                             <GridViewColumn x:Name="col_custom_filename" Width="280">
                                                 <GridViewColumn.Header>
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <WrapPanel VerticalAlignment="Center" MaxWidth="{Binding ElementName=col_custom_filename, Path=Width}">
                                                         <TextBlock Text="CUSTOM FILENAME" Style="{StaticResource T3.Caption}"
                                                                    FontWeight="SemiBold" VerticalAlignment="Center"/>
                                                         <Button x:Name="btn_edit_filename"
@@ -1993,7 +2003,7 @@
                                                                 ToolTip="Restore previous custom filenames before AI naming QA"
                                                                 Visibility="Collapsed"
                                                                 Margin="8,0,0,0"/>
-                                                    </StackPanel>
+                                                    </WrapPanel>
                                                 </GridViewColumn.Header>
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate>
@@ -2473,6 +2483,7 @@
                                 <TextBlock Grid.Column="0" Text="Output Folder:" VerticalAlignment="Center"
                                            FontWeight="Medium" FontSize="13"/>
                                 <TextBox x:Name="output_folder" Grid.Column="1" Height="28"
+                                         ToolTip="Choose the destination folder for exported files."
                                          Style="{StaticResource T3.TextBox}" Margin="4,0"/>
                                 <Button Grid.Column="2" Content="Browse" Height="28" Padding="12,0" FontSize="13"
                                         Style="{StaticResource T3.Button.Secondary}" Click="browse_output_folder"/>
@@ -2514,7 +2525,8 @@
                         <TextBlock Grid.Row="0" Text="Export Queue" Style="{StaticResource T3.Label}"/>
 
                         <Border Grid.Row="1" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True" Margin="0,8,0,0">
-                            <ListView VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                            <Grid>
+<ListView VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                       ScrollViewer.VerticalScrollBarVisibility="Auto"
                                       x:Name="export_preview_list"
@@ -2550,7 +2562,7 @@
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="ORIENTATION" Width="90">
+                                        <GridViewColumn Header="ORIENTATION" Width="110">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding Orientation}" Style="{StaticResource T3.Cell.Muted}"/>
@@ -2584,6 +2596,21 @@
                                     </GridView>
                                 </ListView.View>
                             </ListView>
+<Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Margin" Value="{StaticResource T3.Pad.Panel}"/>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=export_preview_list, Path=HasItems}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="export_queue_empty" Text="The export queue is empty.&#x0a;Go back to Selection, select sheets or views, then choose an export format." Style="{StaticResource T3.Empty}"/>
+                                    </Grid>
+                            </Grid>
                         </Border>
 
                         <StackPanel Grid.Row="2" Margin="0,8,0,0">

@@ -1691,9 +1691,6 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -1710,21 +1707,8 @@
                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </ToggleButton>
 
-                    <!-- 2. Compliance Checker -->
-                    <ToggleButton x:Name="btn_tab_compliance" Grid.Row="1"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  Click="on_sidebar_clicked"
-                                  ToolTip="Compliance Checker">
-                        <Path Data="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M9 12l2 2 4-4"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- 3. Warning Manager -->
-                    <ToggleButton x:Name="btn_tab_warning" Grid.Row="2"
+                    <!-- 2. Warning Manager -->
+                    <ToggleButton x:Name="btn_tab_warning" Grid.Row="1"
                                   Style="{StaticResource T3.Rail.Tile}"
                                   Margin="0,0,0,8"
                                   Click="on_sidebar_clicked"
@@ -1736,12 +1720,12 @@
                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </ToggleButton>
 
-                    <!-- 4. Model Cleanup -->
-                    <ToggleButton x:Name="btn_tab_cleanup" Grid.Row="3"
+                    <!-- 3. Smart Purge -->
+                    <ToggleButton x:Name="btn_tab_purge" Grid.Row="2"
                                   Style="{StaticResource T3.Rail.Tile}"
                                   Margin="0,0,0,8"
                                   Click="on_sidebar_clicked"
-                                  ToolTip="Model Cleanup">
+                                  ToolTip="Smart Purge">
                         <Path Data="M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M10 11v6 M14 11v6"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                               StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
@@ -1749,18 +1733,6 @@
                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </ToggleButton>
 
-                    <!-- 5. Special Audits -->
-                    <ToggleButton x:Name="btn_tab_elements" Grid.Row="4"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  Click="on_sidebar_clicked"
-                                  ToolTip="Special Audits">
-                        <Path Data="M12 2L2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
                 </Grid>
             </Border>
 
@@ -1851,16 +1823,42 @@
                                         <ListBox x:Name="lst_health_recommendations" Grid.Row="1"
                                                  Style="{StaticResource T3.ListBox}"
                                                  BorderThickness="0" Background="Transparent"
-                                                 MaxHeight="120">
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                 HorizontalContentAlignment="Stretch">
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                                                        <Ellipse Fill="{Binding bullet_brush}" Width="6" Height="6" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                        <TextBlock Text="{Binding text}" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"/>
-                                                    </StackPanel>
+                                                    <Grid Margin="0,4">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="8"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Background="{Binding bg_brush}" CornerRadius="4"
+                                                                Padding="8,4" VerticalAlignment="Top" MinWidth="72">
+                                                            <TextBlock Text="{Binding status}" Foreground="{Binding fg_brush}"
+                                                                       Style="{StaticResource T3.Caption}" FontWeight="SemiBold"
+                                                                       HorizontalAlignment="Center"/>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Text="{Binding headline}" Style="{StaticResource T3.BodyStrong}"
+                                                                       TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding recommendation}" Style="{StaticResource T3.Caption}"
+                                                                       Foreground="{StaticResource T3.TextMuted}"
+                                                                       TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="3" Content="Detail…" Height="24" Padding="8,0"
+                                                                Margin="8,0,0,0" VerticalAlignment="Top"
+                                                                Visibility="{Binding select_visibility}"
+                                                                Style="{StaticResource T3.Button.Secondary}" FontSize="11"
+                                                                Click="on_recommendation_detail"/>
+                                                    </Grid>
                                                 </DataTemplate>
                                             </ListBox.ItemTemplate>
                                         </ListBox>
+                                        <TextBlock x:Name="empty_health_recommendations" Grid.Row="1"
+                                                   Text="Nothing needs attention."
+                                                   Style="{StaticResource T3.Empty}"/>
                                     </Grid>
                                 </Grid>
                             </Border>
@@ -1891,7 +1889,6 @@
 
                             <!-- Row 2: Metrics Table -->
                             <Grid Grid.Row="2">
-                                <TextBlock Text="No metrics available." Style="{StaticResource T3.Empty}" Visibility="Collapsed"/>
                                 <DataGrid x:Name="dg_health_metrics"
                                           Style="{StaticResource T3.DataGrid}"
                                           BorderThickness="0">
@@ -1912,8 +1909,7 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <StackPanel Margin="4" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding status_title_full}" FontWeight="SemiBold" Foreground="{Binding status_fg}" FontSize="11"/>
-                                                        <TextBlock Text="{Binding weight_stars}" FontSize="11" Foreground="{StaticResource T3.TextMuted}" Margin="0,4,0,0"/>
+                                                        <TextBlock Text="{Binding weight_stars}" FontSize="11" Foreground="{StaticResource T3.TextMuted}"/>
                                                         <TextBlock Text="{Binding thresholds_text}" FontSize="11" Foreground="{StaticResource T3.TextDisabled}"/>
                                                     </StackPanel>
                                                 </DataTemplate>
@@ -1922,8 +1918,8 @@
                                         <DataGridTemplateColumn Header="ACTION" Width="100">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Button Content="Select" Visibility="{Binding select_visibility}"
-                                                            Click="on_health_metric_select"
+                                                    <Button Content="Detail…" Visibility="{Binding select_visibility}"
+                                                            Click="on_health_metric_detail"
                                                             Style="{StaticResource T3.Button.Secondary}"
                                                             Height="26" Padding="8,0" FontSize="11"
                                                             VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -1932,58 +1928,14 @@
                                         </DataGridTemplateColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
+                                <TextBlock x:Name="empty_health_metrics"
+                                Text="Reading the model…&#x0a;Results appear here as soon as the scan finishes."
+                                Style="{StaticResource T3.Empty}"/>
                             </Grid>
                         </Grid>
                     </TabItem>
 
-                    <!-- ── TAB 1: COMPLIANCE CHECKER ── -->
-                    <TabItem>
-                        <Grid x:Name="grid_model_checker" Margin="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- Top Bar -->
-                                <RowDefinition Height="*"/>    <!-- Results DataGrid -->
-                            </Grid.RowDefinitions>
-
-                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="260"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="Checkset Name:" Style="{StaticResource T3.BodyStrong}" VerticalAlignment="Center"/>
-                                    <ComboBox x:Name="cb_checkset" Grid.Column="2" Height="28" Style="{StaticResource T3.ComboBox}"/>
-                                    <StackPanel Grid.Column="4" Orientation="Horizontal">
-                                        <Button x:Name="btn_checker_run" Style="{StaticResource T3.Button.Secondary}" Content="Run Compliance Check" Height="28" Padding="12,0" Margin="0,0,8,0"/>
-                                        <Button x:Name="btn_checker_export" Style="{StaticResource T3.Button.Secondary}" Content="Export Report" Height="28" Padding="12,0"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <DataGrid x:Name="dg_checker_results" Grid.Row="1"
-                                      Style="{StaticResource T3.DataGrid}"
-                                      BorderThickness="0">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="ID" Binding="{Binding id}" Width="70"
-                                                        ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                    <DataGridTextColumn Header="CATEGORY" Binding="{Binding category}" Width="120"
-                                                        ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                    <DataGridTextColumn Header="SEVERITY" Binding="{Binding severity}" Width="80"
-                                                        ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                    <DataGridTextColumn Header="RULE NAME" Binding="{Binding name}" Width="240"/>
-                                    <DataGridTextColumn Header="RESULT" Binding="{Binding status}" Width="80"
-                                                        ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                    <DataGridTextColumn Header="MESSAGE / DETAILS" Binding="{Binding message}" Width="*"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </Grid>
-                    </TabItem>
-
-                    <!-- ── TAB 2: WARNING MANAGER ── -->
+                    <!-- ── TAB 1: WARNING MANAGER ── -->
                     <TabItem>
                         <Grid x:Name="grid_warning_manager" Margin="0">
                             <Grid.ColumnDefinitions>
@@ -2007,6 +1959,9 @@
                                                             ElementStyle="{StaticResource T3.Cell.Number}"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
+                                <TextBlock x:Name="empty_warning_groups" Grid.Row="0"
+                                           Text="No warnings in this model."
+                                           Style="{StaticResource T3.Empty}"/>
                                 <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
                                         BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                         Padding="16,8">
@@ -2035,6 +1990,9 @@
                                 </Border>
                                 <ListBox x:Name="lst_warning_elements" Grid.Row="1" BorderThickness="0" SelectionMode="Extended"
                                          Style="{StaticResource T3.ListBox}" Padding="8"/>
+                                <TextBlock x:Name="empty_warning_elements" Grid.Row="1"
+                                           Text="Select a warning to list its elements."
+                                           Style="{StaticResource T3.Empty}"/>
                                 <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                         BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                         Padding="16,8">
@@ -2044,243 +2002,50 @@
                         </Grid>
                     </TabItem>
 
-                    <!-- ── TAB 3: MODEL CLEANUP ── -->
+                    <!-- ── TAB 2: SMART PURGE ── -->
                     <TabItem>
-                        <Grid x:Name="grid_model_cleanup" Margin="0">
+                        <Grid x:Name="grid_smart_purge" Margin="0">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- Sub-tab chips -->
-                                <RowDefinition Height="*"/>    <!-- Sub-tab content -->
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-
-                            <!-- Sub-tab strip -->
-                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,4">
-                                <StackPanel Orientation="Horizontal">
-                                    <RadioButton x:Name="btn_sub_smart_purge" Content="Smart Purge"
-                                                 GroupName="CleanupSubTabs"
-                                                 Style="{StaticResource T3.Chip}" IsChecked="True"/>
-                                    <RadioButton x:Name="btn_sub_advanced_purge" Content="Advanced Purge"
-                                                 GroupName="CleanupSubTabs"
-                                                 Style="{StaticResource T3.Chip}"/>
-                                    <RadioButton x:Name="btn_sub_smart_delete" Content="Smart Delete"
-                                                 GroupName="CleanupSubTabs"
-                                                 Style="{StaticResource T3.Chip}"/>
+                            <DataGrid x:Name="dg_smart_purge" Grid.Row="0"
+                                      Style="{StaticResource T3.DataGrid}"
+                                      BorderThickness="0">
+                                <DataGrid.Columns>
+                                    <DataGridCheckBoxColumn Binding="{Binding is_selected}" Width="92">
+                                        <DataGridCheckBoxColumn.Header>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                <CheckBox x:Name="chk_all_dg_smart_purge" Style="{StaticResource T3.CheckBox}"
+                                                          Click="select_all_dg_smart_purge_clicked"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                          ToolTip="Select all rows"/>
+                                                <TextBlock Text="PURGE?" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataGridCheckBoxColumn.Header>
+                                    </DataGridCheckBoxColumn>
+                                    <DataGridTextColumn Header="TYPE / NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="CATEGORY" Binding="{Binding category}" Width="150" IsReadOnly="True"
+                                                        ElementStyle="{StaticResource T3.Body.Secondary}"/>
+                                    <DataGridTextColumn Header="UNUSED INSTANCES" Binding="{Binding count}" Width="120" IsReadOnly="True"
+                                                        ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <TextBlock x:Name="empty_smart_purge" Grid.Row="0"
+                            Text="Nothing unused found.&#x0a;The model is already clean."
+                            Style="{StaticResource T3.Empty}"/>
+                            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
+                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
+                                    Padding="16,8">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button x:Name="btn_smart_purge_check_all" Style="{StaticResource T3.Button.Secondary}" Content="Select All" Height="28" Margin="0,0,8,0"/>
+                                    <Button x:Name="btn_smart_purge_uncheck_all" Style="{StaticResource T3.Button.Secondary}" Content="Deselect All" Height="28" Margin="0,0,8,0"/>
+                                    <Button x:Name="btn_smart_purge_run" Style="{StaticResource T3.Button.Danger}" Content="Purge Selected" Height="28" Padding="16,0"/>
                                 </StackPanel>
                             </Border>
-
-                            <!-- Sub-tabs -->
-                            <TabControl x:Name="cleanup_tab_control" Grid.Row="1" BorderThickness="0" Background="Transparent" Padding="0">
-                                <TabControl.ItemContainerStyle>
-                                    <Style TargetType="TabItem" BasedOn="{StaticResource T3.TabItem.Hidden}"/>
-                                </TabControl.ItemContainerStyle>
-
-                                <!-- Cleanup Sub 0: Smart Purge -->
-                                <TabItem>
-                                    <Grid Margin="0">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <DataGrid x:Name="dg_smart_purge" Grid.Row="0"
-                                                  Style="{StaticResource T3.DataGrid}"
-                                                  BorderThickness="0">
-                                            <DataGrid.Columns>
-                                                <DataGridCheckBoxColumn Binding="{Binding is_selected}" Width="60">
-                                                    <DataGridCheckBoxColumn.Header>
-                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                                            <CheckBox x:Name="chk_all_dg_smart_purge" Style="{StaticResource T3.CheckBox}"
-                                                                      Click="select_all_dg_smart_purge_clicked"
-                                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                      ToolTip="Select all rows"/>
-                                                            <TextBlock Text="PURGE?" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </DataGridCheckBoxColumn.Header>
-                                                </DataGridCheckBoxColumn>
-                                                <DataGridTextColumn Header="TYPE / NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
-                                                <DataGridTextColumn Header="CATEGORY" Binding="{Binding category}" Width="150" IsReadOnly="True"
-                                                                    ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                                <DataGridTextColumn Header="UNUSED INSTANCES" Binding="{Binding count}" Width="120" IsReadOnly="True"
-                                                                    ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                            </DataGrid.Columns>
-                                        </DataGrid>
-                                        <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
-                                                BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                                Padding="16,8">
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                <Button x:Name="btn_smart_purge_check_all" Style="{StaticResource T3.Button.Secondary}" Content="Select All" Height="28" Margin="0,0,8,0"/>
-                                                <Button x:Name="btn_smart_purge_uncheck_all" Style="{StaticResource T3.Button.Secondary}" Content="Deselect All" Height="28" Margin="0,0,8,0"/>
-                                                <Button x:Name="btn_smart_purge_run" Style="{StaticResource T3.Button.Danger}" Content="Purge Selected" Height="28" Padding="16,0"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-                                </TabItem>
-
-                                <!-- Cleanup Sub 1: Advanced Purge -->
-                                <TabItem>
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                                  Padding="16">
-                                        <StackPanel Margin="0">
-                                            <TextBlock Text="SELECT DEEP CLEANUP CATEGORIES" Style="{StaticResource T3.Label}" Margin="0,0,0,16"/>
-                                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                                    BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,0,16">
-                                                <StackPanel>
-                                                    <CheckBox x:Name="chk_adv_views" Style="{StaticResource T3.CheckBox}" Content="Purge Unused Views (not placed on sheets)" Margin="0,0,0,12"/>
-                                                    <CheckBox x:Name="chk_adv_templates" Style="{StaticResource T3.CheckBox}" Content="Purge Unused View Templates" Margin="0,0,0,12"/>
-                                                    <CheckBox x:Name="chk_adv_filters" Style="{StaticResource T3.CheckBox}" Content="Purge Unused View Filters" Margin="0,0,0,12"/>
-                                                    <CheckBox x:Name="chk_adv_materials" Style="{StaticResource T3.CheckBox}" Content="Purge Unused Materials" Margin="0,0,0,12"/>
-                                                    <CheckBox x:Name="chk_adv_dwg" Style="{StaticResource T3.CheckBox}" Content="Purge Unused CAD Imports / Links" Margin="0,0,0,12"/>
-                                                    <CheckBox x:Name="chk_adv_styles" Style="{StaticResource T3.CheckBox}" Content="Purge Unused Line Styles / Fill Patterns"/>
-                                                </StackPanel>
-                                            </Border>
-                                        <Button x:Name="btn_adv_purge_run" Style="{StaticResource T3.Button.Danger}" Content="Run Deep Purge" Height="28" Padding="24,0" HorizontalAlignment="Right"/>
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </TabItem>
-
-                                <!-- Cleanup Sub 2: Smart Delete -->
-                                <TabItem>
-                                    <Grid Margin="0">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                                BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                                Padding="16,8">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="8"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="8"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="Element IDs to Delete:" Style="{StaticResource T3.BodyStrong}" VerticalAlignment="Center"/>
-                                                <TextBox x:Name="tb_delete_ids" Grid.Column="2" Height="28" Style="{StaticResource T3.TextBox}"/>
-                                                <Button x:Name="btn_delete_analyze" Grid.Column="4" Style="{StaticResource T3.Button.Secondary}" Content="Analyze Dependencies" Height="28" Padding="12,0"/>
-                                            </Grid>
-                                        </Border>
-
-                                        <Grid Grid.Row="1">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="*"/>
-                                            </Grid.RowDefinitions>
-                                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                                    Padding="16,8">
-                                                <TextBlock Text="DEPENDENCY MAP (Elements that will also be deleted):" Style="{StaticResource T3.Label}"/>
-                                            </Border>
-                                            <ListBox x:Name="lst_delete_dependencies" Grid.Row="1"
-                                                     Style="{StaticResource T3.ListBox}" BorderThickness="0" FontFamily="Consolas"/>
-                                        </Grid>
-
-                                        <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
-                                                BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                                Padding="16,8">
-                                            <Button x:Name="btn_delete_run" Style="{StaticResource T3.Button.Danger}" Content="Delete Elements Safely" Height="28" Padding="24,0" HorizontalAlignment="Right" IsEnabled="False"/>
-                                        </Border>
-                                    </Grid>
-                                </TabItem>
-                            </TabControl>
                         </Grid>
                     </TabItem>
 
-                    <!-- ── TAB 4: SPECIAL AUDITS ── -->
-                    <TabItem>
-                        <Grid x:Name="grid_special_audits" Margin="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- Sub-tab strip -->
-                                <RowDefinition Height="*"/>    <!-- Sub-tab content -->
-                            </Grid.RowDefinitions>
-
-                            <!-- Sub-tab strip -->
-                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,4">
-                                <StackPanel Orientation="Horizontal">
-                                    <RadioButton x:Name="btn_sub_inplace" Content="In-Place Models"
-                                                 GroupName="SpecialSubTabs"
-                                                 Style="{StaticResource T3.Chip}" IsChecked="True"/>
-                                    <RadioButton x:Name="btn_sub_material" Content="Material List"
-                                                 GroupName="SpecialSubTabs"
-                                                 Style="{StaticResource T3.Chip}"/>
-                                </StackPanel>
-                            </Border>
-
-                            <TabControl x:Name="sub_tab_control" Grid.Row="1" BorderThickness="0" Background="Transparent" Padding="0">
-                                <TabControl.ItemContainerStyle>
-                                    <Style TargetType="TabItem" BasedOn="{StaticResource T3.TabItem.Hidden}"/>
-                                </TabControl.ItemContainerStyle>
-
-                                <!-- Special Sub 0: In-Place Models -->
-                                <TabItem>
-                                    <Grid Margin="0">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <DataGrid x:Name="dg_special_inplace" Grid.Row="0"
-                                                  Style="{StaticResource T3.DataGrid}"
-                                                  BorderThickness="0">
-                                            <DataGrid.Columns>
-                                                <DataGridTextColumn Header="ELEMENT ID" Binding="{Binding id}" Width="90"
-                                                                    ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                                <DataGridTextColumn Header="CATEGORY" Binding="{Binding category}" Width="150"
-                                                                    ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                                <DataGridTextColumn Header="FAMILY NAME" Binding="{Binding family_name}" Width="*"/>
-                                                <DataGridTextColumn Header="TYPE NAME" Binding="{Binding type_name}" Width="200"
-                                                                    ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            </DataGrid.Columns>
-                                        </DataGrid>
-                                        <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
-                                                BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                                Padding="16,8">
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                <Button x:Name="btn_special_inplace_reload" Style="{StaticResource T3.Button.Secondary}" Content="Reload" Height="28" Margin="0,0,8,0"/>
-                                                <Button x:Name="btn_special_inplace_select" Style="{StaticResource T3.Button.Secondary}" Content="Select in Model" Height="28" Margin="0,0,8,0" Padding="12,0"/>
-                                                <Button x:Name="btn_special_inplace_delete" Style="{StaticResource T3.Button.Danger}" Content="Delete Selected" Height="28" Padding="12,0"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-                                </TabItem>
-
-                                <!-- Special Sub 1: Material List -->
-                                <TabItem>
-                                    <Grid Margin="0">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <DataGrid x:Name="dg_special_materials" Grid.Row="0"
-                                                  Style="{StaticResource T3.DataGrid}"
-                                                  BorderThickness="0">
-                                            <DataGrid.Columns>
-                                                <DataGridTextColumn Header="CATEGORY" Binding="{Binding category}" Width="150"
-                                                                    ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                                <DataGridTextColumn Header="MATERIAL NAME" Binding="{Binding name}" Width="*"/>
-                                                <DataGridTextColumn Header="VOLUME (M³)" Binding="{Binding volume_str}" Width="120"
-                                                                    ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                                <DataGridTextColumn Header="AREA (M²)" Binding="{Binding area_str}" Width="120"
-                                                                    ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                            </DataGrid.Columns>
-                                        </DataGrid>
-                                        <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
-                                                BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                                Padding="16,8">
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                <Button x:Name="btn_special_materials_reload" Style="{StaticResource T3.Button.Secondary}" Content="Reload" Height="28" Margin="0,0,8,0"/>
-                                                <Button x:Name="btn_special_materials_export" Style="{StaticResource T3.Button.Secondary}" Content="Export to CSV" Height="28" Padding="12,0"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-                                </TabItem>
-                            </TabControl>
-                        </Grid>
-                    </TabItem>
                 </TabControl>
 
                 <!-- ══════════════════ ROW 2: FOOTER BAR ══════════════════ -->

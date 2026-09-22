@@ -26,6 +26,7 @@ _FMT_ATTRS = {
     'dwf': 'export_dwf',
     'dgn': 'export_dgn',
     'nwd': 'export_nwd',
+    'nwc': 'export_nwd',
     'ifc': 'export_ifc',
     'img': 'export_img',
     'image': 'export_img',
@@ -33,7 +34,7 @@ _FMT_ATTRS = {
 
 _FMT_SUBFOLDER = {
     'pdf': 'PDF', 'dwg': 'DWG', 'dwf': 'DWF',
-    'dgn': 'DGN', 'nwd': 'NWD', 'ifc': 'IFC',
+    'dgn': 'DGN', 'nwd': 'NWC', 'nwc': 'NWC', 'ifc': 'IFC',
     'img': 'Images', 'image': 'Images',
 }
 
@@ -183,9 +184,10 @@ def _notify(callback, message):
 def _validated_format(config):
     value = config.get('format', 'pdf')
     if not isinstance(value, str) or value.strip().lower() not in _FMT_ATTRS:
-        raise ValueError("Choose one supported format: PDF, DWG, DWF, DGN, NWD, IFC or Images.")
+        raise ValueError("Choose one supported format: PDF, DWG, DWF, DGN, NWC, IFC or Images.")
     fmt = value.strip().lower()
-    return 'img' if fmt == 'image' else fmt
+    # Keep old NWD requests compatible, but report the actual output format.
+    return {'image': 'img', 'nwd': 'nwc'}.get(fmt, fmt)
 
 
 def _output_snapshot(folder, extension):
@@ -228,7 +230,7 @@ def parse_export_params(raw_text):
 
     # Detect format
     fmt = 'pdf'  # sensible default
-    for f in ['dwg', 'dwf', 'dgn', 'ifc', 'nwd', 'img', 'image', 'pdf']:
+    for f in ['dwg', 'dwf', 'dgn', 'ifc', 'nwc', 'nwd', 'img', 'image', 'pdf']:
         if f in cmd:
             fmt = f
             break
@@ -313,6 +315,7 @@ def _run_export_method(window, fmt, selected_items, output_folder):
         'dwf':   'export_to_dwf',
         'dgn':   'export_to_dgn',
         'nwd':   'export_to_nwd',
+        'nwc':   'export_to_nwd',
         'ifc':   'export_to_ifc',
         'img':   'export_to_images',
         'image': 'export_to_images',
