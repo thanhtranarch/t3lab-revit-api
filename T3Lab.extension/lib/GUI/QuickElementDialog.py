@@ -366,10 +366,29 @@ class QuickSelectWindow(T3WPFWindow):
         self._get_controls()
         self._setup_events()
         
-        # Load data
+        # Load data — deferred to ContentRendered instead of running here.
+        # "Entire Project" scope walks every category across the whole model
+        # (measured ~2s on a 138k-element project); running that inline in
+        # __init__ leaves the user staring at a frozen ribbon with no window
+        # at all. ContentRendered fires after the first frame, so the (empty)
+        # window is already on screen while the scan runs. Routed through
+        # _defer() — same as _on_display_changed/_on_filter_changed below —
+        # so the ManaSelect (modeless) embedding still re-enters via its
+        # ExternalEvent bridge instead of touching the API off-context.
+        # See ModelAuditorDialog._on_first_render for the same pattern.
         if self.collector:
-            self._load_data()
-    
+            self.ContentRendered += self._on_first_render
+
+    def _on_first_render(self, sender=None, args=None):
+        """Load element data once the window has actually painted."""
+        try:
+            self.ContentRendered -= self._on_first_render
+        except Exception:
+            pass
+        if self._defer(self._on_first_render, sender, args):
+            return
+        self._load_data()
+
     def _defer(self, handler, sender, args):
         """Re-enter `handler` inside the Revit API context.
 

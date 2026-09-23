@@ -214,6 +214,23 @@ def set_items_source(control, items):
         control.ItemsSource = to_items_source(items)
 
 
+_EVENT_ALTERNATION = '|'.join(sorted(_EVENT_NAMES, key=len, reverse=True))
+_TAG_RE = re.compile(r'<[A-Za-z0-9_.:]+(?:\s+[^>]*?)?/?>')
+_NAME_RE = re.compile(r'(?:x:)?Name\s*=\s*"([^"]+)"')
+_ROOT_TAG_RE = re.compile(r'^(<[A-Za-z0-9_.:]+)')
+# One alternation instead of looping _EVENT_NAMES (40 names) with a fresh
+# re.search per name per tag — on a 100k-char tool XAML (~1000 tags) that loop
+# meant up to 40000 regex searches just to sanitize before every window open.
+_EVENT_FIND_RE = re.compile(r'\b(' + _EVENT_ALTERNATION + r')\s*=\s*"([^"]*)"')
+_EVENT_STRIP_RE = re.compile(r'\s*\b(?:' + _EVENT_ALTERNATION + r')\s*=\s*"[^"]*"')
+
+# Sanitize result cache, keyed by (path, mtime, size): reopening the same tool
+# in one Revit session (or across the QA "open every tool once" loop) skips
+# re-running the regex pass on identical, unchanged XAML text.
+_SANITIZE_CACHE = {}
+_SANITIZE_CACHE_MAX = 32
+
+
 def _sanitize_xaml(xaml_content):
     """
     Sanitize XAML for CPython XamlReader:
@@ -224,21 +241,17 @@ def _sanitize_xaml(xaml_content):
     named_elements = set()
     counter = [0]
 
-    for m in re.finditer(r'(?:x:)?Name\s*=\s*"([^"]+)"', xaml_content):
+    for m in _NAME_RE.finditer(xaml_content):
         named_elements.add(m.group(1))
 
     def process_tag(match):
         tag = match.group(0)
-        has_event = False
-        for evt in _EVENT_NAMES:
-            if re.search(r'\b' + evt + r'\s*=\s*"[^"]*"', tag):
-                has_event = True
-                break
-        if not has_event:
+        evt_matches = _EVENT_FIND_RE.findall(tag)
+        if not evt_matches:
             return tag
 
         is_root_window = tag.startswith('<Window')
-        name_match = re.search(r'(?:x:)?Name\s*=\s*"([^"]+)"', tag)
+        name_match = _NAME_RE.search(tag)
         if name_match:
             elem_name = name_match.group(1)
         elif is_root_window:
@@ -247,20 +260,35 @@ def _sanitize_xaml(xaml_content):
             counter[0] += 1
             elem_name = "__t3_dyn_" + str(counter[0])
             named_elements.add(elem_name)
-            tag = re.sub(r'^(<[A-Za-z0-9_.:]+)', r'\1 x:Name="' + elem_name + '"', tag)
+            tag = _ROOT_TAG_RE.sub(r'\1 x:Name="' + elem_name + '"', tag)
 
-        for evt in _EVENT_NAMES:
-            evt_match = re.search(r'\b(' + evt + r')\s*=\s*"([^"]+)"', tag)
-            if evt_match:
-                event_name = evt_match.group(1)
-                handler_name = evt_match.group(2)
-                event_bindings.append((elem_name, event_name, handler_name))
-                tag = re.sub(r'\s*\b' + evt + r'\s*=\s*"[^"]*"', '', tag)
+        for event_name, handler_name in evt_matches:
+            event_bindings.append((elem_name, event_name, handler_name))
+        tag = _EVENT_STRIP_RE.sub('', tag)
 
         return tag
 
-    clean_xaml = re.sub(r'<[A-Za-z0-9_.:]+(?:\s+[^>]*?)?/?>', process_tag, xaml_content)
+    clean_xaml = _TAG_RE.sub(process_tag, xaml_content)
     return clean_xaml, event_bindings, named_elements
+
+
+def _sanitize_xaml_cached(xaml_content, cache_key=None):
+    """`_sanitize_xaml`, skipped on a cache hit for the same (path, mtime, size).
+
+    `cache_key` is `(path, mtime, size)` from the caller, or None for inline
+    XAML strings (never cached — there is no stable identity to key on).
+    """
+    if cache_key is None:
+        return _sanitize_xaml(xaml_content)
+    hit = _SANITIZE_CACHE.get(cache_key)
+    if hit is not None:
+        clean_xaml, event_bindings, named_elements = hit
+        return clean_xaml, list(event_bindings), set(named_elements)
+    result = _sanitize_xaml(xaml_content)
+    if len(_SANITIZE_CACHE) >= _SANITIZE_CACHE_MAX:
+        _SANITIZE_CACHE.pop(next(iter(_SANITIZE_CACHE)))
+    _SANITIZE_CACHE[cache_key] = result
+    return result
 
 
 def setup_window_logo(win_or_elem):
@@ -359,6 +387,7 @@ class T3WPFWindow(Window):
     def load_xaml(self, xaml_source, literal_string=False, handle_esc=True, set_owner=True):
         """Loads XAML and wires named elements + event handlers."""
         # Read XAML content
+        self._sanitize_cache_key = None
         if literal_string:
             xaml_content = xaml_source
         else:
@@ -374,6 +403,11 @@ class T3WPFWindow(Window):
 
             with io.open(xaml_path, 'r', encoding='utf-8-sig') as f:
                 xaml_content = f.read()
+            try:
+                st = os.stat(xaml_path)
+                self._sanitize_cache_key = (xaml_path, st.st_mtime, st.st_size)
+            except Exception:
+                pass
 
         if IRONPY:
             # IronPython engine: use wpf.LoadComponent if available
@@ -398,7 +432,8 @@ class T3WPFWindow(Window):
         """Hydrates Window via System.Windows.Markup.XamlReader with multi-strategy fallbacks."""
         if xaml_content is not None:
             xaml_content = xaml_content.lstrip('\ufeff \t\r\n')
-        clean_xaml, event_bindings, named_elements = _sanitize_xaml(xaml_content)
+        clean_xaml, event_bindings, named_elements = _sanitize_xaml_cached(
+            xaml_content, getattr(self, '_sanitize_cache_key', None))
 
         loaded_win = None
         errors = []

@@ -37,7 +37,10 @@ def load_sanitiser():
     """`_sanitize_xaml` lifted out of WPF_Base without importing the CLR."""
     src = io.open(WPF_BASE, encoding="utf-8").read()
     names = src[src.index("_EVENT_NAMES = {"):src.index("def to_items_source")]
-    body = src[src.index("def _sanitize_xaml("):src.index("def setup_window_logo(")]
+    # Starts at _EVENT_ALTERNATION, not "def _sanitize_xaml(": the precompiled
+    # regex constants (_TAG_RE, _EVENT_FIND_RE, ...) that _sanitize_xaml and
+    # _sanitize_xaml_cached close over live ABOVE the function, in this gap.
+    body = src[src.index("_EVENT_ALTERNATION = "):src.index("def setup_window_logo(")]
     namespace = {"re": re}
     exec(compile(names, WPF_BASE, "exec"), namespace)
     exec(compile(body, WPF_BASE, "exec"), namespace)

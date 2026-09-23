@@ -2024,33 +2024,49 @@
                                                                 HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border x:Name="health_pill" Background="{StaticResource T3.SurfaceSunken}"
-                                                            CornerRadius="4" Padding="8,4"
-                                                            HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                        <TextBlock x:Name="health_pill_text" Text="{Binding status}"
-                                                                   Foreground="{StaticResource T3.TextMuted}"
-                                                                   FontWeight="SemiBold" FontSize="11"/>
-                                                    </Border>
+                                                    <TextBlock x:Name="health_pill_text" Text="{Binding status}"
+                                                               Foreground="{StaticResource T3.TextMuted}"
+                                                               FontWeight="Bold" FontSize="11"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                     <DataTemplate.Triggers>
                                                         <DataTrigger Binding="{Binding severity}" Value="Success">
-                                                            <Setter TargetName="health_pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                                                             <Setter TargetName="health_pill_text" Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding severity}" Value="Warning">
-                                                            <Setter TargetName="health_pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                                                             <Setter TargetName="health_pill_text" Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding severity}" Value="Danger">
-                                                            <Setter TargetName="health_pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                                                             <Setter TargetName="health_pill_text" Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
                                                         </DataTrigger>
                                                     </DataTemplate.Triggers>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="WEIGHT" Binding="{Binding weight_stars}" Width="120"
-                                                            ElementStyle="{StaticResource T3.Cell.Center}"
-                                                            HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"/>
+                                        <DataGridTemplateColumn Header="WEIGHT" Width="120"
+                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <!-- Cùng thang màu Success/Warning/Danger với cột HEALTH và dải
+                                                         legend phía trên — một dòng Critical thì cả HEALTH lẫn WEIGHT
+                                                         đều đỏ, đọc theo hàng ngang là ra ngay mức độ nghiêm trọng. -->
+                                                    <TextBlock x:Name="weight_text" Text="{Binding weight_stars}"
+                                                               Foreground="{StaticResource T3.TextMuted}"
+                                                               FontFamily="Consolas" FontWeight="Bold" FontSize="12.5"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <DataTemplate.Triggers>
+                                                        <DataTrigger Binding="{Binding severity}" Value="Success">
+                                                            <Setter TargetName="weight_text" Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding severity}" Value="Warning">
+                                                            <Setter TargetName="weight_text" Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding severity}" Value="Danger">
+                                                            <Setter TargetName="weight_text" Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                                        </DataTrigger>
+                                                    </DataTemplate.Triggers>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="THRESHOLDS" Binding="{Binding thresholds_text}" Width="*"
                                                             ElementStyle="{StaticResource T3.Cell.Mono}"/>
                                         <DataGridTemplateColumn Header="ACTION" Width="90"
@@ -2151,7 +2167,8 @@
                                     <TextBlock Text="ELEMENTS IN WARNING:" Style="{StaticResource T3.Label}"/>
                                 </Border>
                                 <ListBox x:Name="lst_warning_elements" Grid.Row="1" BorderThickness="0" SelectionMode="Extended"
-                                         Style="{StaticResource T3.ListBox}" Padding="8"/>
+                                         Style="{StaticResource T3.ListBox}" Padding="8"
+                                         SelectionChanged="on_warning_elements_selection_changed"/>
                                 <TextBlock x:Name="empty_warning_elements" Grid.Row="1"
                                            Text="Select a warning to list its elements."
                                            Style="{StaticResource T3.Empty}"/>
@@ -2177,22 +2194,27 @@
                                       Style="{StaticResource T3.DataGrid}"
                                       BorderThickness="0">
                                 <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Binding="{Binding is_selected}" Width="92">
+                                    <DataGridCheckBoxColumn Binding="{Binding is_selected}" Width="36">
                                         <DataGridCheckBoxColumn.Header>
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                                <CheckBox x:Name="chk_all_dg_smart_purge" Style="{StaticResource T3.CheckBox}"
-                                                          Click="select_all_dg_smart_purge_clicked"
-                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                          ToolTip="Select all rows"/>
-                                                <TextBlock Text="PURGE?" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                                            </StackPanel>
+                                            <CheckBox x:Name="chk_all_dg_smart_purge" Style="{StaticResource T3.CheckBox}"
+                                                      Click="select_all_dg_smart_purge_clicked"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      ToolTip="Select all rows"/>
                                         </DataGridCheckBoxColumn.Header>
+                                        <!-- Row checkbox must use the SAME T3.CheckBox style as the header,
+                                             or WPF's default DataGridCheckBoxColumn template renders it at a
+                                             different size/padding and the two never line up. -->
+                                        <DataGridCheckBoxColumn.ElementStyle>
+                                            <Style TargetType="CheckBox" BasedOn="{StaticResource T3.CheckBox}">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGridCheckBoxColumn.ElementStyle>
                                     </DataGridCheckBoxColumn>
                                     <DataGridTextColumn Header="TYPE / NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
                                     <DataGridTextColumn Header="CATEGORY" Binding="{Binding category}" Width="150" IsReadOnly="True"
                                                         ElementStyle="{StaticResource T3.Body.Secondary}"/>
                                     <DataGridTextColumn Header="UNUSED INSTANCES" Binding="{Binding count}" Width="120" IsReadOnly="True"
-                                                        ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                                        ElementStyle="{StaticResource T3.Cell.Center}"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                             <TextBlock x:Name="empty_smart_purge" Grid.Row="0"

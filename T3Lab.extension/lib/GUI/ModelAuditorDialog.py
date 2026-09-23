@@ -69,6 +69,20 @@ def _make_eid(value):
     """Construct an ElementId safely for Revit 2020-2027+."""
     return make_eid(value)
 
+def _eid_list(ids):
+    """Build a .NET List[ElementId] from a python iterable.
+
+    Under PythonNet 3 (CPython) a plain python list no longer converts to
+    IEnumerable<ElementId> during overload resolution, so
+    `List[ElementId](some_python_list)` raises:
+        No method matches given arguments for List`1..ctor: (<class 'list'>)
+    Build it empty and Add() each item instead.
+    """
+    out = System.Collections.Generic.List[ElementId]()
+    for eid in ids:
+        out.Add(eid)
+    return out
+
 # ============================================================================
 # METRIC THRESHOLDS FOR HEALTH CHECK
 # ============================================================================
@@ -812,10 +826,8 @@ class MetricDetailWindow(T3WPFWindow):
             return
 
         try:
-            self.uidoc.Selection.SetElementIds(
-                System.Collections.Generic.List[ElementId](picked))
-            self.uidoc.ShowElements(
-                System.Collections.Generic.List[ElementId](picked))
+            self.uidoc.Selection.SetElementIds(_eid_list(picked))
+            self.uidoc.ShowElements(_eid_list(picked))
         except Exception as ex:
             self.status_text.Text = "Could not select those elements."
             forms.alert("Could not select the elements:\n\n{}".format(ex),
@@ -1492,6 +1504,21 @@ class ModelAuditorWindow(T3WPFWindow):
 
         self._set_rows(self.lst_warning_elements, 'empty_warning_elements', list_items)
 
+    def on_warning_elements_selection_changed(self, sender, e):
+        """Live-select the highlighted row(s) in the Revit view as the user browses the list."""
+        try:
+            elem_ids = []
+            for item in (self.lst_warning_elements.SelectedItems or []):
+                found = re.findall(r'\[(\d+)\]', item)
+                if found:
+                    elem_ids.append(_make_eid(int(found[-1])))
+            if not elem_ids:
+                return
+            self.uidoc.Selection.SetElementIds(_eid_list(elem_ids))
+            self.uidoc.ShowElements(_eid_list(elem_ids))
+        except Exception:
+            pass
+
     def on_warning_select_elements(self, sender, e):
         """Select the rows ticked in the list, or the whole group if none are."""
         elem_ids = []
@@ -1517,8 +1544,8 @@ class ModelAuditorWindow(T3WPFWindow):
                         title="Warning Manager")
             return
 
-        self.uidoc.Selection.SetElementIds(System.Collections.Generic.List[ElementId](elem_ids))
-        self.uidoc.ShowElements(System.Collections.Generic.List[ElementId](elem_ids))
+        self.uidoc.Selection.SetElementIds(_eid_list(elem_ids))
+        self.uidoc.ShowElements(_eid_list(elem_ids))
         self.status_text.Text = "Selected {} elements in model {}".format(
             len(elem_ids), scope)
 
