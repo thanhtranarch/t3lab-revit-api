@@ -463,6 +463,8 @@ class AnnotationManagerWindow(T3WPFWindow):
             self._status("No text notes to check.")
             return
 
+        requested_text = {item["id"]: item["text"] for item in notes}
+
         import json
         prompt = (
             "You are a BIM quality-assurance specialist for architectural, structural and MEP "
@@ -491,12 +493,19 @@ class AnnotationManagerWindow(T3WPFWindow):
                     continue
                 elem_id = str(correction.get('id', ''))
                 suggestion = correction.get('suggested')
-                if elem_id in self._txt_record_by_id and isinstance(suggestion, str) and suggestion.strip():
+                original = correction.get('original')
+                if (elem_id in requested_text
+                        and isinstance(suggestion, str)
+                        and suggestion.strip()
+                        and (original is None or str(original) == requested_text[elem_id])):
                     fixes[elem_id] = suggestion
             updated = 0
             for row in self._txt_dt.Rows:
                 rid = str(row["_id"])
-                if rid in fixes and fixes[rid] != str(row["Name"]):
+                current_text = str(row["Name"])
+                if (rid in fixes
+                        and current_text == requested_text.get(rid)
+                        and fixes[rid] != current_text):
                     row["Name"] = fixes[rid]
                     row["Status"] = "AI Fix"
                     row["Selected"] = True
@@ -854,14 +863,6 @@ class AnnotationManagerWindow(T3WPFWindow):
         kind = "note(s)" if self._txt_submode == "notes" else "type(s)"
         self._status("Loaded {} {}.".format(n, kind))
 
-
-    def _remove_rows(self, dt, elem_map, ok_ids):
-        ok_set = set(ok_ids)
-        to_del = list(r for r in dt.Rows if str(r["_id"]) in ok_set)
-        for r in to_del:
-            dt.Rows.Remove(r)
-        for eid in ok_ids:
-            elem_map.pop(eid, None)
 
     # ── Window controls ──────────────────────────────────────────────────
 
@@ -1248,15 +1249,15 @@ class AnnotationManagerWindow(T3WPFWindow):
             return
 
         tb       = args.EditingElement
-        new_name = tb.Text.strip()
-        if not new_name:
-            args.Cancel = True
-            return
-
         row      = args.Row.Item
         elem_id  = str(row["_id"])
         cat_code = str(row["_cat"])
         old_name = str(row["Name"])
+        raw_name = tb.Text or ""
+        new_name = raw_name.strip() if cat_code == "TxtType" else raw_name
+        if not new_name.strip():
+            args.Cancel = True
+            return
 
         if new_name == old_name:
             return
@@ -1375,10 +1376,11 @@ class AnnotationManagerWindow(T3WPFWindow):
             elem = self._txt_map.get(elem_id)
             if not elem:
                 continue
-            new_name = str(row["Name"]).strip()
-            if not new_name:
-                continue
             cat_code = str(row["_cat"])
+            raw_name = str(row["Name"])
+            new_name = raw_name.strip() if cat_code == "TxtType" else raw_name
+            if not new_name.strip():
+                continue
             current = _type_name(elem) if cat_code == "TxtType" else (elem.Text or "")
             if current != new_name:
                 changes.append((elem, cat_code, new_name))
@@ -1505,6 +1507,8 @@ class AnnotationManagerWindow(T3WPFWindow):
         try:
             callback()
             succeeded = True
+        except SystemExit:
+            self._status("{} was cancelled or is unavailable in the active view.".format(label))
         except Exception as ex:
             logger.exception("{} failed".format(label))
             self._status("{} failed: {}".format(label, ex))

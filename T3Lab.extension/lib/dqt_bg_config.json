@@ -1,0 +1,26 @@
+{
+  "r": 255,
+  "g": 255,
+  "b": 255,
+  "live_apply": false,
+  "custom_presets": [],
+  "recents": [],
+  "gradient": {
+    "sky": [
+      68,
+      118,
+      189
+    ],
+    "horizon": [
+      205,
+      224,
+      240
+    ],
+    "ground": [
+      142,
+      134,
+      114
+    ],
+    "all_views": false
+  }
+}
