@@ -217,35 +217,38 @@ class CheckColumnAlignment(unittest.TestCase):
     """Header select-all box sits exactly over the row boxes: header and cell
     share one geometry (no padding, box centred)."""
 
-    GRIDS = {'ManaViews.xaml': ('views_grid', 'tmpl_grid'),
-             'ManaSheets.xaml': ('sheets_grid', 'renum_grid'),
-             'ManaPara.xaml': ('dg_loader_params',),
-             'ManaSched.xaml': ('xl_dg_schedules', 'dup_dg_schedules'),
-             'ManaStyles.xaml': ('grid_style', 'grid_pattern', 'grid_fill'),
-             'ModelAuditor.xaml': ('dg_smart_purge',),
-             'SheetGen.xaml': ('room_datagrid',),
-             'UIStandardShowcase.xaml': ('sample_grid',),
-             'PDFImport.xaml': ('grid_views',),
-             'ModelAuditorDetail.xaml': ('dg_detail_elements',)}
+    # UI-frozen: its visual design may not change (CLAUDE.md).
+    FROZEN = {'DWGManagement.xaml'}
 
-    def test_check_columns_use_the_shared_geometry(self):
-        for fname, grids in self.GRIDS.items():
+    def test_every_select_all_column_uses_the_shared_geometry(self):
+        seen = []
+        for fname in _xaml_files():
+            if fname in self.FROZEN:
+                continue
             root = ET.parse(os.path.join(TOOLS, fname)).getroot()
-            for grid in root.iter(P + 'DataGrid'):
-                if grid.get(X + 'Name') not in grids:
+            for col in root.iter(P + 'DataGridTemplateColumn'):
+                header = col.find(P + 'DataGridTemplateColumn.Header')
+                if header is None or header.find(P + 'CheckBox') is None:
                     continue
-                col = next(grid.iter(P + 'DataGridTemplateColumn'))
-                where = '%s %s' % (fname, grid.get(X + 'Name'))
+                where = '%s %s' % (fname, header.find(P + 'CheckBox').get(X + 'Name'))
+                seen.append(where)
+                self.assertEqual(col.get('Width'), '36', where)
                 self.assertEqual(col.get('HeaderStyle'),
                                  '{StaticResource T3.DataGridColumnHeader.Check}', where)
                 self.assertEqual(col.get('CellStyle'),
                                  '{StaticResource T3.DataGridCell.Check}', where)
+                self.assertIsNone(col.find(P + 'DataGridTemplateColumn.HeaderStyle'), where)
+                self.assertIsNone(col.find(P + 'DataGridTemplateColumn.CellStyle'), where)
                 boxes = list(col.iter(P + 'CheckBox'))
                 self.assertEqual(len(boxes), 2, where)          # header + row
                 for box in boxes:
                     self.assertEqual(box.get('Style'), '{StaticResource T3.CheckBox.Cell}', where)
-                    for geometry in ('Padding', 'Margin', 'HorizontalAlignment'):
+                    for geometry in ('Padding', 'Margin', 'HorizontalAlignment', 'VerticalAlignment'):
                         self.assertIsNone(box.get(geometry), where)
+        # 15 aligned first, 16 more on 2026-09-26 (AutoWork, BatchLink, DoorThreshold,
+        # FamiGen, ManaAnno, ManaFami, ManaGroup, ManaPara, PointCloud, QuickElement,
+        # RoomToFloor)
+        self.assertEqual(len(seen), 31, seen)
 
     def test_renumber_tab_has_the_same_metrics_frame_as_the_sheets_tab(self):
         root = ET.parse(os.path.join(TOOLS, 'ManaSheets.xaml')).getroot()

@@ -1837,11 +1837,12 @@
                                       SelectionMode="Single"
                                       VerticalScrollBarVisibility="Auto">
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn Width="36">
+                                    <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                            HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                            CellStyle="{StaticResource T3.DataGridCell.Check}">
                                         <DataGridTemplateColumn.Header>
-                                            <CheckBox x:Name="chk_all_results_grid" Style="{StaticResource T3.CheckBox}"
+                                            <CheckBox x:Name="chk_all_results_grid" Style="{StaticResource T3.CheckBox.Cell}"
                                                       Click="select_all_results_grid_clicked"
-                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
                                                       ToolTip="Select all rows"/>
                                         </DataGridTemplateColumn.Header>
                                         <DataGridTemplateColumn.CellTemplate>
@@ -1849,8 +1850,7 @@
                                                 <Grid>
                                                     <TextBlock x:Name="row_include_text" Text="{Binding Include}" Visibility="Collapsed"/>
                                                     <CheckBox IsChecked="{Binding Text, ElementName=row_include_text, Mode=OneWay}"
-                                                              Style="{StaticResource T3.CheckBox}"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                              Style="{StaticResource T3.CheckBox.Cell}"/>
                                                 </Grid>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>

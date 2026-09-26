@@ -1906,17 +1906,18 @@
                                               CanUserSortColumns="True" HeadersVisibility="Column"
                                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
+                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                    CellStyle="{StaticResource T3.DataGridCell.Check}">
                                                 <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_all_dg_dim" Style="{StaticResource T3.CheckBox}"
+                                                    <CheckBox x:Name="chk_all_dg_dim" Style="{StaticResource T3.CheckBox.Cell}"
                                                               Click="select_all_dg_dim_clicked"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
                                                               ToolTip="Select all rows"/>
                                                 </DataGridTemplateColumn.Header>
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <CheckBox IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource T3.CheckBox}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                  Style="{StaticResource T3.CheckBox.Cell}"/>
                                                     </DataTemplate>
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
@@ -2072,17 +2073,18 @@
                                               CanUserSortColumns="True" HeadersVisibility="Column"
                                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
+                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                    CellStyle="{StaticResource T3.DataGridCell.Check}">
                                                 <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_all_dg_txt" Style="{StaticResource T3.CheckBox}"
+                                                    <CheckBox x:Name="chk_all_dg_txt" Style="{StaticResource T3.CheckBox.Cell}"
                                                               Click="select_all_dg_txt_clicked"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
                                                               ToolTip="Select all rows"/>
                                                 </DataGridTemplateColumn.Header>
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <CheckBox IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource T3.CheckBox}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                  Style="{StaticResource T3.CheckBox.Cell}"/>
                                                     </DataTemplate>
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>

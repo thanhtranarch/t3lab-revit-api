@@ -1811,23 +1811,12 @@
                                           SelectionMode="Extended"
                                           SelectionUnit="FullRow">
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Width="36" CanUserSort="False" CanUserResize="False">
-                                            <DataGridTemplateColumn.HeaderStyle>
-                                                <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
-                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                                                    <Setter Property="Padding" Value="0"/>
-                                                </Style>
-                                            </DataGridTemplateColumn.HeaderStyle>
-                                            <DataGridTemplateColumn.CellStyle>
-                                                <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                    <Setter Property="Padding" Value="0"/>
-                                                </Style>
-                                            </DataGridTemplateColumn.CellStyle>
+                                        <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                CellStyle="{StaticResource T3.DataGridCell.Check}">
                                             <DataGridTemplateColumn.Header>
                                                 <CheckBox x:Name="chk_ren_header"
-                                                          Style="{StaticResource T3.CheckBox}"
-                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                          Padding="0" Margin="0"
+                                                          Style="{StaticResource T3.CheckBox.Cell}"
                                                           ToolTip="Select All / Deselect All"
                                                           Click="rename_header_clicked"/>
                                             </DataGridTemplateColumn.Header>
@@ -1836,9 +1825,7 @@
                                                     <Grid>
                                                         <TextBlock x:Name="row_is_selected_text" Text="{Binding IsSelected}" Visibility="Collapsed"/>
                                                         <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                  Padding="0" Margin="0"
+                                                                  Style="{StaticResource T3.CheckBox.Cell}"
                                                                   Click="rename_checkbox_clicked"/>
                                                     </Grid>
                                                 </DataTemplate>
@@ -2004,23 +1991,12 @@
                                           SelectionMode="Extended"
                                           SelectionUnit="FullRow">
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Width="36" CanUserSort="False" CanUserResize="False">
-                                            <DataGridTemplateColumn.HeaderStyle>
-                                                <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
-                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                                                    <Setter Property="Padding" Value="0"/>
-                                                </Style>
-                                            </DataGridTemplateColumn.HeaderStyle>
-                                            <DataGridTemplateColumn.CellStyle>
-                                                <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                    <Setter Property="Padding" Value="0"/>
-                                                </Style>
-                                            </DataGridTemplateColumn.CellStyle>
+                                        <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                CellStyle="{StaticResource T3.DataGridCell.Check}">
                                             <DataGridTemplateColumn.Header>
                                                 <CheckBox x:Name="chk_ws_header"
-                                                          Style="{StaticResource T3.CheckBox}"
-                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                          Padding="0" Margin="0"
+                                                          Style="{StaticResource T3.CheckBox.Cell}"
                                                           ToolTip="Select All / Deselect All"
                                                           Click="workset_header_clicked"/>
                                             </DataGridTemplateColumn.Header>
@@ -2030,9 +2006,7 @@
                                                         <TextBlock x:Name="row_is_selected_text_2" Text="{Binding IsSelected}" Visibility="Collapsed"/>
                                                         <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text_2, Mode=OneWay}"
                                                                   IsEnabled="{Binding IsEnabled}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                  Padding="0" Margin="0"
+                                                                  Style="{StaticResource T3.CheckBox.Cell}"
                                                                   Click="workset_checkbox_clicked"/>
                                                     </Grid>
                                                 </DataTemplate>
@@ -2135,23 +2109,12 @@
                                           SelectionMode="Extended"
                                           SelectionUnit="FullRow">
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Width="36" CanUserSort="False" CanUserResize="False">
-                                            <DataGridTemplateColumn.HeaderStyle>
-                                                <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
-                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                                                    <Setter Property="Padding" Value="0"/>
-                                                </Style>
-                                            </DataGridTemplateColumn.HeaderStyle>
-                                            <DataGridTemplateColumn.CellStyle>
-                                                <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                    <Setter Property="Padding" Value="0"/>
-                                                </Style>
-                                            </DataGridTemplateColumn.CellStyle>
+                                        <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                CellStyle="{StaticResource T3.DataGridCell.Check}">
                                             <DataGridTemplateColumn.Header>
                                                 <CheckBox x:Name="chk_cln_header"
-                                                          Style="{StaticResource T3.CheckBox}"
-                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                          Padding="0" Margin="0"
+                                                          Style="{StaticResource T3.CheckBox.Cell}"
                                                           ToolTip="Select All / Deselect All"
                                                           Click="cleanup_header_clicked"/>
                                             </DataGridTemplateColumn.Header>
@@ -2160,9 +2123,7 @@
                                                     <Grid>
                                                         <TextBlock x:Name="row_is_selected_text_3" Text="{Binding IsSelected}" Visibility="Collapsed"/>
                                                         <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text_3, Mode=OneWay}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                  Padding="0" Margin="0"
+                                                                  Style="{StaticResource T3.CheckBox.Cell}"
                                                                   Click="cleanup_checkbox_clicked"/>
                                                     </Grid>
                                                 </DataTemplate>
