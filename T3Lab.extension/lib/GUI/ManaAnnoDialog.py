@@ -23,16 +23,25 @@ __version__ = "1.1.0"
 import os
 import re
 import sys
+
+# ManaAnnoDialog.py lives in lib/GUI; keep lib first so all absolute imports are
+# stable regardless of the pyRevit clone name or current working directory.
+lib_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if lib_dir not in sys.path:
+    sys.path.insert(0, lib_dir)
+
 import clr
 clr.AddReference('PresentationCore')
 clr.AddReference('PresentationFramework')
 clr.AddReference('System')
 clr.AddReference('System.Data')
 
-from System.Windows import Visibility, WindowState
-from System.Windows.Media.Imaging import BitmapImage
-from System import Uri, UriKind
+from System import TimeSpan
+from System.Collections.Generic import List
 from System.Data import DataTable
+from System.Windows import Visibility, WindowState
+from System.Windows.Threading import DispatcherTimer
+import Autodesk.Revit.DB as DB
 from Autodesk.Revit.DB import (
     FilteredElementCollector,
     Dimension, DimensionType,
@@ -40,49 +49,40 @@ from Autodesk.Revit.DB import (
     Transaction, ElementId,
     BuiltInParameter,
 )
-from pyrevit import revit, forms, script
+from pyrevit import revit, script
+from GUI import T3Dialog
 from GUI.WPF_Base import T3WPFWindow
 
-# Path setup
-extension_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-lib_dir = os.path.join(extension_dir, 'lib')
-if lib_dir not in sys.path:
-    sys.path.append(lib_dir)
 if os.path.dirname(__file__) not in sys.path:
-    sys.path.append(os.path.dirname(__file__))
+    sys.path.insert(0, os.path.dirname(__file__))
 
 try:
     from GUI import DimTextDialog
     from GUI import CopyAnnotationDialog
+    from GUI import TagCheckerDialog
 except Exception:
     import DimTextDialog
     import CopyAnnotationDialog
+    import TagCheckerDialog
 import Utils.UpperAll as UpperAll
 import Utils.RenumberAlongSpline as RenumberAlongSpline
 
 # DEFINE VARIABLES
 # ==================================================
 logger = script.get_logger()
-# CPython has no ScriptOutput.GetDefault; safe_output()
-# returns a no-op window instead of killing the tool.
-try:
-    from _cpython_bootstrap import safe_output
-    output = safe_output()
-except Exception:
-    output = script.get_output()
 # `revit.doc` / `revit.uidoc` RAISE AttributeError (not return None) when no
 # UIDocument is active. At module scope that kills the import outright, so the
 # tool dies before it can explain itself. Resolve defensively and let the entry
 try:
-    from Snippets._host import resolve_doc, resolve_uidoc, get_revit_version
+    from Snippets._host import resolve_doc, resolve_uidoc
 except ImportError:
     try:
         import importlib
         import Snippets._host
         importlib.reload(Snippets._host)
-        from Snippets._host import resolve_doc, resolve_uidoc, get_revit_version
+        from Snippets._host import resolve_doc, resolve_uidoc
     except Exception:
-        from Snippets._host import resolve_doc, get_revit_version
+        from Snippets._host import resolve_doc
         def resolve_uidoc(candidate=None):
             if candidate is not None and hasattr(candidate, 'Document') and candidate.Document is not None:
                 return candidate
@@ -100,10 +100,6 @@ try:
     uidoc = resolve_uidoc(getattr(revit, 'uidoc', None))
 except Exception:
     uidoc = None
-try:
-    REVIT_VERSION = get_revit_version(doc)
-except Exception:
-    REVIT_VERSION = 2024
 
 # ============================================================
 # NAMING STRUCTURE CONFIGURATION — ISO 19650 COMPLIANT
@@ -168,10 +164,64 @@ def _rgb(color_int):
 def _sanitize(v):
     if not v:
         return "N/A"
-    return re.sub(r'[\\/:?"<>|=]', '', v).strip() or "N/A"
+    value = re.sub(r'[\\/:{}\[\]|;<>?`~=\r\n\t"]', '', str(v)).strip()
+    return value[:240] or "N/A"
 
 def _mm(param):
     return "{:.2f}mm".format(round(param.AsDouble() * 304.8, 2))
+
+
+def _param_text(param, default=""):
+    if param is None:
+        return default
+    try:
+        return param.AsString() or default
+    except Exception:
+        return default
+
+
+def _type_name(element, default=""):
+    try:
+        value = element.Name
+        if value:
+            return str(value)
+    except Exception:
+        pass
+    try:
+        return _param_text(
+            element.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME), default
+        )
+    except Exception:
+        return default
+
+
+def _is_grouped(element):
+    try:
+        return element.GroupId != ElementId.InvalidElementId
+    except Exception:
+        return False
+
+
+def _run_transaction(label, action):
+    """Run one atomic Revit write and never leave a started transaction open."""
+    transaction = Transaction(doc, "T3Lab: " + label)
+    try:
+        if transaction.Start() != DB.TransactionStatus.Started:
+            raise RuntimeError("Revit did not start the transaction.")
+        options = transaction.GetFailureHandlingOptions()
+        options.SetForcedModalHandling(True)
+        transaction.SetFailureHandlingOptions(options)
+        result = action()
+        if transaction.Commit() != DB.TransactionStatus.Committed:
+            raise RuntimeError("Revit did not commit the transaction.")
+        return result
+    except Exception:
+        if transaction.GetStatus() == DB.TransactionStatus.Started:
+            transaction.RollBack()
+        raise
+    finally:
+        if transaction.GetStatus() != DB.TransactionStatus.Pending:
+            transaction.Dispose()
 
 # ============================================================
 # DIMENSION RENAME HELPERS
@@ -185,23 +235,23 @@ def _dim_name(dt, origin):
     p = gp(BuiltInParameter.TEXT_SIZE)
     size  = _mm(p) if p else "N/A"
     p = gp(BuiltInParameter.TEXT_FONT)
-    font  = p.AsString() if p else "N/A"
+    font  = _sanitize(_param_text(p, "N/A"))
     p = gp(BuiltInParameter.TEXT_WIDTH_SCALE)
     factor = "{:.2f}".format(p.AsDouble()).rstrip('0').rstrip('.') if p else "N/A"
     p = gp(BuiltInParameter.DIM_TEXT_BACKGROUND)
-    bg    = p.AsValueString() if p else "N/A"
+    bg    = _sanitize(p.AsValueString()) if p else "N/A"
     p = gp(BuiltInParameter.LINE_COLOR)
     color = _DIM_COLORS.get(_rgb(p.AsInteger()), "RGB") if p else "N/A"
     p = gp(BuiltInParameter.DIM_PREFIX)
-    pref  = _sanitize(p.AsString()) if p else "N/A"
+    pref  = _sanitize(_param_text(p)) if p else "N/A"
     p = gp(BuiltInParameter.DIM_STYLE_CENTERLINE_SYMBOL)
     ctr   = "Center" if (p and p.AsElementId() != ElementId.InvalidElementId) else "N/A"
     p = gp(BuiltInParameter.SPOT_ELEV_IND_ELEVATION)
-    elev  = _sanitize(p.AsString()) if p else "N/A"
+    elev  = _sanitize(_param_text(p)) if p else "N/A"
     p = gp(BuiltInParameter.SPOT_ELEV_IND_TOP)
-    top   = _sanitize(p.AsString()) if p else "N/A"
+    top   = _sanitize(_param_text(p)) if p else "N/A"
     p = gp(BuiltInParameter.SPOT_ELEV_IND_BOTTOM)
-    bot   = _sanitize(p.AsString()) if p else "N/A"
+    bot   = _sanitize(_param_text(p)) if p else "N/A"
 
     # Extract custom rounding if available
     rounding_str = ""
@@ -252,7 +302,7 @@ def _txt_name(tt, origin):
     p = gp(BuiltInParameter.TEXT_SIZE)
     size   = _mm(p) if p else "N/A"
     p = gp(BuiltInParameter.TEXT_FONT)
-    font   = p.AsString().replace(" ", "") if p else "N/A"
+    font   = _sanitize(_param_text(p, "N/A").replace(" ", ""))
     p = gp(BuiltInParameter.TEXT_BACKGROUND)
     bg     = ("Opaque" if p.AsInteger() == 0 else "Transparent") if p else "N/A"
     p = gp(BuiltInParameter.TEXT_WIDTH_SCALE)
@@ -334,6 +384,15 @@ class AnnotationManagerWindow(T3WPFWindow):
             self._txt_map = {}   # id-str → Revit element
             self.dg_txt.CellEditEnding += self.txt_cell_edit_ending
 
+            # Debounce live search.  Rebuilding thousands of DataRows on every
+            # keypress was the source of the Journal BIG_GAP on large models.
+            self._dim_search_timer = DispatcherTimer()
+            self._dim_search_timer.Interval = TimeSpan.FromMilliseconds(250)
+            self._dim_search_timer.Tick += self._run_queued_dim_search
+            self._txt_search_timer = DispatcherTimer()
+            self._txt_search_timer.Interval = TimeSpan.FromMilliseconds(250)
+            self._txt_search_timer.Tick += self._run_queued_txt_search
+
             # Sidebar list event bindings
             self.lb_dim_types.SelectionChanged += self.dim_sidebar_select_changed
             self.lb_txt_types.SelectionChanged += self.txt_sidebar_select_changed
@@ -344,10 +403,22 @@ class AnnotationManagerWindow(T3WPFWindow):
             self.dim_kw.TextChanged += self.dim_kw_changed
             self.txt_kw.TextChanged += self.txt_kw_changed
 
-            # Auto-load all elements on startup
+            # Four collectors total at startup (instances/types for each tool).
+            # All search and sidebar operations below work from these snapshots.
+            self._refresh_dim_cache()
+            self._refresh_txt_cache()
             self._load_all_dims()
             self._load_all_txts()
             self._load_sidebar_lists()
+
+            # Bind after initial population so selection sync does not run for
+            # thousands of transient rows while the DataTables are built.
+            self.dg_dim.SelectionChanged += self._dim_grid_selection_changed
+            self.dg_txt.SelectionChanged += self._txt_grid_selection_changed
+
+            include_groups = getattr(self, 'chk_include_groups', None)
+            if include_groups is not None:
+                include_groups.Click += self.settings_filter_changed
 
             # DimText state
             self._dimtext_rules = []
@@ -356,6 +427,9 @@ class AnnotationManagerWindow(T3WPFWindow):
             self.btn_util_copy_anno.Click += self._on_launch_copier
             self.btn_util_renumber_spline.Click += self._on_launch_renumber
             self.btn_util_upper_all.Click += self._on_launch_upper_all
+            tag_button = getattr(self, 'btn_util_tag_checker', None)
+            if tag_button is not None:
+                tag_button.Click += self._on_launch_tag_checker
 
             # Force initial tab content to render: nav_dim.IsChecked was already
             # True when the XAML was parsed, so no explicit SelectedIndex was ever
@@ -431,6 +505,210 @@ class AnnotationManagerWindow(T3WPFWindow):
 
     def _status(self, msg):
         self.status.Text = msg
+
+    def _setting_enabled(self, control_name, default):
+        control = getattr(self, control_name, None)
+        if control is None or control.IsChecked is None:
+            return default
+        return bool(control.IsChecked)
+
+    def _include_grouped(self):
+        return self._setting_enabled('chk_include_groups', False)
+
+    def _auto_select_enabled(self):
+        return self._setting_enabled('chk_auto_select', True)
+
+    def _confirm_delete_enabled(self):
+        return self._setting_enabled('chk_confirm_delete', True)
+
+    @staticmethod
+    def _view_name(owner_view_id, cache):
+        key = str(owner_view_id)
+        if key not in cache:
+            view = doc.GetElement(owner_view_id)
+            cache[key] = view.Name if view is not None else ""
+        return cache[key]
+
+    def _refresh_dim_cache(self):
+        self._dim_types = list(
+            FilteredElementCollector(doc).OfClass(DimensionType)
+            .WhereElementIsElementType()
+        )
+        self._dim_type_by_id = {str(item.Id): item for item in self._dim_types}
+        self._dim_type_names = {
+            key: _type_name(item, "<unnamed style>")
+            for key, item in self._dim_type_by_id.items()
+        }
+        self._dim_records = []
+        self._dim_record_by_id = {}
+        self._dim_counts_all = {}
+        self._dim_counts_ungrouped = {}
+        view_names = {}
+        for element in FilteredElementCollector(doc).OfClass(Dimension).WhereElementIsNotElementType():
+            elem_id = str(element.Id)
+            type_id = str(element.GetTypeId())
+            grouped = _is_grouped(element)
+            self._dim_counts_all[type_id] = self._dim_counts_all.get(type_id, 0) + 1
+            if not grouped:
+                self._dim_counts_ungrouped[type_id] = self._dim_counts_ungrouped.get(type_id, 0) + 1
+            record = {
+                "element": element,
+                "id": elem_id,
+                "type_id": type_id,
+                "type_name": self._dim_type_names.get(type_id, "<unnamed style>"),
+                "view_id": str(element.OwnerViewId),
+                "view_name": self._view_name(element.OwnerViewId, view_names),
+                "grouped": grouped,
+            }
+            self._dim_records.append(record)
+            self._dim_record_by_id[elem_id] = record
+
+    def _refresh_txt_cache(self):
+        self._txt_types = list(
+            FilteredElementCollector(doc).OfClass(TextNoteType)
+            .WhereElementIsElementType()
+        )
+        self._txt_type_by_id = {str(item.Id): item for item in self._txt_types}
+        self._txt_type_names = {
+            key: _type_name(item, "<unnamed>")
+            for key, item in self._txt_type_by_id.items()
+        }
+        self._txt_records = []
+        self._txt_record_by_id = {}
+        self._txt_counts_all = {}
+        self._txt_counts_ungrouped = {}
+        view_names = {}
+        for element in FilteredElementCollector(doc).OfClass(TextNote).WhereElementIsNotElementType():
+            elem_id = str(element.Id)
+            type_id = str(element.GetTypeId())
+            grouped = _is_grouped(element)
+            self._txt_counts_all[type_id] = self._txt_counts_all.get(type_id, 0) + 1
+            if not grouped:
+                self._txt_counts_ungrouped[type_id] = self._txt_counts_ungrouped.get(type_id, 0) + 1
+            record = {
+                "element": element,
+                "id": elem_id,
+                "type_id": type_id,
+                "type_name": self._txt_type_names.get(type_id, "<unnamed>"),
+                "text": element.Text or "",
+                "view_id": str(element.OwnerViewId),
+                "view_name": self._view_name(element.OwnerViewId, view_names),
+                "grouped": grouped,
+            }
+            self._txt_records.append(record)
+            self._txt_record_by_id[elem_id] = record
+
+    def _record_is_visible(self, record):
+        return self._include_grouped() or not record["grouped"]
+
+    def _dim_counts(self):
+        return self._dim_counts_all if self._include_grouped() else self._dim_counts_ungrouped
+
+    def _txt_counts(self):
+        return self._txt_counts_all if self._include_grouped() else self._txt_counts_ungrouped
+
+    def _replace_table(self, table, grid, populate):
+        """Bulk replace rows without a WPF notification/layout pass per row."""
+        was_updating = getattr(self, '_updating_grids', False)
+        self._updating_grids = True
+        grid.ItemsSource = None
+        table.BeginLoadData()
+        try:
+            table.Clear()
+            populate()
+        finally:
+            table.EndLoadData()
+            grid.ItemsSource = table.DefaultView
+            self._updating_grids = was_updating
+
+    @staticmethod
+    def _selected_rows(table, grid):
+        selected = {}
+        for row in table.Rows:
+            if bool(row["Selected"]):
+                selected[str(row["_id"])] = row
+        if not selected:
+            for row in grid.SelectedItems:
+                selected[str(row["_id"])] = row
+        return list(selected.values())
+
+    @staticmethod
+    def _set_header_checkbox(control, value):
+        if control is not None:
+            control.IsChecked = value
+
+    def _confirm_delete(self, count, label):
+        if not self._confirm_delete_enabled():
+            return True
+        return T3Dialog.confirm(
+            "Delete {} selected {}?".format(count, label),
+            title="Confirm Delete",
+            ok_text="Delete",
+            cancel_text="Cancel",
+            danger=True,
+            details="This model change can be restored with one Undo.",
+            owner=self,
+        )
+
+    def _run_queued_dim_search(self, sender, args):
+        self._dim_search_timer.Stop()
+        self.dim_search(None, None)
+
+    def _run_queued_txt_search(self, sender, args):
+        self._txt_search_timer.Stop()
+        self.txt_search(None, None)
+
+    def settings_filter_changed(self, sender, args):
+        self._dim_search_timer.Stop()
+        self._txt_search_timer.Stop()
+        self.dim_search(None, None)
+        self.txt_search(None, None)
+
+    def _set_revit_selection(self, element_ids):
+        if uidoc is None or not element_ids:
+            return
+        ids = List[ElementId]()
+        for element_id in element_ids:
+            ids.Add(element_id)
+        uidoc.Selection.SetElementIds(ids)
+
+    def _dim_grid_selection_changed(self, sender, args):
+        if getattr(self, '_updating_grids', False) or not self._auto_select_enabled():
+            return
+        row = self.dg_dim.SelectedItem
+        if row is None or uidoc is None:
+            return
+        active_view_id = str(uidoc.ActiveView.Id)
+        cat_code = str(row["_cat"])
+        elem_id = str(row["_id"])
+        if cat_code == "DimInst":
+            record = self._dim_record_by_id.get(elem_id)
+            matches = [record] if record and record["view_id"] == active_view_id else []
+        else:
+            matches = [record for record in self._dim_records
+                       if record["type_id"] == elem_id
+                       and record["view_id"] == active_view_id
+                       and self._record_is_visible(record)]
+        self._set_revit_selection([record["element"].Id for record in matches])
+
+    def _txt_grid_selection_changed(self, sender, args):
+        if getattr(self, '_updating_grids', False) or not self._auto_select_enabled():
+            return
+        row = self.dg_txt.SelectedItem
+        if row is None or uidoc is None:
+            return
+        active_view_id = str(uidoc.ActiveView.Id)
+        cat_code = str(row["_cat"])
+        elem_id = str(row["_id"])
+        if cat_code == "TxtInst":
+            record = self._txt_record_by_id.get(elem_id)
+            matches = [record] if record and record["view_id"] == active_view_id else []
+        else:
+            matches = [record for record in self._txt_records
+                       if record["type_id"] == elem_id
+                       and record["view_id"] == active_view_id
+                       and self._record_is_visible(record)]
+        self._set_revit_selection([record["element"].Id for record in matches])
 
     def _dt_add(self, dt, elem_id, cat_code, name, details,
                 size="", font="", bg="", color="", selected=False, count="1", status="Active"):
