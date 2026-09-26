@@ -33,7 +33,18 @@ runner) raises "bad magic number", because .pyc magic differs per minor version.
 
 import os
 import sys
+import time
 
+
+# Engine start. The persistent CPython engine keeps modules in sys.modules for
+# the whole Revit session, so a lib/ file edited after this moment is stale in
+# memory until it is reloaded (see reload_changed_modules).
+_BOOT_TIME = time.time()
+
+# Hot-reloaded by init_cpython_paths() when their file changes on disk.
+HOT_RELOAD_MODULES = ('GUI.WPF_Base', 'WPF_Base', 'GUI.forms',
+                      'pyrevit.forms._cpy', 'Snippets._host', '_host')
+_RELOADED_AT = {}
 
 # Probed by verify_stdlib(); these are the imports that actually broke tools.
 _STDLIB_PROBES = ('configparser', 'csv', 'json', 'email')
@@ -244,6 +255,43 @@ def _log_diagnosis():
         pass
 
 
+def _source_mtime(module):
+    path = getattr(module, '__file__', None) or ''
+    if path.endswith(('.pyc', '.pyo')):
+        path = path[:-1]
+    try:
+        return os.path.getmtime(path) if path else None
+    except Exception:
+        return None
+
+
+def reload_changed_modules(names=HOT_RELOAD_MODULES):
+    """Reload only the cached modules whose source changed since they loaded.
+
+    Every pushbutton calls init_cpython_paths(), and it used to reload all of
+    HOT_RELOAD_MODULES unconditionally — recompiling WPF_Base (1400+ lines,
+    ten clr.AddReference probes) on every click of every tool, three times on
+    the first BatchOut open. An unchanged file now costs one stat() call; an
+    edited one is still picked up without a pyRevit Reload.
+    """
+    import importlib
+    reloaded = []
+    for name in names:
+        module = sys.modules.get(name)
+        if module is None:
+            continue
+        mtime = _source_mtime(module)
+        if mtime is None or mtime <= _RELOADED_AT.get(name, _BOOT_TIME):
+            continue
+        try:
+            importlib.reload(module)
+            reloaded.append(name)
+        except Exception:
+            pass
+        _RELOADED_AT[name] = mtime
+    return reloaded
+
+
 def init_cpython_paths():
     """Ensure pyRevit CPython standard library and C extensions are in sys.path and DLL path."""
     sys.dont_write_bytecode = True
@@ -310,15 +358,9 @@ def init_cpython_paths():
     verify_stdlib()
     _log_diagnosis()
 
-    # Force reload of GUI.WPF_Base if cached, and monkeypatch forms.WPFWindow
+    # Pick up edited base modules, and monkeypatch forms.WPFWindow
     try:
-        import importlib
-        for _mod_name in ('GUI.WPF_Base', 'WPF_Base', 'GUI.forms', 'pyrevit.forms._cpy', 'Snippets._host', '_host'):
-            if _mod_name in sys.modules:
-                try:
-                    importlib.reload(sys.modules[_mod_name])
-                except Exception:
-                    pass
+        reload_changed_modules()
         from GUI.WPF_Base import T3WPFWindow
         import pyrevit.forms as _pyrevit_forms
         _pyrevit_forms.WPFWindow = T3WPFWindow

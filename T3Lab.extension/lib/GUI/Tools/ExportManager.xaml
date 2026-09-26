@@ -2190,6 +2190,8 @@
                                             <TextBlock Text="Export Options" FontWeight="SemiBold" FontSize="12.5" Foreground="{StaticResource T3.Ink}" Margin="0,0,0,12"/>
                                             <CheckBox x:Name="cad_export_views_on_sheets" Content="Export views on sheets" IsChecked="False" Margin="0,4"/>
                                             <CheckBox x:Name="cad_export_links_as_external" Content="Export links as external references" IsChecked="False" Margin="0,4"/>
+                                            <CheckBox x:Name="cad_match_revit_display" Content="Match Revit display (colors, line weights)" IsChecked="True" Margin="0,4"
+                                                      ToolTip="Every line, fill and text keeps the color Revit shows in the view, including V/G overrides and filters. Turn off to use the DWG export setup exactly as saved."/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>

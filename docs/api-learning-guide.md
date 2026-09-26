@@ -55,6 +55,12 @@ Hệ thống học API signatures từ documentation.
 ### 3. **Auto Updater** (`api_updater.py`)
 Tự động kiểm tra và cập nhật API mỗi thứ 6.
 
+> **2026-09-26:** BatchOut **không còn** gọi `auto_check_and_update()` lúc mở
+> tool. Hàm này tải revitapidocs.com bằng `WebClient` đồng bộ trên UI thread
+> của Revit (timeout mặc định 100 s) và kết quả chỉ ghi vào debug log — nên nó
+> chỉ làm chậm lúc mở cửa sổ. Module vẫn giữ để gọi tay; muốn dùng lại trong
+> tool thì phải chạy ngoài UI thread.
+
 **Khả năng:**
 - Tự động check mỗi thứ 6 (khi revitapidocs.com update)
 - Detect phiên bản Revit mới
@@ -80,9 +86,8 @@ if result['updates_found']:
 ```
 1. Load SmartAPIAdapter
 2. Check cache (30 days)
-3. Auto-update nếu cần (Friday only)
-4. Load API info từ cache hoặc web
-5. Apply version-appropriate APIs
+3. Load API info từ cache (không gọi web lúc mở tool)
+4. Apply version-appropriate APIs
 ```
 
 ### Weekly Auto-Update (Thứ 6):

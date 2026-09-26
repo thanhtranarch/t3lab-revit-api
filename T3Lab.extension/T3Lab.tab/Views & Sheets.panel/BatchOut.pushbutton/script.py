@@ -29,7 +29,25 @@ try:
 except Exception:
     pass
 
-from GUI.BatchOutDialog import ExportManagerWindow, show_batchout_dialog
+
+def _main():
+    # Imported inside the guard: a failure while loading the dialog module is
+    # reported like any other error instead of escaping to Revit.
+    from GUI.BatchOutDialog import show_batchout_dialog
+    show_batchout_dialog()
+
 
 if __name__ == '__main__':
-    show_batchout_dialog()
+    try:
+        from GUI.ErrorGuard import run_tool
+    except Exception:
+        _main()
+    else:
+        # Anything that escapes this script ends as Revit's "Command Failure
+        # for External Command" dialog with no cause; run_tool shows the real
+        # error and logs it to %APPDATA%\T3LabAI\errors.log instead.
+        run_tool("BatchOut", _main)
+else:
+    # Loaded as a module by the T3Lab Assistant (_load_batchout_mod fallback),
+    # which needs the window class on this module.
+    from GUI.BatchOutDialog import ExportManagerWindow, show_batchout_dialog  # noqa: F401

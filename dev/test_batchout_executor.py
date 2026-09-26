@@ -166,7 +166,9 @@ class BatchOutExecutorTests(unittest.TestCase):
     def test_pushbutton_exports_the_class_required_by_assistant_loader(self):
         script = ROOT / 'T3Lab.extension/T3Lab.tab/Views & Sheets.panel/BatchOut.pushbutton/script.py'
         tree = ast.parse(script.read_text(encoding='utf-8-sig'))
-        names = {alias.name for node in tree.body if isinstance(node, ast.ImportFrom)
+        # ast.walk: the import sits in the non-__main__ branch, so running the
+        # button keeps it inside ErrorGuard.run_tool.
+        names = {alias.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
                  and node.module == 'GUI.BatchOutDialog' for alias in node.names}
         self.assertIn('ExportManagerWindow', names)
 

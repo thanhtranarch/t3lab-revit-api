@@ -157,6 +157,23 @@ try:
 except Exception:
     IRONPY = 'IronPython' in sys.version
 
+# An exception escaping a WPF handler or binding while a tool window is open
+# surfaces as Revit's "Command Failure for External Command" (modal) or kills
+# Revit (modeless). Every window built on this base is guarded; see ErrorGuard.
+try:
+    from GUI.ErrorGuard import (guard_handler as _guard_handler,
+                                handle_dispatcher_exception as _handle_dispatcher_exception)
+except Exception:
+    try:
+        from ErrorGuard import (guard_handler as _guard_handler,
+                                handle_dispatcher_exception as _handle_dispatcher_exception)
+    except Exception:
+        def _guard_handler(fn, owner=None, name=None):
+            return fn
+
+        def _handle_dispatcher_exception(owner, exc):
+            return False
+
 # Set of standard WPF event attribute names extracted from XAML
 _EVENT_NAMES = {
     'Click', 'Checked', 'Unchecked', 'SelectionChanged', 'TextChanged',
@@ -427,6 +444,41 @@ class T3WPFWindow(Window):
             self.setup_owner()
         if handle_esc:
             self.setup_default_handlers()
+        self._install_dispatcher_guard()
+
+    def _install_dispatcher_guard(self):
+        """Catch exceptions WPF raises outside our handlers while this window
+        is open — a binding onto a read-only property, a handler attached in
+        code, a Dispatcher callback — before they reach Revit.
+
+        Detached again on Closed: the Dispatcher is Revit's UI thread, shared
+        with every other window, and only exceptions from Python code or WPF
+        data binding are ever marked handled (see ErrorGuard).
+        """
+        if getattr(self, '_t3_dispatcher_guard_on', False):
+            return
+        try:
+            self.Dispatcher.UnhandledException += self._on_dispatcher_unhandled
+            self._t3_dispatcher_guard_on = True
+            self.Closed += self._remove_dispatcher_guard
+        except BaseException:
+            pass
+
+    def _remove_dispatcher_guard(self, sender=None, e=None):
+        if not getattr(self, '_t3_dispatcher_guard_on', False):
+            return
+        try:
+            self.Dispatcher.UnhandledException -= self._on_dispatcher_unhandled
+        except BaseException:
+            pass
+        self._t3_dispatcher_guard_on = False
+
+    def _on_dispatcher_unhandled(self, sender, e):
+        try:
+            if not e.Handled and _handle_dispatcher_exception(self, e.Exception):
+                e.Handled = True
+        except BaseException:
+            pass
 
     def _load_via_xaml_reader(self, xaml_content):
         """Hydrates Window via System.Windows.Markup.XamlReader with multi-strategy fallbacks."""
@@ -656,7 +708,7 @@ class T3WPFWindow(Window):
                 if handler is not None and callable(handler):
                     evt = getattr(ctrl, event_name, None)
                     if evt is not None:
-                        evt += handler
+                        evt += _guard_handler(handler, self, handler_name)
             except BaseException:
                 pass
 
@@ -744,7 +796,7 @@ class T3WPFWindow(Window):
                     if handler_name:
                         handler = getattr(self, handler_name, None)
                         if handler is not None and callable(handler):
-                            handler(node, args)
+                            _guard_handler(handler, self, handler_name)(node, args)
                         return
                     node = _parent(node)
             except BaseException:
