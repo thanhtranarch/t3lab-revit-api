@@ -30,8 +30,8 @@ X = '{http://schemas.microsoft.com/winfx/2006/xaml}'
 P = '{http://schemas.microsoft.com/winfx/2006/xaml/presentation}'
 BRIDGE = re.compile(r'^\{Binding Text, ElementName=(\w+), Mode=OneWay\}$')
 
-# Files whose rows are DataRowView (typed bool columns) or UI-frozen.
-EXEMPT = {'ManaAnno.xaml', 'DWGManagement.xaml'}
+# Rows are DataRowView (typed bool columns): a direct binding reads fine.
+EXEMPT = {'ManaAnno.xaml'}
 
 
 # ── fakes for the .NET binding API ───────────────────────────────────────────
@@ -203,7 +203,8 @@ class ShippedXaml(unittest.TestCase):
                 self.assertEqual(bridge.get('Visibility'), 'Collapsed', fname)
                 self.assertRegex(bridge.get('Text') or '', r'^\{Binding \w+\}$', fname)
         # 25 template checkboxes + 13 former DataGridCheckBoxColumns + BatchOut
-        self.assertEqual(count, 39)
+        # + DWGManagement (binding only, its UI stays frozen)
+        self.assertEqual(count, 40)
 
     def test_read_only_workset_state_is_display_only(self):
         root = ET.parse(os.path.join(TOOLS, 'ManaWorkset.xaml')).getroot()
@@ -300,6 +301,22 @@ class MetricDetailGrid(unittest.TestCase):
             body = src[src.index(handler):]
             body = body[:body.index('\n    def ', 1)]
             self.assertIn('self.sync_header_checkbox(self.chk_all_dg_detail_elements', body)
+
+
+class DwgManagementStaysFrozen(unittest.TestCase):
+    """The bridge went in; the frozen look did not change."""
+
+    def test_only_the_binding_changed(self):
+        root = ET.parse(os.path.join(TOOLS, 'DWGManagement.xaml')).getroot()
+        grid = next(g for g in root.iter(P + 'DataGrid') if g.get(X + 'Name') == 'DWGDataGrid')
+        col = next(grid.iter(P + 'DataGridTemplateColumn'))
+        self.assertIsNone(col.get('HeaderStyle'))                 # its own inline styles stay
+        self.assertIsNotNone(col.find(P + 'DataGridTemplateColumn.HeaderStyle'))
+        row_box = next(col.find(P + 'DataGridTemplateColumn.CellTemplate').iter(P + 'CheckBox'))
+        self.assertRegex(row_box.get('IsChecked'), BRIDGE)
+        self.assertEqual((row_box.get('Style'), row_box.get('HorizontalAlignment'),
+                          row_box.get('Padding'), row_box.get('Margin')),
+                         ('{StaticResource T3.CheckBox}', 'Center', '0', '0'))
 
 
 class CustomFilenameCell(unittest.TestCase):

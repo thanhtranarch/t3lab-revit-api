@@ -68,8 +68,9 @@ SELECTALL_EXEMPT = {
 # Miễn trừ, kèm lý do:
 #   ManaAnno      — dòng là DataRowView (DataTable): cột bool có kiểu thật nên
 #                   binding thẳng đọc đúng, bridge không cần.
-#   DWGManagement — UI-frozen theo CLAUDE.md; cần chủ repo đồng ý mới sửa XAML.
-BRIDGE_EXEMPT = {"ManaAnno.xaml", "DWGManagement.xaml"}
+#   (DWGManagement đã qua bridge 2026-09-26 — chủ repo đồng ý sửa binding,
+#    giao diện vẫn khoá nguyên.)
+BRIDGE_EXEMPT = {"ManaAnno.xaml"}
 
 # ── Luật 22 · ICON ───────────────────────────────────────────────────────
 # UI-frozen theo CLAUDE.md: icon của 2 file này không đi theo hệ T3.Icon.*
