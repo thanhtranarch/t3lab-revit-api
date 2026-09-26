@@ -3749,18 +3749,31 @@ class ExportManagerWindow(T3WPFWindow):
                     logger.warning("Could not apply export setup '{}': {}".format(
                         selected_setup_name, setup_ex))
                     dwg_options = DWGExportOptions()
-                    # Fallback: Set PropOverrides to ByEntity to match Revit colors
-                    try:
-                        dwg_options.PropOverrides = PropOverrideMode.ByEntity
-                    except:
-                        pass
             else:
                 dwg_options = DWGExportOptions()
-                # No setup selected - ensure colors match Revit by using ByEntity mode
-                try:
-                    dwg_options.PropOverrides = PropOverrideMode.ByEntity
-                except Exception as prop_ex:
-                    logger.debug("Could not set PropOverrides: {}".format(prop_ex))
+
+            # Force ByEntity regardless of setup outcome. A named export
+            # setup's saved PropOverrides is almost always ByLayer (every
+            # entity on a layer gets one fixed layer color, which is what
+            # AutoCAD's Layer Manager shows) - that silently overrides our
+            # earlier per-branch fallback and is why colors kept coming out
+            # "by layer" instead of matching the view's per-element graphic
+            # overrides (e.g. red dashed demolition, view filters). ByEntity
+            # is what makes each entity carry its own displayed Revit color.
+            try:
+                dwg_options.PropOverrides = PropOverrideMode.ByEntity
+            except Exception as prop_ex:
+                logger.debug("Could not set PropOverrides: {}".format(prop_ex))
+
+            # Solid/hatch fill patterns (filled regions, materials, wall/floor
+            # patterns) otherwise export as foreground lines only, losing the
+            # solid-colour look they have on screen. This is API-only - not
+            # exposed in the Export Setups dialog - so apply it regardless of
+            # whether a named setup was loaded.
+            try:
+                dwg_options.UseHatchBackgroundColor = True
+            except Exception as hatch_ex:
+                logger.debug("Could not set UseHatchBackgroundColor: {}".format(hatch_ex))
 
             # Set AutoCAD version (overrides whatever the setup/default specifies)
             dwg_version_index = self.dwg_version.SelectedIndex
