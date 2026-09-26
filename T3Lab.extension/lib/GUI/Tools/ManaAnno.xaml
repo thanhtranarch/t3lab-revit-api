@@ -1669,7 +1669,7 @@
 
     <!-- ═══ Outer Window Border ═══ -->
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
-            CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True"
+            CornerRadius="12" ClipToBounds="True"
             Background="{StaticResource T3.Surface}">
         <Grid>
             <Grid.RowDefinitions>
@@ -1861,19 +1861,9 @@
                                     <Grid Grid.Row="2">
                                         <ListBox x:Name="lb_dim_types" Style="{StaticResource T3.ListBox}"
                                                  BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-                                        <TextBlock x:Name="lb_dim_types_empty"
+                                        <TextBlock x:Name="lb_dim_types_empty" Style="{StaticResource T3.Empty}"
                                                    Text="No dimension types match this search.&#x0a;Clear the search box to show all types."
-                                                   IsHitTestVisible="False">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Empty}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasItems, ElementName=lb_dim_types}" Value="True">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
+                                                   Visibility="Collapsed" IsHitTestVisible="False"/>
                                     </Grid>
                                 </Grid>
                             </Border>
@@ -1948,19 +1938,9 @@
                                         </DataGrid.Columns>
                                     </DataGrid>
 
-                                    <TextBlock x:Name="dg_dim_empty"
+                                    <TextBlock x:Name="dg_dim_empty" Style="{StaticResource T3.Empty}"
                                                Text="No dimensions match the current filters.&#x0a;Clear the search box or choose another type."
-                                               IsHitTestVisible="False">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Empty}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasItems, ElementName=dg_dim}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                               Visibility="Collapsed" IsHitTestVisible="False"/>
                                 </Grid>
 
                                 <!-- Row 2: Action Strip -->
@@ -2047,19 +2027,9 @@
                                     <Grid Grid.Row="2">
                                         <ListBox x:Name="lb_txt_types" Style="{StaticResource T3.ListBox}"
                                                  BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-                                        <TextBlock x:Name="lb_txt_types_empty"
+                                        <TextBlock x:Name="lb_txt_types_empty" Style="{StaticResource T3.Empty}"
                                                    Text="No text note types match this search.&#x0a;Clear the search box to show all types."
-                                                   IsHitTestVisible="False">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Empty}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasItems, ElementName=lb_txt_types}" Value="True">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
+                                                   Visibility="Collapsed" IsHitTestVisible="False"/>
                                     </Grid>
                                 </Grid>
                             </Border>
@@ -2134,19 +2104,9 @@
                                         </DataGrid.Columns>
                                     </DataGrid>
 
-                                    <TextBlock x:Name="dg_txt_empty"
+                                    <TextBlock x:Name="dg_txt_empty" Style="{StaticResource T3.Empty}"
                                                Text="No text notes match the current filters.&#x0a;Clear the search box or choose another type."
-                                               IsHitTestVisible="False">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Empty}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasItems, ElementName=dg_txt}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                               Visibility="Collapsed" IsHitTestVisible="False"/>
                                 </Grid>
 
                                 <!-- Row 2: Action Strip -->
@@ -2214,7 +2174,7 @@
                                         <TextBlock Grid.Column="0" Text="DIMENSION OVERRIDE FIELDS" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
                                     </Grid>
                                     <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="{StaticResource T3.R.Control}" Padding="16,12" Margin="0,0,0,16">
+                                            CornerRadius="6" Padding="16,12" Margin="0,0,0,16">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -2252,7 +2212,7 @@
                                     <!-- PRESETS -->
                                     <TextBlock Text="PRESETS — BELOW" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                                     <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="{StaticResource T3.R.Control}" Padding="16,12" Margin="0,0,0,16">
+                                            CornerRadius="6" Padding="16,12" Margin="0,0,0,16">
                                         <WrapPanel Orientation="Horizontal">
                                             <Button Content="(TYP.)" Tag="(TYP.)" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,4,4" Click="dimtext_preset_below"/>
                                             <Button Content="(E.Q.)" Tag="(E.Q.)" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,4,4" Click="dimtext_preset_below"/>
@@ -2268,7 +2228,7 @@
                                     <!-- OPTIONS -->
                                     <TextBlock Text="OPTIONS" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                                     <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="{StaticResource T3.R.Control}" Padding="16,12" Margin="0,0,0,16">
+                                            CornerRadius="6" Padding="16,12" Margin="0,0,0,16">
                                         <StackPanel>
                                             <CheckBox x:Name="chk_leader" Content="Turn off leader lines"
                                                       Style="{StaticResource T3.CheckBox}" Margin="0,0,0,12"/>
@@ -2285,7 +2245,7 @@
                                     <!-- FILTER RULES -->
                                     <TextBlock Text="FILTER BY SEGMENT LENGTH (OPTIONAL)" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                                     <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="{StaticResource T3.R.Control}" Padding="16,12" Margin="0,0,0,16">
+                                            CornerRadius="6" Padding="16,12" Margin="0,0,0,16">
                                         <StackPanel>
                                             <CheckBox x:Name="chk_filter_enable" Content="Enable segment length filter"
                                                       Style="{StaticResource T3.CheckBox}"
@@ -2337,7 +2297,7 @@
                             <UniformGrid Grid.Row="1" Columns="2" Rows="2">
                                 <!-- Card 1: Copy Annotation -->
                                 <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="{StaticResource T3.R.Control}" Padding="16" Margin="0,0,8,8"
+                                        CornerRadius="6" Padding="16" Margin="0,0,8,8"
                                         Background="{StaticResource T3.SurfaceSunken}">
                                     <Grid>
                                         <Grid.RowDefinitions>
@@ -2356,7 +2316,7 @@
 
                                 <!-- Card 2: Renumber Along Spline -->
                                 <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="{StaticResource T3.R.Control}" Padding="16" Margin="8,0,0,8"
+                                        CornerRadius="6" Padding="16" Margin="8,0,0,8"
                                         Background="{StaticResource T3.SurfaceSunken}">
                                     <Grid>
                                         <Grid.RowDefinitions>
@@ -2375,7 +2335,7 @@
 
                                 <!-- Card 3: Upper Case All -->
                                 <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="{StaticResource T3.R.Control}" Padding="16" Margin="0,8,8,0"
+                                        CornerRadius="6" Padding="16" Margin="0,8,8,0"
                                         Background="{StaticResource T3.SurfaceSunken}">
                                     <Grid>
                                         <Grid.RowDefinitions>
@@ -2394,7 +2354,7 @@
 
                                 <!-- Card 4: Tag Checker -->
                                 <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="{StaticResource T3.R.Control}" Padding="16" Margin="8,8,0,0"
+                                        CornerRadius="6" Padding="16" Margin="8,8,0,0"
                                         Background="{StaticResource T3.SurfaceSunken}">
                                     <Grid>
                                         <Grid.RowDefinitions>
@@ -2425,7 +2385,7 @@
 
                             <!-- Left Card: General Preferences -->
                             <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                    CornerRadius="{StaticResource T3.R.Control}" Padding="16" Margin="0,0,12,0">
+                                    CornerRadius="6" Padding="16" Margin="0,0,12,0">
                                 <StackPanel>
                                     <TextBlock Text="GENERAL PREFERENCES" Style="{StaticResource T3.Label}"/>
                                     <TextBlock Text="Configure behavior settings for Annotation Manager." Style="{StaticResource T3.Caption}" Margin="0,4,0,16"/>
@@ -2444,7 +2404,7 @@
 
                             <!-- Right Card: About & Info -->
                             <Border Grid.Column="1" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                    CornerRadius="{StaticResource T3.R.Control}" Padding="16" Margin="12,0,0,0">
+                                    CornerRadius="6" Padding="16" Margin="12,0,0,0">
                                 <StackPanel>
                                     <TextBlock Text="ABOUT T3LAB ANNOTATION SUITE" Style="{StaticResource T3.Label}"/>
                                     <TextBlock Text="Unified management for Revit drafting elements." Style="{StaticResource T3.Caption}" Margin="0,4,0,16"/>
@@ -2455,7 +2415,7 @@
                                     <TextBlock Text="Contact: trantienthanh909@gmail.com" Style="{StaticResource T3.Caption}" Margin="0,0,0,16"/>
 
                                     <Border Background="{StaticResource T3.Surface}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="{StaticResource T3.R.Control}" Padding="12">
+                                            CornerRadius="6" Padding="12">
                                         <TextBlock Text="This utility combines multiple annotation control panels into a unified tool, optimizing your Revit models by standardizing text, cleaning unused styles, and offering rapid auto-renaming of DimensionTypes and TextNoteTypes based on physical parameters."
                                                    TextWrapping="Wrap" Style="{StaticResource T3.Caption}"/>
                                     </Border>
