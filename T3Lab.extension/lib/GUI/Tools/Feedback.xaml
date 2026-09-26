@@ -3,8 +3,8 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Send Feedback"
-        Width="600" Height="680"
-        MinWidth="480" MinHeight="500"
+        Width="460" Height="680"
+        MinWidth="400" MinHeight="480"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="False"
@@ -1715,59 +1715,73 @@
             </Border>
 
             <!-- ══════════════════ ROW 1: FORM BODY CONTENT ══════════════════ -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Background="{StaticResource T3.Surface}">
-                <StackPanel Margin="16">
-                    <!-- Tip / Info Callout -->
-                    <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                            BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,16">
-                        <TextBlock Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap">
-                            <Run Text="Note: " FontWeight="SemiBold" Foreground="{StaticResource T3.Ink}"/>
-                            <Run Text="Your feedback will be prepared in your default email client addressed to trantienthanh909@gmail.com."/>
-                        </TextBlock>
-                    </Border>
+            <Grid Grid.Row="1" Background="{StaticResource T3.Surface}" Margin="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- 0: Tip Callout -->
+                    <RowDefinition Height="Auto"/> <!-- 1: Feedback Type -->
+                    <RowDefinition Height="Auto"/> <!-- 2: Name + Email -->
+                    <RowDefinition Height="Auto"/> <!-- 3: Subject -->
+                    <RowDefinition Height="Auto"/> <!-- 4: Message Label -->
+                    <RowDefinition Height="*"/>    <!-- 5: Message TextBox (stretches to fill remaining space) -->
+                </Grid.RowDefinitions>
 
-                    <!-- Feedback Type -->
+                <!-- Tip / Info Callout -->
+                <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
+                        BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,12">
+                    <TextBlock Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap">
+                        <Run Text="Note: " FontWeight="SemiBold" Foreground="{StaticResource T3.Ink}"/>
+                        <Run Text="Your feedback will be prepared in your default email client addressed to trantienthanh909@gmail.com."/>
+                    </TextBlock>
+                </Border>
+
+                <!-- Feedback Type -->
+                <StackPanel Grid.Row="1" Margin="0,0,0,12">
                     <TextBlock Text="FEEDBACK TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
                     <ComboBox x:Name="feedback_type" Style="{StaticResource T3.ComboBox}"
-                              ItemContainerStyle="{StaticResource T3.ComboBoxItem}" Margin="0,0,0,16">
+                              ItemContainerStyle="{StaticResource T3.ComboBoxItem}">
                         <ComboBoxItem Content="Suggestion" IsSelected="True"/>
                         <ComboBoxItem Content="Bug report"/>
                         <ComboBoxItem Content="Question"/>
                         <ComboBoxItem Content="Other"/>
                     </ComboBox>
-
-                    <!-- Name + Email Row -->
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="YOUR NAME (OPTIONAL)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="user_name" Style="{StaticResource T3.TextBox}"/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="YOUR EMAIL (OPTIONAL)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="user_email" Style="{StaticResource T3.TextBox}"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Subject -->
-                    <TextBlock Text="SUBJECT" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                    <TextBox x:Name="subject_text" Style="{StaticResource T3.TextBox}" Margin="0,0,0,16"/>
-
-                    <!-- Message -->
-                    <TextBlock Text="MESSAGE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                    <TextBox x:Name="message_text" Style="{StaticResource T3.TextBox}"
-                             AcceptsReturn="True" TextWrapping="Wrap"
-                             VerticalScrollBarVisibility="Auto"
-                             MinHeight="150" Height="180" VerticalContentAlignment="Top"
-                             Padding="8"/>
                 </StackPanel>
-            </ScrollViewer>
+
+                <!-- Name + Email Row -->
+                <Grid Grid.Row="2" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="YOUR NAME (OPTIONAL)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                        <TextBox x:Name="user_name" Style="{StaticResource T3.TextBox}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="YOUR EMAIL (OPTIONAL)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                        <TextBox x:Name="user_email" Style="{StaticResource T3.TextBox}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Subject -->
+                <StackPanel Grid.Row="3" Margin="0,0,0,12">
+                    <TextBlock Text="SUBJECT" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                    <TextBox x:Name="subject_text" Style="{StaticResource T3.TextBox}"/>
+                </StackPanel>
+
+                <!-- Message Label -->
+                <TextBlock Grid.Row="4" Text="MESSAGE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+
+                <!-- Message Box (auto-expands to fill all remaining height) -->
+                <TextBox Grid.Row="5" x:Name="message_text" Style="{StaticResource T3.TextBox}"
+                         Height="Auto" VerticalAlignment="Stretch"
+                         VerticalContentAlignment="Stretch"
+                         VerticalScrollBarVisibility="Auto"
+                         AcceptsReturn="True" TextWrapping="Wrap"
+                         Padding="8"/>
+            </Grid>
 
             <!-- ══════════════════ ROW 2: UNIFIED FOOTER BAR ══════════════════ -->
             <Border Grid.Row="2" Style="{StaticResource T3.FooterBar}">

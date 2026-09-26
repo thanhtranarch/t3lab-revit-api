@@ -3,7 +3,7 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="MCP Control"
-        Width="480" Height="820"
+        Width="460" Height="820"
         MinWidth="420" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="False"
@@ -1826,7 +1826,7 @@
                                            Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
                                 <ComboBox Grid.Column="2" x:Name="snippet_format_cb"
                                           Style="{StaticResource T3.ComboBox}"
-                                          Height="28" Width="240"
+                                          Height="28" Width="215"
                                           ToolTip="Choose the syntax your AI client expects">
                                     <ComboBoxItem Style="{StaticResource T3.ComboBoxItem}" IsSelected="True"
                                                   Content="JSON — Claude / Antigravity"/>

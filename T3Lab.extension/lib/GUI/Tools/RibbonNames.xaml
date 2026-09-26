@@ -3,8 +3,8 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Ribbon Name Manager"
-        Width="640" Height="520"
-        MinWidth="500" MinHeight="400"
+        Width="460" Height="680"
+        MinWidth="400" MinHeight="480"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="False"
@@ -1745,7 +1745,7 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="CURRENT NAME" Width="*"
                                             Binding="{Binding CurrentName}" IsReadOnly="True"/>
-                        <DataGridTextColumn Header="SHORT NAME" Width="200"
+                        <DataGridTextColumn Header="SHORT NAME" Width="130"
                                             Binding="{Binding ShortName}"
                                             ElementStyle="{StaticResource T3.Cell.Mono}"/>
                     </DataGrid.Columns>
@@ -1770,11 +1770,11 @@
                     <!-- Action Buttons -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="BtnShort" Content="Apply Short"
-                                Style="{StaticResource T3.Button.Primary}" IsDefault="True" Margin="0,0,8,0" MinWidth="90"/>
+                                Style="{StaticResource T3.Button.Primary}" IsDefault="True" Margin="0,0,8,0" MinWidth="82"/>
                         <Button x:Name="BtnFull" Content="Restore Full"
-                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0" MinWidth="90"/>
+                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0" MinWidth="82"/>
                         <Button x:Name="BtnClose" Content="Close"
-                                Style="{StaticResource T3.Button.Secondary}" MinWidth="70"/>
+                                Style="{StaticResource T3.Button.Secondary}" MinWidth="60"/>
                     </StackPanel>
                 </Grid>
             </Border>

@@ -1,9 +1,0 @@
-title: "BCF\nReader"
-tooltip: "Read BCF files from IFC Delta Viewer and navigate issues in Revit (modeless)."
-description: |
-  Import BCF files exported from IFC Delta Viewer
-  Browse issues in a modeless panel that stays open while you work
-  Click an issue to navigate the active view to the flagged element
-  Supports BCF 2.1 format with viewpoint and component data
-author: "Dang Quoc Truong"
-version: "1.0.0"
