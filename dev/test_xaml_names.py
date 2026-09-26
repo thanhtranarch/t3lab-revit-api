@@ -27,6 +27,8 @@ REQUIRED = {
                                  'lbl_prev', 'empty_avail', 'empty_selected'],
     'ContainsSetParam.xaml': ['param_cb', 'lbl_value'],
     'ExportManager.xaml': ['sheet_set_summary', 'sheet_set_checklist'],
+    'ManaSheets.xaml': ['renum_total_text', 'renum_selected_text',
+                        'renum_first_text', 'renum_changes_text'],
     'ManaPara.xaml': ['dg_parameters', 'dg_parameters_empty', 'chk_all_dg_parameters',
                       'txt_param_selected', 'btn_param_delete'],
 }
