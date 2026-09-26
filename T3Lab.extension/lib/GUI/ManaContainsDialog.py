@@ -891,320 +891,128 @@ class Tab1ResultGroup:
 
 
 # DefineValueDialog (for Tab 1 configure defined values)
-class DefineValueDialog(Window):
+# Hai dialog con dùng XAML chuẩn T3 — bản dựng tay cũ chết ngay khi mở:
+# Application.Current là None trong Revit và DockPanel không có Padding.
+DEFINE_XAML = os.path.join(GUI_DIR, 'Tools', 'ContainsDefineValue.xaml')
+SETPARAM_XAML = os.path.join(GUI_DIR, 'Tools', 'ContainsSetParam.xaml')
+
+
+def _list_items(listbox):
+    return [str(listbox.Items[i]) for i in range(listbox.Items.Count)]
+
+
+class DefineValueDialog(T3WPFWindow):
     def __init__(self, available_params, current_selected, current_separator):
-        self.Title = "Configure Defined Value - Contains Manager"
-        self.Width = 550
-        self.Height = 420
-        self.WindowStartupLocation = WindowStartupLocation.CenterOwner
-        self.Background = brush(WHITE)
-        self.ResizeMode = ResizeMode.NoResize
-        
-        self.available_params = ["Category", "Family Name", "Type Name"] + available_params
+        T3WPFWindow.__init__(self, DEFINE_XAML)
+        self.available_params = ["Category", "Family Name", "Type Name"] + list(available_params)
         self.selected_params = list(current_selected)
-        self.separator = current_separator
         self.result = None
-        self._build()
+        self.txt_sep.Text = current_separator or ""
         self._load()
-        
-    def _build(self):
-        root = DockPanel()
-        root.Padding = Thickness(15)
-        root.LastChildFill = True
-        
-        # Bottom Buttons
-        bp = StackPanel()
-        bp.Orientation = Orientation.Horizontal
-        bp.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
-        DockPanel.SetDock(bp, Dock.Bottom)
-        
-        self.btn_ok = Button()
-        self.btn_ok.Content = "OK"
-        self.btn_ok.Width = 75
-        self.btn_ok.Height = 26
-        self.btn_ok.Click += self._ok
-        self.btn_ok.Margin = Thickness(0,10,6,0)
-        self.btn_ok.Style = System.Windows.Application.Current.FindResource("SuccessButton")
-        bp.Children.Add(self.btn_ok)
-        
-        self.btn_cancel = Button()
-        self.btn_cancel.Content = "Cancel"
-        self.btn_cancel.Width = 75
-        self.btn_cancel.Height = 26
-        self.btn_cancel.Click += lambda s, e: self.Close()
-        self.btn_cancel.Margin = Thickness(0,10,0,0)
-        self.btn_cancel.Style = System.Windows.Application.Current.FindResource("SecondaryButton")
-        bp.Children.Add(self.btn_cancel)
-        
-        root.Children.Add(bp)
-        
-        # Center Content
-        gp = WPFGrid()
-        gp.ColumnDefinitions.Add(ColumnDefinition())
-        gp.ColumnDefinitions.Add(ColumnDefinition())
-        
-        # Left Side: Available List
-        left_sp = StackPanel()
-        left_sp.Margin = Thickness(0,0,10,0)
-        lbl_avail = TextBlock()
-        lbl_avail.Text = "Available Variables/Params:"
-        lbl_avail.FontWeight = FontWeights.Bold
-        lbl_avail.Margin = Thickness(0,0,0,4)
-        left_sp.Children.Add(lbl_avail)
-        
-        scroll1 = ScrollViewer()
-        scroll1.Height = 220
-        self.avail_list = ListBox()
-        self.avail_list.SelectionMode = SelectionMode.Extended
-        self.avail_list.MouseDoubleClick += self._move_right
-        scroll1.Content = self.avail_list
-        left_sp.Children.Add(scroll1)
-        WPFGrid.SetColumn(left_sp, 0)
-        gp.Children.Add(left_sp)
-        
-        # Right Side: Selected List & Controls
-        right_sp = StackPanel()
-        right_sp.Margin = Thickness(10,0,0,0)
-        lbl_sel = TextBlock()
-        lbl_sel.Text = "Selected Composition:"
-        lbl_sel.FontWeight = FontWeights.Bold
-        lbl_sel.Margin = Thickness(0,0,0,4)
-        right_sp.Children.Add(lbl_sel)
-        
-        scroll2 = ScrollViewer()
-        scroll2.Height = 150
-        self.selected_list = ListBox()
-        self.selected_list.SelectionMode = SelectionMode.Extended
-        self.selected_list.MouseDoubleClick += self._move_left
-        scroll2.Content = self.selected_list
-        right_sp.Children.Add(scroll2)
-        
-        # Move up/down, Separator
-        ctrl_sp = StackPanel()
-        ctrl_sp.Orientation = Orientation.Horizontal
-        ctrl_sp.Margin = Thickness(0,6,0,6)
-        
-        self.btn_up = Button()
-        self.btn_up.Content = "▲ Up"
-        self.btn_up.Width = 55
-        self.btn_up.Height = 22
-        self.btn_up.Click += self._move_up
-        self.btn_up.Margin = Thickness(0,0,4,0)
-        ctrl_sp.Children.Add(self.btn_up)
-        
-        self.btn_dn = Button()
-        self.btn_dn.Content = "▼ Down"
-        self.btn_dn.Width = 55
-        self.btn_dn.Height = 22
-        self.btn_dn.Click += self._move_down
-        self.btn_dn.Margin = Thickness(0,0,10,0)
-        ctrl_sp.Children.Add(self.btn_dn)
-        
-        lbl_sep = TextBlock()
-        lbl_sep.Text = "Separator:"
-        lbl_sep.VerticalAlignment = System.Windows.VerticalAlignment.Center
-        lbl_sep.Margin = Thickness(0,0,4,0)
-        ctrl_sp.Children.Add(lbl_sep)
-        
-        self.txt_sep = TextBox()
-        self.txt_sep.Text = self.separator
-        self.txt_sep.Width = 40
-        self.txt_sep.Height = 22
-        self.txt_sep.VerticalContentAlignment = System.Windows.VerticalAlignment.Center
-        ctrl_sp.Children.Add(self.txt_sep)
-        right_sp.Children.Add(ctrl_sp)
-        
-        # Preview Text
-        self.lbl_prev = TextBlock()
-        self.lbl_prev.Text = "Preview: Name_Number"
-        self.lbl_prev.FontStyle = System.Windows.FontStyles.Italic
-        self.lbl_prev.Foreground = brush(TEXT_GRAY)
-        self.lbl_prev.Margin = Thickness(0,6,0,0)
-        right_sp.Children.Add(self.lbl_prev)
-        
-        WPFGrid.SetColumn(right_sp, 1)
-        gp.Children.Add(right_sp)
-        
-        root.Children.Add(gp)
-        self.Content = root
-        
+
     def _load(self):
         for p in self.available_params:
             if p not in self.selected_params:
                 self.avail_list.Items.Add(p)
         for p in self.selected_params:
             self.selected_list.Items.Add(p)
-        self._update_preview()
-        
-    def _move_right(self, s, e):
-        sel = list(self.avail_list.SelectedItems)
-        for item in sel:
-            self.selected_list.Items.Add(item)
-            self.avail_list.Items.Remove(item)
-        self._update_preview()
-        
-    def _move_left(self, s, e):
-        sel = list(self.selected_list.SelectedItems)
-        for item in sel:
-            self.avail_list.Items.Add(item)
-            self.selected_list.Items.Remove(item)
-        self._update_preview()
-        
-    def _move_up(self, s, e):
-        idx = self.selected_list.SelectedIndex
-        if idx > 0:
-            val = self.selected_list.Items[idx]
-            self.selected_list.Items.RemoveAt(idx)
-            self.selected_list.Items.Insert(idx - 1, val)
-            self.selected_list.SelectedIndex = idx - 1
-            self._update_preview()
-            
-    def _move_down(self, s, e):
-        idx = self.selected_list.SelectedIndex
-        if idx >= 0 and idx < self.selected_list.Items.Count - 1:
-            val = self.selected_list.Items[idx]
-            self.selected_list.Items.RemoveAt(idx)
-            self.selected_list.Items.Insert(idx + 1, val)
-            self.selected_list.SelectedIndex = idx + 1
-            self._update_preview()
-            
-    def _update_preview(self):
-        sep = self.txt_sep.Text
-        items = [str(self.selected_list.Items[i]) for i in range(self.selected_list.Items.Count)]
-        self.lbl_prev.Text = "Preview: " + sep.join(items)
-        
-    def _ok(self, s, e):
-        self.result = {
-            "params": [str(self.selected_list.Items[i]) for i in range(self.selected_list.Items.Count)],
-            "separator": self.txt_sep.Text
-        }
+        self._refresh()
+
+    def _refresh(self):
+        vis = System.Windows.Visibility
+        self.empty_avail.Visibility = vis.Visible if self.avail_list.Items.Count == 0 else vis.Collapsed
+        self.empty_selected.Visibility = vis.Visible if self.selected_list.Items.Count == 0 else vis.Collapsed
+        self.lbl_prev.Text = "Preview: " + (self.txt_sep.Text or "").join(_list_items(self.selected_list))
+
+    def _move(self, src, dst):
+        for item in list(src.SelectedItems):
+            dst.Items.Add(item)
+            src.Items.Remove(item)
+        self._refresh()
+
+    def move_right_clicked(self, sender, e):
+        self._move(self.avail_list, self.selected_list)
+
+    def move_left_clicked(self, sender, e):
+        self._move(self.selected_list, self.avail_list)
+
+    def _shift(self, step):
+        lst = self.selected_list
+        idx = lst.SelectedIndex
+        new = idx + step
+        if idx < 0 or new < 0 or new >= lst.Items.Count:
+            return
+        val = lst.Items[idx]
+        lst.Items.RemoveAt(idx)
+        lst.Items.Insert(new, val)
+        lst.SelectedIndex = new
+        self._refresh()
+
+    def move_up_clicked(self, sender, e):
+        self._shift(-1)
+
+    def move_down_clicked(self, sender, e):
+        self._shift(1)
+
+    def separator_changed(self, sender, e):
+        if hasattr(self, 'selected_list'):
+            self._refresh()
+
+    def ok_clicked(self, sender, e):
+        params = _list_items(self.selected_list)
+        if not params:
+            TaskDialog.Show("Configure Defined Value",
+                            "No parameter selected. Add at least one parameter to build the value.")
+            return
+        self.result = {"params": params, "separator": self.txt_sep.Text}
         self.DialogResult = True
+        self.Close()
+
+    def cancel_clicked(self, sender, e):
         self.Close()
 
 
 # SetParamDialog (for Tab 1 Set Parameter Value Dialog)
-class SetParamDialog(Window):
+class SetParamDialog(T3WPFWindow):
+    _DEFAULT_PARAMS = ("DQT_Contain_SpatialID", "IFC-SG_RoomNumber", "Comments", "Mark")
+
     def __init__(self, selected_groups, spatial_type, define_params, define_separator):
-        self.Title = "Set Parameter Value - Contains Manager"
-        self.Width = 450
-        self.Height = 250
-        self.WindowStartupLocation = WindowStartupLocation.CenterOwner
-        self.Background = brush(WHITE)
-        self.ResizeMode = ResizeMode.NoResize
-        
+        T3WPFWindow.__init__(self, SETPARAM_XAML)
         self.selected_groups = selected_groups
         self.spatial_type = spatial_type
         self.define_params = define_params
         self.define_separator = define_separator
         self.result = None
-        self._build()
         self._load()
-        
-    def _build(self):
-        root = DockPanel()
-        root.Padding = Thickness(15)
-        root.LastChildFill = True
-        
-        # Bottom Buttons
-        bp = StackPanel()
-        bp.Orientation = Orientation.Horizontal
-        bp.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
-        DockPanel.SetDock(bp, Dock.Bottom)
-        
-        self.btn_ok = Button()
-        self.btn_ok.Content = "Apply"
-        self.btn_ok.Width = 75
-        self.btn_ok.Height = 26
-        self.btn_ok.Click += self._ok
-        self.btn_ok.Margin = Thickness(0,10,6,0)
-        self.btn_ok.Style = System.Windows.Application.Current.FindResource("PrimaryButton")
-        bp.Children.Add(self.btn_ok)
-        
-        self.btn_cancel = Button()
-        self.btn_cancel.Content = "Cancel"
-        self.btn_cancel.Width = 75
-        self.btn_cancel.Height = 26
-        self.btn_cancel.Click += lambda s, e: self.Close()
-        self.btn_cancel.Margin = Thickness(0,10,0,0)
-        self.btn_cancel.Style = System.Windows.Application.Current.FindResource("SecondaryButton")
-        bp.Children.Add(self.btn_cancel)
-        
-        root.Children.Add(bp)
-        
-        # Content Grid
-        gp = WPFGrid()
-        gp.ColumnDefinitions.Add(ColumnDefinition())
-        gp.ColumnDefinitions.Add(ColumnDefinition())
-        
-        lbl_mode = TextBlock()
-        lbl_mode.Text = "Assignment Mode:"
-        lbl_mode.FontWeight = FontWeights.Bold
-        lbl_mode.Margin = Thickness(0,0,0,8)
-        lbl_mode.VerticalAlignment = System.Windows.VerticalAlignment.Center
-        WPFGrid.SetRow(lbl_mode, 0)
-        WPFGrid.SetColumn(lbl_mode, 0)
-        gp.Children.Add(lbl_mode)
-        
-        self.rb_custom = RadioButton()
-        self.rb_custom.Content = "Write Defined Value"
-        self.rb_custom.IsChecked = True
-        self.rb_custom.GroupName = "SetMode"
-        self.rb_custom.Margin = Thickness(0,0,0,6)
-        WPFGrid.SetRow(self.rb_custom, 0)
-        WPFGrid.SetColumn(self.rb_custom, 1)
-        gp.Children.Add(self.rb_custom)
-        
-        # Parameter Combobox
-        lbl_param = TextBlock()
-        lbl_param.Text = "Target Parameter (on elements):"
-        lbl_param.FontWeight = FontWeights.Bold
-        lbl_param.VerticalAlignment = System.Windows.VerticalAlignment.Center
-        lbl_param.Margin = Thickness(0,10,0,0)
-        WPFGrid.SetRow(lbl_param, 1)
-        WPFGrid.SetColumn(lbl_param, 0)
-        gp.Children.Add(lbl_param)
-        
-        self.param_cb = ComboBox()
-        self.param_cb.Height = 28
-        self.param_cb.Margin = Thickness(0,10,0,0)
-        self.param_cb.IsEditable = True
-        WPFGrid.SetRow(self.param_cb, 1)
-        WPFGrid.SetColumn(self.param_cb, 1)
-        gp.Children.Add(self.param_cb)
-        
-        root.Children.Add(gp)
-        self.Content = root
-        
+
     def _load(self):
-        # Sample parameter list from elements
-        sample_elems = []
-        for g in self.selected_groups:
-            sample_elems.extend(g.elements[:5])
-        
         params = []
-        if sample_elems:
-            params = get_str_params(sample_elems[0])
-            
+        for g in self.selected_groups:
+            if g.elements:
+                params = get_str_params(g.elements[0])
+                break
         for p in params:
             self.param_cb.Items.Add(p)
-            
-        # Select common parameters default if exists
-        default_params = ["DQT_Contain_SpatialID", "IFC-SG_RoomNumber", "Comments", "Mark"]
-        for p in default_params:
+        for p in self._DEFAULT_PARAMS:
             if p in params:
                 self.param_cb.Text = p
                 break
-                
-    def _ok(self, s, e):
-        param = self.param_cb.Text
+        count = sum(g.count for g in self.selected_groups)
+        sample = self.selected_groups[0].get_define_value(self.define_params, self.define_separator) \
+            if self.selected_groups else ""
+        self.lbl_value.Text = "{} element(s) in {} group(s). Example value: {}".format(
+            count, len(self.selected_groups), sample or "(empty)")
+
+    def ok_clicked(self, sender, e):
+        param = (self.param_cb.Text or "").strip()
         if not param:
-            TaskDialog.Show("Set Parameter", "Please select a target parameter.")
+            TaskDialog.Show("Set Parameter", "No target parameter. Pick or type a parameter name.")
             return
-        self.result = {
-            "mode": "custom",
-            "param": param
-        }
+        self.result = {"mode": "custom", "param": param}
         self.DialogResult = True
+        self.Close()
+
+    def cancel_clicked(self, sender, e):
         self.Close()
 
 

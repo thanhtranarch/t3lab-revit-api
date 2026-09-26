@@ -148,9 +148,16 @@ class FakeAlert:
         return None
 
 
+class _NetList(list):
+    """Stand-in for System.Collections.Generic.List[T] — empty ctor + Add()."""
+
+    def Add(self, item):
+        self.append(item)
+
+
 class _GenericList:
     def __getitem__(self, _type):
-        return lambda seq: list(seq)
+        return lambda seq=(): _NetList(seq)
 
 
 FAKE_SYSTEM = SimpleNamespace(

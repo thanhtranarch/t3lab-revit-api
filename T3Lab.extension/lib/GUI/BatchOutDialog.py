@@ -2605,11 +2605,11 @@ class ExportManagerWindow(T3WPFWindow):
                 if hasattr(child, 'Tag') and child.Tag is not None and child.IsChecked
             ]
             if not checked:
-                self.sheet_set_label.Text = "All Sheets/Views"
+                self.sheet_set_summary.Text = "All Sheets/Views"
             elif len(checked) == 1:
-                self.sheet_set_label.Text = checked[0]
+                self.sheet_set_summary.Text = checked[0]
             else:
-                self.sheet_set_label.Text = "{} sets selected".format(len(checked))
+                self.sheet_set_summary.Text = "{} sets selected".format(len(checked))
         except Exception as ex:
             logger.debug("Error updating sheet set label: {}".format(ex))
 
@@ -2653,7 +2653,7 @@ class ExportManagerWindow(T3WPFWindow):
             self.sheets_listview.Items.Refresh()
             self.update_selection_count()
             self.status_text.Text = "'{}': {} sheets selected".format(
-                self.sheet_set_label.Text, selected_count)
+                self.sheet_set_summary.Text, selected_count)
 
         except Exception as ex:
             logger.error("Error applying sheet set filter: {}".format(ex))

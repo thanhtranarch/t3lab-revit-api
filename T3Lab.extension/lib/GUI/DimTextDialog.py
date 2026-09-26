@@ -27,7 +27,6 @@ from System.Windows.Controls import (
     StackPanel, ComboBox, ComboBoxItem, TextBox, Button, TextBlock
 )
 from System.Windows.Controls import Orientation as WPFOrientation
-from System.Windows.Media import SolidColorBrush, Color, FontFamily as WPFFontFamily
 from Autodesk.Revit.DB import Dimension, FilteredElementCollector, Transaction
 from pyrevit import revit, forms, script
 from GUI.WPF_Base import T3WPFWindow
@@ -119,6 +118,141 @@ def _get_selected_dims():
 
 
 # ── WINDOW ────────────────────────────────────────────────────────────────────
+# ── SHARED RULE-ROW / FILTER / APPLY (dùng chung với ManaAnno > DimText) ──
+def _t3_style(host, key):
+    """Style T3 từ window chủ; None nếu không có (không bao giờ ném)."""
+    try:
+        return host.TryFindResource(key)
+    except Exception:
+        return None
+
+
+def create_rule_row(host, on_remove):
+    """Một dòng rule lọc theo chiều dài: toán tử · giá trị · (and giá trị) · Remove.
+
+    Mọi màu / font / cỡ lấy từ style T3 của `host` — không hardcode.
+    `on_remove(rd)` được gọi khi bấm Remove.
+    """
+    rd = {}
+    row = StackPanel()
+    row.Orientation = WPFOrientation.Horizontal
+    row.Margin = Thickness(0, 0, 0, 8)
+    rd["panel"] = row
+
+    combo = ComboBox()
+    combo.Style = _t3_style(host, "T3.ComboBox")
+    combo.Width = 200
+    combo.Margin = Thickness(0, 0, 8, 0)
+    for op in _OPERATORS:
+        item = ComboBoxItem()
+        item.Content = op
+        combo.Items.Add(item)
+    combo.SelectedIndex = 0
+    rd["combo"] = combo
+    row.Children.Add(combo)
+
+    def _value_box():
+        box = TextBox()
+        box.Style = _t3_style(host, "T3.TextBox.Mono")
+        box.Width = 72
+        box.Margin = Thickness(0, 0, 4, 0)
+        return box
+
+    def _caption(text):
+        lbl = TextBlock()
+        lbl.Style = _t3_style(host, "T3.Caption")
+        lbl.Text = text
+        lbl.Margin = Thickness(0, 0, 8, 0)
+        lbl.VerticalAlignment = VerticalAlignment.Center
+        return lbl
+
+    rd["txt1"] = _value_box()
+    rd["lbl_mm"] = _caption("mm")
+    rd["lbl_and"] = _caption("and")
+    rd["txt2"] = _value_box()
+    rd["lbl_mm2"] = _caption("mm")
+    for key in ("txt1", "lbl_mm", "lbl_and", "txt2", "lbl_mm2"):
+        row.Children.Add(rd[key])
+
+    btn = Button()
+    btn.Style = _t3_style(host, "T3.Button.Ghost")
+    btn.Content = "Remove"
+    btn.ToolTip = "Remove this rule"
+    btn.Click += lambda s, e: on_remove(rd)
+    row.Children.Add(btn)
+
+    def _sync(sender=None, args=None):
+        sel = combo.SelectedItem
+        op = sel.Content if sel is not None else ""
+        v1 = Visibility.Collapsed if op in _NO_VALUE_OPS else Visibility.Visible
+        v2 = Visibility.Visible if op in _TWO_VALUE_OPS else Visibility.Collapsed
+        rd["txt1"].Visibility = rd["lbl_mm"].Visibility = v1
+        rd["lbl_and"].Visibility = rd["txt2"].Visibility = rd["lbl_mm2"].Visibility = v2
+
+    combo.SelectionChanged += _sync
+    _sync()
+    return rd
+
+
+def _to_float(text):
+    try:
+        return float((text or "").strip() or "0")
+    except ValueError:
+        return 0.0
+
+
+def build_filter_fn(rules, use_and):
+    """Hàm lọc theo chiều dài segment (mm) từ danh sách rule; None nếu không có rule."""
+    parsed = []
+    for rd in rules:
+        sel = rd["combo"].SelectedItem
+        if sel is None:
+            continue
+        op = sel.Content
+        v1 = 0.0 if op in _NO_VALUE_OPS else _to_float(rd["txt1"].Text)
+        v2 = _to_float(rd["txt2"].Text) if op in _TWO_VALUE_OPS else 0.0
+        parsed.append((op, v1, v2))
+    if not parsed:
+        return None
+
+    def filter_fn(length_mm):
+        if length_mm is None:
+            return False
+        results = []
+        for op, v1, v2 in parsed:
+            if   op == "equals":                      results.append(abs(length_mm - v1) < 0.5)
+            elif op == "does not equal":              results.append(abs(length_mm - v1) >= 0.5)
+            elif op == "is greater than":             results.append(length_mm >  v1)
+            elif op == "is greater than or equal to": results.append(length_mm >= v1)
+            elif op == "is less than":                results.append(length_mm <  v1)
+            elif op == "is less than or equal to":    results.append(length_mm <= v1)
+            elif op == "between":                     results.append(min(v1, v2) <= length_mm <= max(v1, v2))
+            elif op == "has a value":                 results.append(True)
+            elif op == "has no value":                results.append(False)
+        if not results:
+            return True
+        return all(results) if use_and else any(results)
+
+    return filter_fn
+
+
+def apply_dim_text(dims, prefix, suffix, above, below, override,
+                   leader_off=False, filter_fn=None):
+    """Ghi override cho `dims` trong MỘT transaction; lỗi → rollback rồi ném lại."""
+    t = Transaction(doc, "Dim Text Override")
+    t.Start()
+    try:
+        for dim in dims:
+            _set_dim_text(dim, prefix, suffix, above, below, override, filter_fn)
+            if leader_off:
+                _turn_off_leader(dim)
+        t.Commit()
+    except Exception:
+        if t.HasStarted() and not t.HasEnded():
+            t.RollBack()
+        raise
+
+
 class DimTextWindow(T3WPFWindow):
 
     def __init__(self):
@@ -171,172 +305,17 @@ class DimTextWindow(T3WPFWindow):
         self.sp_rules.Children.Add(rd["panel"])
 
     def _create_rule_row(self):
-        """Build one rule row and return a dict of its controls."""
-        rd = {}
+        return create_rule_row(self, self._remove_rule)
 
-        row = StackPanel()
-        row.Orientation = WPFOrientation.Horizontal
-        row.Margin = Thickness(0, 0, 0, 6)
-        rd["panel"] = row
+    def _remove_rule(self, rd):
+        self.sp_rules.Children.Remove(rd["panel"])
+        if rd in self._rules:
+            self._rules.remove(rd)
 
-        # ── operator combo ──
-        combo = ComboBox()
-        combo.Width = 185
-        combo.Height = 28
-        combo.FontFamily = WPFFontFamily("Inter")
-        combo.FontSize = 12
-        combo.Margin = Thickness(0, 0, 6, 0)
-        for op in _OPERATORS:
-            item = ComboBoxItem()
-            item.Content = op
-            combo.Items.Add(item)
-        combo.SelectedIndex = 0
-        combo.SelectionChanged += self._make_op_handler(rd)
-        rd["combo"] = combo
-        row.Children.Add(combo)
-
-        # ── value 1 ──
-        txt1 = TextBox()
-        txt1.Width = 72
-        txt1.Height = 28
-        txt1.FontSize = 12
-        txt1.Padding = Thickness(6, 4, 6, 4)
-        txt1.Margin = Thickness(0, 0, 4, 0)
-        txt1.BorderBrush = SolidColorBrush(Color.FromRgb(0x54, 0x6E, 0x7A))
-        txt1.BorderThickness = Thickness(1)
-        rd["txt1"] = txt1
-        row.Children.Add(txt1)
-
-        # ── mm label ──
-        lbl_mm = TextBlock()
-        lbl_mm.Text = "mm"
-        lbl_mm.FontSize = 11
-        lbl_mm.Foreground = SolidColorBrush(Color.FromRgb(0x7F, 0x8C, 0x8D))
-        lbl_mm.Margin = Thickness(0, 0, 8, 0)
-        lbl_mm.VerticalAlignment = VerticalAlignment.Center
-        rd["lbl_mm"] = lbl_mm
-        row.Children.Add(lbl_mm)
-
-        # ── "and" label (between only) ──
-        lbl_and = TextBlock()
-        lbl_and.Text = "and"
-        lbl_and.FontSize = 11
-        lbl_and.Foreground = SolidColorBrush(Color.FromRgb(0x2C, 0x3E, 0x50))
-        lbl_and.Margin = Thickness(0, 0, 6, 0)
-        lbl_and.VerticalAlignment = VerticalAlignment.Center
-        lbl_and.Visibility = Visibility.Collapsed
-        rd["lbl_and"] = lbl_and
-        row.Children.Add(lbl_and)
-
-        # ── value 2 (between only) ──
-        txt2 = TextBox()
-        txt2.Width = 72
-        txt2.Height = 28
-        txt2.FontSize = 12
-        txt2.Padding = Thickness(6, 4, 6, 4)
-        txt2.Margin = Thickness(0, 0, 4, 0)
-        txt2.BorderBrush = SolidColorBrush(Color.FromRgb(0x54, 0x6E, 0x7A))
-        txt2.BorderThickness = Thickness(1)
-        txt2.Visibility = Visibility.Collapsed
-        rd["txt2"] = txt2
-        row.Children.Add(txt2)
-
-        # ── mm2 label (between only) ──
-        lbl_mm2 = TextBlock()
-        lbl_mm2.Text = "mm"
-        lbl_mm2.FontSize = 11
-        lbl_mm2.Foreground = SolidColorBrush(Color.FromRgb(0x7F, 0x8C, 0x8D))
-        lbl_mm2.Margin = Thickness(0, 0, 8, 0)
-        lbl_mm2.VerticalAlignment = VerticalAlignment.Center
-        lbl_mm2.Visibility = Visibility.Collapsed
-        rd["lbl_mm2"] = lbl_mm2
-        row.Children.Add(lbl_mm2)
-
-        # ── remove button ──
-        btn = Button()
-        btn.Content = "-"
-        btn.Width = 26
-        btn.Height = 26
-        btn.FontSize = 14
-        btn.Background = SolidColorBrush(Color.FromArgb(0, 0, 0, 0))
-        btn.BorderThickness = Thickness(1)
-        btn.BorderBrush = SolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F))
-        btn.Foreground = SolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F))
-        btn.Click += self._make_remove_handler(rd)
-        row.Children.Add(btn)
-
-        return rd
-
-    def _make_op_handler(self, rd):
-        def handler(sender, args):
-            op = sender.SelectedItem.Content if sender.SelectedItem else ""
-            no_val  = op in _NO_VALUE_OPS
-            two_val = op in _TWO_VALUE_OPS
-            # first value column
-            v1_vis = Visibility.Collapsed if no_val else Visibility.Visible
-            rd["txt1"].Visibility   = v1_vis
-            rd["lbl_mm"].Visibility = v1_vis
-            # second value column (between only)
-            v2_vis = Visibility.Visible if two_val else Visibility.Collapsed
-            rd["lbl_and"].Visibility = v2_vis
-            rd["txt2"].Visibility    = v2_vis
-            rd["lbl_mm2"].Visibility = v2_vis
-        return handler
-
-    def _make_remove_handler(self, rd):
-        def handler(sender, args):
-            self.sp_rules.Children.Remove(rd["panel"])
-            if rd in self._rules:
-                self._rules.remove(rd)
-        return handler
-
-    # ── build filter function from current rules ────────────────────────────────
     def _build_filter_fn(self):
         if not self.chk_filter_enable.IsChecked or not self._rules:
             return None
-
-        parsed = []
-        for rd in self._rules:
-            op = rd["combo"].SelectedItem.Content if rd["combo"].SelectedItem else None
-            if op is None:
-                continue
-            v1, v2 = 0.0, 0.0
-            if op not in _NO_VALUE_OPS:
-                try:
-                    v1 = float(rd["txt1"].Text.strip() or "0")
-                except ValueError:
-                    v1 = 0.0
-            if op in _TWO_VALUE_OPS:
-                try:
-                    v2 = float(rd["txt2"].Text.strip() or "0")
-                except ValueError:
-                    v2 = 0.0
-            parsed.append((op, v1, v2))
-
-        if not parsed:
-            return None
-
-        use_and = (self.combo_combine.SelectedIndex == 0)
-
-        def filter_fn(length_mm):
-            if length_mm is None:
-                return False
-            results = []
-            for op, v1, v2 in parsed:
-                if   op == "equals":                      results.append(abs(length_mm - v1) < 0.5)
-                elif op == "does not equal":              results.append(abs(length_mm - v1) >= 0.5)
-                elif op == "is greater than":             results.append(length_mm >  v1)
-                elif op == "is greater than or equal to": results.append(length_mm >= v1)
-                elif op == "is less than":                results.append(length_mm <  v1)
-                elif op == "is less than or equal to":    results.append(length_mm <= v1)
-                elif op == "between":                     results.append(min(v1, v2) <= length_mm <= max(v1, v2))
-                elif op == "has a value":                 results.append(True)
-                elif op == "has no value":                results.append(False)
-            if not results:
-                return True
-            return all(results) if use_and else any(results)
-
-        return filter_fn
+        return build_filter_fn(self._rules, self.combo_combine.SelectedIndex == 0)
 
     # ── apply ──────────────────────────────────────────────────────────────────
     def apply_clicked(self, sender, args):
@@ -345,7 +324,7 @@ class DimTextWindow(T3WPFWindow):
         above    = self.txt_above.Text.strip()
         below    = self.txt_below.Text.strip()
         override = self.txt_override.Text.strip()
-        leader_off = self.chk_leader.IsChecked
+        leader_off = bool(self.chk_leader.IsChecked)
         filter_fn  = self._build_filter_fn()
 
         if self.rb_view.IsChecked:
@@ -356,16 +335,15 @@ class DimTextWindow(T3WPFWindow):
             scope_label = "selection"
 
         if not dims:
-            self.lbl_status.Text = "No dimensions found in {}.".format(scope_label)
+            self.lbl_status.Text = "No dimensions found in {}. Select dimensions or switch to 'All dims in active view'.".format(scope_label)
             return
 
-        with Transaction(doc, "Dim Text Override") as t:
-            t.Start()
-            for dim in dims:
-                _set_dim_text(dim, prefix, suffix, above, below, override, filter_fn)
-                if leader_off:
-                    _turn_off_leader(dim)
-            t.Commit()
+        try:
+            apply_dim_text(dims, prefix, suffix, above, below, override, leader_off, filter_fn)
+        except Exception as ex:
+            self.lbl_status.Text = "Dim text not changed: {}. Nothing was modified.".format(ex)
+            logger.error("DimText failed: {}".format(ex))
+            return
 
         filter_note = " (length filter active)" if filter_fn else ""
         self.lbl_status.Text = "Applied to {} dim(s) in {}{}.".format(

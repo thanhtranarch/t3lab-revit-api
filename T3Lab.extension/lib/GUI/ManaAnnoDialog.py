@@ -1394,9 +1394,20 @@ class AnnotationManagerWindow(T3WPFWindow):
         self.sp_filter_config.Visibility = vis
 
     def dimtext_add_rule(self, sender, args):
-        rd = self._dimtext_create_rule_row()
+        rd = DimTextDialog.create_rule_row(self, self._dimtext_remove_rule)
         self._dimtext_rules.append(rd)
         self.sp_rules.Children.Add(rd["panel"])
+
+    def _dimtext_remove_rule(self, rd):
+        self.sp_rules.Children.Remove(rd["panel"])
+        if rd in self._dimtext_rules:
+            self._dimtext_rules.remove(rd)
+
+    def _dimtext_build_filter_fn(self):
+        if not self.chk_filter_enable.IsChecked or not self._dimtext_rules:
+            return None
+        return DimTextDialog.build_filter_fn(self._dimtext_rules,
+                                             self.combo_combine.SelectedIndex == 0)
 
     def dimtext_apply(self, sender, args):
         prefix   = self.txt_prefix.Text.strip()
@@ -1415,154 +1426,19 @@ class AnnotationManagerWindow(T3WPFWindow):
             scope = "selection"
 
         if not dims:
-            self._status("DimText: no dimensions found in {}.".format(scope))
+            self._status("DimText: no dimensions found in {}. Select dimensions or "
+                         "choose 'All dimensions in active view'.".format(scope))
             return
 
-        from Autodesk.Revit.DB import Transaction
-        with Transaction(doc, "Dim Text Override") as t:
-            t.Start()
-            for dim in dims:
-                DimTextDialog._set_dim_text(dim, prefix, suffix, above, below, override, filter_fn)
-                if leader_off:
-                    DimTextDialog._turn_off_leader(dim)
-            t.Commit()
+        try:
+            DimTextDialog.apply_dim_text(dims, prefix, suffix, above, below, override,
+                                         leader_off, filter_fn)
+        except Exception as ex:
+            self._status("DimText: failed ({}). Nothing was modified.".format(ex))
+            return
 
         note = " (filter active)" if filter_fn else ""
         self._status("DimText: applied to {} dim(s) in {}{}.".format(len(dims), scope, note))
-
-    def _dimtext_build_filter_fn(self):
-        if not self.chk_filter_enable.IsChecked or not self._dimtext_rules:
-            return None
-        parsed = []
-        for rd in self._dimtext_rules:
-            op = rd["combo"].SelectedItem.Content if rd["combo"].SelectedItem else None
-            if op is None:
-                continue
-            v1 = v2 = 0.0
-            if op not in DimTextDialog._NO_VALUE_OPS:
-                try:
-                    v1 = float(rd["txt1"].Text.strip() or "0")
-                except ValueError:
-                    v1 = 0.0
-            if op in DimTextDialog._TWO_VALUE_OPS:
-                try:
-                    v2 = float(rd["txt2"].Text.strip() or "0")
-                except ValueError:
-                    v2 = 0.0
-            parsed.append((op, v1, v2))
-        if not parsed:
-            return None
-        use_and = (self.combo_combine.SelectedIndex == 0)
-        def filter_fn(length_mm):
-            if length_mm is None:
-                return False
-            results = []
-            for op, v1, v2 in parsed:
-                if   op == "equals":                      results.append(abs(length_mm - v1) < 0.5)
-                elif op == "does not equal":              results.append(abs(length_mm - v1) >= 0.5)
-                elif op == "is greater than":             results.append(length_mm >  v1)
-                elif op == "is greater than or equal to": results.append(length_mm >= v1)
-                elif op == "is less than":                results.append(length_mm <  v1)
-                elif op == "is less than or equal to":    results.append(length_mm <= v1)
-                elif op == "between":                     results.append(min(v1, v2) <= length_mm <= max(v1, v2))
-                elif op == "has a value":                 results.append(True)
-                elif op == "has no value":                results.append(False)
-            if not results:
-                return True
-            return all(results) if use_and else any(results)
-        return filter_fn
-
-    def _dimtext_create_rule_row(self):
-        from System.Windows import Thickness, Visibility, VerticalAlignment
-        from System.Windows.Controls import (
-            StackPanel, ComboBox, ComboBoxItem, TextBox, Button, TextBlock
-        )
-        from System.Windows.Controls import Orientation as WPFOrientation
-        from System.Windows.Media import SolidColorBrush, Color
-        from System.Windows.Media import FontFamily as WPFFontFamily
-
-        rd = {}
-        row = StackPanel()
-        row.Orientation = WPFOrientation.Horizontal
-        row.Margin = Thickness(0, 0, 0, 6)
-        rd["panel"] = row
-
-        combo = ComboBox()
-        combo.Width = 185; combo.Height = 28
-        combo.FontFamily = WPFFontFamily("Inter"); combo.FontSize = 12
-        combo.Margin = Thickness(0, 0, 6, 0)
-        for op in DimTextDialog._OPERATORS:
-            item = ComboBoxItem(); item.Content = op; combo.Items.Add(item)
-        combo.SelectedIndex = 0
-        combo.SelectionChanged += self._dimtext_make_op_handler(rd)
-        rd["combo"] = combo; row.Children.Add(combo)
-
-        txt1 = TextBox()
-        txt1.Width = 72; txt1.Height = 28; txt1.FontSize = 12
-        txt1.Padding = Thickness(6, 4, 6, 4); txt1.Margin = Thickness(0, 0, 4, 0)
-        txt1.BorderBrush = SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1))
-        txt1.BorderThickness = Thickness(1)
-        rd["txt1"] = txt1; row.Children.Add(txt1)
-
-        lbl_mm = TextBlock()
-        lbl_mm.Text = "mm"; lbl_mm.FontSize = 11
-        lbl_mm.Foreground = SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B))
-        lbl_mm.Margin = Thickness(0, 0, 8, 0); lbl_mm.VerticalAlignment = VerticalAlignment.Center
-        rd["lbl_mm"] = lbl_mm; row.Children.Add(lbl_mm)
-
-        lbl_and = TextBlock()
-        lbl_and.Text = "and"; lbl_and.FontSize = 11
-        lbl_and.Foreground = SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A))
-        lbl_and.Margin = Thickness(0, 0, 6, 0); lbl_and.VerticalAlignment = VerticalAlignment.Center
-        lbl_and.Visibility = Visibility.Collapsed
-        rd["lbl_and"] = lbl_and; row.Children.Add(lbl_and)
-
-        txt2 = TextBox()
-        txt2.Width = 72; txt2.Height = 28; txt2.FontSize = 12
-        txt2.Padding = Thickness(6, 4, 6, 4); txt2.Margin = Thickness(0, 0, 4, 0)
-        txt2.BorderBrush = SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1))
-        txt2.BorderThickness = Thickness(1); txt2.Visibility = Visibility.Collapsed
-        rd["txt2"] = txt2; row.Children.Add(txt2)
-
-        lbl_mm2 = TextBlock()
-        lbl_mm2.Text = "mm"; lbl_mm2.FontSize = 11
-        lbl_mm2.Foreground = SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B))
-        lbl_mm2.Margin = Thickness(0, 0, 8, 0); lbl_mm2.VerticalAlignment = VerticalAlignment.Center
-        lbl_mm2.Visibility = Visibility.Collapsed
-        rd["lbl_mm2"] = lbl_mm2; row.Children.Add(lbl_mm2)
-
-        btn = Button()
-        btn.Content = u"−"; btn.Width = 26; btn.Height = 26; btn.FontSize = 14
-        btn.Background = SolidColorBrush(Color.FromArgb(0, 0, 0, 0))
-        btn.BorderThickness = Thickness(1)
-        btn.BorderBrush = SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44))
-        btn.Foreground = SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44))
-        btn.Click += self._dimtext_make_remove_handler(rd)
-        row.Children.Add(btn)
-
-        return rd
-
-    def _dimtext_make_op_handler(self, rd):
-        from System.Windows import Visibility
-        def handler(sender, args):
-            op = sender.SelectedItem.Content if sender.SelectedItem else ""
-            no_val  = op in DimTextDialog._NO_VALUE_OPS
-            two_val = op in DimTextDialog._TWO_VALUE_OPS
-            v1_vis = Visibility.Collapsed if no_val else Visibility.Visible
-            rd["txt1"].Visibility   = v1_vis
-            rd["lbl_mm"].Visibility = v1_vis
-            v2_vis = Visibility.Visible if two_val else Visibility.Collapsed
-            rd["lbl_and"].Visibility = v2_vis
-            rd["txt2"].Visibility    = v2_vis
-            rd["lbl_mm2"].Visibility = v2_vis
-        return handler
-
-    def _dimtext_make_remove_handler(self, rd):
-        def handler(sender, args):
-            self.sp_rules.Children.Remove(rd["panel"])
-            if rd in self._dimtext_rules:
-                self._dimtext_rules.remove(rd)
-        return handler
 
     # ── Sidebar Browsing & Live Filtering List Event Handlers ────────────────
 

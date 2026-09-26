@@ -100,6 +100,7 @@ def _install_stubs():
     collections.Generic = generic
     system = types.ModuleType("System")
     system.Collections = collections
+    system.Int64 = int
     sys.modules["System"] = system
     sys.modules["System.Collections"] = collections
     sys.modules["System.Collections.Generic"] = generic

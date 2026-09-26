@@ -5,14 +5,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
-        Title="Annotation Manager"
-        Width="1180" Height="780"
-        MinWidth="960" MinHeight="620"
-        WindowStartupLocation="CenterScreen"
+        Title="Configure Defined Value"
+        Width="560" Height="440"
+        MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterOwner"
         WindowStyle="None" AllowsTransparency="False"
         Background="{DynamicResource T3.Surface}"
         FontFamily="Segoe UI"
         FontSize="13"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
@@ -1645,744 +1647,132 @@
             CornerRadius="12" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title Bar -->
-                <RowDefinition Height="*"/>       <!-- Row 1: Main Body with Sidebar Rail -->
-                <RowDefinition Height="48"/>      <!-- Row 2: Full-width Footer Bar -->
+                <RowDefinition Height="48"/>      <!-- Row 0: Title Bar -->
+                <RowDefinition Height="*"/>       <!-- Row 1: Content -->
+                <RowDefinition Height="48"/>      <!-- Row 2: Footer Bar -->
             </Grid.RowDefinitions>
 
-            <!-- ══════════════════ ROW 0: FULL-WIDTH TITLE BAR ══════════════════ -->
+            <!-- ══════════════════ ROW 0: TITLE BAR ══════════════════ -->
             <Border Grid.Row="0" Style="{StaticResource T3.TitleBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,0"
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Image x:Name="logo_image" Height="28" Margin="0,0,12,0"
                                VerticalAlignment="Center"
                                RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Orientation="Vertical" VerticalAlignment="Center">
-                            <TextBlock Text="Annotation Manager" Style="{StaticResource T3.Title}"/>
-                            <TextBlock Text="Inspect and clean up project annotations and tags" Style="{StaticResource T3.Subtitle}"/>
+                            <TextBlock Text="Configure Defined Value" Style="{StaticResource T3.Title}"/>
+                            <TextBlock Text="Build the value written to contained elements" Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                     </StackPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                    <StackPanel Grid.Column="1" Orientation="Horizontal"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize"
-                                Click="minimize_button_clicked">
-                            <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
-                        </Button>
-                        <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize"
-                                Click="maximize_button_clicked">
-                            <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
-                        </Button>
-                        <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close"
-                                Click="close_button_clicked" IsCancel="True">
-                            <TextBlock x:Name="close_text" Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
+                        <Button x:Name="btn_close_chrome" Style="{StaticResource T3.WinClose}" ToolTip="Close"
+                                Click="cancel_clicked">
+                            <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- ══════════════════ ROW 1: WORKSPACE WITH REFINED SIDEBAR ══════════════════ -->
-            <Grid Grid.Row="1">
+            <!-- ══════════════════ ROW 1: CONTENT ══════════════════ -->
+            <Grid Grid.Row="1" Margin="16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="58"/>    <!-- Col 0: Left Sidebar Rail -->
-                    <ColumnDefinition Width="*"/>     <!-- Col 1: Main Content Views -->
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- ── Col 0: Left Sidebar Rail ── -->
-                <Border Grid.Column="0"
-                    Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                <Grid Margin="0,12,0,12">
+                <!-- Available -->
+                <Grid Grid.Column="0">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/> <!-- Tab 1: Dimensions -->
-                        <RowDefinition Height="Auto"/> <!-- Tab 2: Text Notes -->
-                        <RowDefinition Height="Auto"/> <!-- Tab 3: DimText -->
-                        <RowDefinition Height="Auto"/> <!-- Tab 4: Utilities -->
-                        <RowDefinition Height="Auto"/> <!-- Tab 5: Settings -->
-                        <RowDefinition Height="*"/>    <!-- Spacer -->
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-
-                    <!-- Tab 1: Dimensions -->
-                    <ToggleButton x:Name="nav_dim" Grid.Row="0"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8" IsChecked="True"
-                                  ToolTip="Dimensions" Click="nav_dimensions_checked">
-                        <Path Data="M3 5v14 M21 5v14 M3 12h18 M6 9l-3 3 3 3 M18 9l3 3-3 3"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Tab 2: Text Notes -->
-                    <ToggleButton x:Name="nav_txt" Grid.Row="1"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  ToolTip="Text Notes" Click="nav_textnotes_checked">
-                        <Path Data="M4 7V4h16v3 M9 20h6 M12 4v16"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Tab 3: DimText -->
-                    <ToggleButton x:Name="nav_dimtext" Grid.Row="2"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  ToolTip="Dim Text" Click="nav_dimtext_checked">
-                        <Path Data="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Tab 4: Utilities -->
-                    <ToggleButton x:Name="nav_utils" Grid.Row="3"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  ToolTip="Utilities" Click="nav_utils_checked">
-                        <Path Data="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Tab 5: Settings -->
-                    <ToggleButton x:Name="nav_settings" Grid.Row="4"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  ToolTip="Settings" Click="nav_settings_checked">
-                        <Path Data="M12 15 a3 3 0 1 0 0 -6 a3 3 0 0 0 0 6 M19.4 15 a1.65 1.65 0 0 0 .33 1.82 l.06 .06 a2 2 0 0 1 -2.83 2.83 l-.06 -.06 a1.65 1.65 0 0 0 -1.82 -.33 a1.65 1.65 0 0 0 -1 1.51 V21 a2 2 0 0 1 -4 0 v-.09 A1.65 1.65 0 0 0 9 19.4 a1.65 1.65 0 0 0 -1.82 .33 l-.06 .06 a2 2 0 0 1 -2.83 -2.83 l.06 -.06 a1.65 1.65 0 0 0 .33 -1.82 a1.65 1.65 0 0 0 -1.51 -1 H3 a2 2 0 0 1 0 -4 h.09 A1.65 1.65 0 0 0 4.6 9 a1.65 1.65 0 0 0 -.33 -1.82 l-.06 -.06 a2 2 0 0 1 2.83 -2.83 l.06 .06 a1.65 1.65 0 0 0 1.82 .33 H9 a1.65 1.65 0 0 0 1 -1.51 V3 a2 2 0 0 1 4 0 v.09 a1.65 1.65 0 0 0 1 1.51 a1.65 1.65 0 0 0 1.82 -.33 l.06 -.06 a2 2 0 0 1 2.83 2.83 l-.06 .06 a1.65 1.65 0 0 0 -.33 1.82 V9 a1.65 1.65 0 0 0 1.51 1 H21 a2 2 0 0 1 0 4 h-.09 a1.65 1.65 0 0 0 -1.51 1 z"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
+                    <TextBlock Text="AVAILABLE PARAMETERS" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                    <Border Grid.Row="1" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                        <Grid>
+                            <ListBox x:Name="avail_list" Style="{StaticResource T3.ListBox}"
+                                     SelectionMode="Extended" BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     MouseDoubleClick="move_right_clicked"/>
+                            <TextBlock x:Name="empty_avail" Style="{StaticResource T3.Empty}"
+                                       Text="All parameters are in use" Visibility="Collapsed"/>
+                        </Grid>
+                    </Border>
+                    <Button Grid.Row="2" Content="Add" Style="{StaticResource T3.Button.Secondary}"
+                            HorizontalAlignment="Right" Margin="0,8,0,0"
+                            ToolTip="Add the selected parameters (or double-click)"
+                            Click="move_right_clicked"/>
                 </Grid>
-            </Border>
 
-                <!-- ── Col 1: Main Content Views ── -->
-                <!-- ══════════════════ ROW 1: CONTENT TABS (Col 1) ══════════════════ -->
-            <Border Grid.Column="1" Background="{DynamicResource T3.Surface}">
-                <TabControl x:Name="main_tabs" BorderThickness="0" Background="Transparent">
-                    <!-- TabControl Item Style to hide headers -->
-                    <TabControl.ItemContainerStyle>
-                        <Style TargetType="TabItem" BasedOn="{StaticResource T3.TabItem.Hidden}"/>
-                    </TabControl.ItemContainerStyle>
-
-                    <!-- ── TAB 1: DIMENSIONS ── -->
-                    <TabItem>
+                <!-- Selected -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="SELECTED COMPOSITION" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                    <Border Grid.Row="1" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
                         <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="260"/>  <!-- Left Sidebar -->
-                                <ColumnDefinition Width="*"/>    <!-- Right Main Table & Actions -->
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Sidebar -->
-                            <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/> <!-- Radio Buttons -->
-                                        <RowDefinition Height="Auto"/> <!-- Search & Label -->
-                                        <RowDefinition Height="*"/>    <!-- Type ListBox -->
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Sub-mode Radios Strip -->
-                                    <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="12,8">
-                                        <StackPanel>
-                                            <RadioButton x:Name="rb_dim_inst" Content="Find Dimensions (search instances)"
-                                                         Style="{StaticResource T3.RadioButton}" IsChecked="True"
-                                                         Margin="0,0,0,8" Checked="dim_submode"/>
-                                            <RadioButton x:Name="rb_dim_type" Content="Find Types (rename inline)"
-                                                         Style="{StaticResource T3.RadioButton}" Checked="dim_submode"/>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- Sidebar Search Strip -->
-                                    <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="12,8">
-                                        <StackPanel>
-                                            <TextBlock x:Name="dim_lbl" Text="TYPE NAME" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                            <TextBox x:Name="dim_sidebar_search" Style="{StaticResource T3.Search}" Tag="Search…" Height="28"/>
-                                            <TextBlock x:Name="dim_sidebar_placeholder" Visibility="Collapsed"/>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- ListBox (Zero-Gap Flush) -->
-                                    <ListBox x:Name="lb_dim_types" Grid.Row="2" Style="{StaticResource T3.ListBox}"
-                                             BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-                                </Grid>
-                            </Border>
-
-                            <!-- Main Content Area -->
-                            <Grid Grid.Column="1">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="40"/>  <!-- Search Bar & Controls -->
-                                    <RowDefinition Height="*"/>   <!-- DataGrid -->
-                                    <RowDefinition Height="48"/>  <!-- Action Strip -->
-                                    <RowDefinition Height="Auto"/><!-- Auto-Rename Card -->
-                                </Grid.RowDefinitions>
-
-                                <!-- Row 0: Search Toolbar -->
-                                <Border Grid.Row="0" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1" Background="{StaticResource T3.Surface}">
-                                    <Grid Margin="12,0,12,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="280"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBox x:Name="dim_kw" Style="{StaticResource T3.Search}" Tag="Filter dimensions…" Height="28"/>
-                                            <TextBlock x:Name="dim_kw_placeholder" Visibility="Collapsed"/>
-                                        </StackPanel>
-
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <TextBlock x:Name="dim_count" Text="0 found" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Row 1: DataGrid -->
-                                <Grid Grid.Row="1">
-                                    <DataGrid x:Name="dg_dim" Style="{StaticResource T3.DataGrid}"
-                                              BorderThickness="0"
-                                              AutoGenerateColumns="False" IsReadOnly="False"
-                                              CanUserAddRows="False" CanUserDeleteRows="False"
-                                              CanUserSortColumns="True" HeadersVisibility="Column"
-                                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                                        <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="36">
-                                                <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_all_dg_dim" Style="{StaticResource T3.CheckBox}"
-                                                              Click="select_all_dg_dim_clicked"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                              ToolTip="Select all rows"/>
-                                                </DataGridTemplateColumn.Header>
-                                                <DataGridTemplateColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <CheckBox IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource T3.CheckBox}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </DataTemplate>
-                                                </DataGridTemplateColumn.CellTemplate>
-                                            </DataGridTemplateColumn>
-                                            <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="*" IsReadOnly="False"/>
-                                            <DataGridTextColumn Header="TYPE / FAMILY" Binding="{Binding Details}" Width="200" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="COUNT" Binding="{Binding Count}" Width="60" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                            <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="80" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="70" IsReadOnly="True" Visibility="Collapsed"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="FONT" Binding="{Binding Font}" Width="90" IsReadOnly="True" Visibility="Collapsed"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="BACKGROUND" Binding="{Binding Background}" Width="90" IsReadOnly="True" Visibility="Collapsed"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="COLOR" Binding="{Binding Color}" Width="90" IsReadOnly="True" Visibility="Collapsed"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-
-                                    <TextBlock Style="{StaticResource T3.Empty}"
-                                               Text="No dimensions match the filter criteria"
-                                               Visibility="{Binding HasItems, ElementName=dg_dim, Converter={x:Null}}"/>
-                                </Grid>
-
-                                <!-- Row 2: Action Strip -->
-                                <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,1">
-                                    <Grid Margin="12,0,12,0">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button x:Name="btn_dim_jump" Content="Jump to View" Style="{StaticResource T3.Button.Primary}"
-                                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="dim_jump" IsDefault="True"/>
-                                            <Button Content="Delete Selected" Style="{StaticResource T3.Button.Danger}"
-                                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="dim_delete"/>
-                                            <Button Content="Select All" Style="{StaticResource T3.Button.Ghost}"
-                                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="dim_select_all"/>
-                                            <Button Content="Clear" Style="{StaticResource T3.Button.Ghost}"
-                                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="dim_clear_sel"/>
-                                            <Button x:Name="btn_dim_apply" Content="✔ Apply Changes" Style="{StaticResource T3.Button.Secondary}"
-                                                    Height="28" Padding="12,0" Visibility="Collapsed" Click="dim_apply"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Row 3: Auto-Rename Card -->
-                                <Border Grid.Row="3" Background="{StaticResource T3.Surface}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,0" Padding="16,12">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="AUTO-RENAME ALL DIMENSION TYPES" Style="{StaticResource T3.Label}"/>
-                                            <TextBlock Text="Generates: LB_[discipline]_[size]_[font]_[factor]_[bg]_[color]_[prefix]_[centerline]_[rounding]"
-                                                       Style="{StaticResource T3.Caption}" Margin="0,4,0,0"/>
-                                        </StackPanel>
-                                        <Button Grid.Column="1" Content="Rename All" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="28" Padding="16,0" Click="dim_rename_all" VerticalAlignment="Center"/>
-                                    </Grid>
-                                </Border>
-                            </Grid>
+                            <ListBox x:Name="selected_list" Style="{StaticResource T3.ListBox}"
+                                     SelectionMode="Extended" BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     MouseDoubleClick="move_left_clicked"/>
+                            <TextBlock x:Name="empty_selected" Style="{StaticResource T3.Empty}"
+                                       Text="No parameters selected" Visibility="Collapsed"/>
                         </Grid>
-                    </TabItem>
-
-                    <!-- ── TAB 2: TEXT NOTES ── -->
-                    <TabItem>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="260"/>  <!-- Left Sidebar -->
-                                <ColumnDefinition Width="*"/>    <!-- Right Main Table & Actions -->
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Sidebar -->
-                            <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/> <!-- Radio Buttons -->
-                                        <RowDefinition Height="Auto"/> <!-- Search & Label -->
-                                        <RowDefinition Height="*"/>    <!-- Type ListBox -->
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Sub-mode Radios Strip -->
-                                    <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="12,8">
-                                        <StackPanel>
-                                            <RadioButton x:Name="rb_notes" Content="Find Notes (search by content)"
-                                                         Style="{StaticResource T3.RadioButton}" IsChecked="True"
-                                                         Margin="0,0,0,8" Checked="txt_submode"/>
-                                            <RadioButton x:Name="rb_types" Content="Find Types (search by type name)"
-                                                         Style="{StaticResource T3.RadioButton}" Checked="txt_submode"/>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- Sidebar Search Strip -->
-                                    <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="12,8">
-                                        <StackPanel>
-                                            <TextBlock x:Name="txt_lbl" Text="CONTENT" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                            <TextBox x:Name="txt_sidebar_search" Style="{StaticResource T3.Search}" Tag="Search…" Height="28"/>
-                                            <TextBlock x:Name="txt_sidebar_placeholder" Visibility="Collapsed"/>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- ListBox (Zero-Gap Flush) -->
-                                    <ListBox x:Name="lb_txt_types" Grid.Row="2" Style="{StaticResource T3.ListBox}"
-                                             BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-                                </Grid>
-                            </Border>
-
-                            <!-- Main Content Area -->
-                            <Grid Grid.Column="1">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="40"/>  <!-- Search Bar & Controls -->
-                                    <RowDefinition Height="*"/>   <!-- DataGrid -->
-                                    <RowDefinition Height="48"/>  <!-- Action Strip -->
-                                    <RowDefinition Height="Auto"/><!-- Auto-Rename Card -->
-                                </Grid.RowDefinitions>
-
-                                <!-- Row 0: Search Toolbar -->
-                                <Border Grid.Row="0" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1" Background="{StaticResource T3.Surface}">
-                                    <Grid Margin="12,0,12,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="280"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBox x:Name="txt_kw" Style="{StaticResource T3.Search}" Tag="Filter text notes…" Height="28"/>
-                                            <TextBlock x:Name="txt_kw_placeholder" Visibility="Collapsed"/>
-                                        </StackPanel>
-
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <TextBlock x:Name="txt_count" Text="0 found" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Row 1: DataGrid -->
-                                <Grid Grid.Row="1">
-                                    <DataGrid x:Name="dg_txt" Style="{StaticResource T3.DataGrid}"
-                                              BorderThickness="0"
-                                              AutoGenerateColumns="False" IsReadOnly="False"
-                                              CanUserAddRows="False" CanUserDeleteRows="False"
-                                              CanUserSortColumns="True" HeadersVisibility="Column"
-                                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                                        <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="36">
-                                                <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_all_dg_txt" Style="{StaticResource T3.CheckBox}"
-                                                              Click="select_all_dg_txt_clicked"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                              ToolTip="Select all rows"/>
-                                                </DataGridTemplateColumn.Header>
-                                                <DataGridTemplateColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <CheckBox IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource T3.CheckBox}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </DataTemplate>
-                                                </DataGridTemplateColumn.CellTemplate>
-                                            </DataGridTemplateColumn>
-                                            <DataGridTextColumn Header="TEXT / NAME" Binding="{Binding Name}" Width="*" IsReadOnly="False"/>
-                                            <DataGridTextColumn Header="TYPE" Binding="{Binding Details}" Width="200" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="COUNT" Binding="{Binding Count}" Width="60" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                            <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="80" IsReadOnly="True"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="70" IsReadOnly="True" Visibility="Collapsed"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="FONT" Binding="{Binding Font}" Width="90" IsReadOnly="True" Visibility="Collapsed"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="BACKGROUND" Binding="{Binding Background}" Width="90" IsReadOnly="True" Visibility="Collapsed"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                            <DataGridTextColumn Header="COLOR" Binding="{Binding Color}" Width="90" IsReadOnly="True" Visibility="Collapsed"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                        </DataGrid.Columns>
-                                    </DataGrid>
-
-                                    <TextBlock Style="{StaticResource T3.Empty}"
-                                               Text="No text notes match the filter criteria"
-                                               Visibility="{Binding HasItems, ElementName=dg_txt, Converter={x:Null}}"/>
-                                </Grid>
-
-                                <!-- Row 2: Action Strip -->
-                                <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,1">
-                                    <Grid Margin="12,0,12,0">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button x:Name="btn_txt_jump" Content="Jump to View" Style="{StaticResource T3.Button.Secondary}"
-                                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="txt_jump"/>
-                                            <Button Content="Delete Selected" Style="{StaticResource T3.Button.Danger}"
-                                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="txt_delete"/>
-                                            <Button Content="Select All" Style="{StaticResource T3.Button.Ghost}"
-                                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="txt_select_all"/>
-                                            <Button Content="Clear" Style="{StaticResource T3.Button.Ghost}"
-                                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="txt_clear_sel"/>
-                                            <Button x:Name="btn_txt_ai_qa" Content="✨ AI Spellcheck &amp; Fix" Style="{StaticResource T3.Button.Secondary}"
-                                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="on_txt_ai_qa_clicked"
-                                                    ToolTip="AI check: Detect typos, abbreviations, casing and standardize notes"/>
-                                            <Button x:Name="btn_txt_apply" Content="✔ Apply Changes" Style="{StaticResource T3.Button.Secondary}"
-                                                    Height="28" Padding="12,0" Visibility="Collapsed" Click="txt_apply"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Row 3: Auto-Rename Card -->
-                                <Border Grid.Row="3" Background="{StaticResource T3.Surface}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,0" Padding="16,12">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="AUTO-RENAME ALL TEXT NOTE TYPES" Style="{StaticResource T3.Label}"/>
-                                            <TextBlock Text="Generates: LB_[discipline]_[size]_[font]_[factor]_[bg]_[color]_[border]_[B/U/I]"
-                                                       Style="{StaticResource T3.Caption}" Margin="0,4,0,0"/>
-                                        </StackPanel>
-                                        <Button Grid.Column="1" Content="Rename All" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="28" Padding="16,0" Click="txt_rename_all" VerticalAlignment="Center"/>
-                                    </Grid>
-                                </Border>
-                            </Grid>
-                        </Grid>
-                    </TabItem>
-
-                    <!-- ── TAB 3: DIMTEXT ── -->
-                    <TabItem>
-                        <Grid Background="{DynamicResource T3.Surface}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="48"/>
-                            </Grid.RowDefinitions>
-
-                            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24,16,24,16">
-                                <StackPanel>
-                                    <!-- TEXT FIELDS -->
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="DIMENSION OVERRIDE FIELDS" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button Grid.Column="1" x:Name="btn_dimtext_ai_suggest" Style="{StaticResource T3.Button.Secondary}"
-                                                Content="✨ AI Suggest Overrides" Height="26" Padding="8,0" VerticalAlignment="Center"
-                                                Click="on_dimtext_ai_suggest_clicked"
-                                                ToolTip="AI recommends engineering annotations (Prefix/Suffix/Above/Below) based on discipline conventions"/>
-                                    </Grid>
-                                    <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" Padding="16,12" Margin="0,0,0,16">
-                                        <StackPanel>
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="90"/>
-                                                    <ColumnDefinition Width="360"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Prefix" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                                                <TextBox x:Name="txt_prefix" Grid.Column="1" Style="{StaticResource T3.TextBox}" Height="28"/>
-                                            </Grid>
-
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="90"/>
-                                                    <ColumnDefinition Width="360"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Suffix" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                                                <TextBox x:Name="txt_suffix" Grid.Column="1" Style="{StaticResource T3.TextBox}" Height="28"/>
-                                            </Grid>
-
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="90"/>
-                                                    <ColumnDefinition Width="360"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Above" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                                                <TextBox x:Name="txt_above" Grid.Column="1" Style="{StaticResource T3.TextBox}" Height="28"/>
-                                            </Grid>
-
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="90"/>
-                                                    <ColumnDefinition Width="360"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Below" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                                                <TextBox x:Name="txt_below" Grid.Column="1" Style="{StaticResource T3.TextBox}" Height="28"/>
-                                            </Grid>
-
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="90"/>
-                                                    <ColumnDefinition Width="360"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="Override" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                                                <TextBox x:Name="txt_override" Grid.Column="1" Style="{StaticResource T3.TextBox}" Height="28"/>
-                                            </Grid>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- PRESETS -->
-                                    <TextBlock Text="PRESETS — BELOW" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                    <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" Padding="16,12" Margin="0,0,0,16">
-                                        <WrapPanel Orientation="Horizontal">
-                                            <Button Content="(TYP.)" Tag="(TYP.)" Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,4,4" Click="dimtext_preset_below"/>
-                                            <Button Content="(E.Q.)" Tag="(E.Q.)" Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,4,4" Click="dimtext_preset_below"/>
-                                            <Button Content="CL." Tag="CL." Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,4,4" Click="dimtext_preset_below"/>
-                                            <Button Content="OPNG." Tag="OPNG." Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,4,4" Click="dimtext_preset_below"/>
-                                            <Button Content="VERIFY" Tag="VERIFY" Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,4,4" Click="dimtext_preset_below"/>
-                                            <Button Content="F.F.L." Tag="F.F.L." Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,4,4" Click="dimtext_preset_below"/>
-                                            <Button Content="S.S.L." Tag="S.S.L." Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,4,4" Click="dimtext_preset_below"/>
-                                            <Button Content="C.H." Tag="C.H." Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,4,4" Click="dimtext_preset_below"/>
-                                        </WrapPanel>
-                                    </Border>
-
-                                    <!-- OPTIONS -->
-                                    <TextBlock Text="OPTIONS" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                    <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" Padding="16,12" Margin="0,0,0,16">
-                                        <StackPanel>
-                                            <CheckBox x:Name="chk_leader" Content="Turn off leader lines"
-                                                      Style="{StaticResource T3.CheckBox}" Margin="0,0,0,8"/>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="Apply to" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                                <RadioButton x:Name="rb_selection" Content="Selection only" IsChecked="True" GroupName="dimtext_scope"
-                                                             Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0"/>
-                                                <RadioButton x:Name="rb_view" Content="All dimensions in active view" GroupName="dimtext_scope"
-                                                             Style="{StaticResource T3.RadioButton}"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- FILTER RULES -->
-                                    <TextBlock Text="FILTER BY SEGMENT LENGTH (OPTIONAL)" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                    <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" Padding="16,12" Margin="0,0,0,16">
-                                        <StackPanel>
-                                            <CheckBox x:Name="chk_filter_enable" Content="Enable segment length filter"
-                                                      Style="{StaticResource T3.CheckBox}"
-                                                      Checked="dimtext_filter_toggle" Unchecked="dimtext_filter_toggle"/>
-                                            <StackPanel x:Name="sp_filter_config" Visibility="Collapsed" Margin="0,8,0,0">
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                <ComboBox x:Name="combo_combine" Style="{StaticResource T3.ComboBox}" Width="240" Height="28">
-                                                    <ComboBoxItem Content="AND — all rules must be true" IsSelected="True"/>
-                                                    <ComboBoxItem Content="OR — any rule may be true"/>
-                                                </ComboBox>
-                                                <Button x:Name="btn_add_rule" Content="+ Add Rule" Style="{StaticResource T3.Button.Secondary}"
-                                                        Click="dimtext_add_rule" Margin="8,0,0,0" Height="28" Padding="12,0"/>
-                                            </StackPanel>
-                                            <StackPanel x:Name="sp_rules"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
-                            </ScrollViewer>
-
-                            <!-- Bottom Action Bar -->
-                            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0" Padding="16,8">
-                                <Grid>
-                                    <Button x:Name="btn_clear_fields" Content="Clear Fields" HorizontalAlignment="Left"
-                                            Style="{StaticResource T3.Button.Ghost}" Height="28" Padding="12,0" Click="dimtext_clear_fields"/>
-                                    <Button x:Name="btn_apply" Content="Apply" HorizontalAlignment="Right"
-                                            Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="16,0" Click="dimtext_apply" MinWidth="100"/>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </TabItem>
-
-                    <!-- ── TAB 4: UTILITIES ── -->
-                    <TabItem>
-                        <Grid Background="{DynamicResource T3.Surface}" Margin="24,16,24,16">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>     <!-- Header -->
-                                <RowDefinition Height="*"/>        <!-- Cards Grid -->
-                            </Grid.RowDefinitions>
-
-                            <StackPanel Grid.Row="0" Margin="0,0,0,24">
-                                <TextBlock Text="ANNOTATION UTILITIES" Style="{StaticResource T3.Label}"/>
-                                <TextBlock Text="Helper tools for renumbering, case formatting, and document syncing."
-                                           Style="{StaticResource T3.Caption}" Margin="0,4,0,0"/>
-                            </StackPanel>
-
-                            <!-- Cards Grid -->
-                            <UniformGrid Grid.Row="1" Columns="3" VerticalAlignment="Top">
-                                <!-- Card 1: Copy Annotation -->
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,16,0" Background="{StaticResource T3.SurfaceSunken}">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <StackPanel Grid.Row="0">
-                                            <TextBlock Text="Copy Annotations" Style="{StaticResource T3.BodyStrong}"/>
-                                            <TextBlock Text="Transfer dimensions, text notes, tags, and detail components from this model to another open Revit document." 
-                                                       Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap" Margin="0,8,0,16"/>
-                                        </StackPanel>
-                                        <Button Grid.Row="2" x:Name="btn_util_copy_anno" Style="{StaticResource T3.Button.Secondary}" Height="28" Content="Launch Copier"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Card 2: Renumber Along Spline -->
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,16,0" Background="{StaticResource T3.SurfaceSunken}">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <StackPanel Grid.Row="0">
-                                            <TextBlock Text="Renumber Along Spline" Style="{StaticResource T3.BodyStrong}"/>
-                                            <TextBlock Text="Renumber any category of elements (such as doors, rooms, equipment) sequentially along a selected line/spline path." 
-                                                       Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap" Margin="0,8,0,16"/>
-                                        </StackPanel>
-                                        <Button Grid.Row="2" x:Name="btn_util_renumber_spline" Style="{StaticResource T3.Button.Secondary}" Height="28" Content="Start Renumbering"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Card 3: Upper Case All -->
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="16" Background="{StaticResource T3.SurfaceSunken}">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <StackPanel Grid.Row="0">
-                                            <TextBlock Text="Uppercase All Texts" Style="{StaticResource T3.BodyStrong}"/>
-                                            <TextBlock Text="Convert view names, sheet names, title block parameter strings, text notes, and dimension overrides to UPPERCASE." 
-                                                       Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap" Margin="0,8,0,16"/>
-                                        </StackPanel>
-                                        <Button Grid.Row="2" x:Name="btn_util_upper_all" Style="{StaticResource T3.Button.Secondary}" Height="28" Content="Run Uppercase Converter"/>
-                                    </Grid>
-                                </Border>
-                            </UniformGrid>
-                        </Grid>
-                    </TabItem>
-
-                    <!-- ── TAB 5: SETTINGS ── -->
-                    <TabItem>
-                        <Grid Margin="24,16,24,16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Left Card: General Preferences -->
-                            <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="16" Margin="0,0,12,0">
-                                <StackPanel>
-                                    <TextBlock Text="GENERAL PREFERENCES" Style="{StaticResource T3.Label}"/>
-                                    <TextBlock Text="Configure behavior settings for Annotation Manager." Style="{StaticResource T3.Caption}" Margin="0,4,0,16"/>
-
-                                    <CheckBox Content="Auto-select matching elements in view when clicking row" Style="{StaticResource T3.CheckBox}" IsChecked="True" Margin="0,0,0,12"/>
-                                    <CheckBox Content="Include annotations inside groups in search results" Style="{StaticResource T3.CheckBox}" IsChecked="False" Margin="0,0,0,12"/>
-                                    <CheckBox Content="Prompt for confirmation before batch deleting elements" Style="{StaticResource T3.CheckBox}" IsChecked="True"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Right Card: About & Info -->
-                            <Border Grid.Column="1" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="16" Margin="12,0,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="ABOUT T3LAB ANNOTATION SUITE" Style="{StaticResource T3.Label}"/>
-                                    <TextBlock Text="Unified management for Revit drafting elements." Style="{StaticResource T3.Caption}" Margin="0,4,0,16"/>
-
-                                    <TextBlock Text="Annotation Manager" Style="{StaticResource T3.BodyStrong}"/>
-                                    <TextBlock Text="Version 1.1.0" Style="{StaticResource T3.Caption}" Margin="0,4,0,8"/>
-                                    <TextBlock Text="Author: Tran Tien Thanh" Style="{StaticResource T3.Body}" Margin="0,0,0,4"/>
-                                    <TextBlock Text="Contact: trantienthanh909@gmail.com" Style="{StaticResource T3.Caption}" Margin="0,0,0,16"/>
-
-                                    <Border Background="{StaticResource T3.Surface}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="12">
-                                        <TextBlock Text="This utility combines multiple annotation control panels into a unified tool, optimizing your Revit models by standardizing text, cleaning unused styles, and offering rapid auto-renaming of DimensionTypes and TextNoteTypes based on physical parameters."
-                                                   TextWrapping="Wrap" Style="{StaticResource T3.Caption}"/>
-                                    </Border>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </TabItem>
-                </TabControl>
-            </Border>
-
-            <!-- ══════════════════ ROW 2: FOOTER BAR (Col 1) ══════════════════ -->
+                    </Border>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button Content="Remove" Style="{StaticResource T3.Button.Ghost}"
+                                ToolTip="Remove the selected parameters (or double-click)"
+                                Click="move_left_clicked" Margin="0,0,8,0"/>
+                        <Button Content="Move Up" Style="{StaticResource T3.Button.Secondary}"
+                                Click="move_up_clicked" Margin="0,0,8,0"/>
+                        <Button Content="Move Down" Style="{StaticResource T3.Button.Secondary}"
+                                Click="move_down_clicked"/>
+                    </StackPanel>
+                    <Grid Grid.Row="3" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Separator" Style="{StaticResource T3.Body}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox x:Name="txt_sep" Grid.Column="1" Style="{StaticResource T3.TextBox.Mono}"
+                                 Width="64" HorizontalAlignment="Left"
+                                 TextChanged="separator_changed"/>
+                    </Grid>
+                    <TextBlock x:Name="lbl_prev" Grid.Row="4" Style="{StaticResource T3.Caption}"
+                               TextWrapping="Wrap" Margin="0,8,0,0" Text="Preview: "/>
+                </Grid>
             </Grid>
 
-            <!-- ══════════════════ ROW 2: FULL-WIDTH FOOTER BAR ══════════════════ -->
+            <!-- ══════════════════ FOOTER BAR ══════════════════ -->
             <Border Grid.Row="2" Style="{StaticResource T3.FooterBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource T3.Copyright}"/>
-                        <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="12,0"/>
-                        <TextBlock x:Name="status" Text="Ready." Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                     </StackPanel>
-
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="Close" Style="{StaticResource T3.Button.Secondary}"
-                                Click="close_button_clicked" IsCancel="True"/>
+                        <Button x:Name="btn_cancel" Content="Cancel"
+                                Style="{StaticResource T3.Button.Secondary}"
+                                Click="cancel_clicked" IsCancel="True" Margin="0,0,8,0"/>
+                        <Button x:Name="btn_ok" Content="OK"
+                                Style="{StaticResource T3.Button.Primary}"
+                                Click="ok_clicked" IsDefault="True"/>
                     </StackPanel>
                 </Grid>
             </Border>

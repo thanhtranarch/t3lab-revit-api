@@ -1910,10 +1910,11 @@ class LLMSettingWindow(T3WPFWindow):
                 cb.VerticalAlignment = System.Windows.VerticalAlignment.Center
                 cb.Margin = Thickness(0, 0, 8, 0)
                 cb.ToolTip = u"Enable / pause this scheduled prompt"
+                # "T3ToggleSwitch" không tồn tại trong stylesheet T3 — dùng T3.CheckBox.
                 try:
-                    cb.Style = self.FindResource("T3ToggleSwitch")
-                    cb.LayoutTransform = System.Windows.Media.ScaleTransform(
-                        0.6, 0.6)
+                    _st = self.TryFindResource("T3.CheckBox")
+                    if _st is not None:
+                        cb.Style = _st
                 except Exception:
                     pass
 
@@ -2292,9 +2293,11 @@ class LLMSettingWindow(T3WPFWindow):
                 cb = CheckBox()
                 cb.IsChecked = bool(meta.get('enabled', True))
                 cb.VerticalAlignment = System.Windows.VerticalAlignment.Center
+                # "T3ToggleSwitch" không tồn tại trong stylesheet T3 — dùng T3.CheckBox.
                 try:
-                    cb.Style = self.FindResource("T3ToggleSwitch")
-                    cb.LayoutTransform = System.Windows.Media.ScaleTransform(0.7, 0.7)
+                    _st = self.TryFindResource("T3.CheckBox")
+                    if _st is not None:
+                        cb.Style = _st
                 except Exception:
                     pass
 
