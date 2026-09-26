@@ -1820,7 +1820,7 @@
                                     <DataGrid x:Name="xl_dg_schedules" Style="{StaticResource T3.DataGrid}"
                                               IsReadOnly="False" BorderThickness="0">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="34"
+                                            <DataGridTemplateColumn Width="36"
                                                                     HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
                                                                     CellStyle="{StaticResource T3.DataGridCell.Check}">
                                                 <DataGridTemplateColumn.Header>
@@ -1983,7 +1983,7 @@
                                     <DataGrid x:Name="dup_dg_schedules" Style="{StaticResource T3.DataGrid}"
                                               IsReadOnly="False" BorderThickness="0">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="34"
+                                            <DataGridTemplateColumn Width="36"
                                                                     HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
                                                                     CellStyle="{StaticResource T3.DataGridCell.Check}">
                                                 <DataGridTemplateColumn.Header>

@@ -32,7 +32,7 @@ Không có pattern nào vừa → dừng lại, ghi `DESIGN SYSTEM GAP` vào
 
 ```
 T3Lab.extension/
-├── T3Lab.tab/<Panel>.panel/<Tool>.pushbutton/
+├── T3Lab_Dev.tab/<Panel>.panel/<Tool>.pushbutton/   ← tên thư mục tab đổi được: code dùng core.extension_paths.tab_dir()
 │   ├── script.py          ← entry point, KHÔNG chứa logic Revit nặng
 │   ├── icon.svg           ← NGUỒN DUY NHẤT, viewBox "0 0 32 32"
 │   ├── icon.dark.svg      ← sinh tự động, KHÔNG sửa tay
@@ -54,7 +54,7 @@ không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy
 
 ---
 
-## 2 · XAML — 24 luật, `audit_t3.py` kiểm tra tự động
+## 2 · XAML — 25 luật, `audit_t3.py` kiểm tra tự động
 
 | # | Luật | Vi phạm |
 |---|------|---------|
@@ -81,6 +81,7 @@ không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy
 | 22 | **Icon một bộ duy nhất**: icon LUÔN là `<TextBlock Text="&#xE721;" Style="{StaticResource T3.Icon...}"/>`. Cấm khai `FontFamily="Segoe MDL2 Assets"` tại chỗ dùng, cấm để icon làm `Content` của Button, cấm ký tự Unicode thường (`✓ ✕ ⚠ ▶ ▢ −`) làm icon. Bảng glyph chuẩn ở mục "Icon" trong `T3LAB_UI_STANDARD.md` | P2 |
 | 23 | **Cột checkbox phải có select-all ở header**: bảng nào cho tick từng dòng thì header cột đó bắt buộc có `<X.Header><CheckBox x:Name="chk_all_<grid>" Style="{StaticResource T3.CheckBox}" Click="select_all_<grid>_clicked" ToolTip="Select all rows"/></X.Header>`. Handler chỉ một dòng: `self.toggle_all_rows(self.<grid>, "<prop>", sender.IsChecked)` (`toggle_all_rows` nằm sẵn trong `T3WPFWindow`). Miễn trừ: cột là **thuộc tính của dòng** chứ không phải để chọn dòng (ví dụ `ManaWorkset` ACTIVE/OPEN/EDITABLE) — khai vào `SELECTALL_EXEMPT` trong `dev/audit_t3.py` | P2 |
 | 24 | **Checkbox của dòng đọc qua string bridge**: dòng là object Python thì KHÔNG `IsChecked="{Binding prop}"` và KHÔNG `DataGridCheckBoxColumn` — WPF không đổi được PyObject sang bool nên luôn hiện unchecked. Dùng `<Grid><TextBlock x:Name="row_prop_text" Text="{Binding prop}" Visibility="Collapsed"/><CheckBox IsChecked="{Binding Text, ElementName=row_prop_text, Mode=OneWay}" .../></Grid>`; `T3WPFWindow` tự ghi click về dòng. Miễn trừ (dòng DataTable) khai vào `BRIDGE_EXEMPT` trong `dev/audit_t3.py` | P1 |
+| 25 | **Visibility phải nhận giá trị Visibility thật**: không bind bool (`HasItems`, `IsChecked`...) thẳng vào `Visibility` — tool XAML không có converter nên binding lỗi và phần tử **luôn hiện** (empty state đè lên dòng của bảng). Dùng `DataTrigger` + `Setter Property="Visibility"`. Thuộc tính Python `"Visible"/"Collapsed"` trong template dòng cũng phải đọc qua string bridge | P1 |
 
 Thêm hai thứ `audit_t3.py` cũng bắt: `<Grid.RowDefinition/>` dot-notation (**P0**,
 crash `EMPTYPROPERTYELEMENT` lúc mở tool) và mọi `Effect` (P2).

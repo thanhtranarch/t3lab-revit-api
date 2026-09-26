@@ -1892,65 +1892,31 @@
                                   CellEditEnding="cell_edit_ending">
                             <DataGrid.Columns>
                                 <!-- Checkbox Column -->
-                                <DataGridTemplateColumn Width="36" CanUserSort="False">
+                                <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                        HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                        CellStyle="{StaticResource T3.DataGridCell.Check}">
                                     <DataGridTemplateColumn.Header>
-                                        <CheckBox x:Name="chk_all_grid_views" Style="{StaticResource T3.CheckBox}"
+                                        <CheckBox x:Name="chk_all_grid_views" Style="{StaticResource T3.CheckBox.Cell}"
                                                   Click="select_all_grid_views_clicked"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
                                                   ToolTip="Select all rows"/>
                                     </DataGridTemplateColumn.Header>
-                                    <DataGridTemplateColumn.HeaderStyle>
-                                        <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
-                                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                                            <Setter Property="Padding" Value="0"/>
-                                        </Style>
-                                    </DataGridTemplateColumn.HeaderStyle>
-                                    <DataGridTemplateColumn.CellStyle>
-                                        <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                            <Setter Property="Padding" Value="0"/>
-                                        </Style>
-                                    </DataGridTemplateColumn.CellStyle>
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Grid>
                                                 <TextBlock x:Name="row_is_selected_text" Text="{Binding IsSelected}" Visibility="Collapsed"/>
                                                 <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
-                                                          Style="{StaticResource T3.CheckBox}"
-                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                          Padding="0" Margin="0"/>
+                                                          Style="{StaticResource T3.CheckBox.Cell}"/>
                                             </Grid>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
 
-                                <!-- Page Number Pill -->
-                                <DataGridTemplateColumn Header="PAGE" Width="60" CanUserSort="False">
+                                <!-- Page Number -->
+                                <DataGridTemplateColumn Header="PAGE" Width="60" CanUserSort="False"
+                                                        HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Border CornerRadius="4" Padding="8,4" HorizontalAlignment="Center">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="{StaticResource T3.SurfaceSunken}"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                                <Setter Property="Background" Value="{StaticResource T3.Ink}"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <TextBlock Text="{Binding PageDisplay}" FontSize="11" FontWeight="Bold">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="{StaticResource T3.TextMuted}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                                    <Setter Property="Foreground" Value="{StaticResource T3.Surface}"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </Border>
+                                            <TextBlock Text="{Binding PageDisplay}" Style="{StaticResource T3.Cell.Center}"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                     <DataGridTemplateColumn.CellEditingTemplate>
@@ -1963,13 +1929,15 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- View Name -->
-                                <DataGridTextColumn Header="VIEW / SHEET NAME" Binding="{Binding Name}" Width="*" MinWidth="240"/>
+                                <DataGridTextColumn Header="VIEW / SHEET NAME" Binding="{Binding Name}" Width="*" MinWidth="240"
+                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"/>
 
                                 <!-- View Type -->
-                                <DataGridTemplateColumn Header="TYPE" Width="130">
+                                <DataGridTemplateColumn Header="TYPE" Width="130"
+                                                        HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Border CornerRadius="4" Padding="8,4" HorizontalAlignment="Left"
+                                            <Border CornerRadius="4" Padding="8,4" HorizontalAlignment="Center"
                                                     Background="{StaticResource T3.SurfaceSunken}">
                                                 <TextBlock Text="{Binding Type}" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextSecondary}"/>
                                             </Border>

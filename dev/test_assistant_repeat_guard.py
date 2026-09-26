@@ -29,9 +29,10 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from tabdir import TAB  # noqa: E402  (the tab folder name changes)
 _dialog_path = os.path.join(REPO, 'T3Lab.extension', 'lib', 'GUI', 'T3LabAssistantDialog.py')
 SCRIPT = _dialog_path if os.path.exists(_dialog_path) else os.path.join(
-    REPO, 'T3Lab.extension', 'T3Lab.tab', 'Support.panel',
+    TAB, 'Support.panel',
     'T3LabAssistant.pushbutton', 'script.py')
 
 FAILURES = []

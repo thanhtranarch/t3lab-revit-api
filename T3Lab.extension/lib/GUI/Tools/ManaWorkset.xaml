@@ -1833,7 +1833,7 @@
                             <!-- Toolbar / Actions Bar -->
                             <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,8">
+                                    Padding="16,0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -1846,7 +1846,7 @@
                                         <TextBlock x:Name="ws_status" Text="" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
                                     </StackPanel>
 
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                         <Button x:Name="btn_refresh" Content="Refresh"
                                                 Style="{StaticResource T3.Button.Secondary}"
                                                 Margin="0,0,8,0" Click="btn_refresh_click"

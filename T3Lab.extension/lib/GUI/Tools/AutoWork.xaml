@@ -1912,18 +1912,19 @@
                                           MouseDoubleClick="dg_audit_double_clicked">
                                     <DataGrid.Columns>
                                         <!-- Selection Checkbox -->
-                                        <DataGridTemplateColumn Width="40" CanUserResize="False">
+                                        <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                CellStyle="{StaticResource T3.DataGridCell.Check}">
                                             <DataGridTemplateColumn.Header>
-                                                <CheckBox x:Name="chk_header_all" Style="{StaticResource T3.CheckBox}"
-                                                          Click="header_checkbox_clicked" HorizontalAlignment="Center"/>
+                                                <CheckBox x:Name="chk_header_all" Style="{StaticResource T3.CheckBox.Cell}"
+                                                          Click="header_checkbox_clicked"/>
                                             </DataGridTemplateColumn.Header>
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
                                                         <TextBlock x:Name="row_is_selected_text" Text="{Binding IsSelected}" Visibility="Collapsed"/>
                                                         <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                  Style="{StaticResource T3.CheckBox.Cell}"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>

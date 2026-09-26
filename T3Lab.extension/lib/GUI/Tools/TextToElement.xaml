@@ -1817,9 +1817,21 @@
                             </DataGrid>
 
                             <!-- Empty state overlay -->
-                            <TextBlock Style="{StaticResource T3.Empty}"
-                                       Text="No intersections found. Click 'Find Intersections' to preview."
-                                       Visibility="{Binding HasItems, ElementName=dg_preview, Converter={x:Null}}"/>
+                            <!-- Empty state: shown only while dg_preview has no rows. (A bool bound straight
+                                 to Visibility has no converter, so it stayed Visible over the rows.) -->
+                            <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasItems, ElementName=dg_preview}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <TextBlock Style="{StaticResource T3.Empty}" Text="No intersections found. Click 'Find Intersections' to preview."/>
+                            </Grid>
                         </Grid>
                     </Border>
 

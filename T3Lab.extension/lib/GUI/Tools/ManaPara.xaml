@@ -1835,11 +1835,12 @@
                                 <DataGrid x:Name="dg_parameters" Style="{StaticResource T3.DataGrid}"
                                           IsReadOnly="False" SelectionMode="Extended" BorderThickness="0">
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
+                                        <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                CellStyle="{StaticResource T3.DataGridCell.Check}">
                                             <DataGridTemplateColumn.Header>
-                                                <CheckBox x:Name="chk_all_dg_parameters" Style="{StaticResource T3.CheckBox}"
+                                                <CheckBox x:Name="chk_all_dg_parameters" Style="{StaticResource T3.CheckBox.Cell}"
                                                           Click="select_all_dg_parameters_clicked"
-                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
                                                           ToolTip="Select all rows"/>
                                             </DataGridTemplateColumn.Header>
                                             <DataGridTemplateColumn.CellTemplate>
@@ -1847,9 +1848,8 @@
                                                     <Grid>
                                                         <TextBlock x:Name="row_is_selected_text" Text="{Binding is_selected}" Visibility="Collapsed"/>
                                                         <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  Click="param_row_checkbox_clicked"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                  Style="{StaticResource T3.CheckBox.Cell}"
+                                                                  Click="param_row_checkbox_clicked"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
@@ -2146,7 +2146,7 @@
                                 <DataGrid x:Name="dg_loader_params" Style="{StaticResource T3.DataGrid}"
                                           IsReadOnly="False" BorderThickness="0">
                                     <DataGrid.Columns>
-                                        <DataGridTemplateColumn Width="32"
+                                        <DataGridTemplateColumn Width="36"
                                                                 HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
                                                                 CellStyle="{StaticResource T3.DataGridCell.Check}">
                                             <DataGridTemplateColumn.Header>

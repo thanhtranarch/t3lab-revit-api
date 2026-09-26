@@ -1459,6 +1459,7 @@ class PropertyLineDialog(T3WPFWindow):
         save_config({"data_source": source})
 
         self._set_status(u"Searching for property boundaries...", busy=True)
+        self._show_results_message(u"Searching for property boundaries...")
         self.btn_search.IsEnabled = False
         self._search_seq += 1
         seq = self._search_seq
@@ -1517,15 +1518,13 @@ class PropertyLineDialog(T3WPFWindow):
             if more:
                 # The geocoder located the address but carried no polygon;
                 # Overpass may still turn one up, so do not declare failure.
-                self._set_status(
-                    u"Location found. Looking for mapped boundaries...",
-                    busy=True)
+                msg = u"Location found. Looking for mapped boundaries..."
+                self._set_status(msg, busy=True)
             else:
-                self._set_status(
-                    u"No property boundary found. Try a more specific "
-                    u"address, or add the city and country.")
-            self.lv_parcels.Visibility = Visibility.Collapsed
-            self.border_no_results.Visibility = Visibility.Visible
+                msg = (u"No property boundary found. Try a more specific "
+                       u"address, or add the city and country.")
+                self._set_status(msg)
+            self._show_results_message(msg)
             return
 
         self.lv_parcels.Visibility = Visibility.Visible
@@ -1555,11 +1554,10 @@ class PropertyLineDialog(T3WPFWindow):
             self.lv_parcels.Items.Add(ParcelItem(p))
 
         if not self._parcels:
-            self._set_status(
-                u"No mapped boundary at that address. Try a nearby address, "
-                u"or a different data source.")
-            self.lv_parcels.Visibility = Visibility.Collapsed
-            self.border_no_results.Visibility = Visibility.Visible
+            msg = (u"No mapped boundary at that address. Try a nearby address, "
+                   u"or a different data source.")
+            self._set_status(msg)
+            self._show_results_message(msg)
             return
 
         self.lv_parcels.Visibility = Visibility.Visible
@@ -1567,6 +1565,12 @@ class PropertyLineDialog(T3WPFWindow):
         self._set_status(
             u"Found {} boundary(ies). Select one to continue.".format(
                 len(self._parcels)))
+
+    def _show_results_message(self, msg):
+        """Hide the parcel list and show `msg` as its single empty state."""
+        self.lv_parcels.Visibility = Visibility.Collapsed
+        self.txt_no_results.Text = msg
+        self.border_no_results.Visibility = Visibility.Visible
 
     def _show_address_warning(self, msg):
         self.txt_address_warning.Text = u"⚠  " + msg
@@ -1588,12 +1592,14 @@ class PropertyLineDialog(T3WPFWindow):
             "httperror", "urlerror", "ioerror", "errno"))
         if is_network:
             logger.warning("Boundary lookup network error: {}".format(error_msg))
-            self._set_status(
-                u"Could not reach the map data service — check your internet "
-                u"connection (and proxy settings) and try again.")
+            msg = (u"Could not reach the map data service — check your internet "
+                   u"connection (and proxy settings) and try again.")
+            self._set_status(msg)
         else:
-            self._set_status("Search error: {}".format(error_msg), error=True)
+            msg = u"Search error: {}".format(error_msg)
+            self._set_status(msg, error=True)
             logger.error("Boundary search error: {}".format(error_msg))
+        self._show_results_message(msg)
 
     def lv_parcels_SelectionChanged(self, sender, e):
         item = self.lv_parcels.SelectedItem

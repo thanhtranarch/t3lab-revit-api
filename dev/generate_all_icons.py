@@ -15,7 +15,8 @@ from PIL import Image, ImageDraw, ImageFilter
 # Configuration
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SUPPORT_PANEL_DIR = os.path.join(BASE_DIR, "T3Lab.extension", "T3Lab.tab", "Support.panel")
+from tabdir import tab_path  # noqa: E402
+SUPPORT_PANEL_DIR = tab_path("Support.panel")
 PREVIEW_DIR = r"C:\Users\tran_tienthanh\.gemini\antigravity\brain\fc9a3b7f-ab70-4e15-861b-b2d3e68112b6"
 
 # Color constants

@@ -1764,11 +1764,12 @@
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="36">
+                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                    CellStyle="{StaticResource T3.DataGridCell.Check}">
                                 <DataGridTemplateColumn.Header>
-                                    <CheckBox x:Name="chk_all_door_datagrid" Style="{StaticResource T3.CheckBox}"
+                                    <CheckBox x:Name="chk_all_door_datagrid" Style="{StaticResource T3.CheckBox.Cell}"
                                               Click="select_all_door_datagrid_clicked"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center"
                                               ToolTip="Select all rows"/>
                                 </DataGridTemplateColumn.Header>
                                 <DataGridTemplateColumn.CellTemplate>
@@ -1776,7 +1777,7 @@
                                         <Grid>
                                             <TextBlock x:Name="row_is_selected_text" Text="{Binding IsSelected}" Visibility="Collapsed"/>
                                             <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
-                                                      Style="{StaticResource T3.CheckBox}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                      Style="{StaticResource T3.CheckBox.Cell}"/>
                                         </Grid>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -1789,9 +1790,21 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <TextBlock Style="{StaticResource T3.Empty}"
-                               Text="No door elements found in view or matching filter."
-                               Visibility="{Binding HasItems, ElementName=door_datagrid, Converter={x:Null}}"/>
+                    <!-- Empty state: shown only while door_datagrid has no rows. (A bool bound straight
+                         to Visibility has no converter, so it stayed Visible over the rows.) -->
+                    <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasItems, ElementName=door_datagrid}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <TextBlock Style="{StaticResource T3.Empty}" Text="No door elements found in view or matching filter."/>
+                    </Grid>
                 </Grid>
 
                 <!-- Right: Settings Panel -->

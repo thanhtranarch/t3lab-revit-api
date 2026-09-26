@@ -1749,9 +1749,21 @@
                                                      Height="110"
                                                      SelectionMode="Extended"
                                                      Style="{StaticResource T3.ListBox}"/>
-                                            <TextBlock Style="{StaticResource T3.Empty}"
-                                                       Text="No plan views found in model."
-                                                       Visibility="{Binding HasItems, ElementName=lst_views, Converter={x:Null}}"/>
+                                            <!-- Empty state: shown only while lst_views has no rows. (A bool bound straight
+                                                 to Visibility has no converter, so it stayed Visible over the rows.) -->
+                                            <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                                <Grid.Style>
+                                                    <Style TargetType="Grid">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasItems, ElementName=lst_views}" Value="False">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Grid.Style>
+                                                <TextBlock Style="{StaticResource T3.Empty}" Text="No plan views found in model."/>
+                                            </Grid>
                                         </Grid>
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                             <Button Content="Select All"
