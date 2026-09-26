@@ -1943,12 +1943,18 @@
                                                                        Foreground="{StaticResource T3.TextMuted}"
                                                                        TextWrapping="Wrap" Margin="0,4,0,0"/>
                                                         </StackPanel>
-                                                        <Button Grid.Column="3" Content="Detail" Height="24" Padding="8,0"
-                                                                MinWidth="0" Margin="8,0,0,0" VerticalAlignment="Top"
-                                                                Visibility="{Binding select_visibility}"
-                                                                Style="{StaticResource T3.Button.Ghost}" FontSize="11"
-                                                                ToolTip="Select the elements behind this metric"
-                                                                Click="on_recommendation_detail"/>
+                                                        <!-- select_visibility is a Python string: WPF converts the
+                                                             PyObject to string but not to Visibility, so read it
+                                                             through a hidden TextBlock (string -> Visibility parses). -->
+                                                        <Grid Grid.Column="3">
+                                                            <TextBlock x:Name="rec_select_visibility_text" Text="{Binding select_visibility}" Visibility="Collapsed"/>
+                                                            <Button Content="Detail" Height="24" Padding="8,0"
+                                                                    MinWidth="0" Margin="8,0,0,0" VerticalAlignment="Top"
+                                                                    Visibility="{Binding Text, ElementName=rec_select_visibility_text}"
+                                                                    Style="{StaticResource T3.Button.Ghost}" FontSize="11"
+                                                                    ToolTip="Select the elements behind this metric"
+                                                                    Click="on_recommendation_detail"/>
+                                                        </Grid>
                                                     </Grid>
                                                     <DataTemplate.Triggers>
                                                         <DataTrigger Binding="{Binding severity}" Value="Success">
@@ -2086,12 +2092,15 @@
                                                                 HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Button Content="Detail" Visibility="{Binding select_visibility}"
-                                                            Click="on_health_metric_detail"
-                                                            Style="{StaticResource T3.Button.Ghost}"
-                                                            Height="22" Padding="8,0" MinWidth="0" FontSize="11"
-                                                            ToolTip="Select the elements behind this metric"
-                                                            VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                    <Grid>
+                                                        <TextBlock x:Name="metric_select_visibility_text" Text="{Binding select_visibility}" Visibility="Collapsed"/>
+                                                        <Button Content="Detail" Visibility="{Binding Text, ElementName=metric_select_visibility_text}"
+                                                                Click="on_health_metric_detail"
+                                                                Style="{StaticResource T3.Button.Ghost}"
+                                                                Height="22" Padding="8,0" MinWidth="0" FontSize="11"
+                                                                ToolTip="Select the elements behind this metric"
+                                                                VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                    </Grid>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>

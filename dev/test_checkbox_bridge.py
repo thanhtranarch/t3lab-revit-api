@@ -30,8 +30,8 @@ X = '{http://schemas.microsoft.com/winfx/2006/xaml}'
 P = '{http://schemas.microsoft.com/winfx/2006/xaml/presentation}'
 BRIDGE = re.compile(r'^\{Binding Text, ElementName=(\w+), Mode=OneWay\}$')
 
-# Files whose rows are DataRowView (typed bool columns) or UI-frozen.
-EXEMPT = {'ManaAnno.xaml', 'DWGManagement.xaml'}
+# Rows are DataRowView (typed bool columns): a direct binding reads fine.
+EXEMPT = {'ManaAnno.xaml'}
 
 
 # ── fakes for the .NET binding API ───────────────────────────────────────────
@@ -203,7 +203,8 @@ class ShippedXaml(unittest.TestCase):
                 self.assertEqual(bridge.get('Visibility'), 'Collapsed', fname)
                 self.assertRegex(bridge.get('Text') or '', r'^\{Binding \w+\}$', fname)
         # 25 template checkboxes + 13 former DataGridCheckBoxColumns + BatchOut
-        self.assertEqual(count, 39)
+        # + DWGManagement (binding only, its UI stays frozen)
+        self.assertEqual(count, 40)
 
     def test_read_only_workset_state_is_display_only(self):
         root = ET.parse(os.path.join(TOOLS, 'ManaWorkset.xaml')).getroot()
@@ -217,33 +218,38 @@ class CheckColumnAlignment(unittest.TestCase):
     """Header select-all box sits exactly over the row boxes: header and cell
     share one geometry (no padding, box centred)."""
 
-    GRIDS = {'ManaViews.xaml': ('views_grid', 'tmpl_grid'),
-             'ManaSheets.xaml': ('sheets_grid', 'renum_grid'),
-             'ManaPara.xaml': ('dg_loader_params',),
-             'ManaSched.xaml': ('xl_dg_schedules', 'dup_dg_schedules'),
-             'ManaStyles.xaml': ('grid_style', 'grid_pattern', 'grid_fill'),
-             'ModelAuditor.xaml': ('dg_smart_purge',),
-             'SheetGen.xaml': ('room_datagrid',),
-             'UIStandardShowcase.xaml': ('sample_grid',)}
+    # UI-frozen: its visual design may not change (CLAUDE.md).
+    FROZEN = {'DWGManagement.xaml'}
 
-    def test_check_columns_use_the_shared_geometry(self):
-        for fname, grids in self.GRIDS.items():
+    def test_every_select_all_column_uses_the_shared_geometry(self):
+        seen = []
+        for fname in _xaml_files():
+            if fname in self.FROZEN:
+                continue
             root = ET.parse(os.path.join(TOOLS, fname)).getroot()
-            for grid in root.iter(P + 'DataGrid'):
-                if grid.get(X + 'Name') not in grids:
+            for col in root.iter(P + 'DataGridTemplateColumn'):
+                header = col.find(P + 'DataGridTemplateColumn.Header')
+                if header is None or header.find(P + 'CheckBox') is None:
                     continue
-                col = next(grid.iter(P + 'DataGridTemplateColumn'))
-                where = '%s %s' % (fname, grid.get(X + 'Name'))
+                where = '%s %s' % (fname, header.find(P + 'CheckBox').get(X + 'Name'))
+                seen.append(where)
+                self.assertEqual(col.get('Width'), '36', where)
                 self.assertEqual(col.get('HeaderStyle'),
                                  '{StaticResource T3.DataGridColumnHeader.Check}', where)
                 self.assertEqual(col.get('CellStyle'),
                                  '{StaticResource T3.DataGridCell.Check}', where)
+                self.assertIsNone(col.find(P + 'DataGridTemplateColumn.HeaderStyle'), where)
+                self.assertIsNone(col.find(P + 'DataGridTemplateColumn.CellStyle'), where)
                 boxes = list(col.iter(P + 'CheckBox'))
                 self.assertEqual(len(boxes), 2, where)          # header + row
                 for box in boxes:
                     self.assertEqual(box.get('Style'), '{StaticResource T3.CheckBox.Cell}', where)
-                    for geometry in ('Padding', 'Margin', 'HorizontalAlignment'):
+                    for geometry in ('Padding', 'Margin', 'HorizontalAlignment', 'VerticalAlignment'):
                         self.assertIsNone(box.get(geometry), where)
+        # 15 aligned first, 16 more on 2026-09-26 (AutoWork, BatchLink, DoorThreshold,
+        # FamiGen, ManaAnno, ManaFami, ManaGroup, ManaPara, PointCloud, QuickElement,
+        # RoomToFloor)
+        self.assertEqual(len(seen), 31, seen)
 
     def test_renumber_tab_has_the_same_metrics_frame_as_the_sheets_tab(self):
         root = ET.parse(os.path.join(TOOLS, 'ManaSheets.xaml')).getroot()
@@ -255,6 +261,62 @@ class CheckColumnAlignment(unittest.TestCase):
             self.assertEqual(captions[:2], ['TOTAL SHEETS', 'SELECTED'], tab)
             widths.append([c.get('Width') for c in tabs[tab].iter(P + 'ColumnDefinition')][:1])
         self.assertEqual(widths[0], widths[1])                 # strip does not jump
+
+
+class PdfImportGrid(unittest.TestCase):
+    """PAGE is a plain centred number and every header sits centred."""
+
+    def grid(self):
+        root = ET.parse(os.path.join(TOOLS, 'PDFImport.xaml')).getroot()
+        return next(g for g in root.iter(P + 'DataGrid') if g.get(X + 'Name') == 'grid_views')
+
+    def test_page_number_has_no_box(self):
+        page = next(c for c in self.grid().iter(P + 'DataGridTemplateColumn')
+                    if c.get('Header') == 'PAGE')
+        template = page.find(P + 'DataGridTemplateColumn.CellTemplate')
+        self.assertEqual(list(template.iter(P + 'Border')), [])
+        cell = next(template.iter(P + 'TextBlock'))
+        self.assertEqual(cell.get('Text'), '{Binding PageDisplay}')
+        self.assertEqual(cell.get('Style'), '{StaticResource T3.Cell.Center}')
+
+    def test_headers_are_centred(self):
+        cols = list(self.grid().find(P + 'DataGrid.Columns'))
+        self.assertEqual([c.get('Header') for c in cols[1:]],
+                         ['PAGE', 'VIEW / SHEET NAME', 'TYPE'])
+        for col in cols[1:]:
+            self.assertEqual(col.get('HeaderStyle'),
+                             '{StaticResource T3.DataGridColumnHeader.Center}', col.get('Header'))
+
+
+class MetricDetailGrid(unittest.TestCase):
+    def test_id_starts_where_its_header_starts(self):
+        # T3.Cell.Number pushed the ids to the right edge, far from "ID".
+        root = ET.parse(os.path.join(TOOLS, 'ModelAuditorDetail.xaml')).getroot()
+        col = next(c for c in root.iter(P + 'DataGridTextColumn') if c.get('Header') == 'ID')
+        self.assertEqual(col.get('ElementStyle'), '{StaticResource T3.Mono}')
+
+    def test_header_box_follows_the_footer_buttons(self):
+        src = open(os.path.join(LIB, 'GUI', 'ModelAuditorDialog.py'), encoding='utf-8').read()
+        for handler in ('def on_check_all', 'def on_uncheck_all'):
+            body = src[src.index(handler):]
+            body = body[:body.index('\n    def ', 1)]
+            self.assertIn('self.sync_header_checkbox(self.chk_all_dg_detail_elements', body)
+
+
+class DwgManagementStaysFrozen(unittest.TestCase):
+    """The bridge went in; the frozen look did not change."""
+
+    def test_only_the_binding_changed(self):
+        root = ET.parse(os.path.join(TOOLS, 'DWGManagement.xaml')).getroot()
+        grid = next(g for g in root.iter(P + 'DataGrid') if g.get(X + 'Name') == 'DWGDataGrid')
+        col = next(grid.iter(P + 'DataGridTemplateColumn'))
+        self.assertIsNone(col.get('HeaderStyle'))                 # its own inline styles stay
+        self.assertIsNotNone(col.find(P + 'DataGridTemplateColumn.HeaderStyle'))
+        row_box = next(col.find(P + 'DataGridTemplateColumn.CellTemplate').iter(P + 'CheckBox'))
+        self.assertRegex(row_box.get('IsChecked'), BRIDGE)
+        self.assertEqual((row_box.get('Style'), row_box.get('HorizontalAlignment'),
+                          row_box.get('Padding'), row_box.get('Margin')),
+                         ('{StaticResource T3.CheckBox}', 'Center', '0', '0'))
 
 
 class CustomFilenameCell(unittest.TestCase):

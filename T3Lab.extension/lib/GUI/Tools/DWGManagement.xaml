@@ -1825,10 +1825,13 @@
                                 </DataGridTemplateColumn.Header>
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                  Padding="0" Margin="0"/>
+                                        <Grid>
+                                            <TextBlock x:Name="row_is_selected_text" Text="{Binding IsSelected}" Visibility="Collapsed"/>
+                                            <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
+                                                      Style="{StaticResource T3.CheckBox}"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      Padding="0" Margin="0"/>
+                                        </Grid>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>

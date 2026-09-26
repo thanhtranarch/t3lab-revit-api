@@ -1731,29 +1731,26 @@
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                           SelectionMode="Extended">
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Width="92">
+                        <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                CellStyle="{StaticResource T3.DataGridCell.Check}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <CheckBox x:Name="chk_all_dg_detail_elements" Style="{StaticResource T3.CheckBox}"
-                                              Click="select_all_dg_detail_elements_clicked"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              ToolTip="Select all rows"/>
-                                    <TextBlock Text="PICK" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                                </StackPanel>
+                                <CheckBox x:Name="chk_all_dg_detail_elements" Style="{StaticResource T3.CheckBox.Cell}"
+                                          Click="select_all_dg_detail_elements_clicked"
+                                          ToolTip="Select all rows"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Grid>
                                         <TextBlock x:Name="row_is_selected_text" Text="{Binding is_selected}" Visibility="Collapsed"/>
                                         <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                  Style="{StaticResource T3.CheckBox.Cell}"/>
                                     </Grid>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTextColumn Header="ID" Binding="{Binding id}" Width="110" IsReadOnly="True"
-                                            ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                            ElementStyle="{StaticResource T3.Mono}"/>
                         <DataGridTextColumn Header="CATEGORY" Binding="{Binding category}" Width="200" IsReadOnly="True"
                                             ElementStyle="{StaticResource T3.Body.Secondary}"/>
                         <DataGridTextColumn Header="NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>

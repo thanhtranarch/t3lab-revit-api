@@ -1816,7 +1816,7 @@
                                               SelectionChanged="room_selection_changed"
                                               PreviewMouseLeftButtonDown="room_row_clicked">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="38"
+                                            <DataGridTemplateColumn Width="36"
                                                                     HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
                                                                     CellStyle="{StaticResource T3.DataGridCell.Check}">
                                                 <DataGridTemplateColumn.Header>

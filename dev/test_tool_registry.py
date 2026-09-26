@@ -47,6 +47,7 @@ except Exception:
     pass
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from tabdir import TAB  # noqa: E402  (the tab folder name changes)
 EXT = os.path.join(REPO, 'T3Lab.extension')
 LIB = os.path.join(EXT, 'lib')
 SERVER = os.path.join(LIB, 'core', 'server.py')
@@ -54,7 +55,7 @@ SPECIALISTS = os.path.join(LIB, 'Intelligence', 'agents', 'specialists.py')
 TOOL_SCHEMA = os.path.join(LIB, 'Intelligence', 'tool_schema.py')
 NLU = os.path.join(LIB, 'Intelligence', 'nlu_engine.py')
 AGENT_LOOP = os.path.join(LIB, 'Intelligence', 'agent_loop.py')
-ASSISTANT = os.path.join(EXT, 'T3Lab.tab', 'Support.panel',
+ASSISTANT = os.path.join(TAB, 'Support.panel',
                          'T3LabAssistant.pushbutton', 'script.py')
 
 FAILURES = []

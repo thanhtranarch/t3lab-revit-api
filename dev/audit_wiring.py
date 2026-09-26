@@ -37,7 +37,7 @@ except Exception:
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXT = os.path.join(REPO, "T3Lab.extension")
-TAB = os.path.join(EXT, "T3Lab.tab")
+from tabdir import TAB  # noqa: E402  (the tab folder name changes)
 LIB = os.path.join(EXT, "lib")
 TOOLS = os.path.join(LIB, "GUI", "Tools")
 

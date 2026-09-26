@@ -52,6 +52,10 @@ Kích thước cửa sổ: S 420×260–320 (NoResize) · M 560×420–560 · L 
 12. **Ngôn ngữ UI là TIẾNG ANH.** Mọi chữ người dùng đọc — label, nút, header, tooltip,
     empty state, thông báo lỗi/cảnh báo/thành công — viết bằng tiếng Anh, không ngoại lệ.
     Comment trong XAML/code và tài liệu nội bộ thì không bị ràng buộc.
+13. **Thanh cao cố định (row 44/48, `T3.FooterBar`) — padding dọc = 0.** Căn nội dung
+    bằng `VerticalAlignment="Center"`, không bằng `Padding="16,8"`: row 44 − 8 − 8 −
+    viền 1px chỉ còn 27px, nút 28–30px bị cắt mất nét đáy (Ribbon Names, ManaStyles,
+    ManaWorkset — 2026-09-26). `dev/test_ui_overlap.py` quét mọi XAML bắt lỗi này.
 
 ## 5 pattern — mọi tool phải là một trong số này
 - **P1 Parameter input form** (M) — form một cột, Expander cho Advanced, callout hệ quả có số lượng trên footer.
@@ -101,6 +105,45 @@ sinh ra để chống:
 có gì đang chạy · `T3.Cell.Muted` ô "— none —" / "n/a" ·
 `T3.Callout.Icon` icon của callout · `T3.Dot` chấm trạng thái 6px ·
 `T3.Log.Time/.Ok/.Skipped/.Failed/.Plain` dòng log · `T3.Tally` dải đếm dưới log.
+
+## Thanh tab ngang — một kiểu duy nhất (thêm 2026-09-26)
+
+Tool có nhiều trang ngang hàng (không phải wizard có rail dọc) dùng **đúng** dải
+này — mẫu gốc là `BGTheme.xaml`, đã áp cho BatchLink, ManaGroup, LLMSetting,
+SplitElements. Không dùng tab WPF mặc định (header hiện), không bọc chip trong
+`T3.Pill` nổi có margin.
+
+```xml
+<Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
+        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+        Padding="16,4">
+  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+    <RadioButton x:Name="chip_tab_a" Content="First" GroupName="xx_tabs"
+                 Style="{StaticResource T3.Chip}" IsChecked="True"
+                 Checked="tab_chip_checked" Tag="0"/>
+    <RadioButton x:Name="chip_tab_b" Content="Second" GroupName="xx_tabs"
+                 Style="{StaticResource T3.Chip}"
+                 Checked="tab_chip_checked" Tag="1"/>
+  </StackPanel>
+</Border>
+<TabControl x:Name="tab_control" Grid.Row="2" Background="Transparent" BorderThickness="0">
+  <TabControl.ItemContainerStyle>
+    <Style TargetType="TabItem" BasedOn="{StaticResource T3.TabItem.Hidden}"/>
+  </TabControl.ItemContainerStyle>
+  ...
+</TabControl>
+```
+
+```python
+def tab_chip_checked(self, sender, e):
+    self.tab_control.SelectedIndex = int(sender.Tag)
+```
+
+- Dải chạy hết chiều ngang, sát dưới title bar; nội dung tab tự lo margin của nó.
+- Bộ lọc dùng chung cho mọi tab (ô tìm, combo) được đặt ở **đầu phải** của dải
+  (ManaGroup), không mở thêm một hàng riêng.
+- Chip dùng làm **bộ lọc** bên trong một trang (ManaGroup `mg_plot_kind`) không
+  phải thanh tab — vẫn có thể nằm trong `T3.Pill`.
 
 ## Bảng có checkbox — bắt buộc có select-all ở header
 

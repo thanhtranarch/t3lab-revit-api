@@ -35,11 +35,12 @@ if _LIB_DIR not in sys.path:
     sys.path.insert(0, _LIB_DIR)
 
 _EXTENSION_DIR = os.path.dirname(_LIB_DIR)
+from core.extension_paths import tab_dir  # noqa: E402  (after the sys.path insert)
 # Per-category prompts: prompts/<slug>.md is a fully self-contained system prompt
 # for that family category (schema, forms, curve segments, failure modes, checklist
 # and category-specific guidance) — picked by the user before "Copy Prompt".
 _PROMPTS_DIR = os.path.join(
-    _EXTENSION_DIR, 'T3Lab.tab', 'Modeling & Datum.panel',
+    tab_dir(_EXTENSION_DIR), 'Modeling & Datum.panel',
     'FamiGen.pushbutton', 'prompts')
 
 from Autodesk.Revit.DB import (

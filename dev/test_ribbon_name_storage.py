@@ -7,7 +7,9 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-SOURCE = Path(__file__).resolve().parents[1] / 'T3Lab.extension/T3Lab.tab/Support.panel/UI.stack/Ribbon Names.pushbutton/script.py'
+from tabdir import TAB  # the tab folder name changes
+
+SOURCE = Path(TAB) / 'Support.panel/UI.stack/Ribbon Names.pushbutton/script.py'
 
 
 class RibbonStorageTests(unittest.TestCase):

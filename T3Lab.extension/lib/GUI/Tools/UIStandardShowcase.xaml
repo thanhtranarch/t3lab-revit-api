@@ -2005,7 +2005,7 @@
                                     <DataGrid x:Name="sample_grid" Style="{StaticResource T3.DataGrid}"
                                               BorderThickness="0" SelectionMode="Extended">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="32"
+                                            <DataGridTemplateColumn Width="36"
                                                                     HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
                                                                     CellStyle="{StaticResource T3.DataGridCell.Check}">
                                                 <DataGridTemplateColumn.Header>

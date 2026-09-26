@@ -26,7 +26,7 @@ import glob
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT = os.path.join(REPO, "T3Lab.extension")
-TAB = os.path.join(ROOT, "T3Lab.tab")
+from tabdir import TAB  # noqa: E402  (the tab folder name changes)
 LIB = os.path.join(ROOT, "lib")
 GUI_TOOLS = os.path.join(LIB, "GUI", "Tools")
 

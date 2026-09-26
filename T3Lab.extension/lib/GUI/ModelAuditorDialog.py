@@ -808,11 +808,15 @@ class MetricDetailWindow(T3WPFWindow):
         for row in self.rows:
             row["is_selected"] = True
         self.dg_detail_elements.Items.Refresh()
+        self.sync_header_checkbox(self.chk_all_dg_detail_elements,
+                                  self.dg_detail_elements, "is_selected")
 
     def on_uncheck_all(self, sender, e):
         for row in self.rows:
             row["is_selected"] = False
         self.dg_detail_elements.Items.Refresh()
+        self.sync_header_checkbox(self.chk_all_dg_detail_elements,
+                                  self.dg_detail_elements, "is_selected")
 
     def on_select_in_model(self, sender, e):
         picked = [row.eid for row in self.rows if row.get("is_selected", False)]

@@ -8,6 +8,8 @@ import unittest
 import xml.etree.ElementTree as ET
 from unittest.mock import Mock
 
+from tabdir import TAB  # the tab folder name changes
+
 ROOT = Path(__file__).resolve().parents[1]
 path = ROOT / 'T3Lab.extension/lib/Services/batchout_executor.py'
 spec = importlib.util.spec_from_file_location('batchout_under_test', path)
@@ -164,7 +166,7 @@ class BatchOutExecutorTests(unittest.TestCase):
         self.assertEqual(self.run_export(format='ifc')[:2], (False, 0))
 
     def test_pushbutton_exports_the_class_required_by_assistant_loader(self):
-        script = ROOT / 'T3Lab.extension/T3Lab.tab/Views & Sheets.panel/BatchOut.pushbutton/script.py'
+        script = Path(TAB) / 'Views & Sheets.panel/BatchOut.pushbutton/script.py'
         tree = ast.parse(script.read_text(encoding='utf-8-sig'))
         # ast.walk: the import sits in the non-__main__ branch, so running the
         # button keeps it inside ErrorGuard.run_tool.

@@ -44,7 +44,7 @@ except Exception:
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Add lib directory to system path
-# __file__ is T3Lab.extension/T3Lab.tab/Annotation & Select.panel/Mana.stack/ManaSelect.pushbutton/script.py
+# __file__ is T3Lab.extension/<Tab>.tab/Annotation & Select.panel/Mana.stack/ManaSelect.pushbutton/script.py
 extension_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 lib_dir = os.path.join(extension_dir, 'lib')
 if lib_dir not in sys.path:
