@@ -8,6 +8,9 @@
 - A Python row attribute ("Visible"/"Collapsed") reaches WPF as a PyObject,
   which does not convert to Visibility either (ModelAuditor "Detail" buttons).
 - BatchLink's tab bar follows the BGTheme strip.
+- A button taller than the fixed bar it sits in loses its bottom stroke
+  (Ribbon Names "Save Map": 44px row - 8+8 padding - 1px rule = 27px for a
+  28px button). Same in ManaStyles and ManaWorkset.
 
 Run: python dev/test_ui_overlap.py
 """
@@ -169,6 +172,92 @@ class TabStripFollowsBGTheme(unittest.TestCase):
                                             for t in items)
                 self.assertTrue(hidden_by_container or hidden_each,
                                 '%s %s' % (fname, tc.get(X + 'Name')))
+
+
+def _thickness(value):
+    if not value:
+        return [0.0] * 4
+    p = [float(x) for x in value.replace(' ', ',').split(',') if x]
+    return p * 4 if len(p) == 1 else ([p[0], p[1], p[0], p[1]] if len(p) == 2 else p)
+
+
+def _vertical(value):
+    t = _thickness(value)
+    return t[1] + t[3]
+
+
+def _number(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+class ControlsFitTheirBars(unittest.TestCase):
+    """Walk up from every sized control to the first fixed-height box around
+    it (a Height, a fixed Grid row, or T3.FooterBar/T3.TitleBar) and check the
+    control plus every margin, padding and border on the way fits inside."""
+
+    ACTION_H = 30.0                                     # T3.H.Action
+    CONTROL_H = {'T3.Button.Primary': ACTION_H, 'T3.Button.Secondary': ACTION_H,
+                 'T3.Button.Ghost': ACTION_H, 'T3.Button.Danger': ACTION_H}
+    BARS = {'T3.FooterBar': (48.0, '0,1,0,0'), 'T3.TitleBar': (48.0, '0,0,0,1')}
+
+    def test_action_height_token(self):
+        styles = read(os.path.join(REPO, 'pyRevit UI Design System', 'T3Lab.Styles.xaml'))
+        self.assertIn('<sys:Double x:Key="T3.H.Action">%g</sys:Double>' % self.ACTION_H, styles)
+
+    def fixed_height(self, el, parent):
+        h = _number(el.get('Height'))
+        key = (el.get('Style') or '').split(' ')[-1].rstrip('}')
+        if h is None and key in self.BARS:
+            h = self.BARS[key][0]
+        par = parent.get(el)
+        if h is None and par is not None and par.tag == P + 'Grid':
+            rows = par.find(P + 'Grid.RowDefinitions')
+            if rows is not None:
+                first = int(el.get('Grid.Row', '0'))
+                span = [_number(r.get('Height')) for r in
+                        list(rows)[first:first + int(el.get('Grid.RowSpan', '1'))]]
+                if span and None not in span:
+                    h = sum(span) - _vertical(el.get('Margin'))
+        return h
+
+    def chrome(self, el):
+        if el.tag != P + 'Border':
+            return 0.0
+        key = (el.get('Style') or '').split(' ')[-1].rstrip('}')
+        border = el.get('BorderThickness') or self.BARS.get(key, (0, None))[1]
+        return _vertical(el.get('Padding')) + _vertical(border)
+
+    def test_no_control_is_clipped_by_its_bar(self):
+        clipped = []
+        for fname in sorted(os.listdir(TOOLS)):
+            if not fname.endswith('.xaml'):
+                continue
+            root = parse(fname)
+            parent = {c: p for p in root.iter() for c in p}
+            for ctl in root.iter():
+                if ctl.tag not in (P + 'Button', P + 'ToggleButton', P + 'TextBox', P + 'ComboBox'):
+                    continue
+                style = (ctl.get('Style') or '').split(' ')[-1].rstrip('}')
+                need = _number(ctl.get('Height')) or self.CONTROL_H.get(style)
+                if need is None:
+                    continue
+                need += _vertical(ctl.get('Margin'))
+                el = parent.get(ctl)
+                while el is not None and el.tag not in (P + 'ScrollViewer', P + 'DataTemplate',
+                                                        P + 'ControlTemplate'):
+                    need += self.chrome(el)
+                    h = self.fixed_height(el, parent)
+                    if h is not None:
+                        if need > h + 0.01:
+                            clipped.append('%s %s needs %g, bar is %g' % (
+                                fname, ctl.get(X + 'Name') or ctl.get('Content'), need, h))
+                        break
+                    need += _vertical(el.get('Margin'))
+                    el = parent.get(el)
+        self.assertEqual(clipped, [])
 
 
 if __name__ == '__main__':

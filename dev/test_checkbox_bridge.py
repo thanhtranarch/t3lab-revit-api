@@ -224,7 +224,9 @@ class CheckColumnAlignment(unittest.TestCase):
              'ManaStyles.xaml': ('grid_style', 'grid_pattern', 'grid_fill'),
              'ModelAuditor.xaml': ('dg_smart_purge',),
              'SheetGen.xaml': ('room_datagrid',),
-             'UIStandardShowcase.xaml': ('sample_grid',)}
+             'UIStandardShowcase.xaml': ('sample_grid',),
+             'PDFImport.xaml': ('grid_views',),
+             'ModelAuditorDetail.xaml': ('dg_detail_elements',)}
 
     def test_check_columns_use_the_shared_geometry(self):
         for fname, grids in self.GRIDS.items():
@@ -255,6 +257,46 @@ class CheckColumnAlignment(unittest.TestCase):
             self.assertEqual(captions[:2], ['TOTAL SHEETS', 'SELECTED'], tab)
             widths.append([c.get('Width') for c in tabs[tab].iter(P + 'ColumnDefinition')][:1])
         self.assertEqual(widths[0], widths[1])                 # strip does not jump
+
+
+class PdfImportGrid(unittest.TestCase):
+    """PAGE is a plain centred number and every header sits centred."""
+
+    def grid(self):
+        root = ET.parse(os.path.join(TOOLS, 'PDFImport.xaml')).getroot()
+        return next(g for g in root.iter(P + 'DataGrid') if g.get(X + 'Name') == 'grid_views')
+
+    def test_page_number_has_no_box(self):
+        page = next(c for c in self.grid().iter(P + 'DataGridTemplateColumn')
+                    if c.get('Header') == 'PAGE')
+        template = page.find(P + 'DataGridTemplateColumn.CellTemplate')
+        self.assertEqual(list(template.iter(P + 'Border')), [])
+        cell = next(template.iter(P + 'TextBlock'))
+        self.assertEqual(cell.get('Text'), '{Binding PageDisplay}')
+        self.assertEqual(cell.get('Style'), '{StaticResource T3.Cell.Center}')
+
+    def test_headers_are_centred(self):
+        cols = list(self.grid().find(P + 'DataGrid.Columns'))
+        self.assertEqual([c.get('Header') for c in cols[1:]],
+                         ['PAGE', 'VIEW / SHEET NAME', 'TYPE'])
+        for col in cols[1:]:
+            self.assertEqual(col.get('HeaderStyle'),
+                             '{StaticResource T3.DataGridColumnHeader.Center}', col.get('Header'))
+
+
+class MetricDetailGrid(unittest.TestCase):
+    def test_id_starts_where_its_header_starts(self):
+        # T3.Cell.Number pushed the ids to the right edge, far from "ID".
+        root = ET.parse(os.path.join(TOOLS, 'ModelAuditorDetail.xaml')).getroot()
+        col = next(c for c in root.iter(P + 'DataGridTextColumn') if c.get('Header') == 'ID')
+        self.assertEqual(col.get('ElementStyle'), '{StaticResource T3.Mono}')
+
+    def test_header_box_follows_the_footer_buttons(self):
+        src = open(os.path.join(LIB, 'GUI', 'ModelAuditorDialog.py'), encoding='utf-8').read()
+        for handler in ('def on_check_all', 'def on_uncheck_all'):
+            body = src[src.index(handler):]
+            body = body[:body.index('\n    def ', 1)]
+            self.assertIn('self.sync_header_checkbox(self.chk_all_dg_detail_elements', body)
 
 
 class CustomFilenameCell(unittest.TestCase):

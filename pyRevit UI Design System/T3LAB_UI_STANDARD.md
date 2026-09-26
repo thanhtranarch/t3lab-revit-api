@@ -52,6 +52,10 @@ Kích thước cửa sổ: S 420×260–320 (NoResize) · M 560×420–560 · L 
 12. **Ngôn ngữ UI là TIẾNG ANH.** Mọi chữ người dùng đọc — label, nút, header, tooltip,
     empty state, thông báo lỗi/cảnh báo/thành công — viết bằng tiếng Anh, không ngoại lệ.
     Comment trong XAML/code và tài liệu nội bộ thì không bị ràng buộc.
+13. **Thanh cao cố định (row 44/48, `T3.FooterBar`) — padding dọc = 0.** Căn nội dung
+    bằng `VerticalAlignment="Center"`, không bằng `Padding="16,8"`: row 44 − 8 − 8 −
+    viền 1px chỉ còn 27px, nút 28–30px bị cắt mất nét đáy (Ribbon Names, ManaStyles,
+    ManaWorkset — 2026-09-26). `dev/test_ui_overlap.py` quét mọi XAML bắt lỗi này.
 
 ## 5 pattern — mọi tool phải là một trong số này
 - **P1 Parameter input form** (M) — form một cột, Expander cho Advanced, callout hệ quả có số lượng trên footer.

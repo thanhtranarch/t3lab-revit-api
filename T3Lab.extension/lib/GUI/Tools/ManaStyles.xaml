@@ -1895,7 +1895,7 @@
                                         <!-- Actions Footer -->
                                         <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                                Padding="16,8">
+                                                Padding="16,0">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
@@ -1903,7 +1903,7 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button x:Name="btn_style_select_all" Style="{StaticResource T3.Button.Secondary}" Content="All" Height="26" Padding="8,0" Margin="0,0,4,0"/>
                                                     <Button x:Name="btn_style_select_custom" Style="{StaticResource T3.Button.Secondary}" Content="Custom" Height="26" Padding="8,0" Margin="0,0,4,0"/>
                                                     <Button x:Name="btn_style_clear_all" Style="{StaticResource T3.Button.Secondary}" Content="Clear" Height="26" Padding="8,0"/>
@@ -1912,7 +1912,7 @@
                                                 <TextBlock x:Name="txt_stats_style" Grid.Column="1" Text="Showing 0 / 0 items"
                                                            Style="{StaticResource T3.Caption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
-                                                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button x:Name="btn_style_rename" Content="Rename" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                                     <Button x:Name="btn_style_delete" Content="Delete Selected" Style="{StaticResource T3.Button.Danger}"/>
                                                 </StackPanel>
@@ -2005,7 +2005,7 @@
                                         <!-- Actions Footer -->
                                         <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                                Padding="16,8">
+                                                Padding="16,0">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
@@ -2013,7 +2013,7 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button x:Name="btn_pattern_select_all" Style="{StaticResource T3.Button.Secondary}" Content="All" Height="26" Padding="8,0" Margin="0,0,4,0"/>
                                                     <Button x:Name="btn_pattern_select_custom" Style="{StaticResource T3.Button.Secondary}" Content="Custom" Height="26" Padding="8,0" Margin="0,0,4,0"/>
                                                     <Button x:Name="btn_pattern_clear_all" Style="{StaticResource T3.Button.Secondary}" Content="Clear" Height="26" Padding="8,0"/>
@@ -2022,7 +2022,7 @@
                                                 <TextBlock x:Name="txt_stats_pattern" Grid.Column="1" Text="Showing 0 / 0 items"
                                                            Style="{StaticResource T3.Caption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
-                                                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button x:Name="btn_pattern_rename" Content="Rename" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                                     <Button x:Name="btn_pattern_duplicate" Content="Duplicate" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                                     <Button x:Name="btn_pattern_delete" Content="Delete Selected" Style="{StaticResource T3.Button.Danger}"/>
@@ -2117,7 +2117,7 @@
                                         <!-- Actions Footer -->
                                         <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                                Padding="16,8">
+                                                Padding="16,0">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
@@ -2125,7 +2125,7 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button x:Name="btn_fill_select_all" Style="{StaticResource T3.Button.Secondary}" Content="All" Height="26" Padding="8,0" Margin="0,0,4,0"/>
                                                     <Button x:Name="btn_fill_select_custom" Style="{StaticResource T3.Button.Secondary}" Content="Custom" Height="26" Padding="8,0" Margin="0,0,4,0"/>
                                                     <Button x:Name="btn_fill_clear_all" Style="{StaticResource T3.Button.Secondary}" Content="Clear" Height="26" Padding="8,0"/>
@@ -2134,7 +2134,7 @@
                                                 <TextBlock x:Name="txt_stats_fill" Grid.Column="1" Text="Showing 0 / 0 items"
                                                            Style="{StaticResource T3.Caption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
-                                                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                                     <Button x:Name="btn_fill_rename" Content="Rename" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                                     <Button x:Name="btn_fill_duplicate" Content="Duplicate" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                                     <Button x:Name="btn_fill_delete" Content="Delete Selected" Style="{StaticResource T3.Button.Danger}"/>
