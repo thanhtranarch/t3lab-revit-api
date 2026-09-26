@@ -64,6 +64,13 @@ SELECTALL_EXEMPT = {
     ("ManaWorkset.xaml", "EDITABLE"),
 }
 
+# ── Luật 24 · Checkbox của dòng đọc qua string bridge ────────────────────
+# Miễn trừ, kèm lý do:
+#   ManaAnno      — dòng là DataRowView (DataTable): cột bool có kiểu thật nên
+#                   binding thẳng đọc đúng, bridge không cần.
+#   DWGManagement — UI-frozen theo CLAUDE.md; cần chủ repo đồng ý mới sửa XAML.
+BRIDGE_EXEMPT = {"ManaAnno.xaml", "DWGManagement.xaml"}
+
 # ── Luật 22 · ICON ───────────────────────────────────────────────────────
 # UI-frozen theo CLAUDE.md: icon của 2 file này không đi theo hệ T3.Icon.*
 #   DWGManagement — thiết kế riêng đã chốt
@@ -403,6 +410,30 @@ def audit(src, base, keys):
             issues.append(("P2", "cột checkbox %s(%s) thiếu checkbox select-all ở "
                                  "header — thêm <%s.Header><CheckBox .../>"
                            % (ctag, prop.group(1) if prop else "?", ctag)))
+
+    # ── Luật 24 · Checkbox của dòng phải đọc qua string bridge ─────────────
+    # pythonnet đưa thuộc tính Python cho WPF dưới dạng PyObject: đổi được sang
+    # string (cột chữ hiện đúng) nhưng KHÔNG sang bool?, nên IsChecked bind
+    # thẳng vào thuộc tính dòng luôn đọc là unchecked — tick biến mất khi
+    # Items.Refresh(), select-all không tick được dòng nào (BatchOut 2026-09-26).
+    # DataGridCheckBoxColumn dính y hệt. Mẫu đúng: WPF_Base.py → "Checkbox bridge".
+    if base not in BRIDGE_EXEMPT:
+        for el in root.iter():
+            tag = local(el.tag)
+            attrs = {local(k): v for k, v in el.attrib.items()}
+            if tag == "DataGridCheckBoxColumn" and "{Binding" in attrs.get("Binding", ""):
+                issues.append(("P1", "DataGridCheckBoxColumn bind %s — PyObject không đổi "
+                                     "được sang bool; dùng DataGridTemplateColumn + "
+                                     "checkbox bridge (WPF_Base.py)" % attrs["Binding"]))
+            elif tag == "CheckBox":
+                b = attrs.get("IsChecked", "")
+                if (b.startswith("{Binding") and "ElementName" not in b
+                        and "RelativeSource" not in b
+                        and any(local(a.tag) in ("DataTemplate", "HierarchicalDataTemplate")
+                                for a in ancestors(el))):
+                    issues.append(("P1", "CheckBox IsChecked=\"%s\" trong template dòng — "
+                                         "luôn đọc unchecked; đọc qua checkbox bridge "
+                                         "(WPF_Base.py)" % " ".join(b.split())))
 
     # ── Luật 22 · ICON — một bộ icon cho toàn extension ───────────────────
     # (a) Font icon duy nhất là Segoe MDL2 Assets, và LUÔN qua style T3.Icon.*

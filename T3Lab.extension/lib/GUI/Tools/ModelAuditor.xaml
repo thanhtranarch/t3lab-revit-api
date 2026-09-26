@@ -800,6 +800,33 @@
             <Setter Property="ToolTip" Value="Click the column name to filter"/>
           </Style>
 
+          <!-- ══════════════════ CỘT CHECKBOX (chọn dòng)
+               Header và ô dòng phải cùng MỘT hình học thì ô select-all mới nằm đúng
+               trên hàng ô tick: không padding, hộp căn giữa theo bề rộng cột.
+               T3.DataGridColumnHeader có Padding 8 + nội dung căn trái, T3.DataGridCell
+               có Padding 8, và T3.CheckBox có Padding 8 bên trái dành cho nhãn — ghép
+               lại thì header lệch vài px so với dòng (ManaViews 2026-09-26).
+                 <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                         HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                         CellStyle="{StaticResource T3.DataGridCell.Check}">
+               và cả checkbox header lẫn checkbox dòng dùng Style="{StaticResource T3.CheckBox.Cell}".
+               ══════════════════ -->
+          <Style x:Key="T3.DataGridColumnHeader.Check" TargetType="DataGridColumnHeader"
+                 BasedOn="{StaticResource T3.DataGridColumnHeader}">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+          </Style>
+          <Style x:Key="T3.DataGridCell.Check" TargetType="DataGridCell"
+                 BasedOn="{StaticResource T3.DataGridCell}">
+            <Setter Property="Padding" Value="0"/>
+          </Style>
+          <!-- Checkbox không nhãn: bỏ Padding dành cho nhãn để hộp nằm đúng tâm. -->
+          <Style x:Key="T3.CheckBox.Cell" TargetType="CheckBox" BasedOn="{StaticResource T3.CheckBox}">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+          </Style>
+
           <!-- Dòng giá trị trong popup lọc (Python dựng, dùng khóa này cho checkbox). -->
           <Style x:Key="T3.Filter.Item" TargetType="CheckBox" BasedOn="{StaticResource T3.CheckBox}">
             <Setter Property="Margin"  Value="0,0,0,4"/>
@@ -2180,22 +2207,24 @@
                                       Style="{StaticResource T3.DataGrid}"
                                       BorderThickness="0">
                                 <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Binding="{Binding is_selected}" Width="36">
-                                        <DataGridCheckBoxColumn.Header>
-                                            <CheckBox x:Name="chk_all_dg_smart_purge" Style="{StaticResource T3.CheckBox}"
+                                    <DataGridTemplateColumn Width="36"
+                                                            HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                            CellStyle="{StaticResource T3.DataGridCell.Check}">
+                                        <DataGridTemplateColumn.Header>
+                                            <CheckBox x:Name="chk_all_dg_smart_purge" Style="{StaticResource T3.CheckBox.Cell}"
                                                       Click="select_all_dg_smart_purge_clicked"
-                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
                                                       ToolTip="Select all rows"/>
-                                        </DataGridCheckBoxColumn.Header>
-                                        <!-- Row checkbox must use the SAME T3.CheckBox style as the header,
-                                             or WPF's default DataGridCheckBoxColumn template renders it at a
-                                             different size/padding and the two never line up. -->
-                                        <DataGridCheckBoxColumn.ElementStyle>
-                                            <Style TargetType="CheckBox" BasedOn="{StaticResource T3.CheckBox}">
-                                                <Setter Property="HorizontalAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridCheckBoxColumn.ElementStyle>
-                                    </DataGridCheckBoxColumn>
+                                        </DataGridTemplateColumn.Header>
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <TextBlock x:Name="row_is_selected_text" Text="{Binding is_selected}" Visibility="Collapsed"/>
+                                                    <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
+                                                              Style="{StaticResource T3.CheckBox.Cell}"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="TYPE / NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
                                     <DataGridTextColumn Header="CATEGORY" Binding="{Binding category}" Width="150" IsReadOnly="True"
                                                         ElementStyle="{StaticResource T3.Body.Secondary}"/>

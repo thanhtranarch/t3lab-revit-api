@@ -108,23 +108,41 @@ Bảng nào cho tick từng dòng thì **phải** cho tick tất cả. Không c�
 "bảng này thường ít dòng" — filter đổi là số dòng đổi.
 
 ```xml
-<DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
+<DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                        HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                        CellStyle="{StaticResource T3.DataGridCell.Check}">
   <DataGridTemplateColumn.Header>
-    <CheckBox x:Name="chk_all_sheets_grid" Style="{StaticResource T3.CheckBox}"
+    <CheckBox x:Name="chk_all_sheets_grid" Style="{StaticResource T3.CheckBox.Cell}"
               Click="select_all_sheets_grid_clicked"
-              HorizontalAlignment="Center" VerticalAlignment="Center"
               ToolTip="Select all rows"/>
   </DataGridTemplateColumn.Header>
   <DataGridTemplateColumn.CellTemplate>
     <DataTemplate>
-      <CheckBox IsChecked="{Binding is_selected, Mode=TwoWay,
-                            UpdateSourceTrigger=PropertyChanged}"
-                Style="{StaticResource T3.CheckBox}"
-                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <Grid>
+        <TextBlock x:Name="row_is_selected_text" Text="{Binding is_selected}"
+                   Visibility="Collapsed"/>
+        <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
+                  Style="{StaticResource T3.CheckBox.Cell}"/>
+      </Grid>
     </DataTemplate>
   </DataGridTemplateColumn.CellTemplate>
 </DataGridTemplateColumn>
 ```
+
+`.Check` / `.Cell` cho header và ô dòng cùng một hình học (không padding, hộp
+căn giữa) — thiếu chúng thì ô select-all lệch vài px so với hàng ô tick.
+
+**Checkbox của dòng luôn đọc qua string bridge** (luật 24, `audit_t3.py` bắt).
+pythonnet đưa thuộc tính Python cho WPF dưới dạng `PyObject`: WPF đổi được sang
+string (nên mọi cột chữ hiện đúng) nhưng **không** đổi được sang `bool?`. Vì vậy
+`IsChecked="{Binding is_selected}"` — và cả `DataGridCheckBoxColumn` — luôn đọc
+là unchecked: tick biến mất khi `Items.Refresh()`, select-all không tick được
+dòng nào. TextBlock ẩn đọc "True"/"False", CheckBox parse chuỗi đó ra bool.
+Chiều ngược lại (click → dòng) do `T3WPFWindow` tự ghi: nó nghe `Checked` /
+`Unchecked` của mọi checkbox bridge và set đúng thuộc tính mà TextBlock đang bind,
+**trước** khi Click handler của tool chạy — không cần viết gì trong Python.
+Dòng là `DataRowView` (DataTable) thì bind thẳng vẫn đúng, khai vào
+`BRIDGE_EXEMPT`. Không dùng `DataGridCheckBoxColumn` cho dòng Python.
 
 Code-behind đúng một dòng — `toggle_all_rows` nằm sẵn trong `T3WPFWindow`:
 

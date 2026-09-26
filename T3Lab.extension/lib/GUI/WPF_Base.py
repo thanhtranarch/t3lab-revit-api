@@ -308,6 +308,61 @@ def _sanitize_xaml_cached(xaml_content, cache_key=None):
     return result
 
 
+# ── Checkbox bridge ──────────────────────────────────────────────────────────
+# pythonnet hands WPF every Python attribute as a PyObject. WPF converts that
+# to string — which is why every text column renders — but never to bool?, so
+# `IsChecked="{Binding is_selected}"` on a Python row always reads unchecked:
+# the tick a click draws vanishes on Items.Refresh(), select-all ticks nothing,
+# a scrolled-back row comes back empty. The row template reads the flag through
+# a hidden string instead ("True"/"False" parse to bool):
+#
+#   <Grid>
+#     <TextBlock x:Name="row_sel_text" Text="{Binding is_selected}" Visibility="Collapsed"/>
+#     <CheckBox IsChecked="{Binding Text, ElementName=row_sel_text, Mode=OneWay}" .../>
+#   </Grid>
+#
+# OneWay cannot write the click back to the row, so every T3WPFWindow does it:
+# see T3WPFWindow._on_bridged_toggle. dev/audit_t3.py (rule 24) rejects the
+# direct binding.
+
+def bridged_row_property(checkbox, binding_operations, is_checked_dp, text_dp):
+    """(row attribute, bridge TextBlock) of a bridged CheckBox, or (None, None).
+
+    CheckBox.IsChecked must be bound to `Text` of a named element whose own
+    Text binding is a plain property path on the row (the DataContext).
+    """
+    none = (None, None)
+    b = binding_operations.GetBinding(checkbox, is_checked_dp)
+    if b is None or not b.ElementName or b.Path is None or b.Path.Path != 'Text':
+        return none
+    bridge = checkbox.FindName(b.ElementName)
+    if bridge is None:
+        return none
+    tb = binding_operations.GetBinding(bridge, text_dp)
+    if tb is None or tb.Path is None or tb.ElementName or \
+            tb.RelativeSource is not None or tb.Source is not None:
+        return none
+    path = tb.Path.Path or ''
+    if not path or '.' in path or '[' in path:
+        return none
+    return path, bridge
+
+
+def write_bridged_toggle(checkbox, prop):
+    """Push a user toggle to the Python row. True when the row changed."""
+    row = getattr(checkbox, 'DataContext', None)
+    if row is None or not prop:
+        return False
+    value = bool(checkbox.IsChecked)
+    try:
+        if getattr(row, prop) == value:
+            return False            # a model -> view refresh, not a click
+        setattr(row, prop, value)
+        return True
+    except Exception:
+        return False                # DataRowView, DisconnectedItem, read-only
+
+
 def setup_window_logo(win_or_elem):
     """Auto-bind T3Lab logo to logo_image and window Icon if present on any Window or FrameworkElement."""
     try:
@@ -712,6 +767,10 @@ class T3WPFWindow(Window):
             except BaseException:
                 pass
 
+        # Checkbox bridge ghi lại model TRƯỚC mọi Click handler (Checked chạy
+        # trong OnToggle, Click chạy sau) — y như TwoWay binding ngày trước.
+        self._install_checkbox_bridge()
+
         # Nút nằm trong DataTemplate không có trong namescope của window nên
         # vòng trên không nối được — xử lý riêng bằng routed event.
         self._wire_templated_clicks(unresolved)
@@ -730,6 +789,50 @@ class T3WPFWindow(Window):
 
         # Auto-wire window chrome controls (minimize, maximize, close)
         self._wire_window_controls()
+
+    def _install_checkbox_bridge(self):
+        """Write bridged row checkboxes back to their Python row.
+
+        ToggleButton.Checked / Unchecked bubble up from every row template;
+        they fire inside OnToggle, before Click, so each tool's Click handler
+        already sees the updated row — the order TwoWay binding used to give.
+        Toggles caused by the binding itself (model -> view) find the row
+        already equal and write nothing.
+        """
+        try:
+            from System.Windows import RoutedEventHandler
+            from System.Windows.Controls.Primitives import ToggleButton
+        except BaseException:
+            return
+        try:
+            # Keep the delegate: if it is collected the checkboxes go dead.
+            self._t3_bridge_handler = RoutedEventHandler(self._on_bridged_toggle)
+            self.AddHandler(ToggleButton.CheckedEvent, self._t3_bridge_handler, True)
+            self.AddHandler(ToggleButton.UncheckedEvent, self._t3_bridge_handler, True)
+        except BaseException:
+            pass
+
+    def _on_bridged_toggle(self, sender, e):
+        try:
+            from System.Windows.Data import BindingOperations
+            from System.Windows.Controls import TextBlock
+            from System.Windows.Controls.Primitives import ToggleButton
+            checkbox = e.OriginalSource
+            prop, bridge = bridged_row_property(checkbox, BindingOperations,
+                                                ToggleButton.IsCheckedProperty,
+                                                TextBlock.TextProperty)
+            if not prop:
+                return
+            write_bridged_toggle(checkbox, prop)
+            # Re-read the row into the bridge. Without it the TextBlock keeps
+            # the pre-click "False" while the box shows the click; a recycled
+            # container then lands on another "False" row, Text does not
+            # change, the binding never fires, and that row shows a stale tick.
+            expr = BindingOperations.GetBindingExpression(bridge, TextBlock.TextProperty)
+            if expr is not None:
+                expr.UpdateTarget()
+        except BaseException:
+            pass
 
     def _wire_templated_clicks(self, unresolved):
         """Nối `Click=` cho nút sinh ra từ DataTemplate / ControlTemplate.
