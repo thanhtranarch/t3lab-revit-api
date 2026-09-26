@@ -2605,15 +2605,14 @@ class ExportManagerWindow(T3WPFWindow):
     def row_checkbox_clicked(self, sender, e):
         """Handle direct click on row CheckBox."""
         try:
-            # Synchronously update data_item.IsSelected to match CheckBox.IsChecked
-            # to eliminate WPF data binding latency from causing the selected count to lag by 1
+            # The ONLY writer of the model: the row CheckBox is bound OneWay
+            # (through the hidden row_selected_text bridge in the XAML).
             if hasattr(sender, 'DataContext') and sender.DataContext is not None:
                 sender.DataContext.IsSelected = bool(sender.IsChecked)
 
-            # Refresh the ListView so ListViewItem.IsSelected binding picks up
-            # the new SheetItem.IsSelected value (highlight stays in sync).
-            # Required because SheetItem is a plain Python object without CLR
-            # INotifyPropertyChanged, so TwoWay binding only auto-pushes UI→model.
+            # SheetItem is a plain Python object without CLR
+            # INotifyPropertyChanged; re-read every visible row so the ticks
+            # always show the model.
             self.sheets_listview.Items.Refresh()
 
             self.update_selection_count()

@@ -1937,10 +1937,19 @@
                                                 </GridViewColumn.Header>
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate>
-                                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  HorizontalAlignment="Center"
-                                                                  Click="row_checkbox_clicked"/>
+                                                        <!-- pythonnet hands WPF a PyObject for every Python attribute.
+                                                             WPF converts that to string (every text column works) but not
+                                                             to bool?, so IsChecked bound straight to IsSelected always read
+                                                             unchecked and the tick vanished on Items.Refresh(). Bridge
+                                                             through a hidden string; "True"/"False" parse to bool.
+                                                             row_checkbox_clicked writes the model, hence OneWay. -->
+                                                        <Grid>
+                                                            <TextBlock x:Name="row_selected_text" Text="{Binding IsSelected}" Visibility="Collapsed"/>
+                                                            <CheckBox IsChecked="{Binding Text, ElementName=row_selected_text, Mode=OneWay}"
+                                                                      Style="{StaticResource T3.CheckBox}"
+                                                                      HorizontalAlignment="Center"
+                                                                      Click="row_checkbox_clicked"/>
+                                                        </Grid>
                                                     </DataTemplate>
                                                 </GridViewColumn.CellTemplate>
                                             </GridViewColumn>
