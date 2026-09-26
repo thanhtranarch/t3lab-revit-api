@@ -32,13 +32,6 @@ class ViewSheetSetsService(object):
             [{'element': item, 'name': item.Name, 'id': item.Id}
              for item in elements], key=lambda item: item['name'].casefold())
 
-    def get_available_sheets(self):
-        with FilteredElementCollector(self.doc) as collector:
-            elements = collector.OfClass(ViewSheet).ToElements()
-        return sorted(
-            [sheet for sheet in elements
-             if not sheet.IsPlaceholder and sheet.CanBePrinted],
-            key=lambda sheet: (sheet.SheetNumber, sheet.Name))
 
     def _require_transaction(self):
         if not self.doc.IsModifiable:
@@ -171,13 +164,6 @@ class ViewSheetSetsService(object):
         views = [view for view in sheet_set.Views if self._id_key(view.Id) not in remove]
         return self._save_views(sheet_set, views)
 
-    def replace_sheets_in_set(self, sheet_set, sheet_ids):
-        """Atomic membership update, preserving non-sheet views in mixed print sets."""
-        self._require_transaction()
-        sheet_set = self._saved_set(sheet_set)
-        sheets = self._sheets(sheet_ids)  # Validate everything before assigning Views.
-        views = [view for view in sheet_set.Views if not isinstance(view, ViewSheet)]
-        return self._save_views(sheet_set, views + sheets)
 
     def get_sheets_in_set(self, sheet_set):
         """Return sheet ElementIds, not View objects or non-sheet view IDs."""

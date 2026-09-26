@@ -1676,19 +1676,6 @@
                             <TextBlock x:Name="lblSubtitle" Text="Load, review and track BIM Collaboration Format issues" Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                         <!-- AI Mode Status Pill -->
-                        <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}"
-                                Margin="16,0,0,0" Height="24" CornerRadius="12" Padding="8,0"
-                                Background="{StaticResource T3.SurfaceSunken}"
-                                BorderBrush="{StaticResource T3.Border}"
-                                Visibility="Collapsed" VerticalAlignment="Center"
-                                ToolTip="AI Mode is active - Intelligent issue triage and clash resolution enabled">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="✨" FontSize="11" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready"
-                                           FontSize="11" FontWeight="SemiBold"
-                                           Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
                     </StackPanel>
 
                     <!-- Search Bar -->
@@ -1891,10 +1878,6 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="ISSUE DETAILS" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                            <Button Grid.Column="1" x:Name="btn_ai_triage" Content="✨ AI Triage"
-                                    Style="{StaticResource T3.Button.Secondary}" Height="24" Padding="8,0"
-                                    Click="ai_triage_clicked"
-                                    ToolTip="AI Triage: diagnose clash cause, assign discipline (Arch/Struct/MEP), and recommend Revit resolution"/>
                         </Grid>
                     </Border>
 

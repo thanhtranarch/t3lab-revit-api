@@ -231,20 +231,6 @@ class RevitAPILearner(object):
 
         return None
 
-    def supports_property(self, class_name, property_name):
-        """Check if a property is supported in the current Revit version.
-
-        Args:
-            class_name: Name of the class (e.g., 'dwg_export_options')
-            property_name: Name of the property (e.g., 'exporting_areas')
-
-        Returns:
-            bool: True if property is supported, False otherwise
-        """
-        class_info = self.api_info.get(class_name, {})
-        prop_info = class_info.get(property_name, {})
-
-        return prop_info.get('available', False)
 
     def get_version_notes(self):
         """Get version-specific notes for the current Revit version.
@@ -356,27 +342,6 @@ class SmartAPIAdapter(object):
         except Exception as ex:
             raise ex
 
-    def configure_dwg_options(self, options, prop_override_mode=None):
-        """Configure DWGExportOptions with version-appropriate settings.
-
-        Args:
-            options: DWGExportOptions object
-            prop_override_mode: PropOverrideMode enum value (optional)
-
-        Returns:
-            DWGExportOptions: Configured options object
-        """
-        try:
-            # Check if PropOverrides accepts enum only
-            prop_info = self.learner.api_info.get('dwg_export_options', {}).get('prop_overrides', {})
-
-            if prop_info.get('accepts_enum_only', True) and prop_override_mode:
-                # Set PropOverrides to enum value (Revit 2018+)
-                options.PropOverrides = prop_override_mode
-
-            return options
-        except Exception:
-            return options
 
     def configure_pdf_options(self, options, hide_ref_planes=False, hide_scope_boxes=False, hide_crop_boundaries=False, hide_unreferenced_tags=False):
         """Configure PDFExportOptions with version-appropriate settings.

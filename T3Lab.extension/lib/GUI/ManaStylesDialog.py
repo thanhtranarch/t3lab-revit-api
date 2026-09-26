@@ -1147,18 +1147,7 @@ class ManaStylesWindow(T3WPFWindow):
         # Load style data and initialize splasher
         self._load_style_manager_data()
         self._init_color_splasher()
-        self._init_ai_mode()
 
-    def _init_ai_mode(self):
-        try:
-            if hasattr(self, 'is_ai_mode_active') and self.is_ai_mode_active():
-                if hasattr(self, 'ai_mode_badge') and self.ai_mode_badge:
-                    self.ai_mode_badge.Visibility = Visibility.Visible
-                if hasattr(self, 'txt_ai_status') and self.txt_ai_status:
-                    info = self.get_ai_status_info()
-                    self.txt_ai_status.Text = "AI Mode: {}".format(info.get('model', 'Ready'))
-        except Exception:
-            pass
 
     # ========================================================================
     # MAIN WINDOW NAVIGATION & CHROME CONTROLS
@@ -1267,6 +1256,31 @@ class ManaStylesWindow(T3WPFWindow):
         except Exception as ex:
             print("Error loading line styles: {}".format(str(ex)))
 
+    # ── Select CAD styles (trước đây: "AI Clean CAD Styles") ─────────────
+    # Nhận diện style rác từ DWG bằng tiền tố đã biết — tất định, không cần AI.
+    # AI trước đây chỉ in thêm một đoạn "gợi ý gộp" mà không làm gì với nó.
+    _CAD_STYLE_PATTERNS = (r'^\$0\$', r'^A-', r'^C-', r'^S-', r'^M-', r'^E-',
+                           r'^P-', r'^I-', r'^DEFPOINTS', r'^0_')
+
+    def select_cad_styles_clicked(self, sender, e):
+        """Tick mọi line style nhập từ CAD để xoá / đổi tên hàng loạt."""
+        cad_items = [
+            item for item in self.line_styles
+            if not getattr(item, 'is_system', False)
+            and any(re.search(p, getattr(item, 'name', ''), re.IGNORECASE)
+                    for p in self._CAD_STYLE_PATTERNS)
+        ]
+        if not cad_items:
+            forms.alert("No imported CAD line styles found "
+                        "(prefixes $0$, A-, C-, S-, M-, E-, P-, I-, DEFPOINTS, 0_).",
+                        title="Select CAD Styles")
+            return
+        for item in cad_items:
+            item.is_selected = True
+        self._filter_line_styles()
+        self.status_text.Text = ("Selected {} CAD line style(s) - review, then delete "
+                                 "or rename.".format(len(cad_items)))
+
     def _filter_line_styles(self):
         query = self.txt_search_style.Text.lower() if self.txt_search_style.Text else ""
         self.filtered_line_styles.Clear()
@@ -1315,100 +1329,6 @@ class ManaStylesWindow(T3WPFWindow):
     def _on_style_refresh(self, s, e):
         self._load_line_styles()
 
-    def ai_clean_styles_clicked(self, sender, e):
-        """AI Clean: Detect CAD junk line styles ($0$*) and suggest consolidation to standard line styles."""
-        btn = getattr(self, 'btn_ai_clean_styles', None)
-        orig_content = "✨ AI Clean CAD Styles"
-
-        def _restore_btn():
-            if btn:
-                btn.Content = orig_content
-                btn.IsEnabled = True
-
-        try:
-            cad_patterns = [r'^\$0\$', r'^A-', r'^C-', r'^S-', r'^M-', r'^E-', r'^P-', r'^I-', r'^DEFPOINTS', r'^0_']
-            cad_items = []
-            for item in self.line_styles:
-                if getattr(item, 'is_system', False):
-                    continue
-                name = getattr(item, 'name', '')
-                if any(re.search(pat, name, re.IGNORECASE) for pat in cad_patterns):
-                    cad_items.append(item)
-
-            if not cad_items:
-                forms.alert(
-                    "No imported CAD line styles detected (patterns: $0$*, A-*, DEFPOINTS, etc.).",
-                    title="AI Clean Styles"
-                )
-                return
-
-            def _apply_classic():
-                for item in cad_items:
-                    item.is_selected = True
-                self._filter_line_styles()
-                forms.alert(
-                    "Detected {} CAD line styles (e.g. $0$, DEFPOINTS, CAD layer prefixes).\n\n"
-                    "They have been selected in the DataGrid for batch deletion or renaming.".format(len(cad_items)),
-                    title="Clean CAD Styles"
-                )
-                _restore_btn()
-
-            if not hasattr(self, 'is_ai_mode_active') or not self.is_ai_mode_active():
-                _apply_classic()
-                return
-
-            if btn:
-                btn.Content = "⏳ Analyzing..."
-                btn.IsEnabled = False
-
-            cad_names = [getattr(it, 'name', '') for it in cad_items[:25]]
-            standard_styles = ["<Thin Lines>", "<Medium Lines>", "<Wide Lines>", "<Hidden>", "<Overhead>", "<Centerline>", "<Demolished>"]
-
-            prompt = (
-                "You are an expert BIM Specialist auditing AutoCAD imported line styles in Autodesk Revit.\n"
-                "The following CAD line styles were imported from DWGs:\n{}\n\n"
-                "Target Revit standard styles:\n{}\n\n"
-                "For each CAD style, propose the best Revit standard style mapping, or 'DELETE' if obsolete/junk.\n"
-                "Return JSON ONLY with keys: {{\"mappings\": [{{\"source\": string, \"target\": string, \"reason\": string}}], \"summary\": string}}"
-            ).format(json.dumps(cad_names), json.dumps(standard_styles))
-
-            def _worker():
-                return self.ai_bridge.ask_json(prompt, fast=True)
-
-            def _callback(res, err):
-                try:
-                    if err or not res or not isinstance(res, dict) or 'mappings' not in res:
-                        _apply_classic()
-                        return
-
-                    mappings = res.get('mappings', [])
-                    summary = res.get('summary', 'CAD style consolidation recommended.')
-
-                    # Select detected items in the grid
-                    for item in cad_items:
-                        item.is_selected = True
-                    self._filter_line_styles()
-
-                    lines_msg = ["AI CAD Line Styles Consolidation Plan:"]
-                    lines_msg.append(summary)
-                    lines_msg.append("")
-                    for m in mappings[:12]:
-                        lines_msg.append(u"• {} → {} ({})".format(
-                            m.get('source', ''), m.get('target', ''), m.get('reason', '')
-                        ))
-                    if len(mappings) > 12:
-                        lines_msg.append(u"... and {} more".format(len(mappings) - 12))
-                    lines_msg.append("\nAll {} CAD line styles are now selected in the table.".format(len(cad_items)))
-
-                    forms.alert("\n".join(lines_msg), title="AI Clean Styles Recommendation")
-                finally:
-                    _restore_btn()
-
-            self.run_ai_async(_worker, _callback)
-
-        except Exception as ex:
-            _restore_btn()
-            forms.alert("Error analyzing CAD line styles: {}".format(ex), title="AI Clean Styles Error")
 
     def _on_style_calc_usage(self, s, e):
         for item in self.line_styles:

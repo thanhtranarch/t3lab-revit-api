@@ -89,6 +89,9 @@ def _candidate_clone_roots(refresh=False):
 
     def add(path):
         path = _norm(path)
+        if os.sep != '\\':
+            # POSIX dev/test host: _norm() turned '/tmp/x' into '\\tmp\\x'.
+            path = path.replace('\\', os.sep)
         if not path or path.lower() in seen:
             return
         try:

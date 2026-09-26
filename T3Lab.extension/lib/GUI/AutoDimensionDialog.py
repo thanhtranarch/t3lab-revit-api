@@ -156,12 +156,6 @@ def _wall_is_horizontal(wall):
     return abs(d.X) >= abs(d.Y)
 
 
-def _grid_is_horizontal(grid):
-    """Return True if the grid line runs primarily along the X axis."""
-    d = _curve_direction(grid.Curve)
-    return abs(d.X) >= abs(d.Y)
-
-
 def _elem_centroid(elem, view):
     """Return (cx, cy) centroid of an element in world coords."""
     try:
@@ -246,35 +240,6 @@ def _nearest_grid_nonzero(centroid_x, centroid_y, grids, axis,
     # all grids at zero (degenerate) — return second if available, else first
     idx = 1 if len(candidates) > 1 else 0
     return candidates[idx][1], candidates[idx][2]
-
-
-def _aligned_dim_line(elem_pos, grid_pos, perp_pos, axis, margin, dim_z):
-    """
-    Build the Line for NewDimension.
-    axis='Y': vertical line at x=perp_pos spanning the Y range (elem_pos ↔ grid_pos).
-    axis='X': horizontal line at y=perp_pos spanning the X range.
-    """
-    lo = min(elem_pos, grid_pos) - margin
-    hi = max(elem_pos, grid_pos) + margin
-    if abs(hi - lo) < 1e-6:
-        hi += margin
-    if axis == 'Y':
-        return Line.CreateBound(XYZ(perp_pos, lo, dim_z), XYZ(perp_pos, hi, dim_z))
-    else:
-        return Line.CreateBound(XYZ(lo, perp_pos, dim_z), XYZ(hi, perp_pos, dim_z))
-
-
-def _try_create_dim(doc_ref, view, refs, dim_line, dim_type):
-    """Create a NewDimension; return True on success, False on any failure."""
-    try:
-        ra = ReferenceArray()
-        for r in refs:
-            ra.Append(r)
-        doc_ref.Create.NewDimension(view, dim_line, ra, dim_type)
-        return True
-    except Exception as ex:
-        logger.warning("NewDimension skipped: {}".format(ex))
-        return False
 
 
 def _collect_wall_core_refs(wall):
@@ -364,25 +329,6 @@ def _get_grid_reference(grid, view):
         except Exception as ex:
             logger.warning("Grid ref error (use_view={}): {}".format(use_view, ex))
     return None
-
-
-def _collect_door_refs(door):
-    """
-    Return the Left and Right built-in reference planes of a door family instance.
-    These correspond to the outermost edges (jambs) of the door opening.
-    Uses FamilyInstanceReferenceType.Left / Right which are stable references
-    valid for NewDimension regardless of the door's host wall orientation.
-    """
-    refs = []
-    try:
-        for ref_type in (FamilyInstanceReferenceType.Left,
-                         FamilyInstanceReferenceType.Right):
-            ref_list = door.GetReferences(ref_type)
-            for r in ref_list:
-                refs.append(r)
-    except Exception as ex:
-        logger.warning("Door reference error: {}".format(ex))
-    return refs
 
 
 def element_id_int(elem_id):
@@ -672,31 +618,14 @@ class AutoDimensionWindow(T3WPFWindow):
         self._populate_dim_types()
         self._populate_views()
         self._set_status("Ready")
-        self._init_ai_mode()
 
-    # ── AI Mode Support ──────────────────────────────────────────────────
 
-    def _init_ai_mode(self):
-        try:
-            if hasattr(self, 'is_ai_mode_active') and self.is_ai_mode_active():
-                if hasattr(self, 'ai_mode_badge') and self.ai_mode_badge:
-                    self.ai_mode_badge.Visibility = Visibility.Visible
-                if hasattr(self, 'txt_ai_status') and self.txt_ai_status:
-                    info = self.get_ai_status_info()
-                    self.txt_ai_status.Text = "AI Mode: {}".format(info.get('model', 'Ready'))
-        except Exception as ex:
-            logger.warning("AI Mode init failed: {}".format(ex))
+    def on_offsets_from_scale_clicked(self, sender, args):
+        """L1/L2/L3 theo tỉ lệ view: 6 / 12 / 18 mm giấy, làm tròn 50 mm thực.
 
-    def on_ai_auto_offsets_clicked(self, sender, args):
-        """Calculate optimal L1/L2/L3 offsets using AI or architectural scale rules."""
-        btn = getattr(self, 'btn_ai_auto_offsets', None)
-        orig_content = "✨ AI Auto-Offsets"
-
-        def _restore_btn():
-            if btn:
-                btn.Content = orig_content
-                btn.IsEnabled = True
-
+        Công thức tất định — cùng tỉ lệ luôn ra cùng khoảng cách (trước đây là
+        nút "AI Auto-Offsets", AI chỉ đoán lại chính mấy con số này).
+        """
         try:
             scale = 100
             try:
@@ -704,95 +633,30 @@ class AutoDimensionWindow(T3WPFWindow):
                     scale = self.uidoc.ActiveView.Scale or 100
             except Exception:
                 pass
-
-            selected_type_name = "Default"
-            try:
-                if self.cmb_dim_type.SelectedItem:
-                    selected_type_name = str(self.cmb_dim_type.SelectedItem)
-            except Exception:
-                pass
-
-            # Backup current values for undo
             self._prev_offsets_backup = {
                 'mode': getattr(self.cmb_offset_mode, 'SelectedIndex', 0),
                 'l1': getattr(self.txt_l1, 'Text', ''),
                 'l2': getattr(self.txt_l2, 'Text', ''),
                 'l3': getattr(self.txt_l3, 'Text', ''),
-                'offset': getattr(self.txt_offset, 'Text', '')
+                'offset': getattr(self.txt_offset, 'Text', ''),
             }
-            undo_btn = getattr(self, 'btn_ai_undo_offsets', None)
-            if undo_btn:
-                undo_btn.Visibility = Visibility.Visible
-
-            def _apply_offsets(l1_val, l2_val, l3_val, single_val, rationale_msg):
-                try:
-                    if hasattr(self, 'cmb_offset_mode'):
-                        self.cmb_offset_mode.SelectedIndex = 1  # 3-Level auto
-                    if hasattr(self, 'txt_l1'):
-                        self.txt_l1.Text = str(int(l1_val))
-                    if hasattr(self, 'txt_l2'):
-                        self.txt_l2.Text = str(int(l2_val))
-                    if hasattr(self, 'txt_l3'):
-                        self.txt_l3.Text = str(int(l3_val))
-                    if hasattr(self, 'txt_offset'):
-                        self.txt_offset.Text = str(int(single_val))
-                    self._set_status("AI Offsets: L1={}mm, L2={}mm, L3={}mm ({})".format(
-                        int(l1_val), int(l2_val), int(l3_val), rationale_msg))
-                except Exception as apply_ex:
-                    logger.warning("Apply offsets error: {}".format(apply_ex))
-                finally:
-                    _restore_btn()
-
-            calc_l1 = max(400, int(round((scale * 6.0) / 50.0) * 50))
-            calc_l2 = max(800, int(round((scale * 12.0) / 50.0) * 50))
-            calc_l3 = max(1200, int(round((scale * 18.0) / 50.0) * 50))
-            calc_single = calc_l2
-
-            if not hasattr(self, 'is_ai_mode_active') or not self.is_ai_mode_active():
-                _apply_offsets(calc_l1, calc_l2, calc_l3, calc_single, "Architectural standard formula")
-                return
-
-            if btn:
-                btn.Content = "⏳ Calculating..."
-                btn.IsEnabled = False
-
-            self._set_status("AI calculating optimal offsets for 1:{} scale...".format(scale))
-
-            prompt = (
-                "Given an architectural plan view with drawing scale 1:{scale} and linear dimension type '{dim_type}', "
-                "calculate the optimal, clutter-free offset distances (in millimeters) from the building perimeter for:\n"
-                "- L1: Openings and detail elements\n"
-                "- L2: Walls and structural columns\n"
-                "- L3: Building overall grid dimensions\n"
-                "- single_offset: single general chain\n"
-                "Standard printed clearance is ~6mm-10mm between text and strings. "
-                "Return JSON ONLY with keys:\n"
-                "{{\"l1_mm\": integer, \"l2_mm\": integer, \"l3_mm\": integer, \"single_offset_mm\": integer, \"rationale\": string}}"
-            ).format(scale=scale, dim_type=selected_type_name)
-
-            def _worker():
-                return self.ai_bridge.ask_json(prompt, fast=True)
-
-            def _callback(res, err):
-                if err or not res or not isinstance(res, dict) or 'l1_mm' not in res:
-                    _apply_offsets(calc_l1, calc_l2, calc_l3, calc_single, "Calculated based on 1:{} scale".format(scale))
-                else:
-                    l1 = res.get('l1_mm', calc_l1)
-                    l2 = res.get('l2_mm', calc_l2)
-                    l3 = res.get('l3_mm', calc_l3)
-                    single = res.get('single_offset_mm', calc_single)
-                    rat = res.get('rationale', "Optimized for 1:{} scale".format(scale))
-                    _apply_offsets(l1, l2, l3, single, rat)
-
-            self.run_ai_async(_worker, _callback)
-
+            l1 = max(400, int(round((scale * 6.0) / 50.0) * 50))
+            l2 = max(800, int(round((scale * 12.0) / 50.0) * 50))
+            l3 = max(1200, int(round((scale * 18.0) / 50.0) * 50))
+            self.cmb_offset_mode.SelectedIndex = 1      # 3-Level auto
+            self.txt_l1.Text = str(l1)
+            self.txt_l2.Text = str(l2)
+            self.txt_l3.Text = str(l3)
+            self.txt_offset.Text = str(l2)
+            self.btn_offsets_undo.Visibility = Visibility.Visible
+            self._set_status("Offsets for 1:{}: L1={} mm, L2={} mm, L3={} mm.".format(
+                scale, l1, l2, l3))
         except Exception as ex:
-            _restore_btn()
-            logger.error("Error in on_ai_auto_offsets_clicked: {}".format(ex))
-            self._set_status("Error calculating offsets: {}".format(ex))
+            logger.error("Offsets from scale failed: {}".format(ex))
+            self._set_status("Could not compute offsets: {}".format(ex))
 
-    def on_ai_undo_offsets_clicked(self, sender, args):
-        """Revert offset inputs to previous values before AI calculation."""
+    def on_offsets_undo_clicked(self, sender, args):
+        """Trả offset về giá trị trước lần bấm Offsets from Scale."""
         try:
             bak = getattr(self, '_prev_offsets_backup', None)
             if not bak:
@@ -809,13 +673,12 @@ class AutoDimensionWindow(T3WPFWindow):
                 self.txt_offset.Text = bak.get('offset', '')
 
             self._prev_offsets_backup = None
-            undo_btn = getattr(self, 'btn_ai_undo_offsets', None)
+            undo_btn = getattr(self, 'btn_offsets_undo', None)
             if undo_btn:
                 undo_btn.Visibility = Visibility.Collapsed
             self._set_status("Reverted dimension offsets to previous values.")
         except Exception as ex:
-            logger.error("Error in on_ai_undo_offsets_clicked: {}".format(ex))
-
+            logger.error("Undo offsets failed: {}".format(ex))
 
 
     # ── Status ───────────────────────────────────────────────────────────

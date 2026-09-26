@@ -1667,17 +1667,20 @@
                             <TextBlock Text="Parameter Manager" Style="{StaticResource T3.Title}"/>
                             <TextBlock Text="Browse, transfer and load project parameters" Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
+                        <!-- AI MODE BADGE — chuẩn T3 (T3LAB_UI_STANDARD.md § AI Mode). Code: init_ai_badge() -->
+                        <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}" Height="24" Margin="16,0,0,0"
+                                Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                <TextBlock x:Name="txt_ai_status" Text="AI off" Style="{StaticResource T3.Caption}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                         <!-- AI Mode Status Pill & Window Controls -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal"
                                     shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0" Visibility="Collapsed">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
 
                             <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
                                 <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
@@ -1803,18 +1806,34 @@
                             <!-- Parameters DataGrid -->
                             <Grid Grid.Row="1">
                                 <DataGrid x:Name="dg_parameters" Style="{StaticResource T3.DataGrid}"
-                                          BorderThickness="0">
+                                          IsReadOnly="False" SelectionMode="Extended" BorderThickness="0">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="PARAMETER NAME" Binding="{Binding name}" Width="*"/>
-                                        <DataGridTextColumn Header="TYPE" Binding="{Binding param_type}" Width="90"
+                                        <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
+                                            <DataGridTemplateColumn.Header>
+                                                <CheckBox x:Name="chk_all_dg_parameters" Style="{StaticResource T3.CheckBox}"
+                                                          Click="select_all_dg_parameters_clicked"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                          ToolTip="Select all rows"/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding is_selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                              Style="{StaticResource T3.CheckBox}"
+                                                              Click="param_row_checkbox_clicked"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="PARAMETER NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="TYPE" Binding="{Binding param_type}" Width="90" IsReadOnly="True"
                                                             ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                        <DataGridTextColumn Header="DATA TYPE" Binding="{Binding data_type}" Width="100"
+                                        <DataGridTextColumn Header="DATA TYPE" Binding="{Binding data_type}" Width="100" IsReadOnly="True"
                                                             ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                        <DataGridTextColumn Header="GROUP" Binding="{Binding group}" Width="140"
+                                        <DataGridTextColumn Header="GROUP" Binding="{Binding group}" Width="140" IsReadOnly="True"
                                                             ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                        <DataGridTextColumn Header="BINDING" Binding="{Binding binding}" Width="90"
+                                        <DataGridTextColumn Header="BINDING" Binding="{Binding binding}" Width="90" IsReadOnly="True"
                                                             ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                        <DataGridTextColumn Header="CATEGORIES" Binding="{Binding categories}" Width="200"
+                                        <DataGridTextColumn Header="CATEGORIES" Binding="{Binding categories}" Width="200" IsReadOnly="True"
                                                             ElementStyle="{StaticResource T3.Body.Secondary}"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
@@ -1827,18 +1846,30 @@
                             <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                     Padding="16,8">
-                                <StackPanel Orientation="Horizontal">
-                                    <Button x:Name="btn_param_edit_group" Content="Edit Group"
-                                            Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                    <Button x:Name="btn_param_edit_cats" Content="Edit Categories"
-                                            Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                    <Button x:Name="btn_param_edit_binding" Content="Edit Binding"
-                                            Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                    <Button x:Name="btn_param_export" Content="Export CSV"
-                                            Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                    <Button x:Name="btn_param_delete" Content="Delete"
-                                            Style="{StaticResource T3.Button.Danger}"/>
-                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button x:Name="btn_param_edit_group" Content="Edit Group"
+                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                                        <Button x:Name="btn_param_edit_cats" Content="Edit Categories"
+                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                                        <Button x:Name="btn_param_edit_binding" Content="Edit Binding"
+                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                                        <Button x:Name="btn_param_export" Content="Export CSV"
+                                                Style="{StaticResource T3.Button.Secondary}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <TextBlock x:Name="txt_param_selected" Text="0 selected"
+                                                   Style="{StaticResource T3.Caption}"
+                                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                        <Button x:Name="btn_param_delete" Content="Delete Selected"
+                                                Style="{StaticResource T3.Button.Danger}"
+                                                ToolTip="Delete every ticked parameter (or the highlighted rows when nothing is ticked). One Undo restores them all."/>
+                                    </StackPanel>
+                                </Grid>
                             </Border>
                         </Grid>
                     </TabItem>
@@ -1934,9 +1965,14 @@
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="TARGET PARAMETER (WRITE TO):" Style="{StaticResource T3.Label}"
                                                            VerticalAlignment="Center"/>
-                                                <Button x:Name="btn_transfer_ai_match" Grid.Column="1"
-                                                        Content="✨ AI Match" Style="{StaticResource T3.Button.Secondary}"
-                                                        Height="24" Padding="8,0" ToolTip="AI Smart Map: Semantically match target parameter from selected source"/>
+                                                <Button x:Name="btn_transfer_ai_match" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
+                                                        Height="24" Padding="8,0"
+                                                        ToolTip="Pick the target parameter whose meaning matches the selected source parameter">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                        <TextBlock Text="AI Match" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
                                             </Grid>
                                             <TextBox x:Name="txt_transfer_tgt_search"
                                                      Style="{StaticResource T3.Search}"

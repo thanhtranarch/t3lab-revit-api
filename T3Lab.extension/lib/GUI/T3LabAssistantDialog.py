@@ -567,28 +567,6 @@ def launch_batchout_configured(config, progress_cb=None):
         return False
 
 
-def launch_export_direct(config, progress_cb=None):
-    """Export sheets directly without showing BatchOut UI.
-
-    Args:
-        config: dict with format, filter, folder (optional).
-        progress_cb: optional callable(str) for chat progress updates.
-    Returns:
-        bool success
-    """
-    try:
-        if not HAS_EXECUTOR:
-            raise RuntimeError("batchout_executor not available")
-        mod = _load_batchout_mod()
-        ok, count, msg = direct_export(mod, config, progress_cb)
-        return ok
-    except Exception as ex:
-        logger.error(u"Error in direct export: {}".format(_exc_text(ex)))
-        if progress_cb:
-            progress_cb(u"Export error: {}".format(_exc_text(ex)))
-        return False
-
-
 def launch_loadfamily():
     """Open the Family Manager on its Loader tab."""
     try:
@@ -8193,24 +8171,6 @@ class T3LabAssistantWindow(T3WPFWindow):
         t.SetApartmentState(ApartmentState.STA)
         t.Start()
 
-    def _run_tool(self, intent, default_msg):
-        """Helper for quick-button clicks: guard, show message, run launcher."""
-        if self._busy:
-            self._append_bot_message(u"Still working on the previous request, please wait...",
-                                     icon=_ICON_SYNC, icon_color=_ICON_SLATE)
-            return
-        self._set_busy(True)
-        self._last_raw = default_msg
-        self._append_bot_message(default_msg)
-        self._add_to_history("assistant", default_msg)
-        launcher = TOOL_LAUNCHERS.get(intent)
-        if launcher:
-            # Same API-context hop as the chat path — a quick button is still
-            # a WPF click, not a Revit command. See _launch_tool.
-            self._launch_tool(intent, launcher)
-            return
-        self._append_bot_message(self._unknown_tool_text(intent, default_msg))
-        self._set_busy(False)
 
     # ─── Native agentic loop (function calling) ────────────────────────────────
 
@@ -10385,54 +10345,11 @@ class T3LabAssistantWindow(T3WPFWindow):
     _ACT_PREV  = u"M15 18l-6-6 6-6"
     _ACT_NEXT  = u"M9 18l6-6-6-6"
 
-    def _make_action_icon(self, data, tooltip, handler, token='IconFg'):
-        """One muted icon button for the message action row."""
-        from System.Windows.Controls import Button
-        from System.Windows.Shapes import Path
-        from System.Windows.Media import Geometry, Stretch, PenLineCap, PenLineJoin
-
-        p = Path()
-        p.Data             = Geometry.Parse(data)
-        _bind_stroke(p, token)
-        p.StrokeThickness  = 1.5
-        p.StrokeStartLineCap = PenLineCap.Round
-        p.StrokeEndLineCap   = PenLineCap.Round
-        p.StrokeLineJoin     = PenLineJoin.Round
-        p.Width  = 13.5
-        p.Height = 13.5
-        p.Stretch = Stretch.Uniform
-
-        btn = Button()
-        try:
-            btn.Style = self.Resources["MsgActionBtn"]
-        except Exception:
-            pass
-        btn.Content = p
-        btn.ToolTip = tooltip
-        if handler is not None:
-            btn.Click += handler
-        return btn
 
     def _make_message_actions(self, row):
         """The action/feedback bar under assistant replies — disabled per user request."""
         return None
 
-    @staticmethod
-    def _owning_reply_row(sender):
-        """Walk up from a clicked action icon to the reply row that owns it."""
-        from System.Windows.Media import VisualTreeHelper
-        node = sender
-        for _ in range(12):
-            try:
-                node = VisualTreeHelper.GetParent(node)
-            except Exception:
-                return None
-            if node is None:
-                return None
-            tag = getattr(node, 'Tag', None)
-            if isinstance(tag, dict) and 'versions' in tag:
-                return node
-        return None
 
     def _refresh_reply_row(self, row):
         """Re-render a reply row's body + action bar from its Tag state."""
@@ -10466,117 +10383,6 @@ class T3LabAssistantWindow(T3WPFWindow):
 
     # ─── Action handlers ─────────────────────────────────────────────────────
 
-    def _msg_copy_clicked(self, sender, e):
-        """Copy the reply to the clipboard, with the icon flashing a check."""
-        row = self._owning_reply_row(sender)
-        if row is None:
-            return
-        state = row.Tag or {}
-        versions = state.get('versions') or [u""]
-        text = versions[max(0, min(state.get('index', 0), len(versions) - 1))]
-        try:
-            from System.Windows import Clipboard
-            try:
-                Clipboard.SetText(text)
-            except Exception:
-                # Another process can hold the clipboard open; SetDataObject
-                # with copy=True retries through the shell instead of throwing.
-                Clipboard.SetDataObject(text, True)
-        except Exception as ex:
-            logger.debug(u"copy to clipboard failed: {}".format(_exc_text(ex)))
-            return
-
-        try:
-            from System.Windows.Media import Geometry
-            from System.Windows.Threading import DispatcherTimer
-            from System import TimeSpan
-            glyph = sender.Content
-            glyph.Data = Geometry.Parse(self._ACT_CHECK)
-            _bind_stroke(glyph, 'Success')
-            sender.ToolTip = u"Copied"
-
-            timer = DispatcherTimer()
-            timer.Interval = TimeSpan.FromMilliseconds(1200)
-
-            def _restore(s, ev):
-                timer.Stop()
-                try:
-                    glyph.Data = Geometry.Parse(self._ACT_COPY)
-                    _bind_stroke(glyph, 'IconFg')
-                    sender.ToolTip = u"Copy"
-                except Exception:
-                    pass
-            timer.Tick += _restore
-            timer.Start()
-        except Exception:
-            pass
-
-    def _msg_retry_clicked(self, sender, e):
-        """Regenerate this reply from the prompt that produced it.
-
-        The reply is NOT replaced: the new answer is filed as another version
-        of the same row, so the arrows let the user compare instead of losing
-        the first answer. The user's own message is not echoed a second time.
-        """
-        if self._busy:
-            return
-        row = self._owning_reply_row(sender)
-        if row is None:
-            return
-        prompt = (row.Tag or {}).get('prompt') or u""
-        if not prompt.strip():
-            self._append_bot_message(
-                u"Nothing to try again — the original request for this reply "
-                u"is no longer in this session.",
-                icon=_ICON_INFO, icon_color=_ICON_SLATE)
-            return
-        self._retry_target_row  = row
-        self._suppress_user_echo = True
-        try:
-            self.chat_input.Text = prompt
-            self._process_input()
-        except Exception as ex:
-            self._retry_target_row   = None
-            self._suppress_user_echo = False
-            logger.debug(u"retry failed: {}".format(_exc_text(ex)))
-
-    def _msg_vote_up_clicked(self, sender, e):
-        self._record_vote(sender, 'up')
-
-    def _msg_vote_down_clicked(self, sender, e):
-        self._record_vote(sender, 'down')
-
-    def _record_vote(self, sender, vote):
-        """Latch a thumbs up/down on a reply, log it, and LEARN from it.
-
-        Clicking the latched side again clears the vote, so a mis-click is
-        undoable rather than permanent.
-
-        The vote used to end at the activity log. It now also feeds the route
-        that produced the reply (captured in row.Tag['decision'] when the row
-        was built): 👍 reinforces the phrasing→intent mapping through the same
-        learn_pattern() the assistant already uses, 👎 suppresses that exact
-        pair so it can never win the turn again. Both are deliberately scoped
-        to the phrasing that was voted on — one bad answer is evidence about
-        one route, and a feedback loop that over-generalizes is worse than
-        none.
-        """
-        row = self._owning_reply_row(sender)
-        if row is None:
-            return
-        state = row.Tag or {}
-        state['vote'] = None if state.get('vote') == vote else vote
-        row.Tag = state
-        self._refresh_reply_row(row)
-        if not state['vote']:
-            return          # vote cleared — nothing to log or learn from
-
-        versions = state.get('versions') or [u""]
-        text = versions[max(0, min(state.get('index', 0), len(versions) - 1))]
-        preview = u" ".join((text or u"").split())[:200]
-        self._log_activity(u"Feedback: {} — “{}”".format(
-            u"good response" if vote == 'up' else u"bad response", preview))
-        self._apply_vote(vote, state.get('decision') or {})
 
     def _vote_decision(self):
         """Snapshot of how the current turn was routed, for the vote loop.
@@ -10595,56 +10401,6 @@ class T3LabAssistantWindow(T3WPFWindow):
             'specialist': dec.get('specialist'),
         }
 
-    def _apply_vote(self, vote, decision):
-        """Persist one vote against the route that produced the reply.
-
-        Never raises: feedback is a nicety, and a write failure must not take
-        down the chat.
-        """
-        raw = (decision.get('raw') or u'').strip()
-        if not raw:
-            return
-        try:
-            from Intelligence import feedback
-            feedback.record_vote(vote, raw,
-                                 intent=decision.get('intent'),
-                                 skill=decision.get('skill'),
-                                 specialist=decision.get('specialist'))
-        except Exception as ex:
-            logger.debug(u"feedback store error: {}".format(_exc_text(ex)))
-
-        if vote != 'up':
-            return
-        # An up-voted turn is a confirmed phrasing→intent mapping. learn_pattern
-        # already refuses small talk and non-tool intents, so this cannot
-        # record "thanks" as a command.
-        intent = decision.get('intent')
-        if not intent:
-            return
-        try:
-            learn_pattern(raw, intent, decision.get('params') or {},
-                          decision.get('message') or u'')
-        except Exception as ex:
-            logger.debug(u"learn_pattern from vote failed: {}".format(_exc_text(ex)))
-
-    def _msg_prev_clicked(self, sender, e):
-        self._step_version(sender, -1)
-
-    def _msg_next_clicked(self, sender, e):
-        self._step_version(sender, +1)
-
-    def _step_version(self, sender, delta):
-        row = self._owning_reply_row(sender)
-        if row is None:
-            return
-        state = row.Tag or {}
-        versions = state.get('versions') or []
-        idx = state.get('index', 0) + delta
-        if idx < 0 or idx >= len(versions):
-            return
-        state['index'] = idx
-        row.Tag = state
-        self._refresh_reply_row(row)
 
     def _adopt_retry_version(self, text, icon=None, icon_color=None):
         """File `text` as another version of the row Try again was pressed on.
@@ -11371,7 +11127,6 @@ class T3LabAssistantWindow(T3WPFWindow):
 
 # MAIN SCRIPT
 # ==================================================
-
 
 
 def show_assistant_dialog(is_docked=False):

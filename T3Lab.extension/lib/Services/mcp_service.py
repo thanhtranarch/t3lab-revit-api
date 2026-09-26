@@ -712,13 +712,6 @@ class MCPService(object):
         except Exception as ex:
             return False, str(ex)
 
-    @staticmethod
-    def toggle_teaching_mode():
-        """Flip teaching capture. Returns (new_state: bool, err|None)."""
-        status = MCPService.teaching_status()
-        if status.get('error'):
-            return False, status['error']
-        return MCPService.set_teaching_mode(not status.get('enabled'))
 
     @staticmethod
     def mark_active_document_as_sandbox():
@@ -747,15 +740,6 @@ class MCPService(object):
         except Exception as ex:
             return None, str(ex)
 
-    @staticmethod
-    def clear_sandbox():
-        """Clear the designated sandbox document. Returns (ok, err|None)."""
-        try:
-            server = _get_server()
-            server.set_sandbox_document(None)
-            return True, None
-        except Exception as ex:
-            return False, str(ex)
 
     # ── File watcher ───────────────────────────────────────────────────────────
 
@@ -940,10 +924,6 @@ class MCPService(object):
         """Return [(key, label, fmt)] for every auto-configurable MCP client."""
         return [(c['key'], c['label'], c['fmt']) for c in AI_CLIENTS]
 
-    @staticmethod
-    def find_client_config(key):
-        """Config file path for one client key ('claude'/'chatgpt'/'antigravity')."""
-        return _resolve_client_path(_client_spec(key))
 
     @staticmethod
     def client_status(key):
@@ -976,10 +956,6 @@ class MCPService(object):
                          'error': 'Parse error: {}'.format(ex)})
         return base
 
-    @staticmethod
-    def clients_status():
-        """Status dicts for every client, in registry order."""
-        return [MCPService.client_status(c['key']) for c in AI_CLIENTS]
 
     @staticmethod
     def configure_client(key, port=None):
@@ -1034,47 +1010,6 @@ class MCPService(object):
 
     # ── Backwards-compatible Claude Desktop wrappers ──────────────────────────
 
-    @staticmethod
-    def find_claude_desktop_config():
-        """Deprecated — use find_client_config('claude')."""
-        return MCPService.find_client_config('claude')
-
-    @staticmethod
-    def claude_desktop_status():
-        """Deprecated — use client_status('claude')."""
-        return MCPService.client_status('claude')
-
-    @staticmethod
-    def configure_claude_desktop(port=None):
-        """Deprecated — use configure_client('claude', port)."""
-        return MCPService.configure_client('claude', port=port)
 
     # ── Combined snapshot (for dashboard widgets) ──────────────────────────────
 
-    @staticmethod
-    def full_status():
-        """
-        Return a combined status dict for both server and watcher.
-
-        Useful for status-bar indicators or dashboards that need a single call.
-
-        Returns:
-            {
-              'server':  {running, port, tools_count, commands_processed, error},
-              'watcher': {running, data_dir, has_ext_event, error},
-              'config':  '<snippet string>',
-              'clients': [{key, label, fmt, path, file_exists, configured, error}],
-            }
-        """
-        srv = MCPService.server_status()
-        wat = MCPService.watcher_status()
-        try:
-            clients = MCPService.clients_status()
-        except Exception:
-            clients = []
-        return {
-            'server':  srv,
-            'watcher': wat,
-            'config':  MCPService.config_snippet(port=srv.get('port')),
-            'clients': clients,
-        }

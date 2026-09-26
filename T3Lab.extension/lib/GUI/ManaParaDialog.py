@@ -35,6 +35,7 @@ from System.Reflection import BindingFlags
 
 from pyrevit import revit, DB, forms, script
 from GUI.WPF_Base import T3WPFWindow, to_items_source
+from GUI.T3Dialog import confirm as t3_confirm, show_warning, show_error
 
 
 _XAML = os.path.join(os.path.dirname(__file__), 'Tools', 'ManaPara.xaml')
@@ -52,6 +53,7 @@ def _hex_brush(hex_color):
 # VERSION HELPERS
 # ============================================================================
 from Snippets._compat import make_eid, eid_value
+from Snippets._project_params import definition_key, delete_project_parameters
 
 def _eid_int(element_id):
     """ElementId integer value — compatible across Revit 2020-2027+."""
@@ -220,35 +222,14 @@ def _get_all_categories():
     return sorted(cats, key=lambda x: x[1])
 
 
-def _delete_parameter(param_name):
-    doc = revit.doc
-    try:
-        t = DB.Transaction(doc, "T3Lab: Delete Parameter")
-        t.Start()
-        try:
-            param_bindings = doc.ParameterBindings
-            iterator = param_bindings.ForwardIterator()
-            found = False
-            while iterator.MoveNext():
-                definition = iterator.Key
-                if definition.Name == param_name:
-                    param_bindings.Remove(definition)
-                    found = True
-                    break
-            if found:
-                t.Commit()
-                return True, "Deleted"
-            else:
-                t.RollBack()
-                return False, "Not found"
-        except Exception as ex:
-            t.RollBack()
-            return False, str(ex)
-    except Exception as ex:
-        return False, str(ex)
+def _same_param(definition, param_name, def_key=None):
+    """Khớp theo Definition.Id khi có — hai parameter có thể trùng tên."""
+    if def_key is not None:
+        return definition_key(definition) == def_key
+    return definition.Name == param_name
 
 
-def _update_parameter_group(param_name, new_group_id):
+def _update_parameter_group(param_name, new_group_id, def_key=None):
     doc = revit.doc
     try:
         t = DB.Transaction(doc, "T3Lab: Update Parameter Group")
@@ -259,7 +240,7 @@ def _update_parameter_group(param_name, new_group_id):
             definition = None
             while iterator.MoveNext():
                 defn = iterator.Key
-                if defn.Name == param_name:
+                if _same_param(defn, param_name, def_key):
                     definition = defn
                     break
             if not definition:
@@ -320,7 +301,7 @@ def _update_parameter_group(param_name, new_group_id):
         return False, str(ex)
 
 
-def _update_parameter_categories(param_name, new_categories):
+def _update_parameter_categories(param_name, new_categories, def_key=None):
     doc = revit.doc
     app = doc.Application
     if doc.IsModifiable:
@@ -336,7 +317,7 @@ def _update_parameter_categories(param_name, new_categories):
             while iterator.MoveNext():
                 defn = iterator.Key
                 binding = iterator.Current
-                if defn.Name == param_name:
+                if _same_param(defn, param_name, def_key):
                     old_definition = defn
                     old_binding = binding
                     break
@@ -365,7 +346,7 @@ def _update_parameter_categories(param_name, new_categories):
         return False, str(ex)
 
 
-def _update_parameter_binding(param_name, new_binding_type):
+def _update_parameter_binding(param_name, new_binding_type, def_key=None):
     doc = revit.doc
     app = doc.Application
     if doc.IsModifiable:
@@ -381,7 +362,7 @@ def _update_parameter_binding(param_name, new_binding_type):
             while iterator.MoveNext():
                 defn = iterator.Key
                 binding = iterator.Current
-                if defn.Name == param_name:
+                if _same_param(defn, param_name, def_key):
                     old_definition = defn
                     old_binding = binding
                     break
@@ -426,8 +407,10 @@ class ParameterItem(_Reactive):
     """WPF-bindable parameter data model."""
 
     def __init__(self, name, param_type, data_type, group, group_id,
-                 binding, categories, category_objects=None):
+                 binding, categories, category_objects=None, def_key=None):
         self._handlers = []
+        self._def_key = def_key
+        self._is_selected = False
         self._name = name
         self._param_type = param_type
         self._data_type = data_type
@@ -511,6 +494,20 @@ class ParameterItem(_Reactive):
     @property
     def is_shared(self):
         return self._is_shared
+
+    @property
+    def def_key(self):
+        """Definition.Id (int) — khoá xoá an toàn khi hai parameter trùng tên."""
+        return self._def_key
+
+    @property
+    def is_selected(self):
+        return self._is_selected
+
+    @is_selected.setter
+    def is_selected(self, value):
+        self._is_selected = bool(value)
+        self.OnPropertyChanged("is_selected")
 
 
 # ============================================================================
@@ -612,7 +609,7 @@ class EditGroupDialog(Window):
             MessageBox.Show("No change — same group selected.", "Info",
                             MessageBoxButton.OK, MessageBoxImage.Information)
             return
-        success, msg = _update_parameter_group(self.item.name, new_id)
+        success, msg = _update_parameter_group(self.item.name, new_id, self.item.def_key)
         if success:
             self.item.group = new_name
             self.item.group_id = new_id
@@ -746,7 +743,7 @@ class EditCategoriesDialog(Window):
             return
         cats = [lb.Tag for lb in selected]
         names = [lb.Content for lb in selected]
-        success, msg = _update_parameter_categories(self.item.name, cats)
+        success, msg = _update_parameter_categories(self.item.name, cats, self.item.def_key)
         if success:
             self.item.categories = ', '.join(names)
             self.item.category_objects = cats
@@ -856,7 +853,7 @@ class EditBindingDialog(Window):
             MessageBox.Show("No change — same binding selected.", "Info",
                             MessageBoxButton.OK, MessageBoxImage.Information)
             return
-        success, msg = _update_parameter_binding(self.item.name, new_binding)
+        success, msg = _update_parameter_binding(self.item.name, new_binding, self.item.def_key)
         if success:
             self.item.binding = new_binding
             self.result = True
@@ -1172,17 +1169,6 @@ class ParameterAdder(object):
         self._original_sp_path = None
         self._temp_sp_path = None
 
-    def _get_existing_params(self):
-        existing = set()
-        bm = self.doc.ParameterBindings
-        it = bm.ForwardIterator()
-        it.Reset()
-        while it.MoveNext():
-            try:
-                existing.add(it.Key.Name)
-            except:
-                pass
-        return existing
 
     def _setup_temp_shared_param_file(self):
         """Create temp shared param file using TEMP env var (not script dir)."""
@@ -1672,6 +1658,12 @@ class LoaderGridRow(_Reactive):
 # ============================================================================
 
 class ManaParaWindow(T3WPFWindow):
+    AI_TOOL = "ManaPara"
+
+    # Checkbox từng dòng của dg_parameters nằm trong DataTemplate: không bật cờ
+    # này thì param_row_checkbox_clicked không chạy và bộ đếm "N selected" đứng.
+    WIRE_TEMPLATED_CLICKS = True
+
     def __init__(self, script_dir, revit_obj):
         T3WPFWindow.__init__(self, _XAML)
         self._script_dir = script_dir
@@ -1823,7 +1815,8 @@ class ManaParaWindow(T3WPFWindow):
                     param_name, param_type, data_type, group_name, group_id,
                     binding_type,
                     ', '.join(categories) if categories else 'N/A',
-                    cat_objects
+                    cat_objects,
+                    def_key=definition_key(definition)
                 )
                 self._all_param_items.append(item)
             self._all_param_items.sort(key=lambda x: x.name)
@@ -1863,6 +1856,9 @@ class ManaParaWindow(T3WPFWindow):
                 filtered.append(item)
 
             self.dg_parameters.ItemsSource = to_items_source(filtered)
+            self.dg_parameters_empty.Visibility = (
+                Visibility.Collapsed if filtered else Visibility.Visible)
+            self._update_param_selection_count()
             self._set_status("Showing {} of {} parameters.".format(
                 len(filtered), len(self._all_param_items)))
         except Exception as ex:
@@ -1944,27 +1940,95 @@ class ManaParaWindow(T3WPFWindow):
             MessageBox.Show("Export error:\n{}".format(str(ex)), "Error",
                             MessageBoxButton.OK, MessageBoxImage.Error)
 
+    # ── Chọn nhiều + xoá hàng loạt ──────────────────────────────────────
+
+    def select_all_dg_parameters_clicked(self, sender, e):
+        """Header checkbox: tick/bỏ tick mọi dòng ĐANG HIỂN THỊ (tôn trọng filter)."""
+        self.toggle_all_rows(self.dg_parameters, "is_selected", sender.IsChecked)
+        self._update_param_selection_count()
+
+    def param_row_checkbox_clicked(self, sender, e):
+        self._update_param_selection_count()
+
+    def _visible_param_rows(self):
+        try:
+            return [r for r in self.dg_parameters.Items if isinstance(r, ParameterItem)]
+        except Exception:
+            return []
+
+    def _update_param_selection_count(self):
+        visible = self._visible_param_rows()
+        ticked = sum(1 for r in visible if r.is_selected)
+        try:
+            self.txt_param_selected.Text = "{} selected".format(ticked)
+        except Exception:
+            pass
+        self.sync_header_checkbox(self.chk_all_dg_parameters, self.dg_parameters, "is_selected")
+
+    def _params_to_delete(self):
+        """Dòng đã tick và đang hiển thị; không tick dòng nào thì lấy các dòng đang bôi đen.
+
+        Dòng đã tick nhưng bị filter ẩn đi KHÔNG bị xoá — người dùng chỉ xoá
+        cái mình đang nhìn thấy. Trả về (targets, số dòng tick bị ẩn).
+        """
+        visible = self._visible_param_rows()
+        targets = [r for r in visible if r.is_selected]
+        if not targets:
+            try:
+                targets = [r for r in self.dg_parameters.SelectedItems
+                           if isinstance(r, ParameterItem)]
+            except Exception:
+                targets = []
+        visible_ids = set(id(r) for r in visible)
+        hidden = sum(1 for r in self._all_param_items
+                     if r.is_selected and id(r) not in visible_ids)
+        return targets, hidden
+
     def _on_param_delete(self, sender, e):
-        item = self._get_selected_param()
-        if not item:
-            MessageBox.Show("Please select a parameter to delete.", "Warning",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
+        targets, hidden = self._params_to_delete()
+        if not targets:
+            show_warning("No parameter selected. Tick the parameters to delete, "
+                         "or highlight rows in the table.",
+                         title="Delete Parameters", owner=self)
             return
-        result = MessageBox.Show(
-            "Delete parameter '{}'?\n\nAll parameter values will be lost!".format(item.name),
-            "Confirm Delete",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning
-        )
-        if result != MessageBoxResult.Yes:
+
+        count = len(targets)
+        names = [t.name for t in targets]
+        shown = "\n".join(names[:15])
+        if count > 15:
+            shown += "\n… and {} more".format(count - 15)
+        details = shown
+        if hidden:
+            details += ("\n\n{} ticked parameter(s) hidden by the current filter "
+                        "are NOT included.".format(hidden))
+        if not t3_confirm(
+                "Delete {} parameter{} from this project?\n"
+                "Every value stored in them is removed. One Undo (Ctrl+Z) restores them all."
+                .format(count, "" if count == 1 else "s"),
+                title="Delete Parameters", details=details,
+                ok_text="Delete {}".format(count), cancel_text="Cancel",
+                danger=True, owner=self):
             return
-        success, msg = _delete_parameter(item.name)
-        if success:
-            self._set_status("Deleted '{}'.".format(item.name))
-            self._load_param_data()
-        else:
-            MessageBox.Show("Delete failed:\n\n{}".format(msg), "Error",
-                            MessageBoxButton.OK, MessageBoxImage.Error)
+
+        missing_key = [t.name for t in targets if t.def_key is None]
+        try:
+            deleted, failed = delete_project_parameters(
+                revit.doc, [t.def_key for t in targets if t.def_key is not None])
+        except Exception as ex:
+            show_error("Delete failed — nothing was changed.",
+                       title="Delete Parameters", details=str(ex), owner=self)
+            return
+        failed = [(n, "Could not identify the parameter definition") for n in missing_key] + failed
+
+        self._load_param_data()
+        msg = "Deleted {} of {} parameter{}.".format(
+            len(deleted), count, "" if count == 1 else "s")
+        self._set_status(msg if not failed else msg + " {} failed.".format(len(failed)))
+        if failed:
+            show_warning(msg + " {} could not be deleted.".format(len(failed)),
+                         title="Delete Parameters",
+                         details="\n".join("{} — {}".format(n, why) for n, why in failed),
+                         owner=self)
 
     # ------------------------------------------------------------------
     # Transfer Parameters tab
@@ -2188,27 +2252,7 @@ class ManaParaWindow(T3WPFWindow):
         self._check_enable_run()
 
     def _init_ai_mode(self):
-        """Initialize AI Mode status pill and tool capabilities if AI is active."""
-        try:
-            if hasattr(self, "ai_mode_badge"):
-                if self.is_ai_mode_active():
-                    self.ai_mode_badge.Visibility = Visibility.Visible
-                    info = self.get_ai_status_info()
-                    provider = info.get("provider", "Ready")
-                    model = info.get("model", "")
-                    label = "AI: {}".format(provider)
-                    if model:
-                        label = "AI: {} ({})".format(provider, model)
-                    if hasattr(self, "txt_ai_status"):
-                        self.txt_ai_status.Text = label
-                    if hasattr(self, "btn_transfer_ai_match"):
-                        self.btn_transfer_ai_match.Visibility = Visibility.Visible
-                else:
-                    self.ai_mode_badge.Visibility = Visibility.Collapsed
-                    if hasattr(self, "btn_transfer_ai_match"):
-                        self.btn_transfer_ai_match.ToolTip = "Enable AI Mode in LLMs Setting for semantic parameter matching"
-        except Exception:
-            pass
+        self.init_ai_badge()
 
     def _on_transfer_ai_match(self, sender, e):
         """Use AI to semantically match the selected source parameter to candidate target parameters."""
@@ -2230,14 +2274,7 @@ class ManaParaWindow(T3WPFWindow):
             )
             return
 
-        if not self.is_ai_mode_active():
-            MessageBox.Show(
-                "AI Mode is currently disabled or no LLM provider is configured.\n"
-                "Please enable AI Mode in LLMs Setting.",
-                "AI Mode Inactive",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information
-            )
+        if not self.ai_require():
             return
 
         src_name = self._selected_source
@@ -2247,16 +2284,11 @@ class ManaParaWindow(T3WPFWindow):
 
         # Visual feedback
         btn = getattr(self, 'btn_transfer_ai_match', None)
-        orig_content = btn.Content if btn else "✨ AI Match"
 
         def _restore_btn():
-            if btn:
-                btn.Content = orig_content
-                btn.IsEnabled = True
+            self.ai_busy(btn, False)
 
-        if btn:
-            btn.Content = "⏳ Matching..."
-            btn.IsEnabled = False
+        self.ai_busy(btn, True)
 
         self.txt_transfer_tgt_info.Text = "AI matching target parameter for '{}'...".format(src_name)
         if hasattr(self, "txt_param_status_bar"):

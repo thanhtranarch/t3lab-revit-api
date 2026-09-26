@@ -1668,17 +1668,20 @@
                                 <TextBlock Text="CAD to Elements" Style="{StaticResource T3.Title}"/>
                                 <TextBlock Text="Convert CAD linework into walls, floors, beams or MEP runs" Style="{StaticResource T3.Subtitle}"/>
                             </StackPanel>
+                            <!-- AI MODE BADGE — chuẩn T3 (T3LAB_UI_STANDARD.md § AI Mode). Code: init_ai_badge() -->
+                            <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}" Height="24" Margin="16,0,0,0"
+                                    Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                    <TextBlock x:Name="txt_ai_status" Text="AI off" Style="{StaticResource T3.Caption}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
 
                         <!-- AI Mode Status Pill & Window controls -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal"
                                     shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0" Visibility="Collapsed">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
 
                             <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
                                 <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
@@ -1916,9 +1919,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="CAD LAYERS (WALL LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_wall_ai" Grid.Column="1"
-                                                Content="✨ AI Select" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0" ToolTip="AI Smart Match: Intelligently select CAD layers for walls"/>
+                                        <Button x:Name="btn_wall_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
+                                                Height="26" Padding="8,0"
+                                                ToolTip="Tick the CAD layers that most likely hold this element type">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                         <Button x:Name="btn_wall_select_all" Grid.Column="3"
                                                 Content="Select All" Style="{StaticResource T3.Button.Secondary}"
                                                 Height="26" Padding="12,0"/>
@@ -2057,9 +2065,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="CAD LAYERS (FLOOR OUTLINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_floor_ai" Grid.Column="1"
-                                                Content="✨ AI Select" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0" ToolTip="AI Smart Match: Intelligently select CAD layers for floors"/>
+                                        <Button x:Name="btn_floor_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
+                                                Height="26" Padding="8,0"
+                                                ToolTip="Tick the CAD layers that most likely hold this element type">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                         <Button x:Name="btn_floor_select_all" Grid.Column="3"
                                                 Content="Select All" Style="{StaticResource T3.Button.Secondary}"
                                                 Height="26" Padding="12,0"/>
@@ -2183,9 +2196,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="CAD LAYERS (BEAM OUTLINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_beam_ai" Grid.Column="1"
-                                                Content="✨ AI Select" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0" ToolTip="AI Smart Match: Intelligently select CAD layers for beams"/>
+                                        <Button x:Name="btn_beam_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
+                                                Height="26" Padding="8,0"
+                                                ToolTip="Tick the CAD layers that most likely hold this element type">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                         <Button x:Name="btn_beam_select_all" Grid.Column="3"
                                                 Content="Select All" Style="{StaticResource T3.Button.Secondary}"
                                                 Height="26" Padding="12,0"/>
@@ -2330,9 +2348,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="CAD LAYERS (DUCT LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_duct_ai" Grid.Column="1"
-                                                Content="✨ AI Select" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0" ToolTip="AI Smart Match: Intelligently select CAD layers for ducts"/>
+                                        <Button x:Name="btn_duct_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
+                                                Height="26" Padding="8,0"
+                                                ToolTip="Tick the CAD layers that most likely hold this element type">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                         <Button x:Name="btn_duct_select_all" Grid.Column="3"
                                                 Content="Select All" Style="{StaticResource T3.Button.Secondary}"
                                                 Height="26" Padding="12,0"/>
@@ -2448,9 +2471,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="CAD LAYERS (PIPE LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_pipe_ai" Grid.Column="1"
-                                                Content="✨ AI Select" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0" ToolTip="AI Smart Match: Intelligently select CAD layers for pipes"/>
+                                        <Button x:Name="btn_pipe_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
+                                                Height="26" Padding="8,0"
+                                                ToolTip="Tick the CAD layers that most likely hold this element type">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                         <Button x:Name="btn_pipe_select_all" Grid.Column="3"
                                                 Content="Select All" Style="{StaticResource T3.Button.Secondary}"
                                                 Height="26" Padding="12,0"/>
@@ -2589,9 +2617,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="CAD LAYERS (CABLE TRAY LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_tray_ai" Grid.Column="1"
-                                                Content="✨ AI Select" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0" ToolTip="AI Smart Match: Intelligently select CAD layers for cable trays"/>
+                                        <Button x:Name="btn_tray_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
+                                                Height="26" Padding="8,0"
+                                                ToolTip="Tick the CAD layers that most likely hold this element type">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                         <Button x:Name="btn_tray_select_all" Grid.Column="3"
                                                 Content="Select All" Style="{StaticResource T3.Button.Secondary}"
                                                 Height="26" Padding="12,0"/>
@@ -2702,9 +2735,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="CAD LAYERS (CONDUIT LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_conduit_ai" Grid.Column="1"
-                                                Content="✨ AI Select" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0" ToolTip="AI Smart Match: Intelligently select CAD layers for conduits"/>
+                                        <Button x:Name="btn_conduit_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
+                                                Height="26" Padding="8,0"
+                                                ToolTip="Tick the CAD layers that most likely hold this element type">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                         <Button x:Name="btn_conduit_select_all" Grid.Column="3"
                                                 Content="Select All" Style="{StaticResource T3.Button.Secondary}"
                                                 Height="26" Padding="12,0"/>

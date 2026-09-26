@@ -62,24 +62,3 @@ class ToolRegistry:
             }
         }
 
-    def get_tool(self, tool_id):
-        """Returns tool metadata by ID."""
-        return self.tools.get(tool_id)
-
-    def get_all_tools(self):
-        """Returns all registered tools."""
-        return self.tools
-
-    def get_script_path(self, tool_id):
-        """Returns the absolute path to a tool's script."""
-        tool = self.get_tool(tool_id)
-        if tool:
-            return os.path.join(self.tab_path, tool["rel_path"].replace("/", os.sep))
-        return None
-
-    def list_tools_for_ai(self):
-        """Returns a simplified list of tools for LLM consumption."""
-        return [
-            {"id": tid, "name": t["name"], "description": t["description"]}
-            for tid, t in self.tools.items()
-        ]

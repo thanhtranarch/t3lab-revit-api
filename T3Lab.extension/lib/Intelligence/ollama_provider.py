@@ -127,9 +127,6 @@ class OllamaProvider(BaseLLMProvider):
                     out.append(h)
         return out
 
-    def _get_timeout(self):
-        mod = self._local_llm()
-        return mod.TIMEOUT_GEN if mod else 60
 
     # ── BaseLLMProvider interface ──────────────────────────────────────────────
 

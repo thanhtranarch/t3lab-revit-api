@@ -74,25 +74,6 @@ def rename_template(doc, template, new_name):
         t.RollBack()
         raise e
 
-def batch_rename_templates(doc, rename_pairs):
-    """Rename multiple view templates in a single transaction.
-    rename_pairs is a list of (view_template_element, new_name)
-    """
-    t = DB.Transaction(doc, "DQT - Batch Rename View Templates")
-    t.Start()
-    success_count = 0
-    try:
-        for template, new_name in rename_pairs:
-            try:
-                template.Name = new_name
-                success_count += 1
-            except:
-                pass
-        t.Commit()
-        return success_count
-    except Exception as e:
-        t.RollBack()
-        raise e
 
 def duplicate_templates(doc, templates):
     """Duplicate multiple view templates in a single transaction.

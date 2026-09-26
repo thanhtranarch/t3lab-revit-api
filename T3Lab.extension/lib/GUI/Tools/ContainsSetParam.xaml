@@ -5,14 +5,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
-        Title="Foundation Volume"
-        Width="640" Height="560"
-        MinWidth="520" MinHeight="440"
-        WindowStartupLocation="CenterScreen"
+        Title="Set Parameter Value"
+        Width="420" Height="280"
+        MinWidth="420" MinHeight="260"
+        WindowStartupLocation="CenterOwner"
         WindowStyle="None" AllowsTransparency="False"
         Background="{DynamicResource T3.Surface}"
         FontFamily="Segoe UI"
         FontSize="13"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
@@ -1645,200 +1647,69 @@
             CornerRadius="12" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title Bar -->
-                <RowDefinition Height="*"/>       <!-- Row 1: Main Body with Sidebar Rail -->
-                <RowDefinition Height="48"/>      <!-- Row 2: Full-width Footer Bar -->
+                <RowDefinition Height="48"/>      <!-- Row 0: Title Bar -->
+                <RowDefinition Height="*"/>       <!-- Row 1: Content -->
+                <RowDefinition Height="48"/>      <!-- Row 2: Footer Bar -->
             </Grid.RowDefinitions>
 
-            <!-- ══════════════════ ROW 0: FULL-WIDTH TITLE BAR ══════════════════ -->
-            <Border x:Name="title_bar" Grid.Row="0" Style="{StaticResource T3.TitleBar}">
+            <!-- ══════════════════ ROW 0: TITLE BAR ══════════════════ -->
+            <Border Grid.Row="0" Style="{StaticResource T3.TitleBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,0"
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Image x:Name="logo_image" Height="28" Margin="0,0,12,0"
                                VerticalAlignment="Center"
                                RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Orientation="Vertical" VerticalAlignment="Center">
-                            <TextBlock Text="Foundation Volume" Style="{StaticResource T3.Title}"/>
-                            <TextBlock Text="Calculate foundation volumes and concrete schedules" Style="{StaticResource T3.Subtitle}"/>
+                            <TextBlock Text="Set Parameter Value" Style="{StaticResource T3.Title}"/>
+                            <TextBlock Text="Write the defined value to the ticked groups" Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                     </StackPanel>
-
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal"
+                    <StackPanel Grid.Column="1" Orientation="Horizontal"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
-                            <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
-                        </Button>
-                        <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize">
-                            <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
-                        </Button>
-                        <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close" IsCancel="True">
+                        <Button x:Name="btn_close_chrome" Style="{StaticResource T3.WinClose}" ToolTip="Close">
                             <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- ══════════════════ ROW 1: WORKSPACE WITH REFINED SIDEBAR ══════════════════ -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="58"/>    <!-- Col 0: Left Sidebar Rail -->
-                    <ColumnDefinition Width="*"/>     <!-- Col 1: Main Content Views -->
-                </Grid.ColumnDefinitions>
-
-                <!-- ── Col 0: Left Sidebar Rail ── -->
-                <Border Grid.Column="0"
-                    Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                <Grid Margin="0,12,0,12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/> <!-- Nav 1 -->
-                        <RowDefinition Height="Auto"/> <!-- Nav 2 -->
-                        <RowDefinition Height="*"/>    <!-- Spacer -->
-                    </Grid.RowDefinitions>
-
-                    <!-- Nav: Select Parameter -->
-                    <ToggleButton x:Name="nav_toggle_select" Grid.Row="0"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8" IsChecked="True"
-                                  ToolTip="Select Parameter">
-                        <Path Data="M5 6 H19 M5 12 H19 M5 18 H13"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Nav: Write Volume -->
-                    <ToggleButton x:Name="nav_toggle_write" Grid.Row="1"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  ToolTip="Write Volume">
-                        <Path Data="M3 17 L15 5 19 9 7 21 3 21 Z M15 5 L17 3 21 7 19 9 Z"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
+            <!-- ══════════════════ ROW 1: CONTENT ══════════════════ -->
+            <StackPanel Grid.Row="1" Margin="16">
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Target parameter" Style="{StaticResource T3.Body}" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="param_cb" Grid.Column="1" Style="{StaticResource T3.ComboBox}"
+                              IsEditable="True" ToolTip="Text parameter on the contained elements"/>
                 </Grid>
-            </Border>
+                <TextBlock x:Name="lbl_value" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                           Text="Value: the defined value of each group"/>
+            </StackPanel>
 
-                <!-- ── Col 1: Main Content Views ── -->
-                <!-- ═══════════════ ROW 1: CONTENT TABS (Col 1) ═══════════════ -->
-            <TabControl Grid.Column="1" x:Name="main_tabs"
-                        BorderThickness="0" Background="{DynamicResource T3.Surface}" Padding="0">
-                <TabControl.ItemContainerStyle>
-                    <Style TargetType="TabItem" BasedOn="{StaticResource T3.TabItem.Hidden}"/>
-                </TabControl.ItemContainerStyle>
-
-                <!-- Tab 0: Select Parameter -->
-                <TabItem Header="Select">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="36"/>   <!-- Found foundations count strip -->
-                            <RowDefinition Height="40"/>   <!-- Search box row -->
-                            <RowDefinition Height="*"/>    <!-- Param ListBox -->
-                            <RowDefinition Height="Auto"/> <!-- Selected info badge -->
-                        </Grid.RowDefinitions>
-
-                        <!-- Found foundations count strip -->
-                        <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1" Padding="16,0">
-                            <Grid VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Foundations found: " Style="{StaticResource T3.Caption}"/>
-                                    <TextBlock x:Name="FoundationCount" Text="0" Style="{StaticResource T3.BodyStrong}"/>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-
-                        <!-- Search box -->
-                        <Border Grid.Row="1" Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1" Padding="16,0">
-                            <TextBox x:Name="SearchBox" Style="{StaticResource T3.Search}" Tag="Search parameters…" Height="28"/>
-                        </Border>
-
-                        <!-- Param ListBox with Empty State -->
-                        <Grid Grid.Row="2" Background="{DynamicResource T3.Surface}">
-                            <ListBox x:Name="ParamList" Style="{StaticResource T3.ListBox}"
-                                     VirtualizingPanel.IsVirtualizing="True"
-                                     VirtualizingPanel.VirtualizationMode="Recycling"
-                                     BorderThickness="0"/>
-                            <TextBlock Style="{StaticResource T3.Empty}"
-                                       Text="No writable parameters found."
-                                       Visibility="{Binding HasItems, ElementName=ParamList, Converter={x:Null}}"/>
-                        </Grid>
-
-                        <!-- Selected Parameter badge strip -->
-                        <Border Grid.Row="3" Background="{StaticResource T3.Warning.Fill}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0" Padding="16,12">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Target Parameter: " Style="{StaticResource T3.BodyStrong}" Foreground="{StaticResource T3.Warning.Text}"/>
-                                <TextBlock x:Name="SelectedLabel" Text="(none)" Style="{StaticResource T3.BodyStrong}" Foreground="{StaticResource T3.Warning.Text}"/>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </TabItem>
-
-                <!-- Tab 1: Write Volume (ZERO-GAP FLUSH) -->
-                <TabItem Header="Write">
-                    <Border Background="{StaticResource T3.Surface}" Padding="24,16">
-                        <StackPanel>
-                            <!-- Status result border -->
-                            <Border x:Name="StatusBorder" CornerRadius="4" BorderThickness="1"
-                                    BorderBrush="{StaticResource T3.Success.Accent}" Background="{StaticResource T3.Success.Fill}"
-                                    Padding="16,12" Margin="0,0,0,16" Visibility="Collapsed">
-                                <StackPanel>
-                                    <TextBlock x:Name="StatusTitle" Style="{StaticResource T3.BodyStrong}" Foreground="{StaticResource T3.Success.Text}" Margin="0,0,0,4"/>
-                                    <TextBlock x:Name="StatusText" Style="{StaticResource T3.Body}" Foreground="{StaticResource T3.Success.Text}" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Idle hint border -->
-                            <Border x:Name="WriteHintBorder" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="16,12">
-                                <StackPanel>
-                                    <TextBlock Text="Ready to Write Volume" Style="{StaticResource T3.BodyStrong}" Margin="0,0,0,4"/>
-                                    <TextBlock Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap">
-                                        <Run Text="Click "/><Run Text="Write Volume" FontWeight="SemiBold" Foreground="{StaticResource T3.Ink}"/><Run Text=" to write the computed volume into the selected parameter across all foundations."/>
-                                    </TextBlock>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </Border>
-                </TabItem>
-            </TabControl>
-
-            <!-- ═══════════════ ROW 2: FOOTER BAR (Col 1) ═══════════════ -->
-            </Grid>
-
-            <!-- ══════════════════ ROW 2: FULL-WIDTH FOOTER BAR ══════════════════ -->
+            <!-- ══════════════════ FOOTER BAR ══════════════════ -->
             <Border Grid.Row="2" Style="{StaticResource T3.FooterBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource T3.Copyright}"/>
-                        <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="12,0"/>
-                        <TextBlock Text="Foundation Volume · T3Lab" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                     </StackPanel>
-
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="back_button" Content="← Back" Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="16,0" Margin="0,0,8,0" Visibility="Collapsed"/>
-                        <Button x:Name="RunButton" Style="{StaticResource T3.Button.Primary}"
-                                Height="28" Padding="16,0" IsDefault="True">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock x:Name="next_button_text" Text="Next" FontWeight="SemiBold"/>
-                                <TextBlock x:Name="next_button_icon" Text=" →" FontWeight="SemiBold"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="CloseButton" Content="Close" Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="16,0" Visibility="Collapsed"/>
+                        <Button x:Name="btn_cancel" Content="Cancel"
+                                Style="{StaticResource T3.Button.Secondary}"
+                                Click="cancel_clicked" IsCancel="True" Margin="0,0,8,0"/>
+                        <Button x:Name="btn_ok" Content="Apply"
+                                Style="{StaticResource T3.Button.Primary}"
+                                Click="ok_clicked" IsDefault="True"/>
                     </StackPanel>
                 </Grid>
             </Border>

@@ -1,18 +1,31 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="Auto Work"
-        Width="1100" Height="700" MinWidth="900" MinHeight="550"
-        WindowStartupLocation="CenterScreen"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        mc:Ignorable="d"
+        Title="Configure Defined Value"
+        Width="560" Height="440"
+        MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None" AllowsTransparency="False"
+        Background="{DynamicResource T3.Surface}"
+        FontFamily="Segoe UI"
+        FontSize="13"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
 
-    <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="48" ResizeBorderThickness="6"
-                            CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
-    </shell:WindowChrome.WindowChrome>
+    <WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="48"
+                            ResizeBorderThickness="6"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
 
     <Window.Resources>
         <ResourceDictionary>
@@ -1635,7 +1648,7 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Title Bar -->
-                <RowDefinition Height="*"/>       <!-- Row 1: Workspace Area -->
+                <RowDefinition Height="*"/>       <!-- Row 1: Content -->
                 <RowDefinition Height="48"/>      <!-- Row 2: Footer Bar -->
             </Grid.RowDefinitions>
 
@@ -1646,396 +1659,122 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,0"
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Image x:Name="logo_image" Height="28" Margin="0,0,12,0"
                                VerticalAlignment="Center"
                                RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Orientation="Vertical" VerticalAlignment="Center">
-                            <TextBlock Text="Auto Work" Style="{StaticResource T3.Title}"/>
-                            <TextBlock Text="Automated drawing QA/QC, spellcheck and annotation clash audit" Style="{StaticResource T3.Subtitle}"/>
+                            <TextBlock Text="Configure Defined Value" Style="{StaticResource T3.Title}"/>
+                            <TextBlock Text="Build the value written to contained elements" Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                     </StackPanel>
-
                     <StackPanel Grid.Column="1" Orientation="Horizontal"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize"
-                                Click="minimize_button_clicked">
-                            <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
-                        </Button>
-                        <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize"
-                                Click="maximize_button_clicked">
-                            <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
-                        </Button>
-                        <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close"
-                                Click="close_button_clicked" IsCancel="True">
+                        <Button x:Name="btn_close_chrome" Style="{StaticResource T3.WinClose}" ToolTip="Close">
                             <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- ══════════════════ ROW 1: WORKSPACE (ZERO-GAP FLUSH) ══════════════════ -->
-            <Grid Grid.Row="1">
+            <!-- ══════════════════ ROW 1: CONTENT ══════════════════ -->
+            <Grid Grid.Row="1" Margin="16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="58"/>    <!-- Sidebar Rail -->
-                    <ColumnDefinition Width="*"/>     <!-- Content Views -->
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Sidebar Icon Rail -->
-                <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}"
-                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                    <StackPanel Margin="0,12,0,12">
-                        <!-- Nav 0: Drawing QA/QC & Audit -->
-                        <ToggleButton x:Name="nav_btn_audit"
-                                      Style="{StaticResource T3.Rail.Tile}"
-                                      Margin="0,0,0,8" IsChecked="True"
-                                      Click="nav_mode_clicked"
-                                      ToolTip="Drawing QA/QC &amp; Annotation Audit">
-                            <Path Data="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                  Width="18" Height="18" Stretch="Uniform"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </ToggleButton>
-
-                        <!-- Nav 1: Macro & Quick Click -->
-                        <ToggleButton x:Name="nav_btn_macro"
-                                      Style="{StaticResource T3.Rail.Tile}"
-                                      Click="nav_mode_clicked"
-                                      ToolTip="Macro &amp; Auto Click Automation">
-                            <Path Data="M13 10V3L4 14h7v7l9-11h-7z"
-                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                  Width="18" Height="18" Stretch="Uniform"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </ToggleButton>
-                    </StackPanel>
-                </Border>
-
-                <!-- Main View Tabs -->
-                <TabControl x:Name="main_view_tabs" Grid.Column="1"
-                            Background="Transparent" BorderThickness="0">
-                    <TabControl.ItemContainerStyle>
-                        <Style TargetType="TabItem" BasedOn="{StaticResource T3.TabItem.Hidden}"/>
-                    </TabControl.ItemContainerStyle>
-
-                    <!-- ── TAB 0: DRAWING QA/QC & AUDIT DASHBOARD (ZERO-GAP FLUSH) ── -->
-                    <TabItem>
-                        <Grid Margin="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>    <!-- Row 0: Scope & Run Config (Flush) -->
-                                <RowDefinition Height="Auto"/>    <!-- Row 1: KPI Metric Banner (Flush) -->
-                                <RowDefinition Height="Auto"/>    <!-- Row 2: Search & Filter Toolbar (Flush) -->
-                                <RowDefinition Height="*"/>       <!-- Row 3: DataGrid Results (Zero Gap) -->
-                            </Grid.RowDefinitions>
-
-                            <!-- Row 0: Scope & Action Bar (Flush) -->
-                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- Scope Selector -->
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                                        <TextBlock Text="SCOPE:" Style="{StaticResource T3.Label}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <RadioButton x:Name="rb_scope_active" Content="Active View" Style="{StaticResource T3.RadioButton}"
-                                                     GroupName="AuditScope" IsChecked="True" Margin="0,0,12,0"/>
-                                        <RadioButton x:Name="rb_scope_sheets" Content="Placed Views" Style="{StaticResource T3.RadioButton}"
-                                                     GroupName="AuditScope" Margin="0,0,12,0"/>
-                                        <RadioButton x:Name="rb_scope_project" Content="Entire Project" Style="{StaticResource T3.RadioButton}"
-                                                     GroupName="AuditScope"/>
-                                    </StackPanel>
-
-                                    <!-- Check Types Toggles -->
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                        <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="0,0,12,0"/>
-                                        <CheckBox x:Name="chk_check_clashes" Content="Clashes" Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True" Margin="0,0,8,0"/>
-                                        <CheckBox x:Name="chk_check_spelling" Content="Spelling" Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True" Margin="0,0,8,0"/>
-                                        <CheckBox x:Name="chk_check_sheets" Content="Sheet Info" Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True" Margin="0,0,8,0"/>
-                                        <CheckBox x:Name="chk_check_spatial" Content="Rooms" Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True"/>
-                                    </StackPanel>
-
-                                    <!-- Run Audit Button -->
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button x:Name="btn_run_audit" Content="Run Drawing Audit" Style="{StaticResource T3.Button.Primary}"
-                                                Click="run_audit_clicked" Height="28" Padding="12,0" IsDefault="True"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <!-- Row 1: KPI Metric Banner (Flush) -->
-                            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="1"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="1"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="1"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="1"/>
-                                        <ColumnDefinition Width="1.2*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- Card 1: Total Checked -->
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="CHECKED" Style="{StaticResource T3.Caption}"/>
-                                        <TextBlock x:Name="txt_kpi_checked" Text="0" Style="{StaticResource T3.Display}"/>
-                                    </StackPanel>
-
-                                    <Border Grid.Column="1" Background="{StaticResource T3.Border}" Margin="0,4"/>
-
-                                    <!-- Card 2: Total Issues -->
-                                    <StackPanel Grid.Column="2" Margin="16,0,0,0">
-                                        <TextBlock Text="DEFECTS" Style="{StaticResource T3.Caption}"/>
-                                        <TextBlock x:Name="txt_kpi_issues" Text="0" Style="{StaticResource T3.Display}"/>
-                                    </StackPanel>
-
-                                    <Border Grid.Column="3" Background="{StaticResource T3.Border}" Margin="0,4"/>
-
-                                    <!-- Card 3: Critical Issues -->
-                                    <StackPanel Grid.Column="4" Margin="16,0,0,0">
-                                        <TextBlock Text="CRITICAL" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Danger.Text}"/>
-                                        <TextBlock x:Name="txt_kpi_critical" Text="0" Style="{StaticResource T3.Display}" Foreground="{StaticResource T3.Danger.Text}"/>
-                                    </StackPanel>
-
-                                    <Border Grid.Column="5" Background="{StaticResource T3.Border}" Margin="0,4"/>
-
-                                    <!-- Card 4: Warnings -->
-                                    <StackPanel Grid.Column="6" Margin="16,0,0,0">
-                                        <TextBlock Text="WARNINGS" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Warning.Text}"/>
-                                        <TextBlock x:Name="txt_kpi_warnings" Text="0" Style="{StaticResource T3.Display}" Foreground="{StaticResource T3.Warning.Text}"/>
-                                    </StackPanel>
-
-                                    <Border Grid.Column="7" Background="{StaticResource T3.Border}" Margin="0,4"/>
-
-                                    <!-- Card 5: Pass Rate -->
-                                    <StackPanel Grid.Column="8" Margin="16,0,0,0" VerticalAlignment="Center">
-                                        <Grid Margin="0,0,0,4">
-                                            <TextBlock Text="PASS RATE" Style="{StaticResource T3.Caption}"/>
-                                            <TextBlock x:Name="txt_kpi_pass_rate" Text="100%" Style="{StaticResource T3.Caption}"
-                                                       HorizontalAlignment="Right" FontWeight="SemiBold"/>
-                                        </Grid>
-                                        <ProgressBar x:Name="pb_pass_rate" Value="100" Maximum="100" Style="{StaticResource T3.Meter}"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <!-- Row 2: Search & Filter Toolbar (Flush) -->
-                            <Border Grid.Row="2" Background="{StaticResource T3.Surface}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- Filter Buttons -->
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button x:Name="btn_filter_all" Content="All Issues" Style="{StaticResource T3.Button.Secondary}"
-                                                Click="filter_clicked" Tag="All" Height="26" Padding="8,0" Margin="0,0,4,0"/>
-                                        <Button x:Name="btn_filter_critical" Content="Critical" Style="{StaticResource T3.Button.Ghost}"
-                                                Click="filter_clicked" Tag="Critical" Height="26" Padding="8,0" Margin="0,0,4,0"/>
-                                        <Button x:Name="btn_filter_clash" Content="Clashes" Style="{StaticResource T3.Button.Ghost}"
-                                                Click="filter_clicked" Tag="Clashes" Height="26" Padding="8,0" Margin="0,0,4,0"/>
-                                        <Button x:Name="btn_filter_spell" Content="Spelling" Style="{StaticResource T3.Button.Ghost}"
-                                                Click="filter_clicked" Tag="Spelling" Height="26" Padding="8,0" Margin="0,0,4,0"/>
-                                        <Button x:Name="btn_filter_info" Content="Drawing Info" Style="{StaticResource T3.Button.Ghost}"
-                                                Click="filter_clicked" Tag="Info" Height="26" Padding="8,0"/>
-                                    </StackPanel>
-
-                                    <!-- Search Box -->
-                                    <Grid Grid.Column="1" Margin="12,0,12,0" VerticalAlignment="Center">
-                                        <TextBox x:Name="txt_search" Style="{StaticResource T3.TextBox}" Height="28"
-                                                 TextChanged="search_text_changed" Padding="8,0"/>
-                                    </Grid>
-
-                                    <!-- Quick Selection Actions -->
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button Content="Select All" Style="{StaticResource T3.Button.Ghost}" Click="select_all_clicked"
-                                                Height="26" Padding="8,0" Margin="0,0,4,0"/>
-                                        <Button Content="Clear" Style="{StaticResource T3.Button.Ghost}" Click="select_none_clicked"
-                                                Height="26" Padding="8,0"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <!-- Row 3: Main DataGrid (Zero Gap) -->
-                            <Grid Grid.Row="3">
-                                <DataGrid x:Name="dg_audit_results" Style="{StaticResource T3.DataGrid}"
-                                          AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-                                          IsReadOnly="False" SelectionMode="Extended" HeadersVisibility="Column"
-                                          BorderThickness="0" Margin="0"
-                                          MouseDoubleClick="dg_audit_double_clicked">
-                                    <DataGrid.Columns>
-                                        <!-- Selection Checkbox -->
-                                        <DataGridTemplateColumn Width="40" CanUserResize="False">
-                                            <DataGridTemplateColumn.Header>
-                                                <CheckBox x:Name="chk_header_all" Style="{StaticResource T3.CheckBox}"
-                                                          Click="header_checkbox_clicked" HorizontalAlignment="Center"/>
-                                            </DataGridTemplateColumn.Header>
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                              Style="{StaticResource T3.CheckBox}"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-
-                                        <!-- Severity -->
-                                        <DataGridTextColumn Header="SEVERITY" Binding="{Binding Severity}" Width="90" IsReadOnly="True"
-                                                            ElementStyle="{StaticResource T3.Cell.Muted}"/>
-
-                                        <!-- Category -->
-                                        <DataGridTextColumn Header="CATEGORY" Binding="{Binding Category}" Width="130" IsReadOnly="True"
-                                                            ElementStyle="{StaticResource T3.Body.Secondary}"/>
-
-                                        <!-- View / Sheet -->
-                                        <DataGridTextColumn Header="VIEW / SHEET" Binding="{Binding ViewName}" Width="160" IsReadOnly="True"
-                                                            ElementStyle="{StaticResource T3.Cell.Muted}"/>
-
-                                        <!-- Element ID -->
-                                        <DataGridTextColumn Header="ELEMENT ID" Binding="{Binding ElementIdsStr}" Width="110" IsReadOnly="True"
-                                                            ElementStyle="{StaticResource T3.Cell.Mono}"/>
-
-                                        <!-- Description -->
-                                        <DataGridTextColumn Header="DEFECT DESCRIPTION" Binding="{Binding Description}" Width="*" IsReadOnly="True"/>
-
-                                        <!-- Calculation / Measurement -->
-                                        <DataGridTextColumn Header="MEASUREMENT / FIX" Binding="{Binding Calculation}" Width="230" IsReadOnly="True"
-                                                            ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                    </DataGrid.Columns>
-                                </DataGrid>
-
-                                <!-- Empty State Overlay -->
-                                <TextBlock x:Name="pnl_empty_state" Style="{StaticResource T3.Empty}"
-                                           Text="No audit findings. Click 'Run Drawing Audit' to scan."/>
-                            </Grid>
+                <!-- Available -->
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="AVAILABLE PARAMETERS" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                    <Border Grid.Row="1" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                        <Grid>
+                            <ListBox x:Name="avail_list" Style="{StaticResource T3.ListBox}"
+                                     SelectionMode="Extended" BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     MouseDoubleClick="move_right_clicked"/>
+                            <TextBlock x:Name="empty_avail" Style="{StaticResource T3.Empty}"
+                                       Text="All parameters are in use" Visibility="Collapsed"/>
                         </Grid>
-                    </TabItem>
+                    </Border>
+                    <Button Grid.Row="2" Content="Add" Style="{StaticResource T3.Button.Secondary}"
+                            HorizontalAlignment="Right" Margin="0,8,0,0"
+                            ToolTip="Add the selected parameters (or double-click)"
+                            Click="move_right_clicked"/>
+                </Grid>
 
-                    <!-- ── TAB 1: MACRO & AUTOMATION UTILITIES ── -->
-                    <TabItem>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel Margin="24,16,24,16">
-                                <TextBlock Text="MACRO &amp; CLICK AUTOMATION" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-
-                                <!-- Quick Click Box -->
-                                <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="4" Padding="16,12" Margin="0,0,0,16">
-                                    <StackPanel>
-                                        <TextBlock Text="1. QUICK CLICK COORDINATES" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                        <Grid Margin="0,0,0,12">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="110"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="24"/>
-                                                <ColumnDefinition Width="110"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="X Coordinate:" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="txt_x" Grid.Column="1" Height="28" Text="500" Style="{StaticResource T3.TextBox}"/>
-
-                                            <TextBlock Grid.Column="3" Text="Y Coordinate:" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="txt_y" Grid.Column="4" Height="28" Text="500" Style="{StaticResource T3.TextBox}"/>
-                                        </Grid>
-
-                                        <TextBlock Text="CLICK SETTINGS" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                        <Grid Margin="0,0,0,12">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="110"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="24"/>
-                                                <ColumnDefinition Width="110"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="Interval (sec):" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="txt_interval" Grid.Column="1" Height="28" Text="1.0" Style="{StaticResource T3.TextBox}"
-                                                     ToolTip="Delay between clicks, in seconds (minimum 0.05)."/>
-
-                                            <TextBlock Grid.Column="3" Text="Click count:" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="txt_clicks" Grid.Column="4" Height="28" Text="10" Style="{StaticResource T3.TextBox}"
-                                                     ToolTip="How many clicks to send. Press any key to stop early."/>
-                                        </Grid>
-
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button Content="Pick Location on Screen (3s countdown)" Style="{StaticResource T3.Button.Secondary}"
-                                                    Click="pick_location_clicked" Height="28" Padding="12,0" Margin="0,0,8,0"/>
-                                            <Button x:Name="btn_start_click" Content="Start Auto Click" Style="{StaticResource T3.Button.Secondary}"
-                                                    Click="start_clicked" Height="28" Padding="16,0"/>
-                                        </StackPanel>
-                                        <TextBlock Text="Press any key to stop the auto click at any time."
-                                                   Style="{StaticResource T3.Caption}" Margin="0,8,0,0"/>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Record & Replay Box -->
-                                <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="4" Padding="16,12">
-                                    <StackPanel>
-                                        <TextBlock Text="2. RECORD &amp; REPLAY ACTIONS" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                            <Button x:Name="btn_start_record" Content="● Start Recording" Style="{StaticResource T3.Button.Danger}"
-                                                    Click="start_recording_clicked" Height="28" Padding="16,0"/>
-                                            <Button x:Name="btn_play" Content="Play Replay" Style="{StaticResource T3.Button.Secondary}"
-                                                    Click="play_clicked" Height="28" Padding="16,0" Margin="8,0,0,0" IsEnabled="False"/>
-                                            <Button x:Name="btn_clear" Content="Clear" Style="{StaticResource T3.Button.Ghost}"
-                                                    Click="clear_clicked" Height="28" Padding="16,0" Margin="8,0,0,0"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="lbl_action_count" Text="0 actions recorded. Press any key to stop recording."
-                                                   Style="{StaticResource T3.Caption}"/>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-                </TabControl>
+                <!-- Selected -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="SELECTED COMPOSITION" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                    <Border Grid.Row="1" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                        <Grid>
+                            <ListBox x:Name="selected_list" Style="{StaticResource T3.ListBox}"
+                                     SelectionMode="Extended" BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     MouseDoubleClick="move_left_clicked"/>
+                            <TextBlock x:Name="empty_selected" Style="{StaticResource T3.Empty}"
+                                       Text="No parameters selected" Visibility="Collapsed"/>
+                        </Grid>
+                    </Border>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button Content="Remove" Style="{StaticResource T3.Button.Ghost}"
+                                ToolTip="Remove the selected parameters (or double-click)"
+                                Click="move_left_clicked" Margin="0,0,8,0"/>
+                        <Button Content="Move Up" Style="{StaticResource T3.Button.Secondary}"
+                                Click="move_up_clicked" Margin="0,0,8,0"/>
+                        <Button Content="Move Down" Style="{StaticResource T3.Button.Secondary}"
+                                Click="move_down_clicked"/>
+                    </StackPanel>
+                    <Grid Grid.Row="3" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Separator" Style="{StaticResource T3.Body}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox x:Name="txt_sep" Grid.Column="1" Style="{StaticResource T3.TextBox.Mono}"
+                                 Width="64" HorizontalAlignment="Left"
+                                 TextChanged="separator_changed"/>
+                    </Grid>
+                    <TextBlock x:Name="lbl_prev" Grid.Row="4" Style="{StaticResource T3.Caption}"
+                               TextWrapping="Wrap" Margin="0,8,0,0" Text="Preview: "/>
+                </Grid>
             </Grid>
 
-            <!-- ══════════════════ ROW 2: FOOTER BAR ══════════════════ -->
+            <!-- ══════════════════ FOOTER BAR ══════════════════ -->
             <Border Grid.Row="2" Style="{StaticResource T3.FooterBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource T3.Copyright}"/>
-                        <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="12,0"/>
-                        <TextBlock x:Name="status_text" Text="Ready" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                     </StackPanel>
-
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btn_zoom" Content="Zoom to Element" Style="{StaticResource T3.Button.Secondary}"
-                                Click="zoom_clicked" Margin="0,0,8,0"/>
-                        <Button x:Name="btn_select" Content="Select in Revit" Style="{StaticResource T3.Button.Secondary}"
-                                Click="select_in_revit_clicked" Margin="0,0,8,0"/>
-                        <Button x:Name="btn_export" Content="Export Report..." Style="{StaticResource T3.Button.Secondary}"
-                                Click="export_report_clicked" Margin="0,0,8,0"/>
-                        <Button Content="Close" Style="{StaticResource T3.Button.Secondary}"
-                                Click="close_button_clicked" IsCancel="True"/>
+                        <Button x:Name="btn_cancel" Content="Cancel"
+                                Style="{StaticResource T3.Button.Secondary}"
+                                Click="cancel_clicked" IsCancel="True" Margin="0,0,8,0"/>
+                        <Button x:Name="btn_ok" Content="OK"
+                                Style="{StaticResource T3.Button.Primary}"
+                                Click="ok_clicked" IsDefault="True"/>
                     </StackPanel>
                 </Grid>
             </Border>
-
         </Grid>
     </Border>
 </Window>

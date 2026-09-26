@@ -78,8 +78,6 @@ class Plan(object):
         return [n for n in self.graph.nodes()
                 if n.kind == AGENT and not self.graph.is_fallback_target(n.id)]
 
-    def all_agent_nodes(self):
-        return [n for n in self.graph.nodes() if n.kind == AGENT]
 
     def has_writer(self):
         return any(n.writer for n in self.agent_nodes())

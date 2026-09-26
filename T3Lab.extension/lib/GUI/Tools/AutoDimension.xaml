@@ -1671,12 +1671,6 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
 
                         <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize"
                                 Click="minimize_button_clicked">
@@ -1837,14 +1831,14 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="4. PLACEMENT &amp; OFFSETS" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                <Button x:Name="btn_ai_auto_offsets" Style="{StaticResource T3.Button.Secondary}"
-                                        Content="✨ AI Auto-Offsets" Height="26" Padding="8,0" VerticalAlignment="Center"
-                                        Click="on_ai_auto_offsets_clicked"
-                                        ToolTip="Calculate optimal L1/L2/L3 dimension offsets according to view scale and dimension text size"/>
-                                <Button x:Name="btn_ai_undo_offsets" Style="{StaticResource T3.Button.Ghost}"
+                                <Button x:Name="btn_offsets_from_scale" Style="{StaticResource T3.Button.Secondary}"
+                                        Content="Offsets from Scale" Height="26" Padding="8,0" VerticalAlignment="Center"
+                                        Click="on_offsets_from_scale_clicked"
+                                        ToolTip="Set L1/L2/L3 to 6 / 12 / 18 mm on paper at the active view scale"/>
+                                <Button x:Name="btn_offsets_undo" Style="{StaticResource T3.Button.Ghost}"
                                         Content="Undo" Height="26" Padding="8,0" VerticalAlignment="Center"
                                         Margin="8,0,0,0" Visibility="Collapsed"
-                                        Click="on_ai_undo_offsets_clicked"
+                                        Click="on_offsets_undo_clicked"
                                         ToolTip="Revert offsets to previous values"/>
                             </StackPanel>
                         </Grid>

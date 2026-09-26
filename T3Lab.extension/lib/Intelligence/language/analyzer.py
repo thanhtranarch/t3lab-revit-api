@@ -90,9 +90,6 @@ class Utterance(object):
     def is_command(self):
         return self.modality == 'command'
 
-    @property
-    def is_confirmation(self):
-        return self.modality == 'confirmation'
 
     @property
     def is_safe_to_act(self):

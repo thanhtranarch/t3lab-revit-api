@@ -65,22 +65,6 @@ class CustomParametersService(object):
             print("Error getting sheet parameters: {}".format(str(e)))
             return []
     
-    def get_parameter_values(self, sheet, param_name):
-        """Get parameter value from a sheet"""
-        try:
-            param = sheet.LookupParameter(param_name)
-            if param and param.HasValue:
-                if param.StorageType.ToString() == "String":
-                    return param.AsString()
-                elif param.StorageType.ToString() == "Integer":
-                    return param.AsInteger()
-                elif param.StorageType.ToString() == "Double":
-                    return param.AsDouble()
-                else:
-                    return param.AsValueString()
-            return None
-        except:
-            return None
     
     def set_parameter_value(self, sheet, param_name, value):
         """Set parameter value on a sheet"""
@@ -130,21 +114,6 @@ class CustomParametersService(object):
             print("Error in bulk update: {}".format(str(e)))
             return 0
     
-    def create_parameter_template(self, name, param_values):
-        """Save a parameter template for reuse
-        
-        param_values: dict of {param_name: value}
-        """
-        try:
-            # Store as simple dict (could be saved to file)
-            template = {
-                'name': name,
-                'parameters': param_values
-            }
-            return template
-        except Exception as e:
-            print("Error creating template: {}".format(str(e)))
-            return None
     
     def apply_parameter_template(self, sheets, template):
         """Apply a parameter template to sheets"""

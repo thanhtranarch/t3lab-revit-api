@@ -306,6 +306,8 @@ _XAML_PATH = os.path.join(_GUI_DIR, 'Tools', 'ManaAnno.xaml')
 # WINDOW CLASS
 # ============================================================
 class AnnotationManagerWindow(T3WPFWindow):
+    AI_TOOL = "ManaAnno"
+
 
     def __init__(self):
         try:
@@ -364,188 +366,66 @@ class AnnotationManagerWindow(T3WPFWindow):
             logger.error("Error initializing window: {}".format(ex))
             raise
 
-    # ── AI Mode Support ──────────────────────────────────────────────────
-
     def _init_ai_mode(self):
-        try:
-            if hasattr(self, 'is_ai_mode_active') and self.is_ai_mode_active():
-                if hasattr(self, 'ai_mode_badge') and self.ai_mode_badge:
-                    self.ai_mode_badge.Visibility = Visibility.Visible
-                if hasattr(self, 'txt_ai_status') and self.txt_ai_status:
-                    info = self.get_ai_status_info()
-                    self.txt_ai_status.Text = "AI Mode: {}".format(info.get('model', 'Ready'))
-        except Exception as ex:
-            logger.warning("AI Mode init failed: {}".format(ex))
+        self.init_ai_badge()
 
     def on_txt_ai_qa_clicked(self, sender, args):
-        """AI Quality Check: Detect typos, formatting issues, casing in Text Notes."""
-        try:
-            notes_to_check = []
+        """AI Spellcheck: typo / casing / viết tắt trong Text Note — chỉ STAGE, Apply mới ghi.
+
+        Không có fallback bằng luật: bản cũ thay 'dam'→'DẦM', 'san'→'SÀN'… bất kể
+        ngữ cảnh nên phá cả chữ tiếng Anh. AI tắt thì báo, không tự sửa gì.
+        """
+        if not self.ai_require():
+            return
+        notes = [{"id": str(r["_id"]), "text": str(r["Name"])}
+                 for r in self._txt_dt.Rows if r["Selected"]]
+        if not notes:
+            notes = [{"id": str(r["_id"]), "text": str(r["Name"])}
+                     for r in list(self._txt_dt.Rows)[:30]]
+        if not notes:
+            self._status("No text notes to check.")
+            return
+
+        import json
+        prompt = (
+            "You are a BIM quality-assurance specialist for architectural, structural and MEP "
+            "drawing annotations (Vietnamese and English).\n"
+            "Review these text notes for spelling errors, irregular casing, abbreviations and "
+            "inconsistencies. Keep each note's language; only fix real mistakes.\n"
+            "Return JSON ONLY: {\"corrections\": [{\"id\": \"...\", \"original\": \"...\", "
+            "\"suggested\": \"...\", \"issue\": \"...\"}], \"summary\": \"<one English sentence>\"}\n"
+            "Notes:\n" + json.dumps(notes, ensure_ascii=False)
+        )
+        btn = getattr(self, 'btn_txt_ai_qa', None)
+        self.ai_busy(btn, True)
+        self._status("AI checking {} text note(s)...".format(len(notes)))
+
+        def _worker():
+            return self.ai_bridge.ask_json(prompt, fast=True)
+
+        def _callback(res, err):
+            self.ai_busy(btn, False)
+            if err or not isinstance(res, dict) or 'corrections' not in res:
+                self._status("AI returned no usable result - nothing was changed. Try again.")
+                return
+            fixes = {c['id']: c['suggested'] for c in res.get('corrections', [])
+                     if 'id' in c and 'suggested' in c}
+            updated = 0
             for row in self._txt_dt.Rows:
-                if row["Selected"]:
-                    notes_to_check.append({"id": str(row["_id"]), "text": str(row["Name"])})
-            if not notes_to_check:
-                for row in self._txt_dt.Rows:
-                    notes_to_check.append({"id": str(row["_id"]), "text": str(row["Name"])})
-                    if len(notes_to_check) >= 30:
-                        break
+                rid = str(row["_id"])
+                if rid in fixes and fixes[rid] != str(row["Name"]):
+                    row["Name"] = fixes[rid]
+                    row["Status"] = "AI Fix"
+                    row["Selected"] = True
+                    updated += 1
+            if updated:
+                self.btn_txt_apply.Visibility = Visibility.Visible
+                self._status("AI staged {} fix(es) (Status 'AI Fix') - review, then Apply Changes.".format(updated))
+            else:
+                self._status("AI found nothing to fix in {} note(s).".format(len(notes)))
 
-            if not notes_to_check:
-                self._status("No text notes found to check.")
-                return
+        self.run_ai_async(_worker, _callback)
 
-            self._status("AI inspecting {} text note(s) for typos & BIM standards...".format(len(notes_to_check)))
-            if hasattr(self, 'btn_txt_ai_qa'):
-                self.btn_txt_ai_qa.IsEnabled = False
-                self.btn_txt_ai_qa.Content = "⏳ Checking..."
-
-            def _restore_txt_btn():
-                if hasattr(self, 'btn_txt_ai_qa'):
-                    self.btn_txt_ai_qa.IsEnabled = True
-                    self.btn_txt_ai_qa.Content = "✨ AI Spellcheck & Fix"
-
-            def _apply_classic():
-                _restore_txt_btn()
-                changed = 0
-                for row in self._txt_dt.Rows:
-                    orig = str(row["Name"])
-                    cleaned = " ".join(orig.split())
-                    terms = {"wc": "WC", "nvs": "NVS", "dam": "DẦM", "cot": "CỘT", "san": "SÀN", "tang": "TẦNG"}
-                    for t_low, t_up in terms.items():
-                        cleaned = re.sub(r'\b' + re.escape(t_low) + r'\b', t_up, cleaned, flags=re.IGNORECASE)
-                    if cleaned != orig:
-                        row["Name"] = cleaned
-                        row["Status"] = "Rule Fix"
-                        row["Selected"] = True
-                        changed += 1
-                if changed:
-                    self.btn_txt_apply.Visibility = Visibility.Visible
-                    self._status("Rule-based QA: Standardized {} note(s) (marked 'Rule Fix'). Click Apply to save.".format(changed))
-                else:
-                    self._status("Rule-based QA: All checked notes conform to basic formatting.")
-
-            if not hasattr(self, 'is_ai_mode_active') or not self.is_ai_mode_active():
-                _apply_classic()
-                return
-
-            import json
-            prompt = (
-                "You are an expert BIM Quality Assurance specialist for architectural, structural, and MEP drawing annotations (Vietnamese & English).\n"
-                "Review these drawing text notes for spelling errors, irregular casing, abbreviations, and inconsistencies.\n"
-                "Return JSON ONLY with this structure:\n"
-                "{\n"
-                "  \"corrections\": [\n"
-                "    {\"id\": \"...\", \"original\": \"...\", \"suggested\": \"...\", \"issue\": \"...\"}\n"
-                "  ],\n"
-                "  \"summary\": \"...\"\n"
-                "}\n"
-                "Notes to inspect:\n" + json.dumps(notes_to_check)
-            )
-
-            def _worker():
-                return self.ai_bridge.ask_json(prompt, fast=True)
-
-            def _callback(res, err):
-                _restore_txt_btn()
-                if err or not res or not isinstance(res, dict) or 'corrections' not in res:
-                    _apply_classic()
-                    return
-
-                corrections = res.get('corrections', [])
-                summary = res.get('summary', 'Inspection complete')
-                if not corrections:
-                    self._status("AI QA: All notes look standard. No corrections needed.")
-                    return
-
-                corr_map = {c['id']: c['suggested'] for c in corrections if 'id' in c and 'suggested' in c}
-                updated = 0
-                for row in self._txt_dt.Rows:
-                    rid = str(row["_id"])
-                    if rid in corr_map:
-                        row["Name"] = corr_map[rid]
-                        row["Status"] = "AI Fix"
-                        row["Selected"] = True
-                        updated += 1
-
-                if updated > 0:
-                    self.btn_txt_apply.Visibility = Visibility.Visible
-                    self._status("AI QA: {}. {} note(s) updated (marked as 'AI Fix'). Click Apply Changes to commit.".format(
-                        summary, updated))
-                else:
-                    self._status("AI QA: {}".format(summary))
-
-            self.run_ai_async(_worker, _callback)
-
-        except Exception as ex:
-            if hasattr(self, 'btn_txt_ai_qa'):
-                self.btn_txt_ai_qa.IsEnabled = True
-                self.btn_txt_ai_qa.Content = "✨ AI Spellcheck & Fix"
-            logger.error("Error in on_txt_ai_qa_clicked: {}".format(ex))
-            self._status("Error in AI QA: {}".format(ex))
-
-    def on_dimtext_ai_suggest_clicked(self, sender, args):
-        """Suggest standard engineering dimension text overrides (Prefix, Suffix, Above, Below)."""
-        try:
-            self._status("AI suggesting standard dimension override annotations...")
-            if hasattr(self, 'btn_dimtext_ai_suggest'):
-                self.btn_dimtext_ai_suggest.IsEnabled = False
-                self.btn_dimtext_ai_suggest.Content = "⏳ Suggesting..."
-
-            def _restore_dim_btn():
-                if hasattr(self, 'btn_dimtext_ai_suggest'):
-                    self.btn_dimtext_ai_suggest.IsEnabled = True
-                    self.btn_dimtext_ai_suggest.Content = "✨ AI Suggest Overrides"
-
-            def _apply_suggestions(pfx, sfx, abv, blw, rationale):
-                _restore_dim_btn()
-                if hasattr(self, 'txt_prefix') and pfx and not self.txt_prefix.Text:
-                    self.txt_prefix.Text = pfx
-                if hasattr(self, 'txt_suffix') and sfx:
-                    self.txt_suffix.Text = sfx
-                if hasattr(self, 'txt_above') and abv:
-                    self.txt_above.Text = abv
-                if hasattr(self, 'txt_below') and blw:
-                    self.txt_below.Text = blw
-                self._status("AI Suggest: Applied overrides ({})".format(rationale))
-
-            if not hasattr(self, 'is_ai_mode_active') or not self.is_ai_mode_active():
-                _apply_suggestions("", " (TYP.)", "VERIFY ON SITE", "F.F.L.", "Standard BIM drawing convention")
-                return
-
-            prompt = (
-                "Suggest standard architectural/engineering BIM dimension override text for typical floor plan annotations.\n"
-                "Return JSON ONLY with keys:\n"
-                "{\n"
-                "  \"prefix\": string,\n"
-                "  \"suffix\": string (e.g. ' (TYP.)' or ' (E.Q.)'),\n"
-                "  \"above\": string (e.g. 'VERIFY' or 'CLEAR'),\n"
-                "  \"below\": string (e.g. 'F.F.L.' or 'C.H.'),\n"
-                "  \"rationale\": string\n"
-                "}"
-            )
-
-            def _worker():
-                return self.ai_bridge.ask_json(prompt, fast=True)
-
-            def _callback(res, err):
-                if err or not res or not isinstance(res, dict):
-                    _apply_suggestions("", " (TYP.)", "VERIFY ON SITE", "F.F.L.", "Standard drawing practice")
-                else:
-                    pfx = res.get('prefix', '')
-                    sfx = res.get('suffix', ' (TYP.)')
-                    abv = res.get('above', 'VERIFY')
-                    blw = res.get('below', 'F.F.L.')
-                    rat = res.get('rationale', 'AEC drawing standard')
-                    _apply_suggestions(pfx, sfx, abv, blw, rat)
-
-            self.run_ai_async(_worker, _callback)
-
-        except Exception as ex:
-            if hasattr(self, 'btn_dimtext_ai_suggest'):
-                self.btn_dimtext_ai_suggest.IsEnabled = True
-                self.btn_dimtext_ai_suggest.Content = "✨ AI Suggest Overrides"
-            logger.error("Error in on_dimtext_ai_suggest_clicked: {}".format(ex))
-            self._status("Error in AI Suggest: {}".format(ex))
 
     # ── helpers ─────────────────────────────────────────────────────────
 
@@ -702,13 +582,6 @@ class AnnotationManagerWindow(T3WPFWindow):
         kind = "note(s)" if self._txt_submode == "notes" else "type(s)"
         self._status("Loaded {} {}.".format(n, kind))
 
-    def dim_refresh(self, sender, args):
-        self._load_all_dims()
-        self._load_sidebar_lists()
-
-    def txt_refresh(self, sender, args):
-        self._load_all_txts()
-        self._load_sidebar_lists()
 
     def _remove_rows(self, dt, elem_map, ok_ids):
         ok_set = set(ok_ids)
@@ -993,38 +866,6 @@ class AnnotationManagerWindow(T3WPFWindow):
         self._load_all_dims()
         self._load_sidebar_lists()
 
-    def dim_delete_unused(self, sender, args):
-        from pyrevit import forms as pf
-        all_dims = FilteredElementCollector(doc).OfClass(Dimension)\
-                   .WhereElementIsNotElementType().ToElements()
-        used_ids = set()
-        for d in all_dims:
-            try:
-                used_ids.add(str(d.DimensionType.Id))
-            except Exception:
-                pass
-        all_types = FilteredElementCollector(doc).OfClass(DimensionType)\
-                    .WhereElementIsElementType().ToElements()
-        unused = [dt for dt in all_types if str(dt.Id) not in used_ids]
-        if not unused:
-            self._status("No unused Dimension Types found.")
-            return
-        if not pf.alert("Purge {} unused Dimension Type(s)?\nThis cannot be undone.".format(len(unused)),
-                        title="Confirm Purge", yes=True, no=True):
-            return
-        t = Transaction(doc, "Purge Unused Dimension Types")
-        t.Start()
-        ok = 0
-        for dt in unused:
-            try:
-                doc.Delete(dt.Id)
-                ok += 1
-            except Exception:
-                pass
-        t.Commit()
-        self._status("Purged {} unused Dimension Type(s).".format(ok))
-        self._load_all_dims()
-        self._load_sidebar_lists()
 
     # ── TextNote sub-mode ────────────────────────────────────────────────
 
@@ -1276,50 +1117,8 @@ class AnnotationManagerWindow(T3WPFWindow):
         self._load_all_txts()
         self._load_sidebar_lists()
 
-    def txt_delete_unused(self, sender, args):
-        from pyrevit import forms as pf
-        all_notes = FilteredElementCollector(doc).OfClass(TextNote)\
-                    .WhereElementIsNotElementType().ToElements()
-        used_ids = set()
-        for tn in all_notes:
-            try:
-                used_ids.add(str(tn.TextNoteType.Id))
-            except Exception:
-                pass
-        all_types = FilteredElementCollector(doc).OfClass(TextNoteType)\
-                    .WhereElementIsElementType().ToElements()
-        unused = [tt for tt in all_types if str(tt.Id) not in used_ids]
-        if not unused:
-            self._status("No unused Text Note Types found.")
-            return
-        if not pf.alert("Purge {} unused Text Note Type(s)?\nThis cannot be undone.".format(len(unused)),
-                        title="Confirm Purge", yes=True, no=True):
-            return
-        t = Transaction(doc, "Purge Unused Text Note Types")
-        t.Start()
-        ok = 0
-        for tt in unused:
-            try:
-                doc.Delete(tt.Id)
-                ok += 1
-            except Exception:
-                pass
-        t.Commit()
-        self._status("Purged {} unused Text Note Type(s).".format(ok))
-        self._load_all_txts()
-        self._load_sidebar_lists()
 
     # ── Header Checkbox Toggle Event Handlers ─────────────────────────────────
-
-    def dim_header_select_all_clicked(self, sender, args):
-        is_checked = sender.IsChecked
-        for row in self._dim_dt.Rows:
-            row["Selected"] = is_checked
-
-    def txt_header_select_all_clicked(self, sender, args):
-        is_checked = sender.IsChecked
-        for row in self._txt_dt.Rows:
-            row["Selected"] = is_checked
 
     # ── Top Horizontal Navigation Tab Event Handlers ─────────────────────────
 
@@ -1394,9 +1193,20 @@ class AnnotationManagerWindow(T3WPFWindow):
         self.sp_filter_config.Visibility = vis
 
     def dimtext_add_rule(self, sender, args):
-        rd = self._dimtext_create_rule_row()
+        rd = DimTextDialog.create_rule_row(self, self._dimtext_remove_rule)
         self._dimtext_rules.append(rd)
         self.sp_rules.Children.Add(rd["panel"])
+
+    def _dimtext_remove_rule(self, rd):
+        self.sp_rules.Children.Remove(rd["panel"])
+        if rd in self._dimtext_rules:
+            self._dimtext_rules.remove(rd)
+
+    def _dimtext_build_filter_fn(self):
+        if not self.chk_filter_enable.IsChecked or not self._dimtext_rules:
+            return None
+        return DimTextDialog.build_filter_fn(self._dimtext_rules,
+                                             self.combo_combine.SelectedIndex == 0)
 
     def dimtext_apply(self, sender, args):
         prefix   = self.txt_prefix.Text.strip()
@@ -1415,154 +1225,19 @@ class AnnotationManagerWindow(T3WPFWindow):
             scope = "selection"
 
         if not dims:
-            self._status("DimText: no dimensions found in {}.".format(scope))
+            self._status("DimText: no dimensions found in {}. Select dimensions or "
+                         "choose 'All dimensions in active view'.".format(scope))
             return
 
-        from Autodesk.Revit.DB import Transaction
-        with Transaction(doc, "Dim Text Override") as t:
-            t.Start()
-            for dim in dims:
-                DimTextDialog._set_dim_text(dim, prefix, suffix, above, below, override, filter_fn)
-                if leader_off:
-                    DimTextDialog._turn_off_leader(dim)
-            t.Commit()
+        try:
+            DimTextDialog.apply_dim_text(dims, prefix, suffix, above, below, override,
+                                         leader_off, filter_fn)
+        except Exception as ex:
+            self._status("DimText: failed ({}). Nothing was modified.".format(ex))
+            return
 
         note = " (filter active)" if filter_fn else ""
         self._status("DimText: applied to {} dim(s) in {}{}.".format(len(dims), scope, note))
-
-    def _dimtext_build_filter_fn(self):
-        if not self.chk_filter_enable.IsChecked or not self._dimtext_rules:
-            return None
-        parsed = []
-        for rd in self._dimtext_rules:
-            op = rd["combo"].SelectedItem.Content if rd["combo"].SelectedItem else None
-            if op is None:
-                continue
-            v1 = v2 = 0.0
-            if op not in DimTextDialog._NO_VALUE_OPS:
-                try:
-                    v1 = float(rd["txt1"].Text.strip() or "0")
-                except ValueError:
-                    v1 = 0.0
-            if op in DimTextDialog._TWO_VALUE_OPS:
-                try:
-                    v2 = float(rd["txt2"].Text.strip() or "0")
-                except ValueError:
-                    v2 = 0.0
-            parsed.append((op, v1, v2))
-        if not parsed:
-            return None
-        use_and = (self.combo_combine.SelectedIndex == 0)
-        def filter_fn(length_mm):
-            if length_mm is None:
-                return False
-            results = []
-            for op, v1, v2 in parsed:
-                if   op == "equals":                      results.append(abs(length_mm - v1) < 0.5)
-                elif op == "does not equal":              results.append(abs(length_mm - v1) >= 0.5)
-                elif op == "is greater than":             results.append(length_mm >  v1)
-                elif op == "is greater than or equal to": results.append(length_mm >= v1)
-                elif op == "is less than":                results.append(length_mm <  v1)
-                elif op == "is less than or equal to":    results.append(length_mm <= v1)
-                elif op == "between":                     results.append(min(v1, v2) <= length_mm <= max(v1, v2))
-                elif op == "has a value":                 results.append(True)
-                elif op == "has no value":                results.append(False)
-            if not results:
-                return True
-            return all(results) if use_and else any(results)
-        return filter_fn
-
-    def _dimtext_create_rule_row(self):
-        from System.Windows import Thickness, Visibility, VerticalAlignment
-        from System.Windows.Controls import (
-            StackPanel, ComboBox, ComboBoxItem, TextBox, Button, TextBlock
-        )
-        from System.Windows.Controls import Orientation as WPFOrientation
-        from System.Windows.Media import SolidColorBrush, Color
-        from System.Windows.Media import FontFamily as WPFFontFamily
-
-        rd = {}
-        row = StackPanel()
-        row.Orientation = WPFOrientation.Horizontal
-        row.Margin = Thickness(0, 0, 0, 6)
-        rd["panel"] = row
-
-        combo = ComboBox()
-        combo.Width = 185; combo.Height = 28
-        combo.FontFamily = WPFFontFamily("Inter"); combo.FontSize = 12
-        combo.Margin = Thickness(0, 0, 6, 0)
-        for op in DimTextDialog._OPERATORS:
-            item = ComboBoxItem(); item.Content = op; combo.Items.Add(item)
-        combo.SelectedIndex = 0
-        combo.SelectionChanged += self._dimtext_make_op_handler(rd)
-        rd["combo"] = combo; row.Children.Add(combo)
-
-        txt1 = TextBox()
-        txt1.Width = 72; txt1.Height = 28; txt1.FontSize = 12
-        txt1.Padding = Thickness(6, 4, 6, 4); txt1.Margin = Thickness(0, 0, 4, 0)
-        txt1.BorderBrush = SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1))
-        txt1.BorderThickness = Thickness(1)
-        rd["txt1"] = txt1; row.Children.Add(txt1)
-
-        lbl_mm = TextBlock()
-        lbl_mm.Text = "mm"; lbl_mm.FontSize = 11
-        lbl_mm.Foreground = SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B))
-        lbl_mm.Margin = Thickness(0, 0, 8, 0); lbl_mm.VerticalAlignment = VerticalAlignment.Center
-        rd["lbl_mm"] = lbl_mm; row.Children.Add(lbl_mm)
-
-        lbl_and = TextBlock()
-        lbl_and.Text = "and"; lbl_and.FontSize = 11
-        lbl_and.Foreground = SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A))
-        lbl_and.Margin = Thickness(0, 0, 6, 0); lbl_and.VerticalAlignment = VerticalAlignment.Center
-        lbl_and.Visibility = Visibility.Collapsed
-        rd["lbl_and"] = lbl_and; row.Children.Add(lbl_and)
-
-        txt2 = TextBox()
-        txt2.Width = 72; txt2.Height = 28; txt2.FontSize = 12
-        txt2.Padding = Thickness(6, 4, 6, 4); txt2.Margin = Thickness(0, 0, 4, 0)
-        txt2.BorderBrush = SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1))
-        txt2.BorderThickness = Thickness(1); txt2.Visibility = Visibility.Collapsed
-        rd["txt2"] = txt2; row.Children.Add(txt2)
-
-        lbl_mm2 = TextBlock()
-        lbl_mm2.Text = "mm"; lbl_mm2.FontSize = 11
-        lbl_mm2.Foreground = SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B))
-        lbl_mm2.Margin = Thickness(0, 0, 8, 0); lbl_mm2.VerticalAlignment = VerticalAlignment.Center
-        lbl_mm2.Visibility = Visibility.Collapsed
-        rd["lbl_mm2"] = lbl_mm2; row.Children.Add(lbl_mm2)
-
-        btn = Button()
-        btn.Content = u"−"; btn.Width = 26; btn.Height = 26; btn.FontSize = 14
-        btn.Background = SolidColorBrush(Color.FromArgb(0, 0, 0, 0))
-        btn.BorderThickness = Thickness(1)
-        btn.BorderBrush = SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44))
-        btn.Foreground = SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44))
-        btn.Click += self._dimtext_make_remove_handler(rd)
-        row.Children.Add(btn)
-
-        return rd
-
-    def _dimtext_make_op_handler(self, rd):
-        from System.Windows import Visibility
-        def handler(sender, args):
-            op = sender.SelectedItem.Content if sender.SelectedItem else ""
-            no_val  = op in DimTextDialog._NO_VALUE_OPS
-            two_val = op in DimTextDialog._TWO_VALUE_OPS
-            v1_vis = Visibility.Collapsed if no_val else Visibility.Visible
-            rd["txt1"].Visibility   = v1_vis
-            rd["lbl_mm"].Visibility = v1_vis
-            v2_vis = Visibility.Visible if two_val else Visibility.Collapsed
-            rd["lbl_and"].Visibility = v2_vis
-            rd["txt2"].Visibility    = v2_vis
-            rd["lbl_mm2"].Visibility = v2_vis
-        return handler
-
-    def _dimtext_make_remove_handler(self, rd):
-        def handler(sender, args):
-            self.sp_rules.Children.Remove(rd["panel"])
-            if rd in self._dimtext_rules:
-                self._dimtext_rules.remove(rd)
-        return handler
 
     # ── Sidebar Browsing & Live Filtering List Event Handlers ────────────────
 

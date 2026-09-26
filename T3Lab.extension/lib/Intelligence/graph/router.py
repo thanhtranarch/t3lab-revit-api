@@ -111,6 +111,3 @@ class GraphRouter(object):
         alt = _FALLBACK_ROUTE.get(specialist, 'general')
         return [alt] if alt else []
 
-    @staticmethod
-    def is_writer(specialist):
-        return specialist in WRITER_SPECIALISTS

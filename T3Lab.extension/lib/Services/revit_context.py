@@ -186,11 +186,6 @@ def ensure_api_context():
             return False, _err_text(ex)
 
 
-def has_api_context():
-    """True when a callable can be marshalled into a real API context."""
-    return _EVENT is not None
-
-
 def run_in_api_context(func, on_done=None, require_api_context=False):
     """Run `func` inside Revit's API context.
 

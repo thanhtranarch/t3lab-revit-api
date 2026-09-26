@@ -15,6 +15,9 @@ python dev/audit_t3.py --quiet
 # Static Code & XAML Gate:
 python dev/audit_tools.py --quiet
 
+# Wiring Gate (XAML <-> Python: missing controls, unwired template events, dead buttons/handlers):
+python dev/audit_wiring.py --quiet
+
 # Run test suites:
 python dev/test_batch_link.py
 python dev/test_group_manager.py

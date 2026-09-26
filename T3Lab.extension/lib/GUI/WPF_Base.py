@@ -695,10 +695,14 @@ class T3WPFWindow(Window):
         như khi nối trực tiếp.
 
         Cơ chế này TẮT mặc định và mỗi window tự bật bằng
-        `WIRE_TEMPLATED_CLICKS = True`. Lý do: vài tool (ManaGroup, BatchLink,
-        ExportManager…) đã tự bù bằng `AddHandler(CheckBox.ClickEvent, …)` trên
+        `WIRE_TEMPLATED_CLICKS = True`. Lý do: vài tool (ManaGroup,
+        SelectFromDict) đã tự bù bằng `AddHandler(CheckBox.ClickEvent, …)` trên
         cả bảng; bật đại trà sẽ khiến handler của chúng chạy hai lần. Tool nào
-        muốn dùng thì bật rồi bỏ phần AddHandler thủ công.
+        muốn dùng thì bật rồi bỏ phần AddHandler thủ công. Đang bật: ModelAuditor,
+        BatchLink, BatchOut, ManaFami, ManaLoca, ManaSheets. Nghe cả
+        `ButtonBase.ClickEvent` lẫn `Hyperlink.ClickEvent`; event khác Click
+        (Checked, PreviewMouse…) trong template KHÔNG được nối —
+        `dev/audit_wiring.py` (W2) bắt trường hợp đó.
         """
         if not getattr(self, 'WIRE_TEMPLATED_CLICKS', False):
             return
@@ -709,11 +713,28 @@ class T3WPFWindow(Window):
         if not clicks:
             return
         try:
-            from System.Windows import RoutedEventHandler
+            from System.Windows import RoutedEventHandler, LogicalTreeHelper
             from System.Windows.Controls.Primitives import ButtonBase
-            from System.Windows.Media import VisualTreeHelper
+            from System.Windows.Media import VisualTreeHelper, Visual
         except BaseException:
             return
+        try:
+            from System.Windows.Documents import Hyperlink
+        except BaseException:
+            Hyperlink = None
+
+        def _parent(node):
+            # Hyperlink / Run là ContentElement, không phải Visual:
+            # VisualTreeHelper.GetParent ném lỗi, phải đi theo logical tree.
+            try:
+                if isinstance(node, Visual):
+                    return VisualTreeHelper.GetParent(node)
+            except BaseException:
+                pass
+            try:
+                return LogicalTreeHelper.GetParent(node)
+            except BaseException:
+                return None
 
         def _dispatch(sender, args):
             try:
@@ -725,7 +746,7 @@ class T3WPFWindow(Window):
                         if handler is not None and callable(handler):
                             handler(node, args)
                         return
-                    node = VisualTreeHelper.GetParent(node)
+                    node = _parent(node)
             except BaseException:
                 pass
 
@@ -733,6 +754,9 @@ class T3WPFWindow(Window):
             # Giữ tham chiếu tới delegate, nếu không GC thu mất và nút chết lại.
             self._templated_click_handler = RoutedEventHandler(_dispatch)
             self.AddHandler(ButtonBase.ClickEvent, self._templated_click_handler, True)
+            # Hyperlink.ClickEvent là routed event RIÊNG, không phải ButtonBase.ClickEvent.
+            if Hyperlink is not None:
+                self.AddHandler(Hyperlink.ClickEvent, self._templated_click_handler, True)
         except BaseException:
             pass
 
@@ -1268,6 +1292,61 @@ class T3WPFWindow(Window):
         if not b:
             return {"available": False, "provider": "None", "model": "", "label": "AI Offline"}
         return b.get_active_provider_info()
+
+    # ── AI Mode chuẩn T3 (xem T3LAB_UI_STANDARD.md § AI Mode) ──────────────
+    # Tool giữ AI khai AI_TOOL = "<Tên>" — khoá tra tool_toggles trong settings.
+    # XAML: badge `ai_mode_badge` + `txt_ai_status` trên title bar; nút AI dùng
+    # icon EA80 + nhãn "AI <Động từ>". Không đổi Content của nút khi đang chạy.
+    AI_TOOL = None
+
+    def init_ai_badge(self):
+        """Badge AI trên title bar: chữ 'AI ready' / 'AI off' + tooltip provider.
+
+        Trạng thái nói bằng CHỮ, không chỉ bằng màu. Trả về True khi AI sẵn sàng.
+        """
+        badge = getattr(self, 'ai_mode_badge', None)
+        label = getattr(self, 'txt_ai_status', None)
+        active = self.is_ai_mode_active(self.AI_TOOL)
+        if badge is None or label is None:
+            return active
+        try:
+            from System.Windows import Visibility as _Vis
+            if active:
+                info = self.get_ai_status_info() or {}
+                label.Text = "AI ready"
+                badge.ToolTip = "AI Mode: {}".format(info.get('label') or 'ready')
+            else:
+                label.Text = "AI off"
+                badge.ToolTip = ("AI Mode is off. Turn it on and add an API key "
+                                 "in Support > LLMs Setting.")
+            badge.Visibility = _Vis.Visible
+        except Exception:
+            pass
+        return active
+
+    def ai_require(self):
+        """True khi AI dùng được; nếu không, báo MỘT câu thống nhất và trả False."""
+        if self.is_ai_mode_active(self.AI_TOOL):
+            return True
+        try:
+            from GUI.T3Dialog import show_info
+            show_info("AI Mode is off, or no AI provider is available.",
+                      title="AI Mode",
+                      details="Turn on AI Mode and add an API key in "
+                              "Support > LLMs Setting, then try again.",
+                      owner=self)
+        except Exception:
+            pass
+        return False
+
+    def ai_busy(self, button, busy):
+        """Khoá / mở nút AI trong lúc chờ model — không đụng Content (icon + nhãn)."""
+        if button is None:
+            return
+        try:
+            button.IsEnabled = not busy
+        except Exception:
+            pass
 
     def run_ai_async(self, worker_func, on_done=None, on_error=None, **kwargs):
         """Run an AI query on a background thread and invoke callbacks on the UI thread.

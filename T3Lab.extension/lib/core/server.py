@@ -83,7 +83,7 @@ def _set_process_anchor(inst):
         pass
     setattr(sys, _PROCESS_SINGLETON_KEY, inst)
 
-from Snippets._compat import eid_value, make_eid
+from Snippets._compat import eid_value, make_eid, net_list
 try:
     from http.server import HTTPServer, BaseHTTPRequestHandler
     from urllib.parse import urlparse, parse_qs
@@ -190,7 +190,6 @@ except Exception as e:
     pass
 
 
-
 class _ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """One thread per request, so /health probes and the bridge's parallel
     instance scans answer instantly even while a slow tools/call is in
@@ -262,12 +261,6 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         body = jsonsafe.dumps(data)
         self._send_response(status_code, 'application/json', body)
 
-    def _send_sse_event(self, event_type, data):
-        """Send SSE event"""
-        message = "event: {}\ndata: {}\n\n".format(event_type,
-                                                   jsonsafe.dumps(data))
-        self.wfile.write(message.encode('utf-8'))
-        self.wfile.flush()
 
     def do_OPTIONS(self):
         """Handle CORS preflight"""
@@ -277,39 +270,6 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
 
-    def do_GET(self):
-        """Handle GET requests"""
-        parsed = urlparse(self.path)
-        path = parsed.path
-
-        if path == '/':
-            # Server info
-            self._send_json({
-                'name': 'T3LabAI MCP Server',
-                'version': '1.0.0',
-                'protocol': 'mcp',
-                'status': 'running'
-            })
-
-        elif path == '/sse':
-            # SSE endpoint for MCP communication
-            self._handle_sse()
-
-        elif path == '/health':
-            # Health check. pid + port let external diagnostics attribute a
-            # listener to its Revit process — the same pid answering on
-            # SEVERAL ports in the range means orphaned duplicate servers
-            # (broken singleton anchor), not several Revit windows.
-            self._send_json({'status': 'ok', 'pid': os.getpid(),
-                             'port': self.server.server_port})
-
-        elif path in ('/v1/models', '/models'):
-            # Tolerate OpenAI-compatible clients that probe for a model list,
-            # so they don't repeatedly hit an "unexpected endpoint" 404.
-            self._send_json({'object': 'list', 'data': []})
-
-        else:
-            self._send_json({'error': 'Not found'}, 404)
 
     def do_POST(self):
         """Handle POST requests (MCP messages)"""
@@ -330,35 +290,6 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         else:
             self._send_json({'error': 'Not found'}, 404)
 
-    def _handle_sse(self):
-        """Handle SSE connection for MCP"""
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/event-stream')
-        self.send_header('Cache-Control', 'no-cache')
-        self.send_header('Connection', 'keep-alive')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-
-        # Register client
-        server = self.server.mcp_server
-        client_id = str(uuid.uuid4())
-        server._register_client(client_id)
-
-        # Send endpoint event for MCP protocol
-        endpoint_url = "http://127.0.0.1:{}/message".format(server.port)
-        self._send_sse_event('endpoint', endpoint_url)
-
-        try:
-            # Keep connection alive
-            while server.is_running:
-                # Send keep-alive ping every 30 seconds
-                import time
-                time.sleep(30)
-                self._send_sse_event('ping', {'timestamp': time.time()})
-        except Exception:
-            pass
-        finally:
-            server._unregister_client(client_id)
 
     def _handle_mcp_message(self, request):
         """Handle MCP JSON-RPC message.
@@ -2466,19 +2397,6 @@ class T3LabAIServer(object):
     def is_running(self):
         return self._is_running
 
-    @property
-    def client_count(self):
-        return len(self._clients)
-
-    def _register_client(self, client_id):
-        """Register a connected client"""
-        self._clients[client_id] = {'connected': True}
-        self._total_clients += 1
-
-    def _unregister_client(self, client_id):
-        """Unregister a disconnected client"""
-        if client_id in self._clients:
-            del self._clients[client_id]
 
     # ── Open documents ───────────────────────────────────────────────────
     # Every tool call targets pyrevit.revit.doc — the document/window Revit
@@ -6247,7 +6165,7 @@ class T3LabAIServer(object):
                     except Exception:
                         continue
 
-                uidoc.Selection.SetElementIds(List[ElementId](hits))
+                uidoc.Selection.SetElementIds(net_list(ElementId, hits))
                 return {'success': True, 'operation': op, 'match': match,
                         'scope': scope, 'seed_count': len(seeds),
                         'count': len(hits)}
@@ -6270,13 +6188,13 @@ class T3LabAIServer(object):
 
             if op == 'select':
                 from System.Collections.Generic import List
-                id_list = List[ElementId](elem_ids)
+                id_list = net_list(ElementId, elem_ids)
                 uidoc.Selection.SetElementIds(id_list)
                 return {'success': True, 'operation': 'select', 'count': len(elem_ids)}
 
             elif op in ('hide', 'isolate', 'unhide'):
                 from System.Collections.Generic import List
-                id_col = List[ElementId](elem_ids)
+                id_col = net_list(ElementId, elem_ids)
                 t = Transaction(doc, 'T3Lab AI {} Elements'.format(op.title()))
                 t.Start()
                 try:
@@ -6443,7 +6361,7 @@ class T3LabAIServer(object):
                 normal = XYZ(1, 0, 0) if axis == 'x' else XYZ(0, 1, 0)
                 plane = Plane.CreateByNormalAndOrigin(normal, XYZ(ox, oy, 0))
                 keep_original = bool(arguments.get('copy', False))
-                id_list = List[ElementId](elem_ids)
+                id_list = net_list(ElementId, elem_ids)
                 t = Transaction(doc, 'T3Lab AI Mirror Elements')
                 t.Start()
                 new_ids = []
@@ -6522,7 +6440,7 @@ class T3LabAIServer(object):
                 t = Transaction(doc, 'T3Lab AI Group Elements')
                 t.Start()
                 try:
-                    grp = doc.Create.NewGroup(List[ElementId](elem_ids))
+                    grp = doc.Create.NewGroup(net_list(ElementId, elem_ids))
                     gname = arguments.get('group_name')
                     if gname:
                         try:
@@ -7077,7 +6995,7 @@ class T3LabAIServer(object):
                         existing = list(s.GetAdditionalRevisionIds())
                         if target.Id not in existing:
                             existing.append(target.Id)
-                            s.SetAdditionalRevisionIds(List[ElementId](existing))
+                            s.SetAdditionalRevisionIds(net_list(ElementId, existing))
                         done.append(s.SheetNumber)
                     except Exception as ex:
                         failed.append({'sheet': s.SheetNumber, 'error': str(ex)})
@@ -8104,7 +8022,7 @@ class T3LabAIServer(object):
                 dy = float(arguments.get('dy', 0)) * ft
                 dz = float(arguments.get('dz', 0)) * ft
                 ids_raw = arguments.get('element_ids', [])
-                id_list = SCG.List[ElementId]([make_eid(int(i)) for i in ids_raw])
+                id_list = net_list(ElementId, [make_eid(int(i)) for i in ids_raw])
                 t = Transaction(doc, 'T3Lab AI Move Elements')
                 t.Start()
                 try:
@@ -8127,7 +8045,7 @@ class T3LabAIServer(object):
                 dy = float(arguments.get('dy', 0)) * ft
                 dz = float(arguments.get('dz', 0)) * ft
                 ids_raw = arguments.get('element_ids', [])
-                id_list = SCG.List[ElementId]([make_eid(int(i)) for i in ids_raw])
+                id_list = net_list(ElementId, [make_eid(int(i)) for i in ids_raw])
                 t = Transaction(doc, 'T3Lab AI Copy Elements')
                 t.Start()
                 try:
@@ -8154,7 +8072,7 @@ class T3LabAIServer(object):
                 oy = float(arguments.get('origin_y', 0)) * ft
                 axis = Line.CreateBound(XYZ(ox, oy, 0), XYZ(ox, oy, 1))
                 ids_raw = arguments.get('element_ids', [])
-                id_list = SCG.List[ElementId]([make_eid(int(i)) for i in ids_raw])
+                id_list = net_list(ElementId, [make_eid(int(i)) for i in ids_raw])
                 t = Transaction(doc, 'T3Lab AI Rotate Elements')
                 t.Start()
                 try:
@@ -10483,14 +10401,6 @@ class T3LabAIServer(object):
             'current_clients': len(self._clients),
             'tools_count': len(self._tools),
             'external_event_ready': self._external_event is not None,
-        }
-
-    def register_tool(self, name, description, input_schema, handler):
-        """Register a custom tool"""
-        self._tools[name] = {
-            'name': name,
-            'description': description,
-            'inputSchema': input_schema
         }
 
 

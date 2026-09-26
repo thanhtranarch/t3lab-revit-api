@@ -48,35 +48,3 @@ def create_filter(key_parameter, element_value):
 # filter = create_filter(BuiltInParameter.ELEM_TYPE_PARAM, group_type_id)
 # group = FilteredElementCollector(doc).WherePasses(filter).FirstElement()
 
-
-def get_family_types(family_name, target_doc=None):
-    """Function to get FamilyTypes of a given FamilyName. It has to be written exactly the same."""
-    target_doc = target_doc or doc
-    if not target_doc:
-        try:
-            from Snippets._host import resolve_doc
-            target_doc, _ = resolve_doc()
-        except Exception:
-            target_doc = None
-    if not target_doc:
-        return []
-
-    pvp         = ParameterValueProvider(ElementId(BuiltInParameter.ALL_MODEL_FAMILY_NAME))
-    condition   = FilterStringEquals()
-    ruleValue   = family_name
-
-    try:
-        # Revit 2022+ (caseSensitive parameter was removed)
-        fRule = FilterStringRule(pvp, condition, ruleValue)
-    except Exception:
-        # Revit 2021 and earlier
-        fRule = FilterStringRule(pvp, condition, ruleValue, True)
-
-    my_filter   = ElementParameterFilter(fRule)
-
-    family_types = FilteredElementCollector(target_doc).WherePasses(my_filter).WhereElementIsElementType().ToElements()
-
-    if not family_types:
-        alert("Could not find a Family with a name: " + ruleValue, title = 'Family Not Found.', exitscript=True)
-
-    return family_types

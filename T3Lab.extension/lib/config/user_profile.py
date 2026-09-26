@@ -159,41 +159,9 @@ class UserProfile(object):
         except Exception:
             pass
 
-    def get_email(self):
-        return (self._data.get("user", {}).get("email") or u"").strip()
-
-    def set_email(self, email):
-        self._data.setdefault("user", {})["email"] = (email or u"").strip()
-        self.save()
-
-    def get_role(self):
-        return (self._data.get("user", {}).get("role") or u"").strip()
-
-    def set_role(self, role):
-        self._data.setdefault("user", {})["role"] = (role or u"").strip()
-        self.save()
-
-    def get_initial(self):
-        name = self.get_name()
-        return name[:1].upper() if name else u"T"
 
     # ── Model setup ────────────────────────────────────────────────────────────
 
-    def get_model_setup(self):
-        """Return {'provider': ..., 'model': ...}, falling back to settings.json."""
-        m = self._data.get("model", {}) or {}
-        provider = (m.get("provider") or u"").strip()
-        model    = (m.get("model") or u"").strip()
-        if not provider:
-            try:
-                from config.settings import T3LabAISettings
-                s = T3LabAISettings()
-                provider = s.get_active_provider() or u"claude"
-                if not model:
-                    model = s.get_provider_model(provider) or u""
-            except Exception:
-                provider = provider or u"claude"
-        return {"provider": provider, "model": model}
 
     def set_model_setup(self, provider, model=None):
         """Record the chosen provider/model and sync it into settings.json."""

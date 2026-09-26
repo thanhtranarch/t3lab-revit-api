@@ -146,6 +146,9 @@ class RenumberItem(_Reactive):
 # =====================================================
 
 class SheetManagerWindow(T3WPFWindow):
+    # Checkbox từng dòng nằm trong DataTemplate: không bật cờ này thì
+    # sheets_row_checkbox_changed không chạy và bộ đếm SELECTED đứng yên.
+    WIRE_TEMPLATED_CLICKS = True
 
     # ProgressPauseMixin — ManaSheets.xaml status-bar progress panel
     PP_PANEL      = "ms_progress_panel"
@@ -454,8 +457,8 @@ class SheetManagerWindow(T3WPFWindow):
         self._update_sheets_summary()
 
     def sheets_row_checkbox_changed(self, sender, args):
-        """Fires immediately when a row's selection checkbox is toggled (template column,
-        so CellEditEnding does not fire for it) — keep the SELECTED counter live."""
+        """Click của checkbox từng dòng (template column nên CellEditEnding không
+        chạy) — giữ bộ đếm SELECTED cập nhật ngay. Nối qua WIRE_TEMPLATED_CLICKS."""
         self._update_sheets_summary()
 
     def _on_sheets_cell_edit(self, sender, args):

@@ -1667,17 +1667,20 @@
                                 <TextBlock Text="IFC-SG Suite" Style="{StaticResource T3.Title}"/>
                                 <TextBlock Text="Manage IFC-SG parameter mapping and Singapore compliance" Style="{StaticResource T3.Subtitle}"/>
                             </StackPanel>
+                            <!-- AI MODE BADGE — chuẩn T3 (T3LAB_UI_STANDARD.md § AI Mode). Code: init_ai_badge() -->
+                            <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}" Height="24" Margin="16,0,0,0"
+                                    Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                    <TextBlock x:Name="txt_ai_status" Text="AI off" Style="{StaticResource T3.Caption}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
 
                         <!-- AI Mode Status Pill & Window Controls -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal"
                                     shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
 
                             <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
                                 <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
@@ -1872,9 +1875,14 @@
                                                       ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
                                                       Margin="0,0,12,0"/>
                                             <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                                <Button x:Name="btn_ai_auto_match" Content="✨ AI Predict"
+                                                <Button x:Name="btn_ai_auto_match"
                                                         Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0" Padding="12,0"
-                                                        ToolTip="Use AI to automatically predict and match the best IFC-SG subtype for the selected types"/>
+                                                        ToolTip="Predict the IFC-SG subtype of the selected types from their names">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                        <TextBlock Text="AI Predict" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
                                                 <Button x:Name="btnApply" Content="Apply Selected"
                                                         Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                                 <Button x:Name="btnApplyAll" Content="Apply to All"

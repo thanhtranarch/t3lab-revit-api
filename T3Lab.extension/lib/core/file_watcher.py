@@ -390,34 +390,6 @@ class TaskFileWatcher(object):
 
     # ── public API ─────────────────────────────────────────────────────────────
 
-    def execute_and_wait(self, code, timeout=30):
-        """
-        Inject a task programmatically (used by MCP send_code_to_revit).
-        Blocks until result is ready or timeout expires.
-        Returns {'output': ...} or {'error': ...}.
-        """
-        import uuid as _uuid
-        task_id = str(_uuid.uuid4())
-        task    = {'task_id': task_id, 'code': code}
-        self._pending_task = task
-        self._done_event.clear()
-        self._last_task_id = task_id  # prevent re-dispatch from file watcher
-
-        if self._external_event:
-            self._external_event.Raise()
-            self._done_event.wait(timeout)
-        else:
-            self._exec_direct(task)
-
-        # Read result back
-        try:
-            with open(RESULT_FILE, 'r') as f:
-                result = json.load(f)
-            if result.get('task_id') == task_id:
-                return result
-        except Exception:
-            pass
-        return {'task_id': task_id, 'status': 'error', 'error': 'Timeout or result not written'}
 
     def get_status(self):
         return {

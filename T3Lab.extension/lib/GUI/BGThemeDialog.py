@@ -313,10 +313,6 @@ class BackgroundThemeWindow(T3WPFWindow):
     def close_button_clicked(self, sender, e):
         self.Close()
 
-    def handle_input_key(self, sender, args):
-        # overrides pyRevit's default ESC-to-close; idempotent with our own
-        # PreviewKeyDown subscription (whichever runs first consumes the key)
-        self._handle_esc(args)
 
     def _on_preview_key(self, sender, args):
         self._handle_esc(args)
@@ -360,8 +356,6 @@ class BackgroundThemeWindow(T3WPFWindow):
 
     # ------------------------------------------------------------ colour core
 
-    def current_rgb(self):
-        return (self._r, self._g, self._b)
 
     def set_rgb(self, r, g, b):
         self._set_color(clamp255(r), clamp255(g), clamp255(b))

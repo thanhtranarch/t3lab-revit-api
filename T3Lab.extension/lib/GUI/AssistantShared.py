@@ -46,11 +46,6 @@ PROVIDER_COLORS = {
 PROVIDER_GRAY = (161, 161, 170)     # #A1A1AA — no provider / offline
 
 
-def provider_rgb(name):
-    """(r, g, b) for a provider name, grey when unknown."""
-    return PROVIDER_COLORS.get(name, PROVIDER_GRAY)
-
-
 # ─── Open a folder / file in the shell ────────────────────────────────────────
 
 def open_in_explorer(path, create=True):

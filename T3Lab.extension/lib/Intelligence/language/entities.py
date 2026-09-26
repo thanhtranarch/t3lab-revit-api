@@ -440,13 +440,3 @@ def extract_quantity(text):
             'comparator': comparator}
 
 
-def extract_all(text):
-    """Every entity family in one pass — the shape `analyzer` consumes."""
-    return {
-        'categories': extract_categories(text),
-        'colors':     extract_colors(text),
-        'levels':     extract_levels(text),
-        'sheets':     extract_sheets(text),
-        'measures':   extract_measures(text),
-        'quantity':   extract_quantity(text),
-    }

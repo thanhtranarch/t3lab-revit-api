@@ -828,7 +828,7 @@ def search_primary(address, api_key=None, source=SOURCE_AUTO, language=None):
     if use_lightbox:
         if not api_key:
             raise ValueError(
-                u"LightBox needs an API key - add one in the API tab, or "
+                u"Set lightbox_api_key in the T3Lab config to use LightBox, or "
                 u"switch the source to OpenStreetMap.")
         try:
             parcels = search_parcels(api_key, address)
@@ -1037,159 +1037,8 @@ def generate_parcel_map(coordinates, output_path, area_sqft=0):
 # ╚═╝╚═╝ ╩ ╚═╝╩ ╩╚═╝╩ ╩  ╩ ╩╩  ╩ SETBACK / ZONING
 # ==================================================
 
-def get_zoning_from_parcel(parcel_item):
-    """
-    Extract zoning code from an already-fetched ParcelItem.
-
-    The basic Lightbox tier embeds the municipal zoning code in the parcel
-    response under assessment.zoning.assessment.  No separate API call is
-    needed (and /v1/parcels/us/{id}/zoning is not available on basic tier).
-
-    Returns dict: {"zoning_code": str}
-    Setback distances (front/rear/side) are NOT provided by the basic API
-    and must be entered manually by the user.
-    """
-    return {"zoning_code": parcel_item.zoning_code or ""}
-
 
 # ── polygon math (pure Python, no shapely) ───────────────────────────────────
-
-def _polygon_signed_area_2d(pts):
-    """Signed shoelace area. Positive → CCW."""
-    n = len(pts)
-    a = 0.0
-    for i in range(n):
-        j = (i + 1) % n
-        a += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1]
-    return a / 2.0
-
-
-def _line_intersect_2d(p1, p2, p3, p4):
-    """Intersection of infinite lines through (p1,p2) and (p3,p4). Returns None if parallel."""
-    x1, y1 = p1;  x2, y2 = p2
-    x3, y3 = p3;  x4, y4 = p4
-    denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-    if abs(denom) < 1e-10:
-        return None
-    t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
-    return (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
-
-
-def inset_polygon_2d(pts, distance):
-    """
-    Shrink a polygon inward by `distance` feet.
-
-    pts      – open list of (x, y) in Revit feet  (do NOT repeat first point)
-    distance – positive offset distance in feet
-
-    Returns a new open list of (x, y) with the same vertex count.
-    Raises ValueError if the polygon would collapse (setback too large).
-    """
-    n = len(pts)
-    if n < 3:
-        raise ValueError("Need at least 3 vertices for polygon inset")
-
-    # Normalise winding to CCW so that left-of-edge = interior
-    if _polygon_signed_area_2d(pts) < 0:
-        pts = list(reversed(pts))
-
-    # Build one offset edge per polygon edge
-    offset_edges = []
-    for i in range(n):
-        p1 = pts[i]
-        p2 = pts[(i + 1) % n]
-        dx = p2[0] - p1[0]
-        dy = p2[1] - p1[1]
-        length = math.sqrt(dx * dx + dy * dy)
-        if length < 1e-10:
-            continue
-        # Inward (left) unit normal for CCW polygon: (-dy/L, +dx/L)
-        nx, ny = -dy / length, dx / length
-        offset_edges.append(
-            ((p1[0] + nx * distance, p1[1] + ny * distance),
-             (p2[0] + nx * distance, p2[1] + ny * distance))
-        )
-
-    if len(offset_edges) < 3:
-        raise ValueError("Too few valid edges for polygon inset")
-
-    # New vertices = intersection of consecutive offset edges
-    m = len(offset_edges)
-    result = []
-    for i in range(m):
-        e1 = offset_edges[i]
-        e2 = offset_edges[(i + 1) % m]
-        pt = _line_intersect_2d(e1[0], e1[1], e2[0], e2[1])
-        result.append(pt if pt is not None else e1[1])
-
-    # Sanity-check: inset area must be at least 1 % of original
-    orig_area  = abs(_polygon_signed_area_2d(pts))
-    inset_area = abs(_polygon_signed_area_2d(result))
-    if orig_area > 0 and inset_area < orig_area * 0.01:
-        raise ValueError(
-            "Setback distance ({:.1f} ft) is too large: polygon collapsed".format(distance)
-        )
-
-    return result
-
-
-def create_setback_lines_in_revit(doc, coordinates, setback_ft,
-                                   elevation_ft=0.0,
-                                   origin_mode="Project Base Point"):
-    """
-    Draw a setback envelope as Model Lines by insetting the parcel boundary.
-
-    Parameters:
-        doc          - Revit Document
-        coordinates  - list of [lon, lat] from GeoJSON outer ring
-        setback_ft   - inset distance in feet (must be > 0)
-        elevation_ft - Z elevation in feet
-        origin_mode  - "Project Base Point" | "Survey Point" | "World Origin (0,0,0)"
-
-    Returns the number of line segments created.
-    """
-    if setback_ft <= 0:
-        raise ValueError("Setback distance must be greater than zero")
-
-    # Convert GeoJSON → feet, relative to polygon centroid
-    centroid_lat, centroid_lon = compute_centroid(coordinates)
-    pts_2d = []
-    for c in coordinates:
-        lon, lat = c[0], c[1]
-        x_ft, y_ft = latlon_to_feet(lat, lon, centroid_lat, centroid_lon)
-        pts_2d.append((x_ft, y_ft))
-
-    # Drop closing duplicate if present
-    if (len(pts_2d) > 1 and
-            abs(pts_2d[0][0] - pts_2d[-1][0]) < 0.001 and
-            abs(pts_2d[0][1] - pts_2d[-1][1]) < 0.001):
-        pts_2d = pts_2d[:-1]
-
-    # Inset the polygon
-    inset_2d = inset_polygon_2d(pts_2d, setback_ft)
-
-    # Determine insertion origin (same logic as property lines)
-    if origin_mode == "Survey Point":
-        offset = get_survey_point(doc)
-    elif origin_mode == "Project Base Point":
-        offset = get_project_base_point(doc)
-    else:
-        offset = DB.XYZ(0, 0, 0)
-
-    # Convert to Revit XYZ and close the loop
-    revit_pts = [
-        DB.XYZ(p[0] + offset.X, p[1] + offset.Y, elevation_ft + offset.Z)
-        for p in inset_2d
-    ]
-    revit_pts.append(revit_pts[0])
-
-    count = 0
-    with DB.Transaction(doc, "Create Setback Envelope") as t:
-        t.Start()
-        count = _create_model_lines_from_pts(doc, revit_pts, elevation_ft + offset.Z)
-        t.Commit()
-
-    return count
 
 
 # ╦═╗╔═╗╦  ╦╦╔╦╗  ╔═╗╦═╗╔═╗╔═╗╔╦╗╦╔═╗╔╗╔
@@ -1540,18 +1389,7 @@ class PropertyLineDialog(T3WPFWindow):
         self._search_seq = 0
 
 
-
-        # Load saved API key if UI element exists
         config = load_config()
-        saved_key = config.get("lightbox_api_key", "")
-        txt_key = getattr(self, "txt_api_key", None)
-        if txt_key is not None:
-            if saved_key:
-                txt_key.Text = saved_key
-                self._update_api_status(True, "API key loaded from config")
-            else:
-                self._update_api_status(
-                    True, "No API key — worldwide OpenStreetMap search still works")
 
         # Restore the last used data source
         saved_source = config.get("data_source", SOURCE_AUTO)
@@ -1574,25 +1412,6 @@ class PropertyLineDialog(T3WPFWindow):
         if e.LeftButton == MouseButtonState.Pressed:
             self.DragMove()
 
-    def btn_tab_search_Click(self, sender, e):
-        if getattr(self, "btn_tab_search", None) is not None:
-            self.btn_tab_search.IsChecked = True
-        if getattr(self, "btn_tab_api", None) is not None:
-            self.btn_tab_api.IsChecked = False
-        if getattr(self, "grid_search_tab", None) is not None:
-            self.grid_search_tab.Visibility = Visibility.Visible
-        if getattr(self, "grid_api_tab", None) is not None:
-            self.grid_api_tab.Visibility = Visibility.Collapsed
-
-    def btn_tab_api_Click(self, sender, e):
-        if getattr(self, "btn_tab_search", None) is not None:
-            self.btn_tab_search.IsChecked = False
-        if getattr(self, "btn_tab_api", None) is not None:
-            self.btn_tab_api.IsChecked = True
-        if getattr(self, "grid_search_tab", None) is not None:
-            self.grid_search_tab.Visibility = Visibility.Collapsed
-        if getattr(self, "grid_api_tab", None) is not None:
-            self.grid_api_tab.Visibility = Visibility.Visible
 
     def btn_minimize_Click(self, sender, e):
         import System.Windows
@@ -1601,24 +1420,6 @@ class PropertyLineDialog(T3WPFWindow):
     def btn_close_Click(self, sender, e):
         self.Close()
 
-    def btn_save_key_Click(self, sender, e):
-        txt_key = getattr(self, "txt_api_key", None)
-        if txt_key is None:
-            return
-        api_key = txt_key.Text.strip()
-        if not api_key:
-            self._update_api_status(False, "API key cannot be empty")
-            return
-        if save_config({"lightbox_api_key": api_key}):
-            self._update_api_status(True, "API key saved successfully")
-        else:
-            self._update_api_status(False, "Failed to save API key")
-
-    def btn_get_api_key_Click(self, sender, e):
-        try:
-            Diagnostics.Process.Start("https://developer.lightboxre.com")
-        except Exception as ex:
-            logger.error("Failed to open Lightbox developer portal: {}".format(ex))
 
     def txt_address_KeyDown(self, sender, e):
         if e.Key == Key.Return:
@@ -1648,8 +1449,8 @@ class PropertyLineDialog(T3WPFWindow):
             pass
 
         source = self._selected_source()
-        txt_key = getattr(self, "txt_api_key", None)
-        api_key = txt_key.Text.strip() if txt_key is not None else load_config().get("lightbox_api_key", "")
+        # Tab API Settings đã gỡ (2026-09-06): key LightBox chỉ còn đọc từ config.
+        api_key = load_config().get("lightbox_api_key", "")
         if source == SOURCE_LIGHTBOX and not api_key:
             self._set_status(
                 u"LightBox needs an API key — switch the source to OpenStreetMap.", error=True)
@@ -1983,9 +1784,6 @@ class PropertyLineDialog(T3WPFWindow):
         lines = [u"{}: {} ft".format(k, v) for k, v in sorted(setbacks.items())]
         self.txt_setback_info.Text = u"  |  ".join(lines) if lines else u"No setback data"
 
-    def btn_fetch_zoning_Click(self, sender, e):
-        """Kept for XAML compatibility; the button is no longer shown."""
-        pass
 
     def btn_copy_project_data_Click(self, sender, e):
         """Copy the formatted Project Data block to the Windows clipboard."""
@@ -2081,20 +1879,6 @@ class PropertyLineDialog(T3WPFWindow):
         except Exception as ex:
             self._set_status("Failed to open Google Maps: {}".format(ex), error=True)
 
-    def _get_min_setback(self):
-        """Return the smallest positive value among the three setback fields, or None."""
-        values = []
-        for txt in (self.txt_setback_front, self.txt_setback_rear, self.txt_setback_side):
-            raw = txt.Text.strip()
-            if not raw:
-                continue
-            try:
-                v = float(raw)
-                if v > 0:
-                    values.append(v)
-            except ValueError:
-                pass
-        return min(values) if values else None
 
     def btn_create_Click(self, sender, e):
         if not self._selected_parcel:
@@ -2177,15 +1961,6 @@ class PropertyLineDialog(T3WPFWindow):
             return False
         return bool(chk.IsChecked)
 
-    def _update_api_status(self, ok, msg):
-        txt_status = getattr(self, "txt_api_status", None)
-        if txt_status is None:
-            return
-        txt_status.Text = msg
-        if ok:
-            txt_status.Foreground = SolidColorBrush(Color.FromRgb(78, 201, 176))  # teal
-        else:
-            txt_status.Foreground = SolidColorBrush(Color.FromRgb(255, 107, 107))  # red
 
     def _set_status(self, msg, error=False, success=False, busy=False):
         self.txt_status.Text = msg
@@ -2215,7 +1990,6 @@ class PropertyLineDialog(T3WPFWindow):
 # ╚═╗╠═╣║ ║║  ║╚═╗
 # ╚═╝╩ ╩╚═╝╩═╝╩╚═╝ PUBLIC ENTRY POINT
 # ==================================================
-
 
 
     def minimize_button_clicked(self, sender, e):

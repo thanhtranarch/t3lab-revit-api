@@ -836,14 +836,3 @@ def read_context_stats(folder, out_subdir=DEFAULT_OUT_SUBDIR,
     return stats
 
 
-def build_for_dirs(folders, progress_cb=None):
-    """Build a digest for each folder. Returns the list of result dicts."""
-    out = []
-    for d in (folders or []):
-        try:
-            res = build_context_file(d, progress_cb=progress_cb)
-        except Exception:
-            res = None
-        if res:
-            out.append(res)
-    return out

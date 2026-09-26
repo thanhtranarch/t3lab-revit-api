@@ -261,13 +261,6 @@ class UIShowcaseWindow(T3WPFWindow):
     def close_button_clicked(self, sender, e):
         self.Close()
 
-    def title_bar_mouse_down(self, sender, e):
-        try:
-            from System.Windows.Input import MouseButtonState
-            if e.LeftButton == MouseButtonState.Pressed:
-                self.DragMove()
-        except Exception:
-            pass
 
     # ── Data & Filtering ─────────────────────────────────────────────────────
 

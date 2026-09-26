@@ -1756,7 +1756,7 @@
                                 <CheckBox x:Name="ai_mode_toggle" Content="AI Mode (Intelligent Copilot for Tools)"
                                           Style="{StaticResource T3.CheckBox}" Margin="0,0,0,4"
                                           Checked="ai_mode_toggled" Unchecked="ai_mode_toggled"/>
-                                <TextBlock Text="ON: Enable AI-powered features (Smart Mapping, Subtype Prediction, Text-to-Family, Executive Audits) across all T3Lab tools when API keys are connected. OFF: Classic mode."
+                                <TextBlock Text="ON: the AI buttons in CAD to Elements (layer select), IFC-SG (subtype predict), Parameter Manager (parameter match), Family Generator, Text to Element and Annotation Manager (spellcheck) use the connected API key. OFF: those buttons explain how to turn AI on; every other feature works the same."
                                            Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="24,0,0,12"/>
 
                                 <Separator Margin="0,0,0,12"/>

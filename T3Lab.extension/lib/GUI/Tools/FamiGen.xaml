@@ -1668,16 +1668,19 @@
                                 <TextBlock Text="Family Generator" Style="{StaticResource T3.Title}"/>
                                 <TextBlock Text="Create Revit families from CAD blocks or JSON schema" Style="{StaticResource T3.Subtitle}"/>
                             </StackPanel>
+                            <!-- AI MODE BADGE — chuẩn T3 (T3LAB_UI_STANDARD.md § AI Mode). Code: init_ai_badge() -->
+                            <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}" Height="24" Margin="16,0,0,0"
+                                    Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                    <TextBlock x:Name="txt_ai_status" Text="AI off" Style="{StaticResource T3.Caption}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
 
                         <!-- Center: AI Mode Status Pill -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
                         </StackPanel>
 
                         <!-- Window Controls -->
@@ -1978,9 +1981,15 @@
                                     <TextBox x:Name="ai_prompt_tb" Grid.Column="0" Height="28"
                                              Style="{StaticResource T3.TextBox}"
                                              ToolTip="Describe family geometry &amp; dimensions (e.g. Dining table 2400x1200x750mm with 6 legs, rounded corners)"/>
-                                    <Button x:Name="btn_ai_generate" Grid.Column="2" Content="✨ AI Generate"
+                                    <Button x:Name="btn_ai_generate" Grid.Column="2"
                                             Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="16,0"
-                                            Click="ai_generate_clicked"/>
+                                            Click="ai_generate_clicked"
+                                            ToolTip="Write the family JSON from the description on the left">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                            <TextBlock Text="AI Generate" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
                                     <Button x:Name="btn_ai_undo" Grid.Column="4" Content="Undo AI"
                                             Style="{StaticResource T3.Button.Ghost}" Height="28" Padding="12,0"
                                             Click="ai_undo_clicked" Visibility="Collapsed"

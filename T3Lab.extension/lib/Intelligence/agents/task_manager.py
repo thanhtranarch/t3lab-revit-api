@@ -176,9 +176,6 @@ class AgentTaskManager(object):
                 pass
         return True
 
-    def cancel_all(self):
-        for t in self.list_tasks(active_only=True):
-            self.cancel(t.id)
 
     def clear_finished(self):
         """Drop terminal tasks from the registry (UI 'clear' action)."""

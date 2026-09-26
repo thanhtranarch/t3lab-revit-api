@@ -265,48 +265,6 @@ class RevitAPIUpdater(object):
         except Exception as ex:
             return None
 
-    def get_available_versions(self):
-        """Get list of available Revit versions from tracker.
-
-        Returns:
-            list: List of version numbers
-        """
-        return sorted(self.update_tracker.get('known_versions', []))
-
-    def get_latest_version(self):
-        """Get the latest known Revit version.
-
-        Returns:
-            int: Latest version number or None
-        """
-        versions = self.get_available_versions()
-        return max(versions) if versions else None
-
-    def get_update_summary(self):
-        """Get summary of update status.
-
-        Returns:
-            dict: Update summary
-        """
-        return {
-            'last_check': self.update_tracker.get('last_check', 'Never'),
-            'last_update': self.update_tracker.get('last_update', 'Never'),
-            'known_versions': self.get_available_versions(),
-            'latest_version': self.get_latest_version(),
-            'auto_update_enabled': self.update_tracker.get('auto_update_enabled', True),
-            'next_check_day': 'Friday' if self.update_tracker.get('update_schedule') == 'friday' else 'Unknown',
-        }
-
-    def enable_auto_update(self):
-        """Enable automatic updates."""
-        self.update_tracker['auto_update_enabled'] = True
-        self._save_update_tracker()
-
-    def disable_auto_update(self):
-        """Disable automatic updates."""
-        self.update_tracker['auto_update_enabled'] = False
-        self._save_update_tracker()
-
 
 class APIUpdateNotifier(object):
     """Notifier for API updates."""
@@ -337,18 +295,6 @@ class APIUpdateNotifier(object):
             list: List of notifications
         """
         return self.notifications
-
-    def clear_notifications(self):
-        """Clear all notifications."""
-        self.notifications = []
-
-    def has_critical_notifications(self):
-        """Check if there are critical notifications.
-
-        Returns:
-            bool: True if critical notifications exist
-        """
-        return any(n['severity'] == 'critical' for n in self.notifications)
 
 
 def auto_check_and_update():

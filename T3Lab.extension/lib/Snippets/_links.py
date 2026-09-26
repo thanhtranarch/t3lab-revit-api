@@ -304,26 +304,6 @@ class LinkWorkset(object):
         self.visible_by_default = bool(visible_by_default)
 
 
-def get_link_worksets(link_doc):
-    """User worksets of an open link document, with their open/closed state."""
-    result = []
-    if link_doc is None:
-        return result
-    try:
-        if not link_doc.IsWorkshared:
-            return result
-    except Exception:
-        return result
-    try:
-        for ws in FilteredWorksetCollector(link_doc).OfKind(WorksetKind.UserWorkset):
-            result.append(LinkWorkset(eid_int_workset(ws.Id), ws.Name,
-                                      ws.IsOpen, ws.IsVisibleByDefault))
-    except Exception:
-        pass
-    result.sort(key=lambda w: w.name.lower())
-    return result
-
-
 def split_workset_ids(worksets, open_names, closed_names):
     """Split a link's worksets into the ids to open and the ids to close.
 

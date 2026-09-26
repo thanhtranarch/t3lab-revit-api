@@ -1671,12 +1671,6 @@
                         <!-- AI Mode Status Pill & Window Controls -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0"
                                     WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
 
                             <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}"
                                     Click="minimize_button_clicked" ToolTip="Minimize">
@@ -1795,14 +1789,6 @@
                                     </StackPanel>
 
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button x:Name="btn_health_ai_summary" Style="{StaticResource T3.Button.Secondary}"
-                                                Click="ai_health_summary_clicked" Margin="0,0,8,0"
-                                                ToolTip="Ask the AI for an executive read of this health report">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
-                                                <TextBlock Text="AI Summary" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
                                         <Button x:Name="btn_health_export" Style="{StaticResource T3.Button.Secondary}"
                                                 Margin="0,0,8,0"
                                                 ToolTip="Save the metric table to a CSV report">

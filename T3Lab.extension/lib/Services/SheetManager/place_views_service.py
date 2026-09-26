@@ -14,42 +14,6 @@ class PlaceViewsService(object):
     def __init__(self, doc):
         self.doc = doc
     
-    def get_placeable_views(self):
-        """Get all views that can be placed on sheets"""
-        try:
-            # First, get all viewports to check which views are already placed
-            viewports = FilteredElementCollector(self.doc).OfClass(Viewport)
-            placed_view_ids = set()
-            for vp in viewports:
-                placed_view_ids.add(vp.ViewId)
-            
-            collector = FilteredElementCollector(self.doc).OfClass(View)
-            
-            placeable_views = []
-            for view in collector:
-                # Skip templates, schedules on sheets, legends on sheets
-                if (not view.IsTemplate and 
-                    view.CanBePrinted and
-                    hasattr(view, 'ViewType')):
-                    
-                    # Check if view ID is in placed views
-                    on_sheet = view.Id in placed_view_ids
-                    
-                    placeable_views.append({
-                        'element': view,
-                        'id': view.Id,
-                        'name': view.Name,
-                        'type': str(view.ViewType),
-                        'on_sheet': on_sheet
-                    })
-                    
-                    if on_sheet:
-                        print("DEBUG: View '{}' is already on a sheet".format(view.Name))
-            
-            return placeable_views
-        except Exception as e:
-            print("Error getting placeable views: {}".format(str(e)))
-            return []
     
     def place_view_on_sheet(self, sheet, view, location=None):
         """Place a view on a sheet"""

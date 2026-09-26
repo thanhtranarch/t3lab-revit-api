@@ -235,113 +235,7 @@ class CreateRoomPlanWindow(T3WPFWindow):
         self.cmb_strip_side.SelectedIndex = 0  # default: right (vertical) strip
         self._update_status()
         self._update_mockup()
-        self._init_ai_mode()
 
-    # ── AI Mode Support ──────────────────────────────────────────────────
-
-    def _init_ai_mode(self):
-        try:
-            if hasattr(self, 'is_ai_mode_active') and self.is_ai_mode_active():
-                if hasattr(self, 'ai_mode_badge') and self.ai_mode_badge:
-                    self.ai_mode_badge.Visibility = Visibility.Visible
-                if hasattr(self, 'txt_ai_status') and self.txt_ai_status:
-                    info = self.get_ai_status_info()
-                    self.txt_ai_status.Text = "AI Mode: {}".format(info.get('model', 'Ready'))
-        except Exception as ex:
-            logger.warning("AI Mode init failed: {}".format(ex))
-
-    def ai_layout_clicked(self, sender, e):
-        """AI Recommendation: analyze selected rooms and suggest optimal layout mode and strip width."""
-        btn = getattr(self, 'btn_ai_layout_naming', None)
-        orig_content = "✨ AI Smart Layout"
-
-        def _restore_btn():
-            if btn:
-                btn.Content = orig_content
-                btn.IsEnabled = True
-
-        try:
-            sel_rooms = [r for r in self._all_rooms if r.IsSelected]
-            target_rooms = sel_rooms if sel_rooms else self._all_rooms[:10]
-
-            if not target_rooms:
-                forms.alert("Please select rooms to analyze layout.", title="AI Layout")
-                return
-
-            def _apply_classic():
-                elev_checked = getattr(self.chk_elevations, 'IsChecked', False)
-                if elev_checked:
-                    self.rdo_layout_separate.IsChecked = True
-                else:
-                    self.rdo_layout_combined.IsChecked = True
-                if hasattr(self, 'txt_strip_mm'):
-                    self.txt_strip_mm.Text = "75"
-                self._update_status("Rule-based Layout: Applied default layout recommendations.")
-                _restore_btn()
-
-            if not hasattr(self, 'is_ai_mode_active') or not self.is_ai_mode_active():
-                _apply_classic()
-                return
-
-            if btn:
-                btn.Content = "⏳ Analyzing..."
-                btn.IsEnabled = False
-
-            self._update_status("AI analyzing optimal sheet layout for {} rooms...".format(len(target_rooms)))
-
-            room_summaries = []
-            for r in target_rooms:
-                room_summaries.append({
-                    "name": getattr(r, 'Name', ''),
-                    "number": getattr(r, 'Number', ''),
-                    "type": getattr(r, 'RoomType', '')
-                })
-
-            prompt = (
-                "You are an expert BIM Architect and Sheet Layout Planner.\n"
-                "Given {} selected room plans for sheet generation in Autodesk Revit:\n{}\n"
-                "Recommend the optimal layout strategy:\n"
-                "- layout_mode: 'combined' (Plan + Elevations on 1 sheet) or 'separate' (Plans on Sheet 1, Elevations on Sheet 2)\n"
-                "- strip_side: 'Right (vertical)' or 'Bottom (horizontal)'\n"
-                "- strip_mm: integer (suggested header margin in mm, e.g. 70, 75, 80)\n"
-                "- rationale: 1-sentence reasoning\n"
-                "Return JSON ONLY with keys: {{\"layout_mode\": string, \"strip_side\": string, \"strip_mm\": integer, \"rationale\": string}}"
-            ).format(len(target_rooms), json.dumps(room_summaries[:15]))
-
-            def _worker():
-                return self.ai_bridge.ask_json(prompt, fast=True)
-
-            def _callback(res, err):
-                try:
-                    if err or not res or not isinstance(res, dict) or 'layout_mode' not in res:
-                        _apply_classic()
-                        return
-
-                    mode = res.get('layout_mode', 'combined').lower()
-                    strip_mm = res.get('strip_mm', 75)
-                    rationale = res.get('rationale', 'Optimal layout applied')
-
-                    if 'separate' in mode:
-                        self.rdo_layout_separate.IsChecked = True
-                    else:
-                        self.rdo_layout_combined.IsChecked = True
-
-                    if hasattr(self, 'txt_strip_mm'):
-                        self.txt_strip_mm.Text = str(int(strip_mm))
-
-                    self._update_status("AI Layout: {} (Strip: {}mm - {})".format(
-                        "Separate Sheets" if 'separate' in mode else "Combined Sheet",
-                        int(strip_mm), rationale
-                    ))
-                finally:
-                    _restore_btn()
-
-            self.run_ai_async(_worker, _callback)
-
-        except Exception as ex:
-            _restore_btn()
-            logger.error("Error in ai_layout_clicked: {}".format(ex))
-            self._update_status("AI Layout error: {}".format(ex))
 
     def _adopt_host_font(self):
         """Adopt host font per T3 standard."""
@@ -578,23 +472,6 @@ class CreateRoomPlanWindow(T3WPFWindow):
                 fallback = v
         return fallback
 
-    def _get_boundary_wall_ids(self, room):
-        """Return set of wall element ids forming the room boundary."""
-        wall_ids = set()
-        try:
-            opt = SpatialElementBoundaryOptions()
-            opt.SpatialElementBoundaryLocation = \
-                SpatialElementBoundaryLocation.Finish
-            segments_list = room.GetBoundarySegments(opt)
-            if segments_list:
-                for seg_loop in segments_list:
-                    for seg in seg_loop:
-                        elem = doc.GetElement(seg.ElementId)
-                        if elem and isinstance(elem, DB.Wall):
-                            wall_ids.add(seg.ElementId)
-        except Exception:
-            pass
-        return wall_ids
 
     def _create_interior_elevation_view(self, marker, host_plan, idx,
                                          cropbox_visible, max_dim,
