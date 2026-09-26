@@ -201,6 +201,7 @@ if __name__ == '__main__':
 [ ] Path setup chèn `lib_dir` vào sys.path
 [ ] python3 dev/audit_t3.py --quiet      → xanh (0 vi phạm)
 [ ] python3 dev/audit_tools.py --quiet   → xanh (clean)
+[ ] python3 dev/audit_wiring.py --quiet  → xanh (W1/W2/W3/D1 = 0)
 [ ] python3 dev/audit_cpython.py --quiet → 0 P0 (bẫy migration CPython)
 [ ] python3 dev/build_icons.py --check   → không lệch (icon đã build)
 [ ] python3 dev/audit_icons.py --quiet   → xanh (0 lỗi)

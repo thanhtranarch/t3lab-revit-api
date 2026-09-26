@@ -1311,16 +1311,6 @@ class AnnotationManagerWindow(T3WPFWindow):
 
     # ── Header Checkbox Toggle Event Handlers ─────────────────────────────────
 
-    def dim_header_select_all_clicked(self, sender, args):
-        is_checked = sender.IsChecked
-        for row in self._dim_dt.Rows:
-            row["Selected"] = is_checked
-
-    def txt_header_select_all_clicked(self, sender, args):
-        is_checked = sender.IsChecked
-        for row in self._txt_dt.Rows:
-            row["Selected"] = is_checked
-
     # ── Top Horizontal Navigation Tab Event Handlers ─────────────────────────
 
     def _update_nav_states(self, active_btn):

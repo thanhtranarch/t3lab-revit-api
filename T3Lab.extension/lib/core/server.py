@@ -83,7 +83,7 @@ def _set_process_anchor(inst):
         pass
     setattr(sys, _PROCESS_SINGLETON_KEY, inst)
 
-from Snippets._compat import eid_value, make_eid
+from Snippets._compat import eid_value, make_eid, net_list
 try:
     from http.server import HTTPServer, BaseHTTPRequestHandler
     from urllib.parse import urlparse, parse_qs
@@ -6247,7 +6247,7 @@ class T3LabAIServer(object):
                     except Exception:
                         continue
 
-                uidoc.Selection.SetElementIds(List[ElementId](hits))
+                uidoc.Selection.SetElementIds(net_list(ElementId, hits))
                 return {'success': True, 'operation': op, 'match': match,
                         'scope': scope, 'seed_count': len(seeds),
                         'count': len(hits)}
@@ -6270,13 +6270,13 @@ class T3LabAIServer(object):
 
             if op == 'select':
                 from System.Collections.Generic import List
-                id_list = List[ElementId](elem_ids)
+                id_list = net_list(ElementId, elem_ids)
                 uidoc.Selection.SetElementIds(id_list)
                 return {'success': True, 'operation': 'select', 'count': len(elem_ids)}
 
             elif op in ('hide', 'isolate', 'unhide'):
                 from System.Collections.Generic import List
-                id_col = List[ElementId](elem_ids)
+                id_col = net_list(ElementId, elem_ids)
                 t = Transaction(doc, 'T3Lab AI {} Elements'.format(op.title()))
                 t.Start()
                 try:
@@ -6443,7 +6443,7 @@ class T3LabAIServer(object):
                 normal = XYZ(1, 0, 0) if axis == 'x' else XYZ(0, 1, 0)
                 plane = Plane.CreateByNormalAndOrigin(normal, XYZ(ox, oy, 0))
                 keep_original = bool(arguments.get('copy', False))
-                id_list = List[ElementId](elem_ids)
+                id_list = net_list(ElementId, elem_ids)
                 t = Transaction(doc, 'T3Lab AI Mirror Elements')
                 t.Start()
                 new_ids = []
@@ -6522,7 +6522,7 @@ class T3LabAIServer(object):
                 t = Transaction(doc, 'T3Lab AI Group Elements')
                 t.Start()
                 try:
-                    grp = doc.Create.NewGroup(List[ElementId](elem_ids))
+                    grp = doc.Create.NewGroup(net_list(ElementId, elem_ids))
                     gname = arguments.get('group_name')
                     if gname:
                         try:
@@ -7077,7 +7077,7 @@ class T3LabAIServer(object):
                         existing = list(s.GetAdditionalRevisionIds())
                         if target.Id not in existing:
                             existing.append(target.Id)
-                            s.SetAdditionalRevisionIds(List[ElementId](existing))
+                            s.SetAdditionalRevisionIds(net_list(ElementId, existing))
                         done.append(s.SheetNumber)
                     except Exception as ex:
                         failed.append({'sheet': s.SheetNumber, 'error': str(ex)})
@@ -8104,7 +8104,7 @@ class T3LabAIServer(object):
                 dy = float(arguments.get('dy', 0)) * ft
                 dz = float(arguments.get('dz', 0)) * ft
                 ids_raw = arguments.get('element_ids', [])
-                id_list = SCG.List[ElementId]([make_eid(int(i)) for i in ids_raw])
+                id_list = net_list(ElementId, [make_eid(int(i)) for i in ids_raw])
                 t = Transaction(doc, 'T3Lab AI Move Elements')
                 t.Start()
                 try:
@@ -8127,7 +8127,7 @@ class T3LabAIServer(object):
                 dy = float(arguments.get('dy', 0)) * ft
                 dz = float(arguments.get('dz', 0)) * ft
                 ids_raw = arguments.get('element_ids', [])
-                id_list = SCG.List[ElementId]([make_eid(int(i)) for i in ids_raw])
+                id_list = net_list(ElementId, [make_eid(int(i)) for i in ids_raw])
                 t = Transaction(doc, 'T3Lab AI Copy Elements')
                 t.Start()
                 try:
@@ -8154,7 +8154,7 @@ class T3LabAIServer(object):
                 oy = float(arguments.get('origin_y', 0)) * ft
                 axis = Line.CreateBound(XYZ(ox, oy, 0), XYZ(ox, oy, 1))
                 ids_raw = arguments.get('element_ids', [])
-                id_list = SCG.List[ElementId]([make_eid(int(i)) for i in ids_raw])
+                id_list = net_list(ElementId, [make_eid(int(i)) for i in ids_raw])
                 t = Transaction(doc, 'T3Lab AI Rotate Elements')
                 t.Start()
                 try:

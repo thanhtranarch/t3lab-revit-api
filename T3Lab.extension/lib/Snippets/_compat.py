@@ -73,3 +73,19 @@ def elem_name(element):
     except AttributeError:
         from Autodesk.Revit.DB import Element
         return Element.Name.GetValue(element)
+
+
+def net_list(item_type, items):
+    """``List[item_type]`` .NET dựng từ bất kỳ iterable nào (list Python hay collection .NET).
+
+    Dưới PythonNet 3 (CPython), ``List[ElementId](python_list)`` KHÔNG còn tự
+    chuyển list Python sang ``IEnumerable<T>`` khi chọn overload, nên ném
+    ``No method matches given arguments for List`1..ctor: (<class 'list'>)``.
+    Dựng list rỗng rồi ``Add`` từng phần tử thì chạy trên mọi engine.
+    """
+    from System.Collections.Generic import List
+    out = List[item_type]()
+    for item in items or ():
+        if item is not None:
+            out.Add(item)
+    return out

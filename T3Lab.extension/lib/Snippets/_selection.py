@@ -31,6 +31,7 @@ from pyrevit import forms
 #.NET
 clr.AddReference('System')
 from System.Collections.Generic import List
+from Snippets._compat import net_list
 
 # CUSTOM IMPORTS
 from Snippets._variables import ALL_VIEW_TYPES
@@ -79,7 +80,7 @@ def get_selected_rooms(uidoc=uidoc, exitscript = True):
     selected_elements = [doc.GetElement(e_id) for e_id in selection.GetElementIds()]
     selected_rooms    = [e for e in selected_elements if type(e) == Room]
     ref_rooms         = [Reference(r) for r in selected_rooms]
-    ref_preselection  = List[Reference](ref_rooms)
+    ref_preselection  = net_list(Reference, ref_rooms)
 
     # Pick Walls (exterior walls are preselected)
     ISF_Rooms      = ISelectionFilter_Classes([Room,])

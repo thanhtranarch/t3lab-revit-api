@@ -609,6 +609,9 @@ class _PendingExportError(RuntimeError):
 
 class ExportManagerWindow(T3WPFWindow):
     """Export Manager Window."""
+    # Click= trong DataTemplate không nằm trong namescope của window, nếu
+    # không bật cờ này handler của checkbox/nút từng dòng không bao giờ chạy.
+    WIRE_TEMPLATED_CLICKS = True
 
     # Auto-saved "latest setup" — lives beside profiles but is not listed as one
     LATEST_SETUP_FILENAME = '_latest_setup.json'
@@ -2697,7 +2700,9 @@ class ExportManagerWindow(T3WPFWindow):
 
         except Exception as ex:
             logger.error("Error loading sheets: {}".format(ex))
-            forms.alert("Error loading sheets: {}".format(ex), exitscript=True)
+            # Không exitscript: hàm này cũng chạy trong event handler của window
+            # modeless — SystemExit bay qua biên .NET có thể làm Revit crash.
+            forms.alert("Error loading sheets: {}".format(ex))
 
     def _lazy_load_init(self):
         """Kick off chunked Revision loading — no titleblock queries at startup."""
@@ -2811,7 +2816,9 @@ class ExportManagerWindow(T3WPFWindow):
 
         except Exception as ex:
             logger.error("Error loading views: {}".format(ex))
-            forms.alert("Error loading views: {}".format(ex), exitscript=True)
+            # Không exitscript: hàm này cũng chạy trong event handler của window
+            # modeless — SystemExit bay qua biên .NET có thể làm Revit crash.
+            forms.alert("Error loading views: {}".format(ex))
 
     def _lazy_view_load_chunk(self):
         """Load Phase/ViewTemplate for a batch of views, then schedule the next batch."""
@@ -3005,11 +3012,6 @@ class ExportManagerWindow(T3WPFWindow):
         # Double-click just toggles like single click
         # This prevents accidental double-click from causing issues
         pass
-
-    def textbox_prevent_toggle(self, sender, e):
-        """Prevent row toggle when clicking on textbox in Custom Filename column."""
-        # Stop propagation so that clicking in textbox doesn't toggle row selection
-        e.Handled = True
 
     def on_listview_size_changed(self, sender, e):
         """Resize Sheet Name and Custom Filename columns to fill available ListView width with ZERO gaps."""

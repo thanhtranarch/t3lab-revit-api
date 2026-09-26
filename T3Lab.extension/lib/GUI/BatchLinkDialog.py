@@ -268,6 +268,9 @@ def _show_dialog_owned(window, dlg):
 
 class BatchLinkDialog(T3WPFWindow):
     """Main Window class for Batch Link Revit Models."""
+    # Click= trong DataTemplate không nằm trong namescope của window, nếu
+    # không bật cờ này handler của checkbox/nút từng dòng không bao giờ chạy.
+    WIRE_TEMPLATED_CLICKS = True
 
     def __init__(self, doc=None):
         T3WPFWindow.__init__(self, XAML_FILE)

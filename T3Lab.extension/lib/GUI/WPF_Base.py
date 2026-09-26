@@ -695,10 +695,14 @@ class T3WPFWindow(Window):
         như khi nối trực tiếp.
 
         Cơ chế này TẮT mặc định và mỗi window tự bật bằng
-        `WIRE_TEMPLATED_CLICKS = True`. Lý do: vài tool (ManaGroup, BatchLink,
-        ExportManager…) đã tự bù bằng `AddHandler(CheckBox.ClickEvent, …)` trên
+        `WIRE_TEMPLATED_CLICKS = True`. Lý do: vài tool (ManaGroup,
+        SelectFromDict) đã tự bù bằng `AddHandler(CheckBox.ClickEvent, …)` trên
         cả bảng; bật đại trà sẽ khiến handler của chúng chạy hai lần. Tool nào
-        muốn dùng thì bật rồi bỏ phần AddHandler thủ công.
+        muốn dùng thì bật rồi bỏ phần AddHandler thủ công. Đang bật: ModelAuditor,
+        BatchLink, BatchOut, ManaFami, ManaLoca, ManaSheets. Nghe cả
+        `ButtonBase.ClickEvent` lẫn `Hyperlink.ClickEvent`; event khác Click
+        (Checked, PreviewMouse…) trong template KHÔNG được nối —
+        `dev/audit_wiring.py` (W2) bắt trường hợp đó.
         """
         if not getattr(self, 'WIRE_TEMPLATED_CLICKS', False):
             return
@@ -709,11 +713,28 @@ class T3WPFWindow(Window):
         if not clicks:
             return
         try:
-            from System.Windows import RoutedEventHandler
+            from System.Windows import RoutedEventHandler, LogicalTreeHelper
             from System.Windows.Controls.Primitives import ButtonBase
-            from System.Windows.Media import VisualTreeHelper
+            from System.Windows.Media import VisualTreeHelper, Visual
         except BaseException:
             return
+        try:
+            from System.Windows.Documents import Hyperlink
+        except BaseException:
+            Hyperlink = None
+
+        def _parent(node):
+            # Hyperlink / Run là ContentElement, không phải Visual:
+            # VisualTreeHelper.GetParent ném lỗi, phải đi theo logical tree.
+            try:
+                if isinstance(node, Visual):
+                    return VisualTreeHelper.GetParent(node)
+            except BaseException:
+                pass
+            try:
+                return LogicalTreeHelper.GetParent(node)
+            except BaseException:
+                return None
 
         def _dispatch(sender, args):
             try:
@@ -725,7 +746,7 @@ class T3WPFWindow(Window):
                         if handler is not None and callable(handler):
                             handler(node, args)
                         return
-                    node = VisualTreeHelper.GetParent(node)
+                    node = _parent(node)
             except BaseException:
                 pass
 
@@ -733,6 +754,9 @@ class T3WPFWindow(Window):
             # Giữ tham chiếu tới delegate, nếu không GC thu mất và nút chết lại.
             self._templated_click_handler = RoutedEventHandler(_dispatch)
             self.AddHandler(ButtonBase.ClickEvent, self._templated_click_handler, True)
+            # Hyperlink.ClickEvent là routed event RIÊNG, không phải ButtonBase.ClickEvent.
+            if Hyperlink is not None:
+                self.AddHandler(Hyperlink.ClickEvent, self._templated_click_handler, True)
         except BaseException:
             pass
 

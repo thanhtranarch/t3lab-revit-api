@@ -1876,6 +1876,7 @@
                                                     <DataTemplate>
                                                         <CheckBox IsChecked="{Binding is_selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                                   Style="{StaticResource T3.CheckBox}"
+                                                                  Click="sheets_row_checkbox_changed"
                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
                                                                   Padding="0" Margin="0"/>
                                                     </DataTemplate>

@@ -546,6 +546,10 @@ class LocationManagerHandler(IExternalEventHandler):
 # ==================================================
 
 class LocationManagerWindow(T3WPFWindow):
+    # Click= trong DataTemplate không nằm trong namescope của window, nếu
+    # không bật cờ này handler của checkbox/nút từng dòng không bao giờ chạy.
+    WIRE_TEMPLATED_CLICKS = True
+
     def __init__(self, xaml_file_path=None):
         xaml_path = xaml_file_path or XAML_FILE
         self.all_elements    = []

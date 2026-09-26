@@ -1116,12 +1116,6 @@ class ManaSchedWindow(T3WPFWindow):
     def _nav_duplicator_clicked(self, sender, e):
         self.tab_main.SelectedItem = self.tab_duplicator
 
-    def nav_excel_link_clicked(self, sender, e):
-        self._nav_excel_link_clicked(sender, e)
-
-    def nav_duplicator_clicked(self, sender, e):
-        self._nav_duplicator_clicked(sender, e)
-
     # ------------------------------------------------------------------
     # SHARED HELPER
     # ------------------------------------------------------------------
@@ -1513,19 +1507,6 @@ class ManaSchedWindow(T3WPFWindow):
         finally:
             self._set_progress(0, False)
 
-    # XAML Click= aliases for Excel Link tab buttons
-    def btn_preview_clicked(self, sender, e):
-        self._on_preview(sender, e)
-
-    def btn_export_clicked(self, sender, e):
-        self._on_export(sender, e)
-
-    def btn_import_clicked(self, sender, e):
-        self._on_import(sender, e)
-
-    def btn_update_clicked(self, sender, e):
-        self._on_update(sender, e)
-
     # ------------------------------------------------------------------
     # DUPLICATOR - POPULATE CONTROLS
     # ------------------------------------------------------------------
@@ -1697,10 +1678,6 @@ class ManaSchedWindow(T3WPFWindow):
                 "Completed with Errors",
                 MessageBoxButton.OK, MessageBoxImage.Warning
             )
-
-    # XAML Click= alias for Duplicator run button
-    def btn_dup_run_clicked(self, sender, e):
-        self._on_dup_run(sender, e)
 
     # ── Select-all o header cot checkbox ────────────────────────────────
     # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi

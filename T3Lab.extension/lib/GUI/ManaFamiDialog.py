@@ -308,6 +308,10 @@ class FamilyLoadOptions(DB.IFamilyLoadOptions):
 # MAIN CENTRAL WINDOW
 # ==============================================================================
 class ManaFamiWindow(T3WPFWindow):
+    # Click= trong DataTemplate không nằm trong namescope của window, nếu
+    # không bật cờ này handler của checkbox/nút từng dòng không bao giờ chạy.
+    WIRE_TEMPLATED_CLICKS = True
+
     def __init__(self, script_dir, revit):
         T3WPFWindow.__init__(self, _XAML)
         self._script_dir = script_dir

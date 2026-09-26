@@ -2028,8 +2028,7 @@
                                                         <TextBox Text="{Binding CustomFilename, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                                  Style="{StaticResource T3.TextBox}"
                                                                  BorderThickness="0"
-                                                                 ToolTip="Custom filename (leave empty to use pattern)"
-                                                                 PreviewMouseLeftButtonDown="textbox_prevent_toggle"/>
+                                                                 ToolTip="Custom filename (leave empty to use pattern)"/>
                                                     </DataTemplate>
                                                 </GridViewColumn.CellTemplate>
                                             </GridViewColumn>

@@ -8,7 +8,7 @@ import json
 from pyrevit import revit, forms, script
 from GUI.WPF_Base import T3WPFWindow, to_items_source
 from Snippets._host import get_revit_version
-from Snippets._compat import make_eid, eid_value
+from Snippets._compat import make_eid, eid_value, net_list
 
 try:
     from GUI import RevitTheme as _theme
@@ -387,7 +387,7 @@ class RoomToFloorWindow(T3WPFWindow):
 
         if new_floors and self._uidoc:
             try:
-                self._uidoc.Selection.SetElementIds(List[ElementId]([f.Id for f in new_floors if f.IsValidObject]))
+                self._uidoc.Selection.SetElementIds(net_list(ElementId, [f.Id for f in new_floors if f.IsValidObject]))
             except Exception as e:
                 logger.debug("Failed to select created floors: {}".format(e))
 
