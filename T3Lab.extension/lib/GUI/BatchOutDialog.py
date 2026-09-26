@@ -25,14 +25,7 @@ if _lib_dir not in sys.path:
 
 try:
     import _cpython_bootstrap
-    _cpython_bootstrap.init_cpython_paths()
-except Exception:
-    pass
-
-try:
-    from importlib import reload as _reload
-    if 'GUI.WPF_Base' in sys.modules:
-        _reload(sys.modules['GUI.WPF_Base'])
+    _cpython_bootstrap.init_cpython_paths()   # also hot-reloads an edited WPF_Base
 except Exception:
     pass
 
@@ -82,7 +75,6 @@ from Snippets._compat import eid_value, make_eid
 
 try:
     from Intelligence.api_learner import SmartAPIAdapter, RevitAPILearner
-    from Intelligence.api_updater import auto_check_and_update
     HAS_API_LEARNER = True
     _api_learner_err = None
 except Exception as _api_learner_ex:
@@ -171,6 +163,63 @@ VIEW_TYPE_LABELS = _build_view_type_labels()
 NON_EXPORTABLE_VIEW_TYPES = _build_non_exportable_view_types()
 
 
+def _enum_member(enum_name, *members):
+    """First member of DB.<enum_name> this Revit build has, or None."""
+    enum = getattr(DB, enum_name, None)
+    for member in members:
+        value = getattr(enum, member, None) if enum is not None else None
+        if value is not None:
+            return value
+    return None
+
+
+def apply_revit_display_fidelity(options, for_sheets=True):
+    """Make a DWG export look like the Revit view it came from.
+
+    Returns the settings that were applied, for the log.
+
+    - Colors = TrueColorPerView ("True color (RGB values) per view"): every
+      entity carries the RGB Revit draws it in, object styles plus V/G
+      overrides and view filters. The default, IndexColors, colours each layer
+      from the export layer table instead (AIA: magenta text, orange doors,
+      blue schedule fills), which is not what the sheet looks like in Revit.
+      Falls back to TrueColor on a build without the per-view mode.
+    - PropOverrides = ByEntity: element overrides (red dashed demolition,
+      halftone, filter colour / line weight / pattern) stay on the entity
+      instead of being flattened into the category layer.
+    - LineScaling: PaperSpace for sheets (PSLTSCALE = 1, dashes sized per
+      viewport as on the sheet), ViewScale for a view exported on its own.
+    - A hatch background, when the setup turns it on, is the white paper
+      Revit shows — never forced on: it is one colour behind every hatch,
+      which Revit does not draw.
+
+    Line weights go out as Revit's own; AutoCAD draws them only with LWDISPLAY on.
+    """
+    applied = []
+    for prop, value, label in (
+            ('Colors', _enum_member('ExportColorMode', 'TrueColorPerView', 'TrueColor'),
+             'true colors'),
+            ('PropOverrides', _enum_member('PropOverrideMode', 'ByEntity'),
+             'overrides by entity'),
+            ('LineScaling', _enum_member('LineScaling',
+                                         'PaperSpace' if for_sheets else 'ViewScale'),
+             'linetype scale')):
+        if value is None or not hasattr(options, prop):
+            continue
+        try:
+            setattr(options, prop, value)
+            applied.append(label)
+        except Exception as ex:
+            logger.debug("Could not set DWG {}: {}".format(prop, ex))
+    try:
+        if getattr(options, 'UseHatchBackgroundColor', False):
+            options.HatchBackgroundColor = DB.Color(255, 255, 255)
+            applied.append('white hatch background')
+    except Exception as ex:
+        logger.debug("Could not set DWG HatchBackgroundColor: {}".format(ex))
+    return applied
+
+
 def detect_persistent_engine():
     """True only when __persistentengine__ is actually baked into the loaded
     command metadata (pyRevit bakes it at ribbon build — needs a Reload after
@@ -206,8 +255,8 @@ def detect_persistent_engine():
 # debugging instead of just a mysteriously absent smart-adaptation feature.
 if not HAS_API_LEARNER:
     logger.warning(
-        "BatchOut Intelligence helpers unavailable (api_learner/api_updater); "
-        "smart API adaptation & auto-update disabled: {}".format(_api_learner_err))
+        "BatchOut Intelligence helper unavailable (api_learner); "
+        "smart API adaptation disabled: {}".format(_api_learner_err))
 
 # Get Revit version information
 # Read from the Application, not the document: `revit.doc` is None when this
@@ -510,6 +559,8 @@ class ExportProfile(object):
         self.CADExportSetup = "Use setup from file"
         self.CADExportViewsOnSheets = False
         self.CADExportLinksAsExternal = False
+        # Colors / line weights / linetype scale as the Revit view shows them
+        self.CADMatchRevitDisplay = True
 
         # File organization
         self.OutputFolder = os.path.join(os.path.expanduser('~'), 'Documents', 'Revit Exports')
@@ -545,6 +596,7 @@ class ExportProfile(object):
             'CADExportSetup': self.CADExportSetup,
             'CADExportViewsOnSheets': self.CADExportViewsOnSheets,
             'CADExportLinksAsExternal': self.CADExportLinksAsExternal,
+            'CADMatchRevitDisplay': self.CADMatchRevitDisplay,
             'OutputFolder': self.OutputFolder,
             'SplitByFormat': self.SplitByFormat,
             'ReverseOrder': self.ReverseOrder,
@@ -715,11 +767,12 @@ class ExportManagerWindow(T3WPFWindow):
             # Initialize Smart API Adapter for self-learning capability
             if HAS_API_LEARNER:
                 try:
+                    # No web check here: the weekly revitapidocs.com probe that
+                    # used to run at this point was a synchronous WebClient
+                    # download on Revit's UI thread (100 s default timeout),
+                    # holding the window closed on every first open of the week
+                    # for a result that was only ever written to the debug log.
                     self.api_adapter = SmartAPIAdapter(self.doc, REVIT_VERSION)
-                    logger.info("Smart API Adapter initialized successfully")
-
-                    # Check for API updates (non-blocking, runs in background)
-                    self._check_for_api_updates()
                 except Exception as adapter_ex:
                     logger.warning("Could not initialize Smart API Adapter: {}".format(adapter_ex))
                     self.api_adapter = None
@@ -779,36 +832,6 @@ class ExportManagerWindow(T3WPFWindow):
             logger.error("Error initializing BatchOut window: {}".format(ex))
             raise
 
-
-    def _check_for_api_updates(self):
-        """Check for API updates in the background (non-blocking)."""
-        try:
-            # Auto-check for updates (this runs on Fridays or if never checked)
-            update_result = auto_check_and_update()
-
-            if update_result.get('checked'):
-                # Log the check
-                logger.info("API update check performed")
-
-                # Log notifications instead of print_md — any print here pops
-                # the pyRevit output window on every tool open, which defeats
-                # this method being a silent background check.
-                notifications = update_result.get('notifications', [])
-                for notif in notifications:
-                    logger.info("API update [{}]: {}".format(
-                        notif.get('severity', 'info'), notif.get('message', '')))
-
-                # Show learner info
-                if self.api_adapter:
-                    learner_info = self.api_adapter.get_learner_info()
-                    logger.info("API Learner: Cached date: {}, Source: {}".format(
-                        learner_info.get('cached_date'),
-                        learner_info.get('learned_from')
-                    ))
-
-        except Exception as ex:
-            # Don't fail initialization if update check fails
-            logger.debug("API update check failed: {}".format(ex))
 
     def load_profiles(self):
         """Load all saved profiles from disk."""
@@ -966,6 +989,7 @@ class ExportManagerWindow(T3WPFWindow):
             profile.CADExportSetup = self.cad_export_setup.SelectedItem.Content
         profile.CADExportViewsOnSheets = self.cad_export_views_on_sheets.IsChecked if self.cad_export_views_on_sheets.IsChecked is not None else False
         profile.CADExportLinksAsExternal = self.cad_export_links_as_external.IsChecked if self.cad_export_links_as_external.IsChecked is not None else False
+        profile.CADMatchRevitDisplay = bool(self.cad_match_revit_display.IsChecked)
 
         # File organization
         profile.OutputFolder = self.output_folder.Text if self.output_folder.Text else ""
@@ -1034,6 +1058,7 @@ class ExportManagerWindow(T3WPFWindow):
 
             self.cad_export_views_on_sheets.IsChecked = profile.CADExportViewsOnSheets
             self.cad_export_links_as_external.IsChecked = profile.CADExportLinksAsExternal
+            self.cad_match_revit_display.IsChecked = bool(profile.CADMatchRevitDisplay)
 
             # File organization
             self.output_folder.Text = profile.OutputFolder
@@ -2580,15 +2605,14 @@ class ExportManagerWindow(T3WPFWindow):
     def row_checkbox_clicked(self, sender, e):
         """Handle direct click on row CheckBox."""
         try:
-            # Synchronously update data_item.IsSelected to match CheckBox.IsChecked
-            # to eliminate WPF data binding latency from causing the selected count to lag by 1
+            # The ONLY writer of the model: the row CheckBox is bound OneWay
+            # (through the hidden row_selected_text bridge in the XAML).
             if hasattr(sender, 'DataContext') and sender.DataContext is not None:
                 sender.DataContext.IsSelected = bool(sender.IsChecked)
 
-            # Refresh the ListView so ListViewItem.IsSelected binding picks up
-            # the new SheetItem.IsSelected value (highlight stays in sync).
-            # Required because SheetItem is a plain Python object without CLR
-            # INotifyPropertyChanged, so TwoWay binding only auto-pushes UI→model.
+            # SheetItem is a plain Python object without CLR
+            # INotifyPropertyChanged; re-read every visible row so the ticks
+            # always show the model.
             self.sheets_listview.Items.Refresh()
 
             self.update_selection_count()
@@ -3752,28 +3776,15 @@ class ExportManagerWindow(T3WPFWindow):
             else:
                 dwg_options = DWGExportOptions()
 
-            # Force ByEntity regardless of setup outcome. A named export
-            # setup's saved PropOverrides is almost always ByLayer (every
-            # entity on a layer gets one fixed layer color, which is what
-            # AutoCAD's Layer Manager shows) - that silently overrides our
-            # earlier per-branch fallback and is why colors kept coming out
-            # "by layer" instead of matching the view's per-element graphic
-            # overrides (e.g. red dashed demolition, view filters). ByEntity
-            # is what makes each entity carry its own displayed Revit color.
-            try:
-                dwg_options.PropOverrides = PropOverrideMode.ByEntity
-            except Exception as prop_ex:
-                logger.debug("Could not set PropOverrides: {}".format(prop_ex))
-
-            # Solid/hatch fill patterns (filled regions, materials, wall/floor
-            # patterns) otherwise export as foreground lines only, losing the
-            # solid-colour look they have on screen. This is API-only - not
-            # exposed in the Export Setups dialog - so apply it regardless of
-            # whether a named setup was loaded.
-            try:
-                dwg_options.UseHatchBackgroundColor = True
-            except Exception as hatch_ex:
-                logger.debug("Could not set UseHatchBackgroundColor: {}".format(hatch_ex))
+            # "Match Revit display" (default on): colours, overrides and
+            # linetype scale as the view shows them, whatever the setup says.
+            # A setup on IndexColors + ByLayer paints Revit's black linework in
+            # the layer table's colours (magenta text, orange doors, ...).
+            # Off: the selected setup is used exactly as saved (CAD standard).
+            if self.cad_match_revit_display.IsChecked:
+                applied = apply_revit_display_fidelity(
+                    dwg_options, for_sheets=(self.selection_mode == "sheets"))
+                logger.debug("DWG match Revit display: {}".format(", ".join(applied)))
 
             # Set AutoCAD version (overrides whatever the setup/default specifies)
             dwg_version_index = self.dwg_version.SelectedIndex
