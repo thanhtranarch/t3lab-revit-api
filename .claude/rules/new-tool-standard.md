@@ -32,7 +32,7 @@ Không có pattern nào vừa → dừng lại, ghi `DESIGN SYSTEM GAP` vào
 
 ```
 T3Lab.extension/
-├── T3Lab.tab/<Panel>.panel/<Tool>.pushbutton/
+├── T3Lab_Dev.tab/<Panel>.panel/<Tool>.pushbutton/   ← tên thư mục tab đổi được: code dùng core.extension_paths.tab_dir()
 │   ├── script.py          ← entry point, KHÔNG chứa logic Revit nặng
 │   ├── icon.svg           ← NGUỒN DUY NHẤT, viewBox "0 0 32 32"
 │   ├── icon.dark.svg      ← sinh tự động, KHÔNG sửa tay

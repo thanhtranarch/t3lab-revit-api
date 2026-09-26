@@ -123,7 +123,7 @@ Agent definitions: `.claude/agents/`
 
 ```
 T3Lab.extension/
-├── T3Lab.tab/          ← ribbon panels and pushbutton scripts
+├── T3Lab_Dev.tab/      ← ribbon panels and pushbutton scripts (name = tab title; never hardcode it — use core.extension_paths.tab_dir(), dev/tabdir.py in dev tools)
 ├── lib/
 │   ├── GUI/
 │   │   ├── Tools/      ← ALL .xaml files live here

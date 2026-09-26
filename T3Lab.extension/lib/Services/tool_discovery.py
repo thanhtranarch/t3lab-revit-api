@@ -19,11 +19,13 @@ import re
 import io
 import json
 
+from core.extension_paths import tab_dir
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 _SERVICES_DIR = os.path.dirname(os.path.abspath(__file__))
 _LIB_DIR      = os.path.dirname(_SERVICES_DIR)
 _EXT_DIR      = os.path.dirname(_LIB_DIR)
-_TAB_DIR      = os.path.join(_EXT_DIR, 'T3Lab.tab')
+_TAB_DIR      = tab_dir(_EXT_DIR)
 REGISTRY_FILE = os.path.join(_LIB_DIR, 'config', 'tool_registry.json')
 
 # Bump when the entry schema changes — a mismatched on-disk registry is
@@ -64,7 +66,7 @@ _SKIP_BUTTONS = {
 
 def scan_all_buttons():
     """
-    Walk T3Lab.tab and return a list of dicts for every launchable ribbon
+    Walk the ribbon tab folder and return a list of dicts for every launchable ribbon
     button, at any nesting depth (panel/button, panel/stack/button,
     panel/pulldown/stack/button, etc.).
 

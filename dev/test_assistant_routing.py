@@ -31,7 +31,7 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXT = os.path.join(REPO, 'T3Lab.extension')
 LIB = os.path.join(EXT, 'lib')
-TAB = os.path.join(EXT, 'T3Lab.tab')
+from tabdir import TAB  # noqa: E402
 sys.path.insert(0, LIB)
 
 # Sandbox %APPDATA% BEFORE any config/settings import, so settings.json lands
@@ -1642,7 +1642,7 @@ def test_slash_boilerplate_has_three_distinct_modes():
     _t3_path = os.path.join(LIB, 'GUI', 'T3LabAssistantDialog.py')
     if not os.path.exists(_t3_path):
         _t3_path = os.path.join(
-            REPO, 'T3Lab.extension', 'T3Lab.tab', 'Support.panel',
+            TAB, 'Support.panel',
             'T3LabAssistant.pushbutton', 'script.py')
     with _io.open(_t3_path, encoding='utf-8') as f:
         src = f.read()

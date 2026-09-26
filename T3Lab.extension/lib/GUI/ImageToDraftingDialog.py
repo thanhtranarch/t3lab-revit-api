@@ -74,6 +74,7 @@ import Microsoft.Win32
 
 from pyrevit import revit, DB, forms, script
 from GUI.WPF_Base import T3WPFWindow
+from core.extension_paths import tab_dir
 # Put the extension's lib/ on sys.path so GUI.ProgressPauseMixin imports
 # (mirror main()'s "walk up to T3Lab.extension" logic).
 _ext_dir = os.path.dirname(__file__)
@@ -1157,7 +1158,7 @@ class ImageToDraftingWindow(T3WPFWindow):
         self.gs_path      = None   # cached Ghostscript path
         self.temp_files   = []
         ext_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        pb_potrace = os.path.join(ext_dir, 'T3Lab.tab', 'Modeling & Datum.panel', 'Create.stack', 'Create Elements.pulldown', 'ImageToDrafting.pushbutton', 'potrace.exe')
+        pb_potrace = os.path.join(tab_dir(ext_dir), 'Modeling & Datum.panel', 'Create.stack', 'Create Elements.pulldown', 'ImageToDrafting.pushbutton', 'potrace.exe')
         self.potrace_path = pb_potrace if os.path.isfile(pb_potrace) else os.path.join(os.path.dirname(__file__), 'potrace.exe')
 
     # ── window chrome ──────────────────────────────────────────────────────────

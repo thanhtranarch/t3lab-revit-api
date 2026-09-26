@@ -11,11 +11,14 @@ import json
 import os
 import re
 import struct
+import sys
 
 # ── Duong dan ────────────────────────────────────────────────────────────
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-TAB_DIR = os.path.join(REPO, "T3Lab.extension", "T3Lab.tab")
+if os.path.dirname(HERE) not in sys.path:
+    sys.path.insert(0, os.path.dirname(HERE))
+from tabdir import TAB as TAB_DIR  # noqa: E402  (the tab folder name changes)
 TOKENS_FILE = os.path.join(HERE, "tokens.json")
 RENDER_JS = os.path.join(HERE, "render.js")
 
@@ -118,7 +121,7 @@ class Bundle(object):
 
 
 def find_bundles(include_exempt=False):
-    """Moi bundle duoi T3Lab.tab, tru cac bundle duoc mien tru."""
+    """Moi bundle duoi thu muc tab, tru cac bundle duoc mien tru."""
     out = []
     for root, dirs, _files in os.walk(TAB_DIR):
         dirs.sort()

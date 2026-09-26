@@ -9,11 +9,11 @@ try:
 except Exception:
     DB = None
 
+from core.extension_paths import tab_path
+
 LIB_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXT_DIR = os.path.dirname(LIB_DIR)
-CONFIG_PATH = os.path.join(
-    EXT_DIR, 'T3Lab.tab', 'Support.panel', 'UI.stack', 'BG Theme.pushbutton', 'dqt_bg_config.json'
-)
+CONFIG_PATH = tab_path('Support.panel', 'UI.stack', 'BG Theme.pushbutton', 'dqt_bg_config.json')
 if not os.path.exists(os.path.dirname(CONFIG_PATH)):
     CONFIG_PATH = os.path.join(LIB_DIR, 'dqt_bg_config.json')
 

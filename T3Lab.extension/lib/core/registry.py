@@ -10,6 +10,9 @@ Mail: trantienthanh909@gmail.com
 
 import os
 
+from core.extension_paths import tab_dir
+
+
 class ToolRegistry:
     def __init__(self, extension_path=None):
         if extension_path is None:
@@ -19,7 +22,7 @@ class ToolRegistry:
         else:
             self.base_path = extension_path
             
-        self.tab_path = os.path.join(self.base_path, "T3Lab.tab")
+        self.tab_path = tab_dir(self.base_path)
         self.tools = self._initialize_tools()
 
     def _initialize_tools(self):
