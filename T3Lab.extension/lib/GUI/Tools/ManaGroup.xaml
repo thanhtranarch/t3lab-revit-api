@@ -1713,14 +1713,18 @@
                 </Grid>
             </Border>
 
-            <!-- ══════════════════ ROW 1: TAB BAR ══════════════════ -->
-            <Grid Grid.Row="1" Margin="16,12,16,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Style="{StaticResource T3.Pill}" HorizontalAlignment="Left">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- ══════════════════ ROW 1: TAB NAVIGATION STRIP ══════════════════
+                 Same strip as BGTheme: full width, sunken surface, 1px rule under it.
+                 The list filters sit at the right end of the strip. -->
+            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
+                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                    Padding="16,4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <RadioButton x:Name="chip_tab_rename" Content="Rename" GroupName="mg_tabs"
                                      Style="{StaticResource T3.Chip}" IsChecked="True"
                                      Checked="tab_chip_checked" Tag="0"/>
@@ -1734,25 +1738,25 @@
                                      Style="{StaticResource T3.Chip}"
                                      Checked="tab_chip_checked" Tag="3"/>
                     </StackPanel>
-                </Border>
-                <StackPanel Grid.Column="1" Orientation="Horizontal"
-                            HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock x:Name="lbl_kind" Text="Show" Style="{StaticResource T3.Caption}"
-                               VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <ComboBox x:Name="cb_kind" Width="180"
-                              Style="{StaticResource T3.ComboBox}"
-                              ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                              SelectionChanged="kind_filter_changed"/>
-                    <TextBox x:Name="tb_search" Width="220" Height="28" Margin="8,0,0,0"
-                             Style="{StaticResource T3.Search}"
-                             Tag="Search group names..."
-                             TextChanged="search_text_changed"/>
-                    <Button x:Name="btn_refresh" Content="Refresh"
-                            Style="{StaticResource T3.Button.Ghost}"
-                            Margin="8,0,0,0" Padding="12,0" Height="28"
-                            Click="refresh_clicked"/>
-                </StackPanel>
-            </Grid>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock x:Name="lbl_kind" Text="Show" Style="{StaticResource T3.Caption}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="cb_kind" Width="180"
+                                  Style="{StaticResource T3.ComboBox}"
+                                  ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
+                                  SelectionChanged="kind_filter_changed"/>
+                        <TextBox x:Name="tb_search" Width="220" Height="28" Margin="8,0,0,0"
+                                 Style="{StaticResource T3.Search}"
+                                 Tag="Search group names..."
+                                 TextChanged="search_text_changed"/>
+                        <Button x:Name="btn_refresh" Content="Refresh"
+                                Style="{StaticResource T3.Button.Ghost}"
+                                Margin="8,0,0,0" Padding="12,0" Height="28"
+                                Click="refresh_clicked"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
             <!-- ══════════════════ ROW 2: MAIN BODY ══════════════════ -->
             <TabControl x:Name="tab_control" Grid.Row="2" Margin="0"

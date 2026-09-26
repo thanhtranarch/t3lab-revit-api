@@ -1789,9 +1789,21 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <TextBlock Style="{StaticResource T3.Empty}"
-                               Text="No room elements found in view or matching filter."
-                               Visibility="{Binding HasItems, ElementName=room_datagrid, Converter={x:Null}}"/>
+                    <!-- Empty state: shown only while room_datagrid has no rows. (A bool bound straight
+                         to Visibility has no converter, so it stayed Visible over the rows.) -->
+                    <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasItems, ElementName=room_datagrid}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <TextBlock Style="{StaticResource T3.Empty}" Text="No room elements found in view or matching filter."/>
+                    </Grid>
                 </Grid>
 
                 <!-- Right: Settings Panel -->

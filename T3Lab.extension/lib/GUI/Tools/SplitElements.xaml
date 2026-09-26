@@ -1711,7 +1711,33 @@
 
             <!-- ══════════════════ ROW 1: CONTENT WORKSPACE (ZERO-GAP) ══════════════════ -->
             <Grid Grid.Row="1">
-                <TabControl x:Name="tab_elements" Margin="0" Background="Transparent" BorderThickness="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- Tab strip -->
+                    <RowDefinition Height="*"/>    <!-- Tab content -->
+                </Grid.RowDefinitions>
+
+                <!-- TAB NAVIGATION STRIP — same strip as BGTheme / BatchLink / ManaGroup:
+                     full width, sunken surface, 1px rule under it, T3.Chip tabs. -->
+                <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
+                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                        Padding="16,4">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <RadioButton x:Name="chip_tab_walls" Content="Walls" GroupName="se_tabs"
+                                     Style="{StaticResource T3.Chip}" IsChecked="True"
+                                     Checked="tab_chip_checked" Tag="0"/>
+                        <RadioButton x:Name="chip_tab_columns" Content="Columns" GroupName="se_tabs"
+                                     Style="{StaticResource T3.Chip}"
+                                     Checked="tab_chip_checked" Tag="1"/>
+                        <RadioButton x:Name="chip_tab_floors" Content="Floors" GroupName="se_tabs"
+                                     Style="{StaticResource T3.Chip}"
+                                     Checked="tab_chip_checked" Tag="2"/>
+                    </StackPanel>
+                </Border>
+
+                <TabControl x:Name="tab_elements" Grid.Row="1" Margin="0" Background="Transparent" BorderThickness="0">
+                    <TabControl.ItemContainerStyle>
+                        <Style TargetType="TabItem" BasedOn="{StaticResource T3.TabItem.Hidden}"/>
+                    </TabControl.ItemContainerStyle>
                     <!-- Tab 1: Walls -->
                     <TabItem Header="Walls">
                         <Border Background="{StaticResource T3.Surface}" Padding="24,16">

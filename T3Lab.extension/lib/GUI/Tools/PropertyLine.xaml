@@ -1797,11 +1797,15 @@
                                                 </Grid>
                                             </Border>
 
-                                            <!-- Col 2: Parcels List -->
+                                            <!-- Col 2: Parcels List. ONE empty state: PropertyLineDialog
+                                                 (_show_results_message) swaps its text for each phase of the
+                                                 search, so two messages can never stack on each other. -->
                                             <Grid Grid.Column="2">
-                                                <Border x:Name="border_no_results" Background="Transparent" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                                    <TextBlock Text="Enter an address above and click Search to find parcels"
-                                                               Style="{StaticResource T3.Caption}" TextWrapping="Wrap" HorizontalAlignment="Center"/>
+                                                <Border x:Name="border_no_results" Background="Transparent" Padding="16,0"
+                                                        VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                    <TextBlock x:Name="txt_no_results"
+                                                               Text="Enter an address above and click Search to find parcels."
+                                                               Style="{StaticResource T3.Empty}"/>
                                                 </Border>
 
                                                 <ListView x:Name="lv_parcels"
@@ -1829,9 +1833,6 @@
                                                     </ListView.ItemTemplate>
                                                 </ListView>
 
-                                                <TextBlock Style="{StaticResource T3.Empty}"
-                                                           Text="No parcels found"
-                                                           Visibility="{Binding HasItems, ElementName=lv_parcels, Converter={x:Null}}"/>
                                             </Grid>
                                         </Grid>
                                     </StackPanel>

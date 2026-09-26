@@ -1878,9 +1878,21 @@
                                     </GridView>
                                 </ListView.View>
                             </ListView>
-                            <TextBlock Style="{StaticResource T3.Empty}"
-                                       Text="No floors found in model or selected."
-                                       Visibility="{Binding HasItems, ElementName=floors_listview, Converter={x:Null}}"/>
+                            <!-- Empty state: shown only while floors_listview has no rows. (A bool bound straight
+                                 to Visibility has no converter, so it stayed Visible over the rows.) -->
+                            <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasItems, ElementName=floors_listview}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <TextBlock Style="{StaticResource T3.Empty}" Text="No floors found in model or selected."/>
+                            </Grid>
                         </Grid>
                     </Grid>
                 </TabItem>

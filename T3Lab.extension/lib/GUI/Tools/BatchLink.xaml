@@ -1713,9 +1713,11 @@
                 </Grid>
             </Border>
 
-            <!-- ══════════════════ ROW 1: TAB BAR ══════════════════ -->
-            <Border Grid.Row="1" Margin="16,12,16,0" Style="{StaticResource T3.Pill}"
-                    HorizontalAlignment="Left">
+            <!-- ══════════════════ ROW 1: TAB NAVIGATION STRIP ══════════════════
+                 Same strip as BGTheme: full width, sunken surface, 1px rule under it. -->
+            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
+                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                    Padding="16,4">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <RadioButton x:Name="chip_tab_link" Content="Link Models" GroupName="bl_tabs"
                                  Style="{StaticResource T3.Chip}" IsChecked="True"

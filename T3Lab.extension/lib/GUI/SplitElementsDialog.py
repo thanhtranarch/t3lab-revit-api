@@ -67,6 +67,13 @@ class SplitElementsWindow(T3WPFWindow):
         except Exception:
             pass
 
+    def tab_chip_checked(self, sender, e):
+        """Tab strip (T3.Chip, same as BGTheme): show the tab named by Tag."""
+        try:
+            self.tab_elements.SelectedIndex = int(sender.Tag)
+        except (TypeError, ValueError, AttributeError):
+            pass
+
     def _on_execute(self, sender, e):
         idx = 0
         if hasattr(self, 'tab_elements') and self.tab_elements:

@@ -1873,9 +1873,21 @@
                             </DataGrid>
 
                             <!-- T3 Empty state fallback for DataGrid -->
-                            <TextBlock Style="{StaticResource T3.Empty}"
-                                       Text="No elements detected in selected range."
-                                       Visibility="{Binding HasItems, ElementName=results_grid, Converter={x:Null}}"/>
+                            <!-- Empty state: shown only while results_grid has no rows. (A bool bound straight
+                                 to Visibility has no converter, so it stayed Visible over the rows.) -->
+                            <Grid IsHitTestVisible="False" Panel.ZIndex="1">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasItems, ElementName=results_grid}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <TextBlock Style="{StaticResource T3.Empty}" Text="No elements detected in selected range."/>
+                            </Grid>
                         </Grid>
                     </Border>
 

@@ -435,6 +435,32 @@ def audit(src, base, keys):
                                          "luôn đọc unchecked; đọc qua checkbox bridge "
                                          "(WPF_Base.py)" % " ".join(b.split())))
 
+    # ── Luật 25 · Visibility phải nhận được giá trị Visibility thật ─────────
+    # Không có converter nào trong XAML của tool, nên:
+    #  (a) bool (HasItems, IsChecked, ...) bind thẳng vào Visibility → lỗi
+    #      binding → Visibility giữ mặc định Visible: empty state nằm đè lên
+    #      các dòng (PropertyLine + 7 tool, 2026-09-26). Dùng DataTrigger.
+    #  (b) thuộc tính Python của dòng ("Visible"/"Collapsed") là PyObject,
+    #      không đổi được sang Visibility — đọc qua string bridge như luật 24.
+    bool_paths = ("HasItems", "IsChecked", "IsEnabled", "IsSelected", "IsFocused",
+                  "IsMouseOver", "IsOpen", "IsExpanded", "IsVisible", "IsKeyboardFocused")
+    for el in root.iter():
+        v = {local(k): val for k, val in el.attrib.items()}.get("Visibility", "")
+        if not v.startswith("{Binding"):
+            continue
+        flat = " ".join(v.split())
+        m = re.match(r"\{Binding\s+(?:Path=)?([\w.]+)", flat)
+        path = m.group(1) if m else ""
+        has_conv = "Converter=" in flat and "Converter={x:Null}" not in flat
+        if "Converter={x:Null}" in flat or (path in bool_paths and not has_conv):
+            issues.append(("P1", "Visibility=\"%s\" — bool không tự đổi sang Visibility; "
+                                 "dùng DataTrigger (Setter Visibility)" % flat))
+        elif ("ElementName" not in flat and "RelativeSource" not in flat and not has_conv
+              and any(local(a.tag) in ("DataTemplate", "HierarchicalDataTemplate")
+                      for a in ancestors(el))):
+            issues.append(("P1", "Visibility=\"%s\" trong template dòng — thuộc tính Python "
+                                 "không đổi được sang Visibility; đọc qua string bridge" % flat))
+
     # ── Luật 22 · ICON — một bộ icon cho toàn extension ───────────────────
     # (a) Font icon duy nhất là Segoe MDL2 Assets, và LUÔN qua style T3.Icon.*
     #     — không hardcode FontFamily/FontSize tại chỗ dùng.
