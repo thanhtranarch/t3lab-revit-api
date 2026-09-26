@@ -173,11 +173,15 @@ class ManaSheetsTests(unittest.TestCase):
         ui.step_progress = Mock(return_value=True)
         ui.is_cancelled = False
         ui._load_sheets_data()
-        ui.renumber_items = [NS(IsSelected=True, sheet_model=r, preview_number='STALE')
+        ui.renumber_items = [NS(IsSelected=True, sheet_model=r, preview_number='STALE',
+                                orig_number=r.sheet_number)
                              for r in ui.all_sheets]
         ui.renum_start_box, ui.renum_step_box = NS(Text='1'), NS(Text='1')
         ui.renum_prefix_box, ui.renum_suffix_box = NS(Text=''), NS(Text='')
         ui.renum_grid = NS(Items=NS(Refresh=Mock()))
+        # Metrics strip of the Renumber tab (ManaSheets.xaml)
+        ui.renum_total_text, ui.renum_selected_text = NS(Text=''), NS(Text='')
+        ui.renum_first_text, ui.renum_changes_text = NS(Text=''), NS(Text='')
         return ui
 
     def stage(self, row, **changes):
@@ -325,6 +329,23 @@ class ManaSheetsTests(unittest.TestCase):
         ui.renum_start_box.Text = 'bad'
         ui._on_renum_run(None, None)
         self.assertEqual(self.doc.transactions, [])
+
+    def test_renumber_metrics_strip_follows_selection_config_and_preview(self):
+        ui = self.controller()
+        ui.renumber_items[1].IsSelected = False
+        ui.renum_prefix_box.Text, ui.renum_start_box.Text = 'A-', '101'
+        ui._update_renum_summary()
+        self.assertEqual((ui.renum_total_text.Text, ui.renum_selected_text.Text,
+                          ui.renum_first_text.Text), ('2', '1', 'A-101'))
+        for item in ui.renumber_items:
+            item.preview_number = item.orig_number
+        ui._update_renum_summary()
+        self.assertEqual(ui.renum_changes_text.Text, '0')
+        self.assertTrue(ui._on_renum_preview(None, None))
+        self.assertEqual(ui.renum_changes_text.Text, '1')     # only the selected row
+        ui.renum_start_box.Text = 'bad'
+        ui._on_renum_config_changed(None, None)
+        self.assertEqual(ui.renum_first_text.Text, '-')
 
     def test_renumber_ui_stop_preserves_preview_and_pending(self):
         ui = self.controller()

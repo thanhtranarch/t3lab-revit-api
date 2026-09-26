@@ -237,6 +237,9 @@ class SheetManagerWindow(T3WPFWindow):
         self.renum_run_btn.Click += self._on_renum_run
         self.renum_close_btn.Click += self._on_close
         self.renum_grid.ItemsSource = self.renumber_items
+        for box in (self.renum_prefix_box, self.renum_start_box,
+                    self.renum_step_box, self.renum_suffix_box):
+            box.TextChanged += self._on_renum_config_changed
 
         # Column filters (nút phễu trên header — GUI/DataGridColumnFilter.py).
         # Chỉ gắn cho bảng SHEETS: bảng Renumber là preview của chính danh sách
@@ -460,6 +463,10 @@ class SheetManagerWindow(T3WPFWindow):
         """Click của checkbox từng dòng (template column nên CellEditEnding không
         chạy) — giữ bộ đếm SELECTED cập nhật ngay. Nối qua WIRE_TEMPLATED_CLICKS."""
         self._update_sheets_summary()
+
+    def renum_row_checkbox_changed(self, sender, args):
+        """Như trên, cho bảng Renumber. Nối qua WIRE_TEMPLATED_CLICKS."""
+        self._update_renum_summary()
 
     def _on_sheets_cell_edit(self, sender, args):
         """Stage the edit and paint the cell amber. Apply Changes writes it.
@@ -774,6 +781,29 @@ class SheetManagerWindow(T3WPFWindow):
         self.renumber_items.Clear()
         for s in self.filtered_sheets:
             self.renumber_items.Add(RenumberItem(s))
+        self._update_renum_summary()
+
+    def _update_renum_summary(self):
+        """Metrics strip of the Renumber tab — same frame as the Sheets tab."""
+        items = list(self.renumber_items)
+        selected = [item for item in items if item.IsSelected]
+        self.renum_total_text.Text = str(len(items))
+        self.renum_selected_text.Text = str(len(selected))
+        self.renum_changes_text.Text = str(sum(
+            1 for item in selected if item.preview_number != item.orig_number))
+        self.renum_first_text.Text = self._renum_first_number()
+
+    def _renum_first_number(self):
+        """Number the first selected sheet will get, or '-' while START AT is invalid."""
+        try:
+            start = int(self.renum_start_box.Text)
+        except (TypeError, ValueError):
+            return "-"
+        return u"{}{}{}".format(self.renum_prefix_box.Text or "", start,
+                                self.renum_suffix_box.Text or "")
+
+    def _on_renum_config_changed(self, sender, args):
+        self._update_renum_summary()
 
     def _on_renum_refresh(self, sender, args):
         if not self._flush_edits():
@@ -804,6 +834,7 @@ class SheetManagerWindow(T3WPFWindow):
         for item, (_, number) in zip(selected, pairs):
             item.preview_number = number
         self.renum_grid.Items.Refresh()
+        self._update_renum_summary()
         return True
 
     def _on_renum_run(self, sender, args):
@@ -841,6 +872,7 @@ class SheetManagerWindow(T3WPFWindow):
     def select_all_renum_grid_clicked(self, sender, e):
         """Header checkbox: chon/bo chon moi dong dang hien thi cua renum_grid."""
         self.toggle_all_rows(self.renum_grid, "IsSelected", sender.IsChecked)
+        self._update_renum_summary()
 
 
 # =====================================================

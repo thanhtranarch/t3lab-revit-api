@@ -803,6 +803,33 @@
             <Setter Property="ToolTip" Value="Click the column name to filter"/>
           </Style>
 
+          <!-- ══════════════════ CỘT CHECKBOX (chọn dòng)
+               Header và ô dòng phải cùng MỘT hình học thì ô select-all mới nằm đúng
+               trên hàng ô tick: không padding, hộp căn giữa theo bề rộng cột.
+               T3.DataGridColumnHeader có Padding 8 + nội dung căn trái, T3.DataGridCell
+               có Padding 8, và T3.CheckBox có Padding 8 bên trái dành cho nhãn — ghép
+               lại thì header lệch vài px so với dòng (ManaViews 2026-09-26).
+                 <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                         HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                         CellStyle="{StaticResource T3.DataGridCell.Check}">
+               và cả checkbox header lẫn checkbox dòng dùng Style="{StaticResource T3.CheckBox.Cell}".
+               ══════════════════ -->
+          <Style x:Key="T3.DataGridColumnHeader.Check" TargetType="DataGridColumnHeader"
+                 BasedOn="{StaticResource T3.DataGridColumnHeader}">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+          </Style>
+          <Style x:Key="T3.DataGridCell.Check" TargetType="DataGridCell"
+                 BasedOn="{StaticResource T3.DataGridCell}">
+            <Setter Property="Padding" Value="0"/>
+          </Style>
+          <!-- Checkbox không nhãn: bỏ Padding dành cho nhãn để hộp nằm đúng tâm. -->
+          <Style x:Key="T3.CheckBox.Cell" TargetType="CheckBox" BasedOn="{StaticResource T3.CheckBox}">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+          </Style>
+
           <!-- Dòng giá trị trong popup lọc (Python dựng, dùng khóa này cho checkbox). -->
           <Style x:Key="T3.Filter.Item" TargetType="CheckBox" BasedOn="{StaticResource T3.CheckBox}">
             <Setter Property="Margin"  Value="0,0,0,4"/>
@@ -1860,25 +1887,22 @@
                                               HorizontalScrollBarVisibility="Disabled"
                                               EnableRowVirtualization="True">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
+                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                    CellStyle="{StaticResource T3.DataGridCell.Check}">
                                                 <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_all_sheets_grid" Style="{StaticResource T3.CheckBox}"
+                                                    <CheckBox x:Name="chk_all_sheets_grid" Style="{StaticResource T3.CheckBox.Cell}"
                                                               Click="select_all_sheets_grid_clicked"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
                                                               ToolTip="Select all rows"/>
                                                 </DataGridTemplateColumn.Header>
-                                                <DataGridTemplateColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Setter Property="Padding" Value="0"/>
-                                                    </Style>
-                                                </DataGridTemplateColumn.CellStyle>
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
-                                                        <CheckBox IsChecked="{Binding is_selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  Click="sheets_row_checkbox_changed"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                  Padding="0" Margin="0"/>
+                                                        <Grid>
+                                                            <TextBlock x:Name="row_is_selected_text" Text="{Binding is_selected}" Visibility="Collapsed"/>
+                                                            <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
+                                                                      Style="{StaticResource T3.CheckBox.Cell}"
+                                                                      Click="sheets_row_checkbox_changed"/>
+                                                        </Grid>
                                                     </DataTemplate>
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
@@ -2018,13 +2042,68 @@ Binding="{Binding drawn_by}" Width="110"
                     <TabItem x:Name="tab_renumber_item">
                         <Grid Margin="0" Background="{StaticResource T3.Surface}">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- Metrics Strip -->
                                 <RowDefinition Height="*"/>    <!-- Config Panel & DataGrid -->
                                 <RowDefinition Height="Auto"/> <!-- Bottom Actions Bar -->
                             </Grid.RowDefinitions>
 
-                            <Grid Grid.Row="0">
+                            <!-- Metrics Strip: same frame as the Sheets tab, so switching
+                                 tabs never makes the header jump. -->
+                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
+                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                                    Padding="0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="240"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
+                                        <StackPanel Margin="16,12">
+                                            <TextBlock Text="TOTAL SHEETS" Style="{StaticResource T3.Caption}"/>
+                                            <TextBlock x:Name="renum_total_text" Text="0" Style="{StaticResource T3.Display}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Grid Grid.Column="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="1"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="1"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" Margin="16,12">
+                                            <TextBlock Text="SELECTED" Style="{StaticResource T3.Caption}"
+                                                       Foreground="{StaticResource T3.Success.Text}"/>
+                                            <TextBlock x:Name="renum_selected_text" Text="0" Style="{StaticResource T3.Display}"
+                                                       Foreground="{StaticResource T3.Success.Text}"/>
+                                        </StackPanel>
+
+                                        <Border Grid.Column="1" Background="{StaticResource T3.Border}" Margin="0,4"/>
+
+                                        <StackPanel Grid.Column="2" Margin="16,12">
+                                            <TextBlock Text="FIRST NEW NUMBER" Style="{StaticResource T3.Caption}"/>
+                                            <TextBlock x:Name="renum_first_text" Text="-" Style="{StaticResource T3.Display}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+
+                                        <Border Grid.Column="3" Background="{StaticResource T3.Border}" Margin="0,4"/>
+
+                                        <StackPanel Grid.Column="4" Margin="16,12">
+                                            <TextBlock Text="PREVIEWED CHANGES" Style="{StaticResource T3.Caption}"
+                                                       Foreground="{StaticResource T3.Warning.Text}"/>
+                                            <TextBlock x:Name="renum_changes_text" Text="0" Style="{StaticResource T3.Display}"
+                                                       Foreground="{StaticResource T3.Warning.Text}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <Grid Grid.Row="1">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280"/>
+                                    <ColumnDefinition Width="240"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
@@ -2081,24 +2160,22 @@ Binding="{Binding drawn_by}" Width="110"
                                               HorizontalScrollBarVisibility="Disabled"
                                               EnableRowVirtualization="True">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
+                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                    CellStyle="{StaticResource T3.DataGridCell.Check}">
                                                 <DataGridTemplateColumn.Header>
-                                                    <CheckBox x:Name="chk_all_renum_grid" Style="{StaticResource T3.CheckBox}"
+                                                    <CheckBox x:Name="chk_all_renum_grid" Style="{StaticResource T3.CheckBox.Cell}"
                                                               Click="select_all_renum_grid_clicked"
-                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
                                                               ToolTip="Select all rows"/>
                                                 </DataGridTemplateColumn.Header>
-                                                <DataGridTemplateColumn.CellStyle>
-                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
-                                                        <Setter Property="Padding" Value="0"/>
-                                                    </Style>
-                                                </DataGridTemplateColumn.CellStyle>
                                                 <DataGridTemplateColumn.CellTemplate>
                                                     <DataTemplate>
-                                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Style="{StaticResource T3.CheckBox}"
-                                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                  Padding="0" Margin="0"/>
+                                                        <Grid>
+                                                            <TextBlock x:Name="row_is_selected_text_2" Text="{Binding IsSelected}" Visibility="Collapsed"/>
+                                                            <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text_2, Mode=OneWay}"
+                                                                      Style="{StaticResource T3.CheckBox.Cell}"
+                                                                      Click="renum_row_checkbox_changed"/>
+                                                        </Grid>
                                                     </DataTemplate>
                                                 </DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
@@ -2129,7 +2206,7 @@ Binding="{Binding drawn_by}" Width="110"
                             </Grid>
 
                             <!-- Bottom Actions Bar: Docked flush at bottom with 1px top border -->
-                            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
+                            <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                     Padding="16,8">
                                 <Grid>
