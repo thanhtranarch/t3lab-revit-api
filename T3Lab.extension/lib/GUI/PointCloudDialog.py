@@ -138,30 +138,6 @@ def ft_to_mm(ft):
 def mm_to_ft(mm):
     return mm / MM_PER_FOOT
 
-def internal_to_mm(value_ft):
-    """Convert Revit internal (feet) to millimetres, version-safe."""
-    try:
-        if REVIT_VERSION >= 2022:
-            from Autodesk.Revit.DB import UnitUtils, UnitTypeId
-            return UnitUtils.ConvertFromInternalUnits(value_ft, UnitTypeId.Millimeters)
-        else:
-            from Autodesk.Revit.DB import UnitUtils, DisplayUnitType
-            return UnitUtils.ConvertFromInternalUnits(value_ft, DisplayUnitType.DUT_MILLIMETERS)
-    except Exception:
-        return value_ft * MM_PER_FOOT
-
-def mm_to_internal(value_mm):
-    """Convert millimetres to Revit internal (feet), version-safe."""
-    try:
-        if REVIT_VERSION >= 2022:
-            from Autodesk.Revit.DB import UnitUtils, UnitTypeId
-            return UnitUtils.ConvertToInternalUnits(value_mm, UnitTypeId.Millimeters)
-        else:
-            from Autodesk.Revit.DB import UnitUtils, DisplayUnitType
-            return UnitUtils.ConvertToInternalUnits(value_mm, DisplayUnitType.DUT_MILLIMETERS)
-    except Exception:
-        return value_mm / MM_PER_FOOT
-
 
 # ── Section 2: Point Cloud Extraction ─────────────────────────────────────────
 
@@ -327,24 +303,6 @@ def extract_full_cloud_from_region(pc_instance, center, hx, hy, hz,
 
 # ── Section 3: Geometry Math (pure Python) ────────────────────────────────────
 
-def fit_line_2d(pts_xy):
-    """
-    Principal-axis LSR on 2D points.
-    Returns (angle_rad, cx, cy) or None if fewer than 10 points.
-    """
-    if len(pts_xy) < 10:
-        return None
-    xs = [p[0] for p in pts_xy]
-    ys = [p[1] for p in pts_xy]
-    n = len(xs)
-    mx = sum(xs) / n
-    my = sum(ys) / n
-    sxx = sum((x - mx) ** 2 for x in xs)
-    sxy = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
-    syy = sum((y - my) ** 2 for y in ys)
-    angle = 0.5 * math.atan2(2.0 * sxy, sxx - syy)
-    return angle, mx, my
-
 
 def line_thickness_2d(pts_xy, angle, cx, cy):
     """97.5th–2.5th percentile span on the wall-normal axis (in feet)."""
@@ -356,21 +314,6 @@ def line_thickness_2d(pts_xy, angle, cx, cy):
     n = len(proj)
     lo = int(round(0.025 * n))
     hi = int(round(0.975 * n)) - 1
-    if hi <= lo:
-        return abs(proj[-1] - proj[0])
-    return abs(proj[hi] - proj[lo])
-
-
-def line_length_2d(pts_xy, angle, cx, cy, percentile_lo=0.01, percentile_hi=0.99):
-    """99th–1st percentile span along the wall direction (in feet)."""
-    if not pts_xy:
-        return 0.0
-    dx = math.cos(angle)
-    dy = math.sin(angle)
-    proj = sorted((p[0] - cx) * dx + (p[1] - cy) * dy for p in pts_xy)
-    n = len(proj)
-    lo = int(round(percentile_lo * n))
-    hi = int(round(percentile_hi * n)) - 1
     if hi <= lo:
         return abs(proj[-1] - proj[0])
     return abs(proj[hi] - proj[lo])
@@ -614,18 +557,6 @@ class PointCloudAnalyzer(object):
             pass
         return angles
 
-    def _snap_angle(self, angle_rad, tol_deg=1.0):
-        tol = math.radians(tol_deg)
-        a = angle_rad % math.pi
-        for ref in self._grid_angles:
-            r = ref % math.pi
-            for cand in [r, (r + math.pi / 2.0) % math.pi]:
-                diff = abs(a - cand)
-                if diff > math.pi / 2.0:
-                    diff = math.pi - diff
-                if diff <= tol:
-                    return cand, True, u"Snapped {:.1f}°".format(math.degrees(cand))
-        return a, False, u"{:.2f}°".format(math.degrees(a))
 
     def _all_levels(self):
         """Project levels, queried once. _best_level runs per detected element,

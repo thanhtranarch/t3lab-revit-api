@@ -115,11 +115,6 @@ class RibbonNameWindow(T3WPFWindow):
                 self._originals_dirty = True
         self.originals["__tab_ids__"] = identities
 
-    def _full_name_of(self, tab):
-        for original_tab, full in self._tab_identities:
-            if original_tab is tab:
-                return full
-        return None
 
     def _build_rows(self):
         seen = set()

@@ -81,18 +81,6 @@ class ChangeTracker(object):
         if item not in self.modified_items and item not in self.created_items:
             self.modified_items.append(item)
     
-    def track_creation(self, item):
-        """Track newly created item"""
-        if item not in self.created_items:
-            self.created_items.append(item)
-    
-    def track_deletion(self, item):
-        """Track deleted item"""
-        if item not in self.deleted_items:
-            self.deleted_items.append(item)
-            # Remove from modified if present
-            if item in self.modified_items:
-                self.modified_items.remove(item)
     
     def has_changes(self):
         """Check if there are any changes"""

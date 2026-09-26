@@ -33,7 +33,6 @@ DIALOGS_TO_VERIFY = [
     ("BCFReaderDialog.py", "BCFReader.xaml"),
     ("BatchOutDialog.py", "ExportManager.xaml"),
     ("DoorThresholdDialog.py", "DoorThreshold.xaml"),
-    ("FoundationVolumeDialog.py", "FoundationVolume.xaml"),
     ("ImageToDraftingDialog.py", "ImageToDrafting.xaml"),
     ("ManaDWGDialog.py", "DWGManagement.xaml"),
     ("ManaLocaDialog.py", "ManaLoca.xaml"),

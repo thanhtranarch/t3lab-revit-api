@@ -45,14 +45,6 @@ class ToolWrapper:
         except Exception as ex:
             print(json.dumps({"status": "error", "message": str(ex)}))
 
-def get_args():
-    """Helper to get JSON arguments from sys.argv."""
-    if len(sys.argv) > 1:
-        try:
-            return json.loads(sys.argv[1])
-        except:
-            return None
-    return None
 
 def respond(status="success", message="", data=None):
     """Standardized response format for Agent."""

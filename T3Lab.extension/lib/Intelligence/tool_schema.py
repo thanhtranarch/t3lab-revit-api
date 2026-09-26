@@ -234,10 +234,6 @@ def is_model_modifying(name):
 _cache = {}   # keys: "raw", "anthropic[_ess]", "openai[_ess]"
 
 
-def invalidate_cache():
-    _cache.clear()
-
-
 def get_server_tools():
     """Return the raw tool list from the local MCP server registry.
 
@@ -373,9 +369,3 @@ def get_tools_by_names(provider_name, names, extra_tools=None):
     return _convert(subset + list(extra_tools or []), provider_name)
 
 
-def is_registered_tool(name):
-    """True if `name` is a real MCP tool in the server registry."""
-    for t in get_server_tools():
-        if t["name"] == name:
-            return True
-    return False

@@ -217,13 +217,3 @@ def get_intent_info(intent):
     return None, None
 
 
-def get_apis_text():
-    """Return a plain-text list of all available APIs for display in settings."""
-    lines = []
-    current_cat = None
-    for intent, (cat, desc, ex) in sorted(get_available_intents().items(), key=lambda x: x[1][0]):
-        if cat != current_cat:
-            lines.append(u"\n── {} ──".format(cat.upper()))
-            current_cat = cat
-        lines.append(u"  {}  —  {}".format(intent, desc))
-    return u"\n".join(lines).strip()

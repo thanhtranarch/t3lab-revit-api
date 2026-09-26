@@ -65,73 +65,6 @@ class PurgeCategory:
         self.unused_items = []
         self.scan_error = None
     
-    @property
-    def unused_count(self):
-        """Get count of unused items"""
-        return len(self.unused_items) if self.unused_items else 0
-    
-    def get_display_text(self):
-        """Get display text for UI"""
-        if self.is_scanned:
-            count = self.unused_count
-            if count > 0:
-                return "{} {} ({})".format(self.icon, self.name, count)
-            else:
-                return "{} {} (0)".format(self.icon, self.name)
-        else:
-            return "{} {}".format(self.icon, self.name)
-    
-    def get_safety_color(self):
-        """Get safety color for UI"""
-        if self.safety_level == SAFETY_SAFE:
-            return "#FF10B981"  # Green
-        else:  # SAFETY_WARNING
-            return "#FFFFC107"  # Yellow/Orange
-    
-    def get_safety_icon(self):
-        """Get safety icon for UI"""
-        if self.safety_level == SAFETY_SAFE:
-            return u"\u2713"  # ✓ Checkmark
-        else:  # SAFETY_WARNING
-            return u"\u26A0"  # ⚠ Warning
-    
-    def get_safety_text(self):
-        """Get safety level text"""
-        return self.safety_level
-    
-    def get_priority_text(self):
-        """Get priority text"""
-        return self.priority
-    
-    def reset_scan_state(self):
-        """Reset scan state"""
-        self.is_scanned = False
-        self.unused_items = []
-        self.scan_error = None
-    
-    def get_description(self):
-        """Get description"""
-        return self.description
-    
-    def get_status_text(self):
-        """Get status text for UI"""
-        if not self.is_scanned:
-            return "Not scanned"
-        elif self.scan_error:
-            return "Error: {}".format(self.scan_error)
-        elif self.unused_count > 0:
-            return "{} unused".format(self.unused_count)
-        else:
-            return "All in use"
-    
-    def is_safe(self):
-        """Check if category is safe"""
-        return self.safety_level == SAFETY_SAFE
-    
-    def is_warning(self):
-        """Check if category is warning"""
-        return self.safety_level == SAFETY_WARNING
-
 
 # ============================================================================
 # GROUP 1: ELEMENT TYPES (9 categories)
@@ -484,24 +417,3 @@ def create_purge_categories():
     return categories
 
 
-def get_category_by_id(categories, category_id):
-    """Get category object by ID"""
-    for cat in categories:
-        if cat.id == category_id:
-            return cat
-    return None
-
-
-def get_categories_by_group(categories, group_id):
-    """Get all categories in a group"""
-    return [cat for cat in categories if cat.group_id == group_id]
-
-
-def get_safe_categories(categories):
-    """Get all categories with SAFETY_SAFE level"""
-    return [cat for cat in categories if cat.safety_level == SAFETY_SAFE]
-
-
-def get_warning_categories(categories):
-    """Get all categories with SAFETY_WARNING level"""
-    return [cat for cat in categories if cat.safety_level == SAFETY_WARNING]

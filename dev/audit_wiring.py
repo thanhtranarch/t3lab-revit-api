@@ -298,20 +298,7 @@ for p in PY:
 
 # ── Giữ lại có chủ đích (không fail gate) — mỗi dòng PHẢI có lý do ─────────
 # (tên file, mã, chuỗi con của thông điệp) -> lý do
-ALLOW = {
-    ("T3LabAssistantDialog.py", "D1", "_msg_"):
-        "thanh action dưới câu trả lời bị tắt theo yêu cầu user (_make_message_actions trả None)",
-    ("PropertyLineDialog.py", "D1", "btn_"):
-        "tab API Settings bị gỡ khỏi XAML 2026-09-06 — chờ user quyết: khôi phục hay xoá code",
-    ("PropertyLineDialog.py", "W1", "txt_setback_"):
-        "_get_min_setback() không được gọi — cùng nhóm tính năng API/setback đang chờ quyết",
-    ("BatchOutDialog.py", "D1", "_clicked()"):
-        "UI profile / help / sheet-set cũ đã gỡ khỏi ExportManager.xaml — chờ user quyết",
-    ("BatchOutDialog.py", "D1", "filter_by_vs_changed"):
-        "checkbox Filter by V/S đã gỡ khỏi ExportManager.xaml — chờ user quyết",
-    ("ManaWorksetDialog.py", "W1", "doc_name"):
-        "bọc try/except: tên file không hiện nữa từ bản UI 2026-09-02, không crash",
-}
+ALLOW = {}
 
 
 def allowed(f, code, msg):

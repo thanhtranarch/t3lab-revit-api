@@ -310,16 +310,10 @@ def current_theme():
     return 'light'
 
 
-def is_dark(theme=None):
-    """True when the surface should paint itself dark."""
-    return (theme or current_theme()) == 'dark'
-
-
 def force_theme(theme):
     """Pin the theme ('light' / 'dark'), or pass None to follow Revit again."""
     global _forced_theme
     _forced_theme = theme if theme in _PALETTES else None
-
 
 
 # ─── Host palette bridge ──────────────────────────────────────────────────────
@@ -514,11 +508,6 @@ def _host_dictionary(theme):
     return found
 
 
-def host_error():
-    """Why the last host lookup found nothing, or None if it succeeded."""
-    return _host_error
-
-
 def _solid_hex(resource):
     """'#RRGGBB' for a SolidColorBrush or a raw Color; None for anything else.
 
@@ -594,20 +583,6 @@ def _host_hex(token, theme):
     if not host_coverage(theme)[0]:
         return None
     return _host_hex_raw(token, theme)
-
-
-def host_report(theme=None):
-    """``{token: ('#RRGGBB', source)}`` — which tokens came from Revit itself.
-
-    A diagnostic, not a hot path: run it once in a Revit session to see how much
-    of the window is genuinely the host's palette on that version.
-    """
-    theme = theme or current_theme()
-    out = {}
-    for token in palette(theme):
-        live = _host_hex(token, theme) if _use_host else None
-        out[token] = (live, 'revit') if live else (palette(theme)[token], 't3lab')
-    return out
 
 
 def host_resource(base, theme=None):

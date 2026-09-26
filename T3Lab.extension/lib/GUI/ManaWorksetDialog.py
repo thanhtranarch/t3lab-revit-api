@@ -192,11 +192,6 @@ class WorksetManagerWindow(T3WPFWindow):
         self._adopt_host_font()
         self._apply_theme()
 
-        try:
-            fname = os.path.basename(self._doc.PathName) if (self._doc and self._doc.PathName) else "Unsaved Document"
-            self.doc_name.Text = "  ·  {}".format(fname)
-        except Exception:
-            pass
 
         self.list_file_path = DEFAULT_LIST_FILE
         self._update_list_path_display()

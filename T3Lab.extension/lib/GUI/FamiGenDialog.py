@@ -3077,9 +3077,3 @@ class FamilyCreatorDialog(T3WPFWindow):
 def show_family_creator(revit_doc, revit_app, initial_mode='cad'):
     FamilyCreatorDialog(revit_doc, revit_app, initial_mode).ShowDialog()
 
-def show_family_creator_cad(revit_doc, revit_app):
-    show_family_creator(revit_doc, revit_app, 'cad')
-
-def show_family_creator_json(revit_doc, revit_app):
-    show_family_creator(revit_doc, revit_app, 'json')
-

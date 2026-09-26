@@ -193,18 +193,6 @@ class MainWindow(Window):
         if hasattr(self, 'status_text'):
             self.status_text.Text = message
     
-    def update_status_with_counts(self):
-        """Update status with change counts"""
-        modified = len(self.change_tracker.modified_items)
-        created = len(self.change_tracker.created_items)
-        deleted = len(self.change_tracker.deleted_items)
-        
-        if modified > 0 or created > 0 or deleted > 0:
-            msg = "Changes: {} modified | {} created | {} deleted".format(modified, created, deleted)
-        else:
-            msg = "Ready - No pending changes"
-        
-        self.update_status(msg)
     
     def on_apply_click(self, sender, args):
         """Apply all changes"""

@@ -702,13 +702,6 @@ class AnnotationManagerWindow(T3WPFWindow):
         kind = "note(s)" if self._txt_submode == "notes" else "type(s)"
         self._status("Loaded {} {}.".format(n, kind))
 
-    def dim_refresh(self, sender, args):
-        self._load_all_dims()
-        self._load_sidebar_lists()
-
-    def txt_refresh(self, sender, args):
-        self._load_all_txts()
-        self._load_sidebar_lists()
 
     def _remove_rows(self, dt, elem_map, ok_ids):
         ok_set = set(ok_ids)
@@ -993,38 +986,6 @@ class AnnotationManagerWindow(T3WPFWindow):
         self._load_all_dims()
         self._load_sidebar_lists()
 
-    def dim_delete_unused(self, sender, args):
-        from pyrevit import forms as pf
-        all_dims = FilteredElementCollector(doc).OfClass(Dimension)\
-                   .WhereElementIsNotElementType().ToElements()
-        used_ids = set()
-        for d in all_dims:
-            try:
-                used_ids.add(str(d.DimensionType.Id))
-            except Exception:
-                pass
-        all_types = FilteredElementCollector(doc).OfClass(DimensionType)\
-                    .WhereElementIsElementType().ToElements()
-        unused = [dt for dt in all_types if str(dt.Id) not in used_ids]
-        if not unused:
-            self._status("No unused Dimension Types found.")
-            return
-        if not pf.alert("Purge {} unused Dimension Type(s)?\nThis cannot be undone.".format(len(unused)),
-                        title="Confirm Purge", yes=True, no=True):
-            return
-        t = Transaction(doc, "Purge Unused Dimension Types")
-        t.Start()
-        ok = 0
-        for dt in unused:
-            try:
-                doc.Delete(dt.Id)
-                ok += 1
-            except Exception:
-                pass
-        t.Commit()
-        self._status("Purged {} unused Dimension Type(s).".format(ok))
-        self._load_all_dims()
-        self._load_sidebar_lists()
 
     # ── TextNote sub-mode ────────────────────────────────────────────────
 
@@ -1276,38 +1237,6 @@ class AnnotationManagerWindow(T3WPFWindow):
         self._load_all_txts()
         self._load_sidebar_lists()
 
-    def txt_delete_unused(self, sender, args):
-        from pyrevit import forms as pf
-        all_notes = FilteredElementCollector(doc).OfClass(TextNote)\
-                    .WhereElementIsNotElementType().ToElements()
-        used_ids = set()
-        for tn in all_notes:
-            try:
-                used_ids.add(str(tn.TextNoteType.Id))
-            except Exception:
-                pass
-        all_types = FilteredElementCollector(doc).OfClass(TextNoteType)\
-                    .WhereElementIsElementType().ToElements()
-        unused = [tt for tt in all_types if str(tt.Id) not in used_ids]
-        if not unused:
-            self._status("No unused Text Note Types found.")
-            return
-        if not pf.alert("Purge {} unused Text Note Type(s)?\nThis cannot be undone.".format(len(unused)),
-                        title="Confirm Purge", yes=True, no=True):
-            return
-        t = Transaction(doc, "Purge Unused Text Note Types")
-        t.Start()
-        ok = 0
-        for tt in unused:
-            try:
-                doc.Delete(tt.Id)
-                ok += 1
-            except Exception:
-                pass
-        t.Commit()
-        self._status("Purged {} unused Text Note Type(s).".format(ok))
-        self._load_all_txts()
-        self._load_sidebar_lists()
 
     # ── Header Checkbox Toggle Event Handlers ─────────────────────────────────
 

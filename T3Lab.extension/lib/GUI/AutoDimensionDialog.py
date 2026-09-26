@@ -156,12 +156,6 @@ def _wall_is_horizontal(wall):
     return abs(d.X) >= abs(d.Y)
 
 
-def _grid_is_horizontal(grid):
-    """Return True if the grid line runs primarily along the X axis."""
-    d = _curve_direction(grid.Curve)
-    return abs(d.X) >= abs(d.Y)
-
-
 def _elem_centroid(elem, view):
     """Return (cx, cy) centroid of an element in world coords."""
     try:
@@ -246,35 +240,6 @@ def _nearest_grid_nonzero(centroid_x, centroid_y, grids, axis,
     # all grids at zero (degenerate) — return second if available, else first
     idx = 1 if len(candidates) > 1 else 0
     return candidates[idx][1], candidates[idx][2]
-
-
-def _aligned_dim_line(elem_pos, grid_pos, perp_pos, axis, margin, dim_z):
-    """
-    Build the Line for NewDimension.
-    axis='Y': vertical line at x=perp_pos spanning the Y range (elem_pos ↔ grid_pos).
-    axis='X': horizontal line at y=perp_pos spanning the X range.
-    """
-    lo = min(elem_pos, grid_pos) - margin
-    hi = max(elem_pos, grid_pos) + margin
-    if abs(hi - lo) < 1e-6:
-        hi += margin
-    if axis == 'Y':
-        return Line.CreateBound(XYZ(perp_pos, lo, dim_z), XYZ(perp_pos, hi, dim_z))
-    else:
-        return Line.CreateBound(XYZ(lo, perp_pos, dim_z), XYZ(hi, perp_pos, dim_z))
-
-
-def _try_create_dim(doc_ref, view, refs, dim_line, dim_type):
-    """Create a NewDimension; return True on success, False on any failure."""
-    try:
-        ra = ReferenceArray()
-        for r in refs:
-            ra.Append(r)
-        doc_ref.Create.NewDimension(view, dim_line, ra, dim_type)
-        return True
-    except Exception as ex:
-        logger.warning("NewDimension skipped: {}".format(ex))
-        return False
 
 
 def _collect_wall_core_refs(wall):
@@ -364,25 +329,6 @@ def _get_grid_reference(grid, view):
         except Exception as ex:
             logger.warning("Grid ref error (use_view={}): {}".format(use_view, ex))
     return None
-
-
-def _collect_door_refs(door):
-    """
-    Return the Left and Right built-in reference planes of a door family instance.
-    These correspond to the outermost edges (jambs) of the door opening.
-    Uses FamilyInstanceReferenceType.Left / Right which are stable references
-    valid for NewDimension regardless of the door's host wall orientation.
-    """
-    refs = []
-    try:
-        for ref_type in (FamilyInstanceReferenceType.Left,
-                         FamilyInstanceReferenceType.Right):
-            ref_list = door.GetReferences(ref_type)
-            for r in ref_list:
-                refs.append(r)
-    except Exception as ex:
-        logger.warning("Door reference error: {}".format(ex))
-    return refs
 
 
 def element_id_int(elem_id):
@@ -815,7 +761,6 @@ class AutoDimensionWindow(T3WPFWindow):
             self._set_status("Reverted dimension offsets to previous values.")
         except Exception as ex:
             logger.error("Error in on_ai_undo_offsets_clicked: {}".format(ex))
-
 
 
     # ── Status ───────────────────────────────────────────────────────────

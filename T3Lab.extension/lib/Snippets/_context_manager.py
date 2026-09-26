@@ -35,29 +35,3 @@ def try_except(debug=False):
             print("*"*20)
 
 
-@contextlib.contextmanager
-def ef_Transaction(doc, title, debug = True, exitscript = False ):
-    t = Transaction(doc, title)
-    t.Start()
-
-    try:
-        yield
-        t.Commit()
-
-    except Exception as e:
-        if debug:
-            print("*"*20)
-            print("Exception occured - Transaction is being Rollbacked!")
-            print(traceback.format_exc())
-            print("*"*20)
-        t.RollBack()
-
-        if exitscript:
-            print('*Script Excution stopped!*')
-            sys.exit()
-
-
-
-
-
-

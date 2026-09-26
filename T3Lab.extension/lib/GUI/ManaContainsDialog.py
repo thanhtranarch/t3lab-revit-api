@@ -280,19 +280,6 @@ def get_check_points_3d(elem):
         pass
     return pts
 
-def safe_get_location_point(elem):
-    try:
-        loc = elem.Location
-        if loc:
-            try: return loc.Point
-            except:
-                try: return loc.Curve.Evaluate(0.5, True)
-                except: pass
-        bb = elem.get_BoundingBox(None)
-        if bb:
-            return XYZ((bb.Min.X + bb.Max.X)*0.5, (bb.Min.Y + bb.Max.Y)*0.5, (bb.Min.Z + bb.Max.Z)*0.5)
-    except: pass
-    return None
 
 def in_room(r, pt):
     try: return r.IsPointInRoom(pt)
@@ -1062,9 +1049,6 @@ class Tab2CollectResult:
         self.agg_type = agg_type
         self.agg_value = aggregate_values(elements, param_name, agg_type) if param_name else str(len(elements))
         self.is_selected = False
-
-
-
 
 
 # ═══ MAIN WINDOW CONTROLLER ═══

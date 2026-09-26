@@ -190,7 +190,6 @@ except Exception as e:
     pass
 
 
-
 class _ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """One thread per request, so /health probes and the bridge's parallel
     instance scans answer instantly even while a slow tools/call is in
@@ -262,12 +261,6 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         body = jsonsafe.dumps(data)
         self._send_response(status_code, 'application/json', body)
 
-    def _send_sse_event(self, event_type, data):
-        """Send SSE event"""
-        message = "event: {}\ndata: {}\n\n".format(event_type,
-                                                   jsonsafe.dumps(data))
-        self.wfile.write(message.encode('utf-8'))
-        self.wfile.flush()
 
     def do_OPTIONS(self):
         """Handle CORS preflight"""
@@ -277,39 +270,6 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
 
-    def do_GET(self):
-        """Handle GET requests"""
-        parsed = urlparse(self.path)
-        path = parsed.path
-
-        if path == '/':
-            # Server info
-            self._send_json({
-                'name': 'T3LabAI MCP Server',
-                'version': '1.0.0',
-                'protocol': 'mcp',
-                'status': 'running'
-            })
-
-        elif path == '/sse':
-            # SSE endpoint for MCP communication
-            self._handle_sse()
-
-        elif path == '/health':
-            # Health check. pid + port let external diagnostics attribute a
-            # listener to its Revit process — the same pid answering on
-            # SEVERAL ports in the range means orphaned duplicate servers
-            # (broken singleton anchor), not several Revit windows.
-            self._send_json({'status': 'ok', 'pid': os.getpid(),
-                             'port': self.server.server_port})
-
-        elif path in ('/v1/models', '/models'):
-            # Tolerate OpenAI-compatible clients that probe for a model list,
-            # so they don't repeatedly hit an "unexpected endpoint" 404.
-            self._send_json({'object': 'list', 'data': []})
-
-        else:
-            self._send_json({'error': 'Not found'}, 404)
 
     def do_POST(self):
         """Handle POST requests (MCP messages)"""
@@ -330,35 +290,6 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         else:
             self._send_json({'error': 'Not found'}, 404)
 
-    def _handle_sse(self):
-        """Handle SSE connection for MCP"""
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/event-stream')
-        self.send_header('Cache-Control', 'no-cache')
-        self.send_header('Connection', 'keep-alive')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-
-        # Register client
-        server = self.server.mcp_server
-        client_id = str(uuid.uuid4())
-        server._register_client(client_id)
-
-        # Send endpoint event for MCP protocol
-        endpoint_url = "http://127.0.0.1:{}/message".format(server.port)
-        self._send_sse_event('endpoint', endpoint_url)
-
-        try:
-            # Keep connection alive
-            while server.is_running:
-                # Send keep-alive ping every 30 seconds
-                import time
-                time.sleep(30)
-                self._send_sse_event('ping', {'timestamp': time.time()})
-        except Exception:
-            pass
-        finally:
-            server._unregister_client(client_id)
 
     def _handle_mcp_message(self, request):
         """Handle MCP JSON-RPC message.
@@ -2466,19 +2397,6 @@ class T3LabAIServer(object):
     def is_running(self):
         return self._is_running
 
-    @property
-    def client_count(self):
-        return len(self._clients)
-
-    def _register_client(self, client_id):
-        """Register a connected client"""
-        self._clients[client_id] = {'connected': True}
-        self._total_clients += 1
-
-    def _unregister_client(self, client_id):
-        """Unregister a disconnected client"""
-        if client_id in self._clients:
-            del self._clients[client_id]
 
     # ── Open documents ───────────────────────────────────────────────────
     # Every tool call targets pyrevit.revit.doc — the document/window Revit
@@ -10483,14 +10401,6 @@ class T3LabAIServer(object):
             'current_clients': len(self._clients),
             'tools_count': len(self._tools),
             'external_event_ready': self._external_event is not None,
-        }
-
-    def register_tool(self, name, description, input_schema, handler):
-        """Register a custom tool"""
-        self._tools[name] = {
-            'name': name,
-            'description': description,
-            'inputSchema': input_schema
         }
 
 

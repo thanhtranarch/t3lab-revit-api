@@ -578,23 +578,6 @@ class CreateRoomPlanWindow(T3WPFWindow):
                 fallback = v
         return fallback
 
-    def _get_boundary_wall_ids(self, room):
-        """Return set of wall element ids forming the room boundary."""
-        wall_ids = set()
-        try:
-            opt = SpatialElementBoundaryOptions()
-            opt.SpatialElementBoundaryLocation = \
-                SpatialElementBoundaryLocation.Finish
-            segments_list = room.GetBoundarySegments(opt)
-            if segments_list:
-                for seg_loop in segments_list:
-                    for seg in seg_loop:
-                        elem = doc.GetElement(seg.ElementId)
-                        if elem and isinstance(elem, DB.Wall):
-                            wall_ids.add(seg.ElementId)
-        except Exception:
-            pass
-        return wall_ids
 
     def _create_interior_elevation_view(self, marker, host_plan, idx,
                                          cropbox_visible, max_dim,

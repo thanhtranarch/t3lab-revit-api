@@ -830,21 +830,6 @@ class BaseLLMProvider(object):
 
     # ── Shared utilities ───────────────────────────────────────────────────────
 
-    @staticmethod
-    def extract_json(text):
-        """Extract the first JSON object from a response string."""
-        text = text.strip()
-        try:
-            return json.loads(text)
-        except Exception:
-            pass
-        m = re.search(r'\{[\s\S]*\}', text)
-        if m:
-            try:
-                return json.loads(m.group())
-            except Exception:
-                pass
-        return None
 
     @staticmethod
     def blocks_to_text(user_content):

@@ -143,86 +143,6 @@ def tile_rect(ox, oy, tw, th):
     return [V2(ox, oy), V2(ox+tw, oy), V2(ox+tw, oy+th), V2(ox, oy+th)]
 
 
-def _point_in_triangle(p, a, b, c):
-    """Barycentric point-in-triangle test (inclusive of edges)."""
-    v0x, v0y = c.x - a.x, c.y - a.y
-    v1x, v1y = b.x - a.x, b.y - a.y
-    v2x, v2y = p.x - a.x, p.y - a.y
-    dot00 = v0x * v0x + v0y * v0y
-    dot01 = v0x * v1x + v0y * v1y
-    dot02 = v0x * v2x + v0y * v2y
-    dot11 = v1x * v1x + v1y * v1y
-    dot12 = v1x * v2x + v1y * v2y
-    denom = dot00 * dot11 - dot01 * dot01
-    if abs(denom) < 1e-18:
-        return False
-    inv = 1.0 / denom
-    u = (dot11 * dot02 - dot01 * dot12) * inv
-    v = (dot00 * dot12 - dot01 * dot02) * inv
-    eps = -1e-12
-    return u >= eps and v >= eps and (u + v) <= 1.0 - eps
-
-
-def ear_clip_triangulate(pts):
-    """Ear-clipping triangulation of a simple polygon (may be concave).
-    Returns a list of triangles; each triangle is a list of 3 V2s (CCW)."""
-    src = ensure_ccw(list(pts))
-    n = len(src)
-    if n < 3:
-        return []
-    if n == 3:
-        return [src]
-
-    # Work on an index list so we can pop ears in O(n)
-    idx = list(range(n))
-    triangles = []
-
-    def _cross(a, b, c):
-        return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
-
-    def _is_ear_at(pos, live):
-        m = len(live)
-        a = src[live[(pos - 1) % m]]
-        b = src[live[pos]]
-        c = src[live[(pos + 1) % m]]
-        if _cross(a, b, c) <= 0:   # reflex vertex
-            return False
-        # No other vertex may lie inside triangle (a,b,c)
-        for k, vi in enumerate(live):
-            if k in ((pos - 1) % m, pos, (pos + 1) % m):
-                continue
-            if _point_in_triangle(src[vi], a, b, c):
-                return False
-        return True
-
-    guard = 3 * n
-    while len(idx) > 3 and guard > 0:
-        guard -= 1
-        m = len(idx)
-        clipped_one = False
-        for j in range(m):
-            if _is_ear_at(j, idx):
-                a = src[idx[(j - 1) % m]]
-                b = src[idx[j]]
-                c = src[idx[(j + 1) % m]]
-                triangles.append([a, b, c])
-                idx.pop(j)
-                clipped_one = True
-                break
-        if not clipped_one:
-            # Degenerate polygon — fan-triangulate the remainder to avoid loop.
-            break
-
-    if len(idx) == 3:
-        triangles.append([src[idx[0]], src[idx[1]], src[idx[2]]])
-    elif len(idx) > 3:
-        # Fallback fan from the first remaining vertex
-        anchor = src[idx[0]]
-        for k in range(1, len(idx) - 1):
-            triangles.append([anchor, src[idx[k]], src[idx[k + 1]]])
-    return triangles
-
-
 # ═════════════════════════════════════════════════════════════════════════════
 # SECTION 2 — TILE GRID GENERATOR
 # ═════════════════════════════════════════════════════════════════════════════
@@ -870,8 +790,6 @@ class LayoutOption(object):
         self._recompute_stats()
         return True
 
-    def regenerate_with_angle(self, new_angle):
-        return self.regenerate(angle=new_angle)
 
     def shift_screen(self, sdx, sdy):
         """Shift the grid by a SCREEN-space (world-axis) vector. dx/dy live

@@ -246,9 +246,6 @@ class LLMRouter(object):
         """Return list of loaded provider names in FALLBACK_CHAIN order."""
         return [n for n in self.FALLBACK_CHAIN if n in self._providers]
 
-    def enable_fallback(self, enabled=True):
-        """Enable or disable automatic fallback when the active provider fails."""
-        self._fallback_on = enabled
 
     # ── Chat ──────────────────────────────────────────────────────────────────
 
@@ -529,10 +526,6 @@ class LLMRouter(object):
         return [n for n in self.FALLBACK_CHAIN
                 if n in self._providers and n not in ("ollama", "lmstudio")]
 
-    def invalidate_status_cache(self):
-        """Force the next get_status() call to do a live probe."""
-        with self._status_lock:
-            self._status_ts = 0.0
 
     def get_display_label(self):
         """
@@ -598,58 +591,6 @@ _PANE_SYSTEM_PROMPT = (
     "Use plain text (no Markdown). "
     "Respond in the SAME language the user wrote in."
 )
-
-
-def route_message(user_text, history=None, system_prompt=None, max_tokens=600):
-    """
-    Route a chat message through the active LLM provider and return the reply.
-
-    Designed for the DockablePane quick-chat. Unlike parse_command(), this
-    returns natural language text directly without JSON intent parsing.
-
-    Args:
-        user_text (str): Current user message.
-        history (list|None): Conversation history [{role, content}, ...].
-        system_prompt (str|None): Override default system prompt.
-        max_tokens (int): Maximum response tokens.
-
-    Returns:
-        str: AI response text, or an error/fallback message.
-    """
-    _ensure_lib_in_path()
-    prompt = system_prompt if system_prompt is not None else _PANE_SYSTEM_PROMPT
-    router = LLMRouter()
-    hist   = list(history or [])
-    try:
-        result = router.chat(hist, prompt, user_text, max_tokens)
-        return result if result else u'(No response — check your API key in T3Lab Settings.)'
-    except Exception as ex:
-        return u'Error: {}'.format(ex)
-
-
-def route_message_stream(user_text, on_delta, history=None, system_prompt=None, max_tokens=600):
-    """
-    Streaming variant of route_message. Calls on_delta(chunk) for each token.
-
-    Args:
-        user_text (str): Current user message.
-        on_delta (callable): Called with each text chunk as it streams.
-        history (list|None): Conversation history.
-        system_prompt (str|None): Override default system prompt.
-        max_tokens (int): Maximum response tokens.
-
-    Returns:
-        str | None: Full response text, or None if all providers fail.
-    """
-    _ensure_lib_in_path()
-    prompt = system_prompt if system_prompt is not None else _PANE_SYSTEM_PROMPT
-    router = LLMRouter()
-    hist   = list(history or [])
-    try:
-        return router.chat_stream(hist, prompt, user_text,
-                                  on_delta=on_delta, max_tokens=max_tokens)
-    except Exception:
-        return None
 
 
 # ─── Path helper ───────────────────────────────────────────────────────────────

@@ -108,9 +108,6 @@ class T3LabAISettings(object):
         """False when the settings file exists but could not be read."""
         return bool(self._load_ok)
 
-    def get_load_error(self):
-        """Human-readable reason the last load failed, or None."""
-        return self._load_error
 
     def _update(self, mutator):
         """Reload from disk → apply `mutator(settings)` → save.
@@ -241,13 +238,6 @@ class T3LabAISettings(object):
         except Exception:
             return False
 
-    def get_server_config(self):
-        """Get server configuration"""
-        return self._settings.get('server', {})
-
-    def get_enabled_providers(self):
-        """Get list of enabled providers"""
-        return self._settings.get('providers', [])
 
     def get_api_key(self, provider_name):
         """Get API key for a provider — always reads fresh from the in-memory dict.
@@ -406,10 +396,6 @@ class T3LabAISettings(object):
         return bool(self._settings.get('agents', {}).get(
             'allow_sync_with_central', False))
 
-    def set_sync_with_central_allowed(self, allowed):
-        def _m(s):
-            s.setdefault('agents', {})['allow_sync_with_central'] = bool(allowed)
-        return self._update(_m)
 
     def get_action_mode(self):
         """Harness action mode for model-editing tools.
@@ -504,23 +490,6 @@ class T3LabAISettings(object):
         toggles = self._settings.get('ai_mode', {}).get('tool_toggles', {})
         return bool(toggles.get(tool_name, True))
 
-    def set_tool_ai_enabled(self, tool_name, enabled):
-        """Set AI mode state for a specific tool."""
-        def _m(s):
-            s.setdefault('ai_mode', {}).setdefault('tool_toggles', {})[tool_name] = bool(enabled)
-        return self._update(_m)
-
-    def get_ai_mode_config(self):
-        """Return the entire ai_mode configuration dictionary."""
-        defaults = {
-            'enabled': True,
-            'fast_provider': 'auto',
-            'reasoning_provider': 'auto',
-            'tool_toggles': {},
-        }
-        saved = self._settings.get('ai_mode', {})
-        defaults.update(saved)
-        return defaults
 
     def log_model_usage(self, action, provider, model):
         """Log model usage/setup to a log file for audit and fast setup verification."""
@@ -539,7 +508,6 @@ class T3LabAISettings(object):
                 f.write(log_line)
         except Exception:
             pass
-
 
 
 def get_settings():

@@ -1169,17 +1169,6 @@ class ParameterAdder(object):
         self._original_sp_path = None
         self._temp_sp_path = None
 
-    def _get_existing_params(self):
-        existing = set()
-        bm = self.doc.ParameterBindings
-        it = bm.ForwardIterator()
-        it.Reset()
-        while it.MoveNext():
-            try:
-                existing.add(it.Key.Name)
-            except:
-                pass
-        return existing
 
     def _setup_temp_shared_param_file(self):
         """Create temp shared param file using TEMP env var (not script dir)."""

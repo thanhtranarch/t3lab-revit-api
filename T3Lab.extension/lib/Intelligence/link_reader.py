@@ -114,10 +114,6 @@ def find_links(text):
     return [t for _, t in hits][:MAX_LINKS]
 
 
-def has_links(text):
-    return bool(find_links(text))
-
-
 # ─── Local paths ──────────────────────────────────────────────────────────────
 
 def _from_file_uri(uri):

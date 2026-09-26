@@ -3008,22 +3008,6 @@ class BCFManagerWindow(WPFWindow):
 
         return comment_el
 
-    def _xml_text_esc(self, s):
-        if s is None:
-            return ""
-        return (str(s)
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;"))
-
-    def _xml_attr_esc(self, s):
-        if s is None:
-            return ""
-        return (str(s)
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;"))
 
     # ------------------------------------------------------------------
     # Export CSV

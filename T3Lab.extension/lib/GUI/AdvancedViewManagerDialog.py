@@ -225,13 +225,6 @@ class AdvancedViewManagerWindow(T3WPFWindow):
         self._load_all_views()
         self._apply_filters()
         
-    def _get_combo_text(self, combo, default_val=""):
-        if combo and combo.SelectedItem:
-            item = combo.SelectedItem
-            if hasattr(item, 'Content'):
-                return str(item.Content)
-            return str(item)
-        return default_val
         
     def minimize_button_clicked(self, sender, e):
         self.WindowState = WindowState.Minimized
@@ -1168,15 +1161,3 @@ class AdvancedViewManagerWindow(T3WPFWindow):
                           MessageBoxButton.OK, MessageBoxImage.Error)
 
 
-def show_advanced_view_manager():
-    """Launch the Advanced View Manager Dialog"""
-    doc = __revit__.ActiveUIDocument.Document
-    uidoc = __revit__.ActiveUIDocument
-    
-    try:
-        window = AdvancedViewManagerWindow(doc, uidoc)
-        window.ShowDialog()
-    except Exception as e:
-        import traceback
-        MessageBox.Show("Error starting Advanced View Manager:\n\n" + str(e) + "\n\n" + traceback.format_exc(),
-                      "Error", MessageBoxButton.OK, MessageBoxImage.Error)

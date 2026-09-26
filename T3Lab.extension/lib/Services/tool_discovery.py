@@ -506,14 +506,3 @@ def make_launcher_for(entry):
                                  entry.get('url') or '')
 
 
-def build_system_prompt_section(tools):
-    """
-    Return an extra system-prompt snippet listing auto-discovered tools.
-    Pass this to get_system_prompt() / parse_command().
-    """
-    if not tools:
-        return ''
-    lines = ['  ── Auto-discovered tools ────────────────────────────────────────────────────']
-    for t in tools:
-        lines.append('  {}   params: {{}}   (title: "{}")'.format(t['intent'], t['title']))
-    return '\n'.join(lines)
