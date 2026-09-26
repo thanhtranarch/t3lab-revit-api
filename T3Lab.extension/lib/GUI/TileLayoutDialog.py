@@ -624,61 +624,6 @@ class ReportGenerator(object):
         self.params = params
         self.all_floors = all_floors or [fi for fi, _o, _p in chosen_per_floor]
 
-    def summary_text(self):
-        tw_mm = self.params['tile_w_mm']
-        th_mm = self.params['tile_h_mm']
-        jw_mm = self.params['joint_mm']
-
-        lines = [
-            "=" * 68,
-            "  TILE LAYOUT REPORT",
-            "=" * 68,
-            "  Tile size     : {:.0f} x {:.0f} mm".format(tw_mm, th_mm),
-            "  Joint width   : {:.1f} mm".format(jw_mm),
-            "  Nesting       : {}".format(
-                "ON" if self.params['optimize_nesting'] else "OFF"),
-            "=" * 68,
-        ]
-
-        grand_buy = 0
-        grand_waste_area = 0.0
-        grand_waste_denom = 0.0
-
-        for fi, opt, pat in self.chosen:
-            lines.append("")
-            lines.append(u"  FLOOR  {}  ({})".format(
-                fi.floor.Id, PATTERN_LABELS.get(pat, pat)))
-            lines.append("  Option {} — {}".format(opt.option_id, opt.variant))
-            lines.append("  " + "-" * 62)
-            lines.append("    Full tiles     : {:5d}".format(opt.n_full))
-            lines.append("    Cut tiles (A)  : {:5d}".format(opt.n_cut))
-            lines.append("    Reused (B/C..) : {:5d}".format(opt.n_reuse))
-            lines.append("    TILES TO BUY   : {:5d}".format(opt.tiles_to_buy))
-            lines.append("    Waste          : {:5.1f} %".format(opt.waste_pct))
-            lines.append("    Cuts < {:.0f} mm    : {:5d}".format(
-                MIN_CUT_WIDTH_MM, opt.n_thin_cuts))
-
-            grand_buy += opt.tiles_to_buy
-            grand_waste_area += sum(
-                p.area for p in opt.pieces if p.piece_type == 'waste')
-            grand_waste_denom += opt.tiles_to_buy * opt.tile_area
-
-            log = getattr(opt, '_nesting_log', [])
-            if log:
-                lines.append("    Nesting log:")
-                lines.extend("      " + e for e in log)
-
-        grand_pct = (grand_waste_area / grand_waste_denom * 100.0
-                     if grand_waste_denom > 0 else 0.0)
-        lines.extend([
-            "",
-            "=" * 68,
-            "  GRAND TOTAL",
-            "    Tiles to buy   : {}".format(grand_buy),
-            "    Overall waste  : {:.1f} %".format(grand_pct),
-            "=" * 68,
-        ])
-        return "\n".join(lines)
 
     def export_csv(self, filepath):
         with open(filepath, 'wb') as fh:

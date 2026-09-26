@@ -907,7 +907,6 @@ class ModelAuditorWindow(T3WPFWindow):
         # 1. Health tab
         self.btn_health_run.Click += self.on_health_run
         self.btn_health_export.Click += self.on_health_export
-        self._update_ai_status()
 
         # Progress Pause/Stop — wire footer buttons
         if getattr(self, "ma_btn_pause", None) is not None:
@@ -1059,131 +1058,6 @@ class ModelAuditorWindow(T3WPFWindow):
             self.load_smart_purge()
 
     # ========================================================================
-    def _update_ai_status(self):
-        try:
-            txt = getattr(self, 'txt_ai_status', None) or self.FindName('txt_ai_status')
-            if txt is not None:
-                if self.is_ai_mode_active("ModelAuditor"):
-                    info = self.get_ai_status_info()
-                    txt.Text = "AI Mode: " + info.get("label", "Active")
-                else:
-                    txt.Text = "AI Mode: Offline"
-        except Exception:
-            pass
-
-    def ai_health_summary_clicked(self, sender=None, e=None):
-        """Generate an AI Executive Health Summary based on current model audit metrics."""
-        if not self.is_ai_mode_active("ModelAuditor"):
-            forms.alert(
-                "AI Mode is currently offline or no API Key is configured.\n\n"
-                "Please configure an API Key in LLMs Setting to enable AI Executive Summaries.",
-                title="AI Mode Offline"
-            )
-            return
-
-        # The summary quotes the score and the metric breakdown, so it is only
-        # meaningful once a scan has produced them.
-        if not self.health_results:
-            forms.alert("Run the health analysis first.\n\n"
-                        "Click 'Re-Analyze' — the AI summary is written from the "
-                        "score and metrics that scan produces.",
-                        title="AI Executive Summary")
-            return
-
-        grade_tb = getattr(self, 'txt_health_grade', None) or self.FindName('txt_health_grade')
-        grade = grade_tb.Text if grade_tb else "--"
-
-        score_tb = getattr(self, 'txt_health_score', None) or self.FindName('txt_health_score')
-        score = score_tb.Text if score_tb else "--"
-
-        doc = getattr(self, 'doc', None) or getattr(self, '_doc', None)
-        doc_name = doc.Title if (doc and hasattr(doc, 'Title')) else "Active Model"
-
-        # Collect metrics summary and top warnings
-        sum_tb = getattr(self, 'txt_health_summary_metrics', None) or self.FindName('txt_health_summary_metrics')
-        summary_text = sum_tb.Text if sum_tb else ""
-
-        # One GetWarnings() call serves both the total and the frequency table.
-        warning_count = 0
-        top_warnings = []
-        try:
-            raw_warnings = doc.GetWarnings() if (doc and hasattr(doc, 'GetWarnings')) else None
-            if raw_warnings:
-                warn_counts = {}
-                for w in raw_warnings:
-                    warning_count += 1
-                    desc = w.GetDescriptionText()
-                    if desc:
-                        first_line = desc.split('\n')[0].strip()
-                        warn_counts[first_line] = warn_counts.get(first_line, 0) + 1
-                sorted_warns = sorted(warn_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-                top_warnings = ["- {} ({} instances)".format(t, c) for t, c in sorted_warns]
-        except Exception as warn_ex:
-            logger.debug("Error collecting warning frequencies: %s", warn_ex)
-
-        top_warn_text = "\n".join(top_warnings) if top_warnings else "None detected"
-
-        prompt = (
-            "Analyze the following Revit BIM Model Health metrics and produce a concise, professional "
-            "Executive Health Summary in Vietnamese (with English section headers) for the BIM Manager.\n\n"
-            "Model Name: {}\n"
-            "Overall Grade: {}\n"
-            "Health Score: {}\n"
-            "Total Revit Warnings: {}\n"
-            "Top Warning Categories by Frequency:\n{}\n\n"
-            "Diagnostic Summary:\n{}\n\n"
-            "Structure your response with:\n"
-            "1. TỔNG QUAN SỨC KHỎE MÔ HÌNH (Executive Health Rating)\n"
-            "2. TOP 3 NGUY CƠ ẢNH HƯỞNG HIỆU NĂNG (Top 3 Performance Risks & Root Causes)\n"
-            "3. HÀNH ĐỘNG KHẮC PHỤC ƯU TIÊN (Immediate Recommended Actions)\n"
-            "Keep it crisp, actionable and technical."
-        ).format(doc_name, grade, score, warning_count, top_warn_text, summary_text)
-
-        st = getattr(self, 'status_text', None) or self.FindName('status_text')
-        if st:
-            st.Text = "✨ AI is synthesizing executive health report..."
-
-        btn_ai = getattr(self, 'btn_health_ai_summary', None) or self.FindName('btn_health_ai_summary')
-        # Remember the label the XAML actually carries, so restoring it cannot
-        # drift from what the button says.
-        orig_content = btn_ai.Content if btn_ai else None
-
-        def _restore_btn():
-            if btn_ai:
-                btn_ai.Content = orig_content
-                btn_ai.IsEnabled = True
-
-        if btn_ai:
-            btn_ai.Content = "Synthesizing..."
-            btn_ai.IsEnabled = False
-
-        def _bg():
-            b = self.ai_bridge
-            if not b:
-                return None
-            return b.ask(prompt, max_tokens=1500)
-
-        def _on_done(res):
-            _restore_btn()
-            s_el = getattr(self, 'status_text', None) or self.FindName('status_text')
-            if s_el:
-                s_el.Text = "✨ AI Health Summary completed."
-            if res:
-                forms.alert(res, title="✨ AI Executive Model Health Summary")
-                main_sum = getattr(self, 'txt_health_summary', None) or self.FindName('txt_health_summary')
-                if main_sum:
-                    main_sum.Text = "✨ AI Analysis Complete. Click '✨ AI Summary' to re-read."
-            else:
-                forms.alert("AI could not generate summary. Check internet connection and API Key.", title="AI Summary Error")
-
-        def _on_err(err):
-            _restore_btn()
-            s_el = getattr(self, 'status_text', None) or self.FindName('status_text')
-            if s_el:
-                s_el.Text = "AI Error: " + str(err)
-            forms.alert("AI Error:\n" + str(err), title="AI Error")
-
-        self.run_ai_async(_bg, _on_done, _on_err)
 
     def on_health_run(self, sender, e):
         if self.health_analyzer is None:

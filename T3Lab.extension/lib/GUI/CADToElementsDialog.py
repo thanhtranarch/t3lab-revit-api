@@ -2700,6 +2700,8 @@ class CADToElementsWindow(T3WPFWindow):
     active panel; all Revit logic runs in-place — no child windows are
     spawned.
     """
+    AI_TOOL = "CADToElements"
+
 
     # ------------------------------------------------------------------
     # Construction
@@ -2854,23 +2856,7 @@ class CADToElementsWindow(T3WPFWindow):
     # ------------------------------------------------------------------
 
     def _init_ai_mode(self):
-        """Initialize AI Mode status pill and tool capabilities if AI is active."""
-        try:
-            if hasattr(self, "ai_mode_badge"):
-                if self.is_ai_mode_active():
-                    self.ai_mode_badge.Visibility = Visibility.Visible
-                    info = self.get_ai_status_info()
-                    provider = info.get("provider", "Ready")
-                    model = info.get("model", "")
-                    label = "AI: {}".format(provider)
-                    if model:
-                        label = "AI: {} ({})".format(provider, model)
-                    if hasattr(self, "txt_ai_status"):
-                        self.txt_ai_status.Text = label
-                else:
-                    self.ai_mode_badge.Visibility = Visibility.Collapsed
-        except Exception:
-            pass
+        self.init_ai_badge()
 
     def _on_wall_ai(self, sender, e):
         def _apply(matched_names):
@@ -2931,14 +2917,7 @@ class CADToElementsWindow(T3WPFWindow):
 
     def _ai_match_category_layers(self, category_key, category_label, get_names_fn, apply_fn):
         """Asynchronously call AI to match CAD layers for a specific element category."""
-        if not self.is_ai_mode_active():
-            MessageBox.Show(
-                "AI Mode is currently disabled or no LLM provider is configured.\n"
-                "Please enable AI Mode in LLMs Setting to use smart layer auto-matching.",
-                "AI Mode Inactive",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information
-            )
+        if not self.ai_require():
             return
 
         layer_names = get_names_fn()
@@ -2952,16 +2931,11 @@ class CADToElementsWindow(T3WPFWindow):
             return
 
         btn = getattr(self, "btn_{}_ai".format(category_key), None)
-        orig_content = btn.Content if btn else "✨ AI Select"
 
         def _restore_btn():
-            if btn:
-                btn.Content = orig_content
-                btn.IsEnabled = True
+            self.ai_busy(btn, False)
 
-        if btn:
-            btn.Content = "⏳ Analyzing..."
-            btn.IsEnabled = False
+        self.ai_busy(btn, True)
 
         self._set_status("AI analyzing {} CAD layers for {}...".format(len(layer_names), category_label))
 

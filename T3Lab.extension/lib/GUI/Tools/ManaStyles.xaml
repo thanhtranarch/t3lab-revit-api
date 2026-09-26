@@ -1668,19 +1668,6 @@
                                 <TextBlock Text="Manage line styles, fill patterns and color overrides" Style="{StaticResource T3.Subtitle}"/>
                             </StackPanel>
                             <!-- AI Mode Status Pill -->
-                            <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}"
-                                    Margin="16,0,0,0" Height="24" CornerRadius="12" Padding="8,0"
-                                    Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}"
-                                    Visibility="Collapsed" VerticalAlignment="Center"
-                                    ToolTip="AI Mode is active - Intelligent style consolidation enabled">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="✨" FontSize="11" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready"
-                                               FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
                         </StackPanel>
 
                         <!-- Window Controls -->
@@ -1811,10 +1798,10 @@
                                                          Style="{StaticResource T3.Search}" Tag="Search line styles..."/>
 
                                                 <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                                    <Button x:Name="btn_ai_clean_styles" Content="✨ AI Clean CAD Styles"
+                                                    <Button x:Name="btn_select_cad_styles" Content="Select CAD Styles"
                                                             Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
-                                                            Click="ai_clean_styles_clicked"
-                                                            ToolTip="AI Clean: Detect CAD junk line styles ($0$*) and suggest consolidation to standard line styles"/>
+                                                            Click="select_cad_styles_clicked"
+                                                            ToolTip="Tick every line style imported from DWG ($0$, DEFPOINTS, A-/S-/M- layer prefixes) for batch delete or rename"/>
                                                     <Button x:Name="btn_style_calc_usage" Content="Calculate Usage"
                                                             Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                                     <Button x:Name="btn_style_refresh" Content="Refresh"

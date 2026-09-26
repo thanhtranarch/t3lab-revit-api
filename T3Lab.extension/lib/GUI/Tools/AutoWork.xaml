@@ -1994,7 +1994,7 @@
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                             <Button x:Name="btn_start_record" Content="● Start Recording" Style="{StaticResource T3.Button.Danger}"
                                                     Click="start_recording_clicked" Height="28" Padding="16,0"/>
-                                            <Button x:Name="btn_play" Content="▶ Play Replay" Style="{StaticResource T3.Button.Secondary}"
+                                            <Button x:Name="btn_play" Content="Play Replay" Style="{StaticResource T3.Button.Secondary}"
                                                     Click="play_clicked" Height="28" Padding="16,0" Margin="8,0,0,0" IsEnabled="False"/>
                                             <Button x:Name="btn_clear" Content="Clear" Style="{StaticResource T3.Button.Ghost}"
                                                     Click="clear_clicked" Height="28" Padding="16,0" Margin="8,0,0,0"/>

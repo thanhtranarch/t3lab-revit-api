@@ -235,7 +235,7 @@ Bảng glyph chuẩn — **một khái niệm, một glyph, toàn dự án**:
 | `E70D` ChevronDown | `E70E` ChevronUp | `E76B` ChevronLeft | `E76C` ChevronRight |
 | `E74E` Save | `E8E5` OpenFile | `E774` Globe | `E7A7` Undo |
 | `E8A3` Zoom | `E7B3` Isolate | `E7C9` Pick | `E7C3` Document |
-| `E896` Download | `EA80` Insight | | |
+| `E896` Download | `EA80` Insight / AI | | |
 
 Cần glyph chưa có trong bảng → thêm vào bảng này **và** vào comment đầu khối ICON
 trong `T3Lab.Styles.xaml`, đừng dùng lẻ.
@@ -265,6 +265,44 @@ trong `T3Lab.Styles.xaml`, đừng dùng lẻ.
 Gate: `python3 dev/audit_t3.py` bắt cả hai vi phạm (FontFamily inline · ký tự Unicode).
 Miễn trừ: `DWGManagement.xaml` (thiết kế riêng đã chốt) và `T3LabAssistant.xaml`
 (chat surface theo theme Revit — brush tĩnh của `T3.Icon` sẽ hỏng dark mode).
+
+## AI Mode — khi nào có, trông ra sao
+
+AI Mode chỉ được có mặt ở tool khi nó làm được việc **luật không làm tốt** và kết quả
+của nó **đổ thẳng vào thao tác** của tool. Đánh giá lại 2026-09-26 theo đúng hai câu:
+
+| Giữ AI | Việc AI làm | Vì sao cần |
+|---|---|---|
+| CADToElements | Chọn layer CAD cho từng loại element | Tên layer mỗi văn phòng mỗi kiểu — so khớp ngữ nghĩa |
+| IFCSG | Đoán IFC-SG subtype từ tên type | Phân loại theo nghĩa, danh sách subtype dài |
+| ManaPara | Ghép parameter nguồn → đích khi chuyển dữ liệu | Tên khác nhau, cùng nghĩa (`Mark` ↔ `Tag No.`) |
+| FamiGen | Sinh JSON family từ mô tả | Việc sinh nội dung — không có luật thay thế |
+| TextToElement | Đoán category + parameter từ nội dung text note | Đọc hiểu nội dung chữ |
+| ManaAnno › Text | Soát chính tả / viết tắt text note (chỉ stage, Apply mới ghi) | Việc ngôn ngữ |
+
+Đã bỏ (AI chỉ đoán lại con số luật tính đúng, chỉ in một đoạn văn không kèm hành
+động, hoặc tạo kết quả phải tất định): AutoDimension (offset → nút **Offsets from
+Scale**), ManaStyles (→ nút **Select CAD Styles**), SheetGen, ManaSched, ModelAuditor,
+BCFReader, BatchOut (tên file xuất phải tất định — dùng naming pattern), DimText Suggest.
+
+**Muốn thêm AI vào tool mới** → trả lời hai câu trên trong PR. Không trả lời được thì
+không thêm.
+
+### Hình thức — giống nhau ở mọi tool
+
+- **Badge** trên title bar, ngay sau khối tiêu đề/phụ đề: `Border x:Name="ai_mode_badge"`
+  `Style="{StaticResource T3.Pill}"` · icon `&#xEA80;` `T3.Icon.Lead` · `TextBlock
+  x:Name="txt_ai_status"` `T3.Caption`. Code chỉ gọi `self.init_ai_badge()` — chữ
+  **AI ready / AI off** (trạng thái bằng chữ, không chỉ bằng màu), tooltip nêu provider.
+- **Nút AI**: `T3.Button.Secondary`, nội dung là icon `&#xEA80;` (`T3.Icon.Lead`) +
+  nhãn **"AI &lt;Động từ&gt;"** (AI Select, AI Match, AI Predict…). Đặt sát ô dữ liệu mà nó
+  điền, không gom vào toolbar chung.
+- **Code**: khai `AI_TOOL = "<Tên>"` trên class; đầu handler `if not self.ai_require():
+  return` (một câu báo thống nhất khi AI tắt); lúc chờ model `self.ai_busy(btn, True/False)`
+  — **không** đổi `Content` của nút (nó là icon + nhãn). Không có "fallback bằng luật"
+  ngầm làm việc khác đi: AI tắt thì báo, không tự sửa gì.
+- Cấm `✨` `⏳` và mọi ký tự Unicode làm icon — `audit_t3.py` bắt cả dạng dán thẳng.
+- Kết quả AI hiện lên UI phải là **tiếng Anh** như mọi chữ khác của tool.
 
 ## File mẫu — copy từ đây
 

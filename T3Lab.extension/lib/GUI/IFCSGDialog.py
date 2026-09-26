@@ -1004,6 +1004,8 @@ class ExcelReporter:
 # ==============================================================================
 
 class IFCSGSuiteWindow(T3WPFWindow):
+    AI_TOOL = "IFCSG"
+
 
     # ProgressPauseMixin — IFCSG.xaml progress panel element names
     PP_PANEL      = "ifc_progress_panel"
@@ -1421,25 +1423,11 @@ class IFCSGSuiteWindow(T3WPFWindow):
         return sel_str, is_ud
 
     def _update_ai_status(self):
-        try:
-            txt = getattr(self, 'txt_ai_status', None) or self.FindName('txt_ai_status')
-            if txt is not None:
-                if self.is_ai_mode_active("IFCSG"):
-                    info = self.get_ai_status_info()
-                    txt.Text = "AI Mode: " + info.get("label", "Active")
-                else:
-                    txt.Text = "AI Mode: Offline"
-        except Exception:
-            pass
+        self.init_ai_badge()
 
     def _on_ai_auto_match(self, sender=None, args=None):
         """Predict best matching IFC-SG Subtype for selected types using AI Mode."""
-        if not self.is_ai_mode_active("IFCSG"):
-            forms.alert(
-                "AI Mode is currently offline or no API Key is configured.\n\n"
-                "Please configure an API Key in LLMs Setting to enable AI Subtype Predictions.",
-                title="AI Mode Offline"
-            )
+        if not self.ai_require():
             return
 
         if not self.cmbSubtype or not self.cmbSubtype.Items or self.cmbSubtype.Items.Count == 0:
@@ -1465,16 +1453,11 @@ class IFCSGSuiteWindow(T3WPFWindow):
         comp_name = getattr(self, "current_comp", "") or "BIM Component"
 
         btn = getattr(self, 'btn_ai_auto_match', None)
-        orig_content = "✨ AI Predict"
 
         def _restore_btn():
-            if btn:
-                btn.Content = orig_content
-                btn.IsEnabled = True
+            self.ai_busy(btn, False)
 
-        if btn:
-            btn.Content = "⏳ Predicting..."
-            btn.IsEnabled = False
+        self.ai_busy(btn, True)
 
         # Backup current selection for undo/safety
         self._prev_subtype_idx = self.cmbSubtype.SelectedIndex
@@ -1518,7 +1501,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
                         self.cmbSubtype.SelectedIndex = matched_idx
                         forms.alert(
                             "Predicted Subtype: {}\nConfidence: {:.0%}\n\nRationale:\n{}".format(pred, float(conf), ratio),
-                            title="✨ AI Subtype Prediction"
+                            title="AI Subtype Prediction"
                         )
                     else:
                         forms.alert("AI predicted: {}, but not in current subtype list.".format(pred), title="Prediction Note")

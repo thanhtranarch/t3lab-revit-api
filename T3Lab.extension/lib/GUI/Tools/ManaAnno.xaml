@@ -1667,16 +1667,19 @@
                             <TextBlock Text="Annotation Manager" Style="{StaticResource T3.Title}"/>
                             <TextBlock Text="Inspect and clean up project annotations and tags" Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
+                        <!-- AI MODE BADGE — chuẩn T3 (T3LAB_UI_STANDARD.md § AI Mode). Code: init_ai_badge() -->
+                        <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}" Height="24" Margin="16,0,0,0"
+                                Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                <TextBlock x:Name="txt_ai_status" Text="AI off" Style="{StaticResource T3.Caption}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
 
                         <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize"
                                 Click="minimize_button_clicked">
@@ -1920,7 +1923,7 @@
                                                     Height="28" Padding="12,0" Margin="0,0,8,0" Click="dim_select_all"/>
                                             <Button Content="Clear" Style="{StaticResource T3.Button.Ghost}"
                                                     Height="28" Padding="12,0" Margin="0,0,8,0" Click="dim_clear_sel"/>
-                                            <Button x:Name="btn_dim_apply" Content="✔ Apply Changes" Style="{StaticResource T3.Button.Secondary}"
+                                            <Button x:Name="btn_dim_apply" Content="Apply Changes" Style="{StaticResource T3.Button.Secondary}"
                                                     Height="28" Padding="12,0" Visibility="Collapsed" Click="dim_apply"/>
                                         </StackPanel>
                                     </Grid>
@@ -2081,10 +2084,15 @@
                                                     Height="28" Padding="12,0" Margin="0,0,8,0" Click="txt_select_all"/>
                                             <Button Content="Clear" Style="{StaticResource T3.Button.Ghost}"
                                                     Height="28" Padding="12,0" Margin="0,0,8,0" Click="txt_clear_sel"/>
-                                            <Button x:Name="btn_txt_ai_qa" Content="✨ AI Spellcheck &amp; Fix" Style="{StaticResource T3.Button.Secondary}"
+                                            <Button x:Name="btn_txt_ai_qa" Style="{StaticResource T3.Button.Secondary}"
                                                     Height="28" Padding="12,0" Margin="0,0,8,0" Click="on_txt_ai_qa_clicked"
-                                                    ToolTip="AI check: Detect typos, abbreviations, casing and standardize notes"/>
-                                            <Button x:Name="btn_txt_apply" Content="✔ Apply Changes" Style="{StaticResource T3.Button.Secondary}"
+                                                    ToolTip="Find typos, casing and abbreviation issues in the listed text notes. Fixes are staged - review, then Apply">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                    <TextBlock Text="AI Spellcheck" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="btn_txt_apply" Content="Apply Changes" Style="{StaticResource T3.Button.Secondary}"
                                                     Height="28" Padding="12,0" Visibility="Collapsed" Click="txt_apply"/>
                                         </StackPanel>
                                     </Grid>
@@ -2127,10 +2135,6 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="DIMENSION OVERRIDE FIELDS" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button Grid.Column="1" x:Name="btn_dimtext_ai_suggest" Style="{StaticResource T3.Button.Secondary}"
-                                                Content="✨ AI Suggest Overrides" Height="26" Padding="8,0" VerticalAlignment="Center"
-                                                Click="on_dimtext_ai_suggest_clicked"
-                                                ToolTip="AI recommends engineering annotations (Prefix/Suffix/Above/Below) based on discipline conventions"/>
                                     </Grid>
                                     <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
                                             CornerRadius="4" Padding="16,12" Margin="0,0,0,16">

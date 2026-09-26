@@ -1667,17 +1667,20 @@
                             <TextBlock Text="Text to Element" Style="{StaticResource T3.Title}"/>
                             <TextBlock Text="Convert annotation text notes into model elements" Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
+                        <!-- AI MODE BADGE — chuẩn T3 (T3LAB_UI_STANDARD.md § AI Mode). Code: init_ai_badge() -->
+                        <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}" Height="24" Margin="16,0,0,0"
+                                Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                <TextBlock x:Name="txt_ai_status" Text="AI off" Style="{StaticResource T3.Caption}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <!-- AI Mode Status Pill & Window controls -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
 
                         <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
                             <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
@@ -1722,9 +1725,14 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="TARGET SPECIFICATION" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                        <Button x:Name="btn_ai_detect_target" Grid.Column="1"
-                                Content="✨ AI Detect Target" Style="{StaticResource T3.Button.Secondary}"
-                                Height="26" Padding="8,0" ToolTip="AI Auto-Detect: Analyze text notes in view and recommend target category and parameter"/>
+                        <Button x:Name="btn_ai_detect_target" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
+                                Height="26" Padding="8,0"
+                                ToolTip="Guess the target category and parameter from the text notes in the active view">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                <TextBlock Text="AI Detect" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                     </Grid>
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>

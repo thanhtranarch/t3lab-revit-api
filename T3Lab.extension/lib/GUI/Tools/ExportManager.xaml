@@ -1669,12 +1669,6 @@
                     <!-- Window Control Buttons -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Border x:Name="ai_mode_badge" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,16,0" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txt_ai_status" Text="AI Mode: Ready" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
 
                         <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}"
                                 Click="minimize_button_clicked" ToolTip="Minimize">
@@ -1999,27 +1993,6 @@
                                                                 Style="{StaticResource T3.Button.Secondary}"
                                                                 Click="edit_filename_clicked"
                                                                 ToolTip="Edit filename pattern for all items"
-                                                                Margin="8,0,0,0"/>
-                                                        <Button x:Name="btn_ai_verify_naming"
-                                                                Content="✨ AI Naming / QA"
-                                                                Height="22"
-                                                                MinWidth="0"
-                                                                Padding="8,0"
-                                                                FontSize="11.5"
-                                                                Style="{StaticResource T3.Button.Secondary}"
-                                                                Click="ai_verify_naming_clicked"
-                                                                ToolTip="AI QA: Audit sheet naming conventions (ISO 19650) and auto-format export filenames"
-                                                                Margin="8,0,0,0"/>
-                                                        <Button x:Name="btn_ai_undo_naming"
-                                                                Content="Undo Naming"
-                                                                Height="22"
-                                                                MinWidth="0"
-                                                                Padding="8,0"
-                                                                FontSize="11.5"
-                                                                Style="{StaticResource T3.Button.Secondary}"
-                                                                Click="ai_undo_naming_clicked"
-                                                                ToolTip="Restore previous custom filenames before AI naming QA"
-                                                                Visibility="Collapsed"
                                                                 Margin="8,0,0,0"/>
                                                     </WrapPanel>
                                                 </GridViewColumn.Header>

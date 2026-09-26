@@ -306,6 +306,8 @@ _XAML_PATH = os.path.join(_GUI_DIR, 'Tools', 'ManaAnno.xaml')
 # WINDOW CLASS
 # ============================================================
 class AnnotationManagerWindow(T3WPFWindow):
+    AI_TOOL = "ManaAnno"
+
 
     def __init__(self):
         try:
@@ -364,188 +366,66 @@ class AnnotationManagerWindow(T3WPFWindow):
             logger.error("Error initializing window: {}".format(ex))
             raise
 
-    # ── AI Mode Support ──────────────────────────────────────────────────
-
     def _init_ai_mode(self):
-        try:
-            if hasattr(self, 'is_ai_mode_active') and self.is_ai_mode_active():
-                if hasattr(self, 'ai_mode_badge') and self.ai_mode_badge:
-                    self.ai_mode_badge.Visibility = Visibility.Visible
-                if hasattr(self, 'txt_ai_status') and self.txt_ai_status:
-                    info = self.get_ai_status_info()
-                    self.txt_ai_status.Text = "AI Mode: {}".format(info.get('model', 'Ready'))
-        except Exception as ex:
-            logger.warning("AI Mode init failed: {}".format(ex))
+        self.init_ai_badge()
 
     def on_txt_ai_qa_clicked(self, sender, args):
-        """AI Quality Check: Detect typos, formatting issues, casing in Text Notes."""
-        try:
-            notes_to_check = []
+        """AI Spellcheck: typo / casing / viết tắt trong Text Note — chỉ STAGE, Apply mới ghi.
+
+        Không có fallback bằng luật: bản cũ thay 'dam'→'DẦM', 'san'→'SÀN'… bất kể
+        ngữ cảnh nên phá cả chữ tiếng Anh. AI tắt thì báo, không tự sửa gì.
+        """
+        if not self.ai_require():
+            return
+        notes = [{"id": str(r["_id"]), "text": str(r["Name"])}
+                 for r in self._txt_dt.Rows if r["Selected"]]
+        if not notes:
+            notes = [{"id": str(r["_id"]), "text": str(r["Name"])}
+                     for r in list(self._txt_dt.Rows)[:30]]
+        if not notes:
+            self._status("No text notes to check.")
+            return
+
+        import json
+        prompt = (
+            "You are a BIM quality-assurance specialist for architectural, structural and MEP "
+            "drawing annotations (Vietnamese and English).\n"
+            "Review these text notes for spelling errors, irregular casing, abbreviations and "
+            "inconsistencies. Keep each note's language; only fix real mistakes.\n"
+            "Return JSON ONLY: {\"corrections\": [{\"id\": \"...\", \"original\": \"...\", "
+            "\"suggested\": \"...\", \"issue\": \"...\"}], \"summary\": \"<one English sentence>\"}\n"
+            "Notes:\n" + json.dumps(notes, ensure_ascii=False)
+        )
+        btn = getattr(self, 'btn_txt_ai_qa', None)
+        self.ai_busy(btn, True)
+        self._status("AI checking {} text note(s)...".format(len(notes)))
+
+        def _worker():
+            return self.ai_bridge.ask_json(prompt, fast=True)
+
+        def _callback(res, err):
+            self.ai_busy(btn, False)
+            if err or not isinstance(res, dict) or 'corrections' not in res:
+                self._status("AI returned no usable result - nothing was changed. Try again.")
+                return
+            fixes = {c['id']: c['suggested'] for c in res.get('corrections', [])
+                     if 'id' in c and 'suggested' in c}
+            updated = 0
             for row in self._txt_dt.Rows:
-                if row["Selected"]:
-                    notes_to_check.append({"id": str(row["_id"]), "text": str(row["Name"])})
-            if not notes_to_check:
-                for row in self._txt_dt.Rows:
-                    notes_to_check.append({"id": str(row["_id"]), "text": str(row["Name"])})
-                    if len(notes_to_check) >= 30:
-                        break
+                rid = str(row["_id"])
+                if rid in fixes and fixes[rid] != str(row["Name"]):
+                    row["Name"] = fixes[rid]
+                    row["Status"] = "AI Fix"
+                    row["Selected"] = True
+                    updated += 1
+            if updated:
+                self.btn_txt_apply.Visibility = Visibility.Visible
+                self._status("AI staged {} fix(es) (Status 'AI Fix') - review, then Apply Changes.".format(updated))
+            else:
+                self._status("AI found nothing to fix in {} note(s).".format(len(notes)))
 
-            if not notes_to_check:
-                self._status("No text notes found to check.")
-                return
+        self.run_ai_async(_worker, _callback)
 
-            self._status("AI inspecting {} text note(s) for typos & BIM standards...".format(len(notes_to_check)))
-            if hasattr(self, 'btn_txt_ai_qa'):
-                self.btn_txt_ai_qa.IsEnabled = False
-                self.btn_txt_ai_qa.Content = "⏳ Checking..."
-
-            def _restore_txt_btn():
-                if hasattr(self, 'btn_txt_ai_qa'):
-                    self.btn_txt_ai_qa.IsEnabled = True
-                    self.btn_txt_ai_qa.Content = "✨ AI Spellcheck & Fix"
-
-            def _apply_classic():
-                _restore_txt_btn()
-                changed = 0
-                for row in self._txt_dt.Rows:
-                    orig = str(row["Name"])
-                    cleaned = " ".join(orig.split())
-                    terms = {"wc": "WC", "nvs": "NVS", "dam": "DẦM", "cot": "CỘT", "san": "SÀN", "tang": "TẦNG"}
-                    for t_low, t_up in terms.items():
-                        cleaned = re.sub(r'\b' + re.escape(t_low) + r'\b', t_up, cleaned, flags=re.IGNORECASE)
-                    if cleaned != orig:
-                        row["Name"] = cleaned
-                        row["Status"] = "Rule Fix"
-                        row["Selected"] = True
-                        changed += 1
-                if changed:
-                    self.btn_txt_apply.Visibility = Visibility.Visible
-                    self._status("Rule-based QA: Standardized {} note(s) (marked 'Rule Fix'). Click Apply to save.".format(changed))
-                else:
-                    self._status("Rule-based QA: All checked notes conform to basic formatting.")
-
-            if not hasattr(self, 'is_ai_mode_active') or not self.is_ai_mode_active():
-                _apply_classic()
-                return
-
-            import json
-            prompt = (
-                "You are an expert BIM Quality Assurance specialist for architectural, structural, and MEP drawing annotations (Vietnamese & English).\n"
-                "Review these drawing text notes for spelling errors, irregular casing, abbreviations, and inconsistencies.\n"
-                "Return JSON ONLY with this structure:\n"
-                "{\n"
-                "  \"corrections\": [\n"
-                "    {\"id\": \"...\", \"original\": \"...\", \"suggested\": \"...\", \"issue\": \"...\"}\n"
-                "  ],\n"
-                "  \"summary\": \"...\"\n"
-                "}\n"
-                "Notes to inspect:\n" + json.dumps(notes_to_check)
-            )
-
-            def _worker():
-                return self.ai_bridge.ask_json(prompt, fast=True)
-
-            def _callback(res, err):
-                _restore_txt_btn()
-                if err or not res or not isinstance(res, dict) or 'corrections' not in res:
-                    _apply_classic()
-                    return
-
-                corrections = res.get('corrections', [])
-                summary = res.get('summary', 'Inspection complete')
-                if not corrections:
-                    self._status("AI QA: All notes look standard. No corrections needed.")
-                    return
-
-                corr_map = {c['id']: c['suggested'] for c in corrections if 'id' in c and 'suggested' in c}
-                updated = 0
-                for row in self._txt_dt.Rows:
-                    rid = str(row["_id"])
-                    if rid in corr_map:
-                        row["Name"] = corr_map[rid]
-                        row["Status"] = "AI Fix"
-                        row["Selected"] = True
-                        updated += 1
-
-                if updated > 0:
-                    self.btn_txt_apply.Visibility = Visibility.Visible
-                    self._status("AI QA: {}. {} note(s) updated (marked as 'AI Fix'). Click Apply Changes to commit.".format(
-                        summary, updated))
-                else:
-                    self._status("AI QA: {}".format(summary))
-
-            self.run_ai_async(_worker, _callback)
-
-        except Exception as ex:
-            if hasattr(self, 'btn_txt_ai_qa'):
-                self.btn_txt_ai_qa.IsEnabled = True
-                self.btn_txt_ai_qa.Content = "✨ AI Spellcheck & Fix"
-            logger.error("Error in on_txt_ai_qa_clicked: {}".format(ex))
-            self._status("Error in AI QA: {}".format(ex))
-
-    def on_dimtext_ai_suggest_clicked(self, sender, args):
-        """Suggest standard engineering dimension text overrides (Prefix, Suffix, Above, Below)."""
-        try:
-            self._status("AI suggesting standard dimension override annotations...")
-            if hasattr(self, 'btn_dimtext_ai_suggest'):
-                self.btn_dimtext_ai_suggest.IsEnabled = False
-                self.btn_dimtext_ai_suggest.Content = "⏳ Suggesting..."
-
-            def _restore_dim_btn():
-                if hasattr(self, 'btn_dimtext_ai_suggest'):
-                    self.btn_dimtext_ai_suggest.IsEnabled = True
-                    self.btn_dimtext_ai_suggest.Content = "✨ AI Suggest Overrides"
-
-            def _apply_suggestions(pfx, sfx, abv, blw, rationale):
-                _restore_dim_btn()
-                if hasattr(self, 'txt_prefix') and pfx and not self.txt_prefix.Text:
-                    self.txt_prefix.Text = pfx
-                if hasattr(self, 'txt_suffix') and sfx:
-                    self.txt_suffix.Text = sfx
-                if hasattr(self, 'txt_above') and abv:
-                    self.txt_above.Text = abv
-                if hasattr(self, 'txt_below') and blw:
-                    self.txt_below.Text = blw
-                self._status("AI Suggest: Applied overrides ({})".format(rationale))
-
-            if not hasattr(self, 'is_ai_mode_active') or not self.is_ai_mode_active():
-                _apply_suggestions("", " (TYP.)", "VERIFY ON SITE", "F.F.L.", "Standard BIM drawing convention")
-                return
-
-            prompt = (
-                "Suggest standard architectural/engineering BIM dimension override text for typical floor plan annotations.\n"
-                "Return JSON ONLY with keys:\n"
-                "{\n"
-                "  \"prefix\": string,\n"
-                "  \"suffix\": string (e.g. ' (TYP.)' or ' (E.Q.)'),\n"
-                "  \"above\": string (e.g. 'VERIFY' or 'CLEAR'),\n"
-                "  \"below\": string (e.g. 'F.F.L.' or 'C.H.'),\n"
-                "  \"rationale\": string\n"
-                "}"
-            )
-
-            def _worker():
-                return self.ai_bridge.ask_json(prompt, fast=True)
-
-            def _callback(res, err):
-                if err or not res or not isinstance(res, dict):
-                    _apply_suggestions("", " (TYP.)", "VERIFY ON SITE", "F.F.L.", "Standard drawing practice")
-                else:
-                    pfx = res.get('prefix', '')
-                    sfx = res.get('suffix', ' (TYP.)')
-                    abv = res.get('above', 'VERIFY')
-                    blw = res.get('below', 'F.F.L.')
-                    rat = res.get('rationale', 'AEC drawing standard')
-                    _apply_suggestions(pfx, sfx, abv, blw, rat)
-
-            self.run_ai_async(_worker, _callback)
-
-        except Exception as ex:
-            if hasattr(self, 'btn_dimtext_ai_suggest'):
-                self.btn_dimtext_ai_suggest.IsEnabled = True
-                self.btn_dimtext_ai_suggest.Content = "✨ AI Suggest Overrides"
-            logger.error("Error in on_dimtext_ai_suggest_clicked: {}".format(ex))
-            self._status("Error in AI Suggest: {}".format(ex))
 
     # ── helpers ─────────────────────────────────────────────────────────
 

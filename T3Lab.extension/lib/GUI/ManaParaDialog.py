@@ -1658,6 +1658,8 @@ class LoaderGridRow(_Reactive):
 # ============================================================================
 
 class ManaParaWindow(T3WPFWindow):
+    AI_TOOL = "ManaPara"
+
     # Checkbox từng dòng của dg_parameters nằm trong DataTemplate: không bật cờ
     # này thì param_row_checkbox_clicked không chạy và bộ đếm "N selected" đứng.
     WIRE_TEMPLATED_CLICKS = True
@@ -2250,27 +2252,7 @@ class ManaParaWindow(T3WPFWindow):
         self._check_enable_run()
 
     def _init_ai_mode(self):
-        """Initialize AI Mode status pill and tool capabilities if AI is active."""
-        try:
-            if hasattr(self, "ai_mode_badge"):
-                if self.is_ai_mode_active():
-                    self.ai_mode_badge.Visibility = Visibility.Visible
-                    info = self.get_ai_status_info()
-                    provider = info.get("provider", "Ready")
-                    model = info.get("model", "")
-                    label = "AI: {}".format(provider)
-                    if model:
-                        label = "AI: {} ({})".format(provider, model)
-                    if hasattr(self, "txt_ai_status"):
-                        self.txt_ai_status.Text = label
-                    if hasattr(self, "btn_transfer_ai_match"):
-                        self.btn_transfer_ai_match.Visibility = Visibility.Visible
-                else:
-                    self.ai_mode_badge.Visibility = Visibility.Collapsed
-                    if hasattr(self, "btn_transfer_ai_match"):
-                        self.btn_transfer_ai_match.ToolTip = "Enable AI Mode in LLMs Setting for semantic parameter matching"
-        except Exception:
-            pass
+        self.init_ai_badge()
 
     def _on_transfer_ai_match(self, sender, e):
         """Use AI to semantically match the selected source parameter to candidate target parameters."""
@@ -2292,14 +2274,7 @@ class ManaParaWindow(T3WPFWindow):
             )
             return
 
-        if not self.is_ai_mode_active():
-            MessageBox.Show(
-                "AI Mode is currently disabled or no LLM provider is configured.\n"
-                "Please enable AI Mode in LLMs Setting.",
-                "AI Mode Inactive",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information
-            )
+        if not self.ai_require():
             return
 
         src_name = self._selected_source
@@ -2309,16 +2284,11 @@ class ManaParaWindow(T3WPFWindow):
 
         # Visual feedback
         btn = getattr(self, 'btn_transfer_ai_match', None)
-        orig_content = btn.Content if btn else "✨ AI Match"
 
         def _restore_btn():
-            if btn:
-                btn.Content = orig_content
-                btn.IsEnabled = True
+            self.ai_busy(btn, False)
 
-        if btn:
-            btn.Content = "⏳ Matching..."
-            btn.IsEnabled = False
+        self.ai_busy(btn, True)
 
         self.txt_transfer_tgt_info.Text = "AI matching target parameter for '{}'...".format(src_name)
         if hasattr(self, "txt_param_status_bar"):

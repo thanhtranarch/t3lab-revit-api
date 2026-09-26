@@ -86,6 +86,8 @@ FAKE_ICON_GLYPHS = {
     "&#X25C0;": "→ &#xE76B; ChevronLeft",
     "&#X25BC;": "→ &#xE70D; ChevronDown",
     "&#X25B2;": "→ &#xE70E; ChevronUp",
+    "&#X2728;": "→ &#xEA80; Insight (icon AI chuẩn)",
+    "&#X23F3;": "→ bỏ — nút AI đang chạy thì ai_busy() khoá nút, không đổi chữ",
 }
 
 # Marker của khối stylesheet được nhúng bởi dev/sync_t3_styles.py.
@@ -412,8 +414,11 @@ def audit(src, base, keys):
                              '.Lead/.Lg)' % n_inline_mdl2))
     # (b) Ký tự Unicode thường làm icon: render bằng Segoe UI nên lệch nét và
     #     lệch baseline so với glyph MDL2 đứng cạnh.
-    bad_glyphs = sorted({m for m in re.findall(r"&#x[0-9A-Fa-f]{4};", src)
-                         if m.upper() in FAKE_ICON_GLYPHS})
+    # Bắt cả dạng entity (&#x2713;) lẫn ký tự dán thẳng (✓ ✨) trong giá trị thuộc tính.
+    literal = {"&#X%04X;" % ord(ch) for ch in re.findall(r'="[^"]*"', src) for ch in ch}
+    bad_glyphs = sorted({m.upper() for m in re.findall(r"&#x[0-9A-Fa-f]{4};", src)
+                         if m.upper() in FAKE_ICON_GLYPHS} |
+                        {g for g in literal if g in FAKE_ICON_GLYPHS})
     if bad_glyphs and base not in ICON_EXEMPT:
         issues.append(("P2", "icon dùng ký tự Unicode thường (%s) — thay bằng glyph "
                              "Segoe MDL2 Assets, xem bảng glyph trong T3Lab.Styles.xaml"

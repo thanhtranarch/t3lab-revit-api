@@ -1293,6 +1293,61 @@ class T3WPFWindow(Window):
             return {"available": False, "provider": "None", "model": "", "label": "AI Offline"}
         return b.get_active_provider_info()
 
+    # ── AI Mode chuẩn T3 (xem T3LAB_UI_STANDARD.md § AI Mode) ──────────────
+    # Tool giữ AI khai AI_TOOL = "<Tên>" — khoá tra tool_toggles trong settings.
+    # XAML: badge `ai_mode_badge` + `txt_ai_status` trên title bar; nút AI dùng
+    # icon EA80 + nhãn "AI <Động từ>". Không đổi Content của nút khi đang chạy.
+    AI_TOOL = None
+
+    def init_ai_badge(self):
+        """Badge AI trên title bar: chữ 'AI ready' / 'AI off' + tooltip provider.
+
+        Trạng thái nói bằng CHỮ, không chỉ bằng màu. Trả về True khi AI sẵn sàng.
+        """
+        badge = getattr(self, 'ai_mode_badge', None)
+        label = getattr(self, 'txt_ai_status', None)
+        active = self.is_ai_mode_active(self.AI_TOOL)
+        if badge is None or label is None:
+            return active
+        try:
+            from System.Windows import Visibility as _Vis
+            if active:
+                info = self.get_ai_status_info() or {}
+                label.Text = "AI ready"
+                badge.ToolTip = "AI Mode: {}".format(info.get('label') or 'ready')
+            else:
+                label.Text = "AI off"
+                badge.ToolTip = ("AI Mode is off. Turn it on and add an API key "
+                                 "in Support > LLMs Setting.")
+            badge.Visibility = _Vis.Visible
+        except Exception:
+            pass
+        return active
+
+    def ai_require(self):
+        """True khi AI dùng được; nếu không, báo MỘT câu thống nhất và trả False."""
+        if self.is_ai_mode_active(self.AI_TOOL):
+            return True
+        try:
+            from GUI.T3Dialog import show_info
+            show_info("AI Mode is off, or no AI provider is available.",
+                      title="AI Mode",
+                      details="Turn on AI Mode and add an API key in "
+                              "Support > LLMs Setting, then try again.",
+                      owner=self)
+        except Exception:
+            pass
+        return False
+
+    def ai_busy(self, button, busy):
+        """Khoá / mở nút AI trong lúc chờ model — không đụng Content (icon + nhãn)."""
+        if button is None:
+            return
+        try:
+            button.IsEnabled = not busy
+        except Exception:
+            pass
+
     def run_ai_async(self, worker_func, on_done=None, on_error=None, **kwargs):
         """Run an AI query on a background thread and invoke callbacks on the UI thread.
         

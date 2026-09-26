@@ -95,6 +95,8 @@ class TextNoteSelectionFilter(ISelectionFilter):
 
 class TextToElementDialog(T3WPFWindow):
     """WPF dialog controller for Text to Element."""
+    AI_TOOL = "TextToElement"
+
 
     def __init__(self, revit_obj):
         self._app = revit_obj
@@ -170,28 +172,11 @@ class TextToElementDialog(T3WPFWindow):
             self.txt_source_info.Text = "Click 'Find Intersections' to pick text notes"
 
     def _init_ai_mode(self):
-        """Initialize AI Mode status pill if AI is active."""
-        try:
-            if hasattr(self, "ai_mode_badge"):
-                if self.is_ai_mode_active():
-                    self.ai_mode_badge.Visibility = System.Windows.Visibility.Visible
-                    info = self.get_ai_status_info()
-                    provider = info.get("provider", "Ready")
-                    model = info.get("model", "")
-                    label = "AI: {}".format(provider)
-                    if model:
-                        label = "AI: {} ({})".format(provider, model)
-                    if hasattr(self, "txt_ai_status"):
-                        self.txt_ai_status.Text = label
-                else:
-                    self.ai_mode_badge.Visibility = System.Windows.Visibility.Collapsed
-        except Exception:
-            pass
+        self.init_ai_badge()
 
     def _on_ai_detect_target(self, sender, args):
         """Analyze sample text notes from the active view and recommend target category and parameter."""
-        if not self.is_ai_mode_active():
-            forms.alert("AI Mode is disabled or not configured. Please enable AI Mode in LLMs Setting.", title="AI Mode Inactive")
+        if not self.ai_require():
             return
 
         try:
@@ -211,16 +196,11 @@ class TextToElementDialog(T3WPFWindow):
 
         self.txt_status.Text = "AI analyzing {} sample text notes in view...".format(len(samples))
         btn = getattr(self, "btn_ai_detect_target", None)
-        orig_content = "✨ AI Detect Target"
 
         def _restore_btn():
-            if btn:
-                btn.Content = orig_content
-                btn.IsEnabled = True
+            self.ai_busy(btn, False)
 
-        if btn:
-            btn.Content = "⏳ Detecting..."
-            btn.IsEnabled = False
+        self.ai_busy(btn, True)
 
         system_prompt = (
             "You are an expert Autodesk Revit BIM specialist. "
