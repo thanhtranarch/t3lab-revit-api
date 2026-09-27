@@ -38,6 +38,7 @@ clr.AddReference("System.Xml")
 
 import Autodesk.Revit.DB as DB
 from Autodesk.Revit.DB import *
+from Autodesk.Revit.DB import IFailuresPreprocessor, FailureProcessingResult
 from Autodesk.Revit.UI import *
 from System.Collections.Generic import List
 

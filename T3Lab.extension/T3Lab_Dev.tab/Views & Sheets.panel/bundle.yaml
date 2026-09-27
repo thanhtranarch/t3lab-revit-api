@@ -3,4 +3,5 @@ layout:
   - ManaViews
   - ManaSheets
   - SheetGen
+  - CropSync
   - BatchOut

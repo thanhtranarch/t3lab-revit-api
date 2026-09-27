@@ -1,0 +1,7 @@
+title: "Datum\nSync"
+tooltip: "Synchronize 2D extents, bubble visibility, and leaders of Grids and Levels."
+description: |
+  Copies 2D view-specific curves, bubble visibility and leaders from active view to all selected target views.
+  Supports floor plans, ceiling plans, elevations and section views.
+author: "T3Lab"
+version: "1.0.0"

@@ -51,21 +51,8 @@ from Autodesk.Revit.DB import (
 )
 from pyrevit import revit, script
 from GUI import T3Dialog
+from GUI import DimTextDialog
 from GUI.WPF_Base import T3WPFWindow
-
-if os.path.dirname(__file__) not in sys.path:
-    sys.path.insert(0, os.path.dirname(__file__))
-
-try:
-    from GUI import DimTextDialog
-    from GUI import CopyAnnotationDialog
-    from GUI import TagCheckerDialog
-except Exception:
-    import DimTextDialog
-    import CopyAnnotationDialog
-    import TagCheckerDialog
-import Utils.UpperAll as UpperAll
-import Utils.RenumberAlongSpline as RenumberAlongSpline
 
 # DEFINE VARIABLES
 # ==================================================
@@ -1522,16 +1509,31 @@ class AnnotationManagerWindow(T3WPFWindow):
             self._load_sidebar_lists()
 
     def _on_launch_copier(self, sender, e):
-        self._launch_utility(CopyAnnotationDialog.show_dialog, "Annotation Copier")
+        # Keep CLR interface implementations on one canonical module identity.
+        # Importing this module as both GUI.CopyAnnotationDialog and
+        # CopyAnnotationDialog creates duplicate PythonNet wrapper types.
+        def run():
+            from GUI import CopyAnnotationDialog
+            CopyAnnotationDialog.show_dialog()
+        self._launch_utility(run, "Annotation Copier")
 
     def _on_launch_renumber(self, sender, e):
-        self._launch_utility(RenumberAlongSpline.run, "Renumber Along Spline")
+        def run():
+            from Utils import RenumberAlongSpline
+            RenumberAlongSpline.run()
+        self._launch_utility(run, "Renumber Along Spline")
 
     def _on_launch_upper_all(self, sender, e):
-        self._launch_utility(UpperAll.run, "Uppercase Converter")
+        def run():
+            from Utils import UpperAll
+            UpperAll.run()
+        self._launch_utility(run, "Uppercase Converter")
 
     def _on_launch_tag_checker(self, sender, e):
-        self._launch_utility(TagCheckerDialog.show_dialog, "Tag Checker", False)
+        def run():
+            from GUI import TagCheckerDialog
+            TagCheckerDialog.show_dialog()
+        self._launch_utility(run, "Tag Checker", False)
 
     # ── DimText tab handlers ─────────────────────────────────────────────────
 

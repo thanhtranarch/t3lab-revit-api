@@ -1,0 +1,7 @@
+title: "Crop\nSync"
+tooltip: "Synchronize View Crop Region shape, dimensions, and annotation crop."
+description: |
+  Copies exact crop boundary shape (rectangular or non-rectangular sketch), active state, and annotation crop to all selected views.
+  Supports floor plans, ceiling plans, elevations and section views.
+author: "T3Lab"
+version: "1.0.0"
