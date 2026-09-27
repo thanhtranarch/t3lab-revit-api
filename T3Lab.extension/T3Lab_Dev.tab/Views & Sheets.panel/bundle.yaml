@@ -1,6 +1,6 @@
 title: "Views & Sheets"
 background:
-  title: "#2CE07B00"
+  title: "#46E07B00"
 layout:
   - ManaViews
   - ManaSheets
