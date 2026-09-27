@@ -1,0 +1,13 @@
+title: "Make\nPattern"
+tooltip: Interactive Vector Hatch Studio & Large Surface Preview
+description: |
+  Create custom Revit model and drafting hatch patterns with an interactive vector canvas.
+  Features:
+  - In-app drawing canvas with grid snapping and ortho lock
+  - Unit module dimensions and stagger shift ratios (running bond)
+  - Real-time large surface tiling preview
+  - Direct Revit FillPattern / Filled Region creation and AutoCAD .PAT export
+  - Import linework from active Revit view selection
+
+author: T3Lab
+version: 2.0.0

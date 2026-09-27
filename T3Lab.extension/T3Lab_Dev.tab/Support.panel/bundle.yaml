@@ -1,4 +1,6 @@
 title: "Support"
+background:
+  title: "#1FE07B00"
 layout:
   - CloudLinks
   - UI

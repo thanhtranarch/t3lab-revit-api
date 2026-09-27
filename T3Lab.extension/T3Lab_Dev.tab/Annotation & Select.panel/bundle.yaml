@@ -1,4 +1,7 @@
 title: Annotation & Select
+background:
+  title: "#46E07B00"
 layout:
   - ManaAnno
+  - MakePattern
   - Mana
