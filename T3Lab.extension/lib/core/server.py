@@ -271,6 +271,44 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
+    def do_GET(self):
+        """Handle GET requests.
+
+        Never called by name — BaseHTTPRequestHandler dispatches on
+        'do_' + HTTP verb — so a reference count reports it as dead code. It
+        is not: the dead-code sweep af2a9ab (2026-09-26) deleted it, GET
+        /health started answering 501, and the bridge (_port_alive) treated
+        every Revit window started since as dead — Claude could only reach
+        the one window still running the pre-sweep build. The one-port-per-
+        process guard (MCPService._local_server_ports) probes /health too.
+        """
+        path = urlparse(self.path).path
+
+        if path == '/health':
+            # pid + port let external diagnostics attribute a listener to its
+            # Revit process — the same pid answering on SEVERAL ports in the
+            # range means orphaned duplicate servers (broken singleton
+            # anchor), not several Revit windows.
+            self._send_json({'status': 'ok', 'pid': os.getpid(),
+                             'port': self.server.server_port})
+
+        elif path == '/':
+            self._send_json({
+                'name': 'T3LabAI MCP Server',
+                'version': '1.0.0',
+                'protocol': 'mcp',
+                'status': 'running'
+            })
+
+        elif path in ('/v1/models', '/models'):
+            # Tolerate OpenAI-compatible clients that probe for a model list,
+            # so they don't repeatedly hit an "unexpected endpoint" 404.
+            self._send_json({'object': 'list', 'data': []})
+
+        else:
+            self._send_json({'error': 'Not found'}, 404)
+
+
     def do_POST(self):
         """Handle POST requests (MCP messages)"""
         parsed = urlparse(self.path)

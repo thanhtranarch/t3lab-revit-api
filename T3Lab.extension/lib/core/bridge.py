@@ -223,6 +223,16 @@ def _port_alive(port, timeout=PROBE_TIMEOUT):
         req = urllib.request.Request(f"http://127.0.0.1:{port}/health")
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status == 200
+    except urllib.error.HTTPError as e:
+        # Transitional: servers built between the dead-code sweep af2a9ab
+        # (2026-09-26, deleted do_GET) and its restore answer GET /health
+        # with 501 "Unsupported method" while serving POST /mcp normally, and
+        # a Revit window keeps that build until it restarts. Count such a
+        # listener as alive — but only a Python BaseHTTP one: a zombie socket
+        # still times out, and a foreign server (pyRevit Routes runs on
+        # HttpListener) carries no BaseHTTP banner.
+        server = (e.headers.get('Server') or '') if e.headers else ''
+        return e.code == 501 and server.startswith('BaseHTTP')
     except Exception:
         return False
 
