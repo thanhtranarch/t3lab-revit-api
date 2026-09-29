@@ -1865,18 +1865,22 @@
                                                     <DataGridTemplateColumn Header="ILLUSTRATION" Width="110" IsReadOnly="True">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate>
+                                                                <!-- String bridge: PyObject không đổi được sang Brush/double/DoubleCollection -->
                                                                 <Grid Height="24">
-                                                                    <Line X1="0" Y1="0" X2="80" Y2="0"
-                                                                          Stroke="{Binding color_hex}"
-                                                                          StrokeThickness="{Binding thickness_val}"
-                                                                          StrokeDashArray="{Binding dash_str}"
+                                                                    <TextBlock x:Name="row_style_color_text" Text="{Binding color_hex}" Visibility="Collapsed"/>
+                                                                    <TextBlock x:Name="row_style_thickness_text" Text="{Binding thickness_val}" Visibility="Collapsed"/>
+                                                                    <TextBlock x:Name="row_style_dash_text" Text="{Binding dash_view}" Visibility="Collapsed"/>
+                                                                    <Line X1="0" Y1="12" X2="80" Y2="12"
+                                                                          Stroke="{Binding Text, ElementName=row_style_color_text}"
+                                                                          StrokeThickness="{Binding Text, ElementName=row_style_thickness_text}"
+                                                                          StrokeDashArray="{Binding Text, ElementName=row_style_dash_text}"
                                                                           StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                          HorizontalAlignment="Center" VerticalAlignment="Top"/>
                                                                 </Grid>
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
                                                     </DataGridTemplateColumn>
-                                                    <DataGridTextColumn Header="COLOR" Binding="{Binding color}" Width="100" IsReadOnly="True"
+                                                    <DataGridTextColumn Header="COLOR" Binding="{Binding color}" Width="144" IsReadOnly="True"
                                                                         ElementStyle="{StaticResource T3.Cell.Muted}"/>
                                                     <DataGridTextColumn Header="WEIGHT" Binding="{Binding weight}" Width="80" IsReadOnly="True"
                                                                         ElementStyle="{StaticResource T3.Cell.Number}"/>
@@ -1977,13 +1981,17 @@
                                                     <DataGridTemplateColumn Header="ILLUSTRATION" Width="130" IsReadOnly="True">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate>
+                                                                <!-- String bridge: PyObject không đổi được sang Brush/double/DoubleCollection -->
                                                                 <Grid Height="24">
-                                                                    <Line X1="0" Y1="0" X2="100" Y2="0"
-                                                                          Stroke="{Binding color_hex}"
-                                                                          StrokeThickness="{Binding thickness_val}"
-                                                                          StrokeDashArray="{Binding dash_str}"
+                                                                    <TextBlock x:Name="row_pattern_color_text" Text="{Binding color_hex}" Visibility="Collapsed"/>
+                                                                    <TextBlock x:Name="row_pattern_thickness_text" Text="{Binding thickness_val}" Visibility="Collapsed"/>
+                                                                    <TextBlock x:Name="row_pattern_dash_text" Text="{Binding dash_view}" Visibility="Collapsed"/>
+                                                                    <Line X1="0" Y1="12" X2="100" Y2="12"
+                                                                          Stroke="{Binding Text, ElementName=row_pattern_color_text}"
+                                                                          StrokeThickness="{Binding Text, ElementName=row_pattern_thickness_text}"
+                                                                          StrokeDashArray="{Binding Text, ElementName=row_pattern_dash_text}"
                                                                           StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                          HorizontalAlignment="Center" VerticalAlignment="Top"/>
                                                                 </Grid>
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
@@ -2097,10 +2105,17 @@
                                                     <DataGridTemplateColumn Header="ILLUSTRATION" Width="100" IsReadOnly="True">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate>
-                                                                <Border Width="60" Height="18"
-                                                                        CornerRadius="2"
-                                                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                                                        Background="{Binding wpf_brush}" VerticalAlignment="Center"/>
+                                                                <!-- String bridge: PyObject không đổi được sang Geometry -->
+                                                                <Grid>
+                                                                    <TextBlock x:Name="row_fill_geometry_text" Text="{Binding preview_geometry}" Visibility="Collapsed"/>
+                                                                    <Border Width="60" Height="18" CornerRadius="2" ClipToBounds="True"
+                                                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
+                                                                            Background="{StaticResource T3.Surface}" VerticalAlignment="Center">
+                                                                        <Path Data="{Binding Text, ElementName=row_fill_geometry_text}"
+                                                                              Stroke="{StaticResource T3.TextMuted}" StrokeThickness="1"
+                                                                              Fill="{StaticResource T3.BorderStrong}"/>
+                                                                    </Border>
+                                                                </Grid>
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
                                                     </DataGridTemplateColumn>
