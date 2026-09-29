@@ -60,6 +60,7 @@ except ImportError:
 
 from pyrevit import revit, DB, forms, script
 from GUI.WPF_Base import T3WPFWindow
+from Snippets._compat import disposing
 
 # Worldwide (keyless) boundary lookup — OpenStreetMap based
 try:
@@ -1070,7 +1071,7 @@ def set_project_geo_location(doc, lat, lon, place_name=None):
         site = doc.SiteLocation
         if site is None:
             return False
-        with DB.Transaction(doc, "Set Project Geo Location") as t:
+        with disposing(DB.Transaction(doc, "Set Project Geo Location")) as t:
             t.Start()
             site.Latitude = math.radians(float(lat))
             site.Longitude = math.radians(float(lon))
@@ -1161,7 +1162,7 @@ def create_property_lines_in_revit(doc, coordinates, elevation_ft=0.0,
     lines_created = 0
     kind = line_category
 
-    with DB.Transaction(doc, "Create Property Lines") as t:
+    with disposing(DB.Transaction(doc, "Create Property Lines")) as t:
         t.Start()
 
         if line_category == LINE_CAT_PROPERTY:

@@ -75,6 +75,42 @@ def elem_name(element):
         return Element.Name.GetValue(element)
 
 
+class disposing(object):
+    """``with disposing(DB.Transaction(doc, "Name")) as t:`` — `with` cho object .NET.
+
+    IronPython biến mọi ``IDisposable`` thành context manager, nên code cũ viết
+    ``with DB.Transaction(doc, "x") as t:``. pythonnet 3 (CPython) thì KHÔNG:
+    dòng đó ném ``TypeError: 'Transaction' object does not support the context
+    manager protocol`` và thao tác chính của tool chết ngay (Datum Sync,
+    2026-09-29). Dùng cho Transaction / TransactionGroup / SubTransaction /
+    FilteredElementCollector.
+
+    Giữ đúng ngữ nghĩa của IronPython: trả về chính object (KHÔNG tự Start —
+    thân khối vẫn gọi ``t.Start()`` / ``t.Commit()``), và lúc ra khỏi khối,
+    kể cả khi có exception, rollback phần còn mở rồi ``Dispose()``.
+    Exception trong khối vẫn được ném tiếp.
+    """
+
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __enter__(self):
+        return self.obj
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        obj = self.obj
+        try:
+            if obj.HasStarted() and not obj.HasEnded():
+                obj.RollBack()
+        except Exception:
+            pass                # collectors have no HasStarted; nothing to roll back
+        try:
+            obj.Dispose()
+        except Exception:
+            pass
+        return False
+
+
 def net_list(item_type, items):
     """``List[item_type]`` .NET dựng từ bất kỳ iterable nào (list Python hay collection .NET).
 

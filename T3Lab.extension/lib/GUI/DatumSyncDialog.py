@@ -24,6 +24,7 @@ from Snippets.datum_sync import (
     sync_grids_to_view,
     sync_levels_to_view,
 )
+from Snippets._compat import disposing
 
 XAML_FILE = os.path.join(os.path.dirname(__file__), "Tools", "DatumSync.xaml")
 
@@ -35,11 +36,13 @@ class ViewItem(object):
         self.view_type = str(view.ViewType)
         sheet_param = view.get_Parameter(DB.BuiltInParameter.VIEWPORT_SHEET_NUMBER)
         self.sheet_info = sheet_param.AsString() if sheet_param and sheet_param.AsString() else "-"
-        self._is_selected = is_selected
+        self._is_selected = bool(is_selected)
 
     @property
     def is_selected(self):
-        return "True" if self._is_selected else "False"
+        # A real bool: the bridge TextBlock renders it as "True"/"False", and
+        # sync_header_checkbox() reads bool(row.is_selected) - bool("False") is True.
+        return self._is_selected
 
     @is_selected.setter
     def is_selected(self, val):
@@ -50,6 +53,10 @@ class ViewItem(object):
 
 
 class DatumSyncDialog(T3WPFWindow):
+    # The row checkbox's Click= lives in a DataTemplate; without this flag it
+    # is never wired and the status line ignores row clicks.
+    WIRE_TEMPLATED_CLICKS = True
+
     def __init__(self, doc=None, uidoc=None):
         T3WPFWindow.__init__(self, XAML_FILE)
         self._doc = doc or revit.doc
@@ -234,20 +241,14 @@ class DatumSyncDialog(T3WPFWindow):
         self.sync_header_checkbox(self.chk_all_dg_views, self.dg_views, "is_selected")
 
     def select_all_dg_views_clicked(self, sender, args):
-        is_chk = sender.IsChecked
-        val = bool(is_chk) if is_chk is not None else False
-        for item in self._filtered_view_items:
-            item._is_selected = val
-        self.dg_views.Items.Refresh()
+        self.toggle_all_rows(self.dg_views, "is_selected", sender.IsChecked)
         self._update_status()
 
     def row_checkbox_clicked(self, sender, args):
-        item = sender.DataContext
-        if item:
-            item._is_selected = not item._is_selected
-            self.dg_views.Items.Refresh()
-            self._update_status()
-            self.sync_header_checkbox(self.chk_all_dg_views, self.dg_views, "is_selected")
+        # T3WPFWindow's checkbox bridge has already written the tick into the
+        # row before Click fires - toggling here again would undo the click.
+        self._update_status()
+        self.sync_header_checkbox(self.chk_all_dg_views, self.dg_views, "is_selected")
 
     def sync_button_clicked(self, sender, args):
         selected_targets = [item.view for item in self._all_view_items if item._is_selected]
@@ -263,10 +264,10 @@ class DatumSyncDialog(T3WPFWindow):
         total_grids_synced = 0
         total_levels_synced = 0
 
-        with DB.TransactionGroup(self._doc, "T3Lab: Datum Sync") as tg:
+        with disposing(DB.TransactionGroup(self._doc, "T3Lab: Datum Sync")) as tg:
             tg.Start()
             for tgt_view in selected_targets:
-                with DB.Transaction(self._doc, "Sync Datums to " + tgt_view.Name) as t:
+                with disposing(DB.Transaction(self._doc, "Sync Datums to " + tgt_view.Name)) as t:
                     t.Start()
                     if sync_grids and self._source_grids_data:
                         total_grids_synced += sync_grids_to_view(

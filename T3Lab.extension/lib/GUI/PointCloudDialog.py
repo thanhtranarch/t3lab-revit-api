@@ -142,6 +142,7 @@ def mm_to_ft(mm):
 # ── Section 2: Point Cloud Extraction ─────────────────────────────────────────
 
 import uuid
+from Snippets._compat import disposing
 
 class PointCloudSelectionFilter(ISelectionFilter):
     __namespace__ = "T3Lab.PointCloud"
@@ -1435,7 +1436,7 @@ class ElementBuilder(object):
         if not wt:
             return None
 
-        with Transaction(self.doc, "T3Lab: Create Wall") as t:
+        with disposing(Transaction(self.doc, "T3Lab: Create Wall")) as t:
             self._start(t)
             try:
                 wall = Wall.Create(self.doc, wline, wt.Id, lv.Id,
@@ -1457,7 +1458,7 @@ class ElementBuilder(object):
             return None
         cl = self._rect_curve_loop(d['corners_xy'], d['z_ft'])
 
-        with Transaction(self.doc, "T3Lab: Create Floor") as t:
+        with disposing(Transaction(self.doc, "T3Lab: Create Floor")) as t:
             self._start(t)
             try:
                 if REVIT_VERSION >= 2022:
@@ -1487,7 +1488,7 @@ class ElementBuilder(object):
             return None
         cl = self._rect_curve_loop(d['corners_xy'], d['z_ft'])
 
-        with Transaction(self.doc, "T3Lab: Create Ceiling") as t:
+        with disposing(Transaction(self.doc, "T3Lab: Create Ceiling")) as t:
             self._start(t)
             try:
                 if REVIT_VERSION >= 2022:
@@ -1542,7 +1543,7 @@ class ElementBuilder(object):
         sym = col_symbols[0]
         pt  = XYZ(d['cx'], d['cy'], d['z_bot_ft'])
 
-        with Transaction(self.doc, "T3Lab: Create Column") as t:
+        with disposing(Transaction(self.doc, "T3Lab: Create Column")) as t:
             self._start(t)
             try:
                 if not sym.IsActive:
@@ -1586,7 +1587,7 @@ class ElementBuilder(object):
         if not lv:
             return None
 
-        with Transaction(self.doc, "T3Lab: Create {}".format(elem.Type)) as t:
+        with disposing(Transaction(self.doc, "T3Lab: Create {}".format(elem.Type))) as t:
             self._start(t)
             try:
                 if not sym.IsActive:
@@ -1625,7 +1626,7 @@ class ElementBuilder(object):
         pts     = [XYZ(x, y, z_ft) for (x, y) in corners]
         n       = len(pts)
 
-        with Transaction(self.doc, "T3Lab: Create Roof") as t:
+        with disposing(Transaction(self.doc, "T3Lab: Create Roof")) as t:
             self._start(t)
             try:
                 ca = CurveArray()

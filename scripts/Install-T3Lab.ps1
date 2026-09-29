@@ -9,7 +9,8 @@
 
     Checks, in order:
       1. pyRevit clone(s) — any name, any install root
-      2. CPython engine   — any CPY3* build, reported with its Python version
+      2. CPython engine   — any CPY3* build, reported with its Python version,
+                            and whether its python3XX.dll can be loaded here
       3. pyRevit CLI      — used for registration when present
       4. Revit versions installed, with their journal folders
       5. Extension folder — exists, writable, not a OneDrive cloud-only
@@ -111,6 +112,50 @@ function Get-CPythonEngines($clones) {
     return $found
 }
 
+# pythonnet loads the engine's python3XX.dll the first time a '#! python3'
+# button runs. When that load fails, Revit shows only "The type initializer for
+# 'Delegates' threw an exception" and nothing else. Loading the DLL here, the
+# same way, gets the real Win32 reason. Returns $null on success, else the text.
+$script:LoadErrors = @{
+    2    = "file not found"
+    3    = "path not found"
+    5    = "access denied - antivirus or folder permissions"
+    126  = "the DLL or one of its dependencies is missing - incomplete pyRevit install"
+    193  = "not a valid 64-bit DLL - corrupt or partial download"
+    225  = "quarantined by antivirus"
+    1260 = "blocked by Group Policy (AppLocker / Software Restriction Policies)"
+    4551 = "blocked by Windows Defender Application Control (WDAC)"
+}
+
+function Test-EngineDllLoad($dllPath) {
+    if (-not ("T3Lab.Native" -as [type])) {
+        Add-Type -Namespace T3Lab -Name Native -MemberDefinition @'
+[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+public static extern IntPtr LoadLibraryEx(string lpFileName, IntPtr hFile, uint dwFlags);
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern bool FreeLibrary(IntPtr hModule);
+[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
+public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+'@
+    }
+    # 0x8 = LOAD_WITH_ALTERED_SEARCH_PATH: resolve dependencies next to the DLL.
+    $handle = [T3Lab.Native]::LoadLibraryEx($dllPath, [IntPtr]::Zero, 0x8)
+    if ($handle -eq [IntPtr]::Zero) {
+        $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        $why = $script:LoadErrors[$code]
+        if (-not $why) { $why = (New-Object ComponentModel.Win32Exception $code).Message }
+        return "Win32 error ${code}: $why"
+    }
+    try {
+        if ([T3Lab.Native]::GetProcAddress($handle, "Py_IsInitialized") -eq [IntPtr]::Zero) {
+            return "loaded, but it is not a Python runtime DLL (no Py_IsInitialized export)"
+        }
+    } finally {
+        [void][T3Lab.Native]::FreeLibrary($handle)
+    }
+    return $null
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 Write-Host "==================================================" -ForegroundColor Cyan
@@ -209,6 +254,34 @@ if (-not $engines) {
     if (-not $has312) {
         Write-Warn "No Python 3.12 engine. T3Lab is developed against CPY3123 (Python 3.12)."
         Write-Info "Older engines (CPY387 = Python 3.8) may fail on newer syntax in some tools."
+    }
+
+    # Can the engine's Python DLL actually be loaded on this machine?
+    $mode = $ExecutionContext.SessionState.LanguageMode
+    if ($mode -ne "FullLanguage") {
+        Write-Warn "PowerShell runs in $mode mode: AppLocker / WDAC application control is enforced on this machine."
+        Write-Info "That is the usual cause of `"The type initializer for 'Delegates' threw an exception`"."
+        Write-Info "Ask IT to allow the pyRevit engine folder(s) listed above, or install pyRevit for all users (C:\Program Files)."
+    } elseif (-not [Environment]::Is64BitProcess) {
+        Write-Warn "32-bit PowerShell - cannot test the 64-bit engine DLL. Re-run from 64-bit PowerShell."
+    } else {
+        foreach ($e in $engines) {
+            $dll = Get-ChildItem -Path $e.Path -Filter "python3*.dll" -ErrorAction SilentlyContinue |
+                   Where-Object { $_.Name -ne "python3.dll" } | Select-Object -First 1
+            if (-not $dll) {
+                Write-Fail "$($e.Name): no python3XX.dll in the engine folder - incomplete pyRevit install. Reinstall pyRevit."
+                continue
+            }
+            $problem = $null
+            try { $problem = Test-EngineDllLoad $dll.FullName } catch { $problem = "load test crashed: $($_.Exception.Message)" }
+            if ($problem) {
+                Write-Fail "$($e.Name): $($dll.Name) cannot be loaded - $problem"
+                Write-Info "Every '#! python3' tool will fail with `"The type initializer for 'Delegates' threw an exception`"."
+                Write-Info "Fix the cause above, then RESTART Revit (the failure sticks until Revit closes)."
+            } else {
+                Write-Ok "$($e.Name): $($dll.Name) loads"
+            }
+        }
     }
 }
 

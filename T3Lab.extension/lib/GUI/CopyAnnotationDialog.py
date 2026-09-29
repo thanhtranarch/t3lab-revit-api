@@ -41,6 +41,7 @@ from Autodesk.Revit.DB import (
 )
 
 from pyrevit import forms, script, revit
+from Snippets._compat import disposing
 
 # `revit.doc` / `revit.uidoc` RAISE AttributeError (not return None) when no
 # UIDocument is active. At module scope that kills the import outright, so the
@@ -848,7 +849,7 @@ class CopyAnnotationsWindow(Window):
             for eid in ids_to_copy:
                 ids_list.Add(eid)
 
-            with Transaction(self.dest_doc, "DQT - Copy Annotations: " + dest_view.Name) as t:
+            with disposing(Transaction(self.dest_doc, "DQT - Copy Annotations: " + dest_view.Name)) as t:
                 t.Start()
                 # Swallowing warnings
                 options = t.GetFailureHandlingOptions()

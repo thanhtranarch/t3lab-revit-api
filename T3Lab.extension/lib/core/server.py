@@ -9992,7 +9992,10 @@ class T3LabAIServer(object):
 
         # ── create_project_parameter ─────────────────────────────────────────
         elif tool_name == 'create_project_parameter':
-            from Autodesk.Revit.DB import (Transaction, BuiltInParameterGroup,
+            # BuiltInParameterGroup is gone on Revit 2025+: importing it here
+            # made this tool fail before it started. Only the legacy fallback
+            # below imports it.
+            from Autodesk.Revit.DB import (Transaction,
                                            ExternalDefinitionCreationOptions)
             import os as _os
             try:
@@ -10071,6 +10074,7 @@ class T3LabAIServer(object):
                         from Autodesk.Revit.DB import GroupTypeId
                         group_param = GroupTypeId.Data
                     except Exception:
+                        from Autodesk.Revit.DB import BuiltInParameterGroup
                         group_param = BuiltInParameterGroup.PG_DATA
 
                     try:
@@ -10078,6 +10082,7 @@ class T3LabAIServer(object):
                         if not ok:
                             ok = doc.ParameterBindings.ReInsert(ext_def, binding, group_param)
                     except Exception:
+                        from Autodesk.Revit.DB import BuiltInParameterGroup
                         ok = doc.ParameterBindings.Insert(ext_def, binding, BuiltInParameterGroup.PG_DATA)
                         if not ok:
                             ok = doc.ParameterBindings.ReInsert(ext_def, binding, BuiltInParameterGroup.PG_DATA)

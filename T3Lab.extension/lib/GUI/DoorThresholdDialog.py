@@ -40,6 +40,7 @@ from Autodesk.Revit.DB import (
     Wall,
 )
 from Autodesk.Revit.UI import TaskDialog
+from Snippets._compat import disposing
 
 XAML_FILE = os.path.join(os.path.dirname(__file__), 'Tools', 'DoorThreshold.xaml')
 logger = script.get_logger()
@@ -161,7 +162,7 @@ class ThresholdGenerator(object):
         new_floors = []
         error_messages = []
 
-        with Transaction(self.doc, "T3Lab: Door Threshold") as t:
+        with disposing(Transaction(self.doc, "T3Lab: Door Threshold")) as t:
             t.Start()
             failOpt = t.GetFailureHandlingOptions()
             failOpt.SetFailuresPreprocessor(ThresholdCreationWarningSwallower())

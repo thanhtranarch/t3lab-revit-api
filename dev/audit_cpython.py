@@ -13,6 +13,9 @@ suy doan. Chay:  python3 dev/audit_cpython.py [--quiet]
   C6  P1  print() ngoai except                   -> ScriptIO has no attribute write
   C8  P0  ElementId.IntegerValue khong guard     -> AttributeError tren Revit 2024+
   C9  P0  reload() tran                          -> NameError tren CPython 3
+  C10 P0  `with DB.Transaction(...)` tran        -> TypeError: does not support the
+          context manager protocol (pythonnet 3 khong bien IDisposable thanh
+          context manager). Boc bang Snippets._compat.disposing(...).
 """
 
 import ast
@@ -41,6 +44,11 @@ MODULE_DOC = re.compile(
 FORMS_API = re.compile(r'\bforms\.([A-Za-z_][A-Za-z0-9_]*)')
 DB_ENUM = re.compile(r'\bDB\.(BuiltInCategory|BuiltInParameter|UnitType|SpecTypeId)\b')
 PRINT_CALL = re.compile(r'^\s*print\s*\(')
+# `with DB.Transaction(...)` - IronPython only. `revit.Transaction` (pyRevit's
+# Python wrapper) is a real context manager and stays allowed.
+DOTNET_WITH = re.compile(
+    r'^\s*with\s+(?!revit\.)((?:\w+\.)*(?:Transaction|TransactionGroup|'
+    r'SubTransaction|FilteredElementCollector))\s*\(')
 
 
 def iter_py():
@@ -153,6 +161,13 @@ def audit():
 
             if PRINT_CALL.match(line):
                 add('P1', 'C6', path, i, 'print() - bo hoac dung logger')
+
+            m = DOTNET_WITH.match(line)
+            if m:
+                add('P0', 'C10', path, i,
+                    'with %s(...) tran - pythonnet 3 nem TypeError; dung '
+                    '`with disposing(%s(...)) as t:` (Snippets._compat)'
+                    % (m.group(1), m.group(1)))
 
         # C9: bare reload() call (CPython 3 requires importlib.reload)
         try:
