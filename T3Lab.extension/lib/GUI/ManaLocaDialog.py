@@ -21,6 +21,8 @@ clr.AddReference('RevitAPIUI')
 from System import Action
 from System.Collections.Generic import List
 from System.Windows import WindowState, Visibility
+from System.Windows.Controls import DataGridEditingUnit
+from System.Windows.Threading import DispatcherPriority
 
 from Autodesk.Revit.DB import (
     FilteredElementCollector,
@@ -54,6 +56,30 @@ if not os.path.exists(os.path.dirname(SETTINGS_FILE)):
 
 logger = script.get_logger()
 
+# Phần lẻ (mm) lớn hơn ngưỡng này thì toạ độ bị coi là "odd" — dùng chung cho
+# chữ đỏ trong bảng, dải đếm và nút Override Odd.
+ODD_TOL_MM = 0.01
+# Một trục lệch hơn ngưỡng này so với vị trí gốc thì ô tô vàng (chờ Apply).
+# Bằng đúng ngưỡng has_changed (0.0001 ft) để ô vàng nào Apply cũng di chuyển.
+EDIT_TOL_MM = 0.0001 * 304.8
+
+
+def _format_mm(value):
+    """Toạ độ mm hiển thị: luôn 2 chữ số thập phân để dấu chấm thẳng cột."""
+    return "{:.2f}".format(value)
+
+
+def _parse_mm(value, current):
+    """Chữ người dùng gõ vào ô → float; gõ sai thì giữ nguyên giá trị cũ."""
+    try:
+        return float(str(value).strip().replace(" ", "").replace(",", "."))
+    except (TypeError, ValueError):
+        return current
+
+
+def _is_odd_mm(value):
+    return abs(value - round(value)) > ODD_TOL_MM
+
 
 # ==================================================
 # DATA MODEL
@@ -75,10 +101,10 @@ class CategoryItem(object):
     def __init__(self, name):
         self.Name      = name
         self.IsChecked = True
-        self.CountText = "(0)"
+        self.CountText = "0"
 
     def set_count(self, count):
-        self.CountText = "({})".format(count)
+        self.CountText = str(count)
 
 
 class ElementData(object):
@@ -100,6 +126,7 @@ class ElementData(object):
         self.y = pos.Y * 304.8
         self.z = pos.Z * 304.8
         self._original_pos = pos
+        self._orig_mm = (self.x, self.y, self.z)
 
     def _get_type_name(self, element):
         try:
@@ -164,11 +191,58 @@ class ElementData(object):
     @Z.setter
     def Z(self, value): self.z = float(value)
 
+    # ── Cột toạ độ của bảng ─────────────────────────────────────────────
+    # WPF nhận thuộc tính Python dưới dạng PyObject nên StringFormat={0:F2}
+    # không có tác dụng (bảng từng hiện 25619.4021 lẫn 0.0). Bảng bind vào
+    # chuỗi đã format sẵn; setter parse ngược lại khi người dùng sửa ô.
+
+    @property
+    def x_mm(self): return _format_mm(self.x)
+    @x_mm.setter
+    def x_mm(self, value): self.x = _parse_mm(value, self.x)
+
+    @property
+    def y_mm(self): return _format_mm(self.y)
+    @y_mm.setter
+    def y_mm(self, value): self.y = _parse_mm(value, self.y)
+
+    @property
+    def z_mm(self): return _format_mm(self.z)
+    @z_mm.setter
+    def z_mm(self, value): self.z = _parse_mm(value, self.z)
+
+    # Ô vàng = đã sửa, chờ Apply (DataTrigger trên CellStyle của từng cột).
+    @property
+    def dirty_x_mm(self): return abs(self.x - self._orig_mm[0]) > EDIT_TOL_MM
+    @property
+    def dirty_y_mm(self): return abs(self.y - self._orig_mm[1]) > EDIT_TOL_MM
+    @property
+    def dirty_z_mm(self): return abs(self.z - self._orig_mm[2]) > EDIT_TOL_MM
+
+    # Chữ đỏ = toạ độ không tròn mm.
+    @property
+    def odd_x_mm(self): return _is_odd_mm(self.x)
+    @property
+    def odd_y_mm(self): return _is_odd_mm(self.y)
+    @property
+    def odd_z_mm(self): return _is_odd_mm(self.z)
+
+    def is_edited(self):
+        return self.dirty_x_mm or self.dirty_y_mm or self.dirty_z_mm
+
+    def is_odd(self):
+        return self.odd_x_mm or self.odd_y_mm or self.odd_z_mm
+
     def get_new_xyz(self):
         return self._t.XYZ(self.x / 304.8, self.y / 304.8, self.z / 304.8)
 
     def has_changed(self):
         return self.get_new_xyz().DistanceTo(self._original_pos) > 0.0001
+
+    def mark_applied(self, new_pos):
+        """Element đã được di chuyển tới toạ độ đang hiển thị — vị trí mới là gốc."""
+        self._original_pos = new_pos
+        self._orig_mm = (self.x, self.y, self.z)
 
 
 # ==================================================
@@ -433,7 +507,7 @@ class LocationManagerHandler(IExternalEventHandler):
                         translation = new_pos.Subtract(item._original_pos)
                         if translation.GetLength() > 0.0001:
                             t.ETU.MoveElement(doc, item.elem_id, translation)
-                            item._original_pos = new_pos
+                            item.mark_applied(new_pos)
                             count += 1
                     except Exception as ex:
                         last_error = str(ex)
@@ -448,7 +522,7 @@ class LocationManagerHandler(IExternalEventHandler):
         except Exception as tx_ex:
             msg = "Revit API Error: " + str(tx_ex)
 
-        self._invoke(lambda: self.window._set_status(msg))
+        self._invoke(lambda: self.window._on_applied(msg))
 
     def _pick_elements(self, uidoc, doc):
         t = self._t
@@ -464,11 +538,9 @@ class LocationManagerHandler(IExternalEventHandler):
             self._invoke(lambda: self.window.Show())
 
     @staticmethod
-    def _is_odd(item, threshold=0.01):
-        """Return True if any coordinate (mm) has a fractional part > threshold."""
-        return (abs(item.x - round(item.x)) > threshold or
-                abs(item.y - round(item.y)) > threshold or
-                abs(item.z - round(item.z)) > threshold)
+    def _is_odd(item):
+        """Return True if any coordinate (mm) has a fractional part > ODD_TOL_MM."""
+        return item.is_odd()
 
     def _get_solid_fill_id(self, doc):
         try:
@@ -556,6 +628,7 @@ class LocationManagerWindow(T3WPFWindow):
         xaml_path = xaml_file_path or XAML_FILE
         self.all_elements    = []
         self._category_items = []
+        self._shown_count    = 0
         self._updating       = False
         self._ready          = False
 
@@ -663,12 +736,63 @@ class LocationManagerWindow(T3WPFWindow):
                 self.elem_datagrid.ItemsSource = to_items_source(filtered)
         finally:
             self._updating = False
-        if hasattr(self, 'status_count') and self.status_count:
-            self.status_count.Text = "{} / {} elements".format(len(filtered), len(self.all_elements))
+        self._shown_count = len(filtered)
+        self._update_tally()
+
+    def _update_tally(self):
+        """Dải đếm dưới bảng + số trên nút Apply — chỉ đọc dữ liệu Python."""
+        total  = len(self.all_elements)
+        edited = sum(1 for d in self.all_elements if d.is_edited())
+        odd    = sum(1 for d in self.all_elements if d.is_odd())
+        self._set_text('status_count',
+                       "{} of {} shown".format(self._shown_count, total))
+        self._set_text('txt_edited_count', "{} edited".format(edited))
+        self._set_text('txt_odd_count', "{} odd".format(odd))
+        btn = getattr(self, 'btn_apply', None)
+        if btn is not None:
+            btn.Content = ("Apply Changes ({})".format(edited) if edited
+                           else "Apply Changes")
+
+    def _set_text(self, name, text):
+        ctrl = getattr(self, name, None)
+        if ctrl is not None:
+            ctrl.Text = text
+
+    def _commit_grid_edit(self):
+        """Ghi nốt ô đang gõ dở vào dòng trước khi đọc toạ độ."""
+        grid = getattr(self, 'elem_datagrid', None)
+        if grid is None:
+            return
+        try:
+            grid.CommitEdit(DataGridEditingUnit.Row, True)
+        except Exception:
+            pass
+
+    def _redraw_rows(self):
+        """Vẽ lại ô vàng / chữ đỏ và dải đếm sau khi toạ độ đổi.
+
+        Dòng là object Python, không có INotifyPropertyChanged, nên DataTrigger
+        chỉ đọc lại `dirty_*` / `odd_*` khi bảng Refresh.
+        """
+        grid = getattr(self, 'elem_datagrid', None)
+        if grid is not None:
+            self._commit_grid_edit()
+            self._updating = True
+            try:
+                grid.Items.Refresh()
+            except Exception as ex:
+                logger.debug("LocationManager redraw skipped: {}".format(ex))
+            finally:
+                self._updating = False
+        self._update_tally()
 
     def _set_status(self, msg):
         if hasattr(self, 'status_text') and self.status_text:
             self.status_text.Text = msg
+
+    def _on_applied(self, msg):
+        self._set_status(msg)
+        self._redraw_rows()
 
     # ── Toolbar event handlers (WPF thread — NO Revit API here) ──────────────
 
@@ -715,6 +839,7 @@ class LocationManagerWindow(T3WPFWindow):
     def round_to_5mm_clicked(self, sender, e):
         if not hasattr(self, 'elem_datagrid') or not self.elem_datagrid:
             return
+        self._commit_grid_edit()
         rows = self.elem_datagrid.SelectedItems
         if not rows or len(rows) == 0:
             rows = self.elem_datagrid.Items
@@ -728,8 +853,9 @@ class LocationManagerWindow(T3WPFWindow):
                 count += 1
 
         if count > 0:
-            self.elem_datagrid.Items.Refresh()
-            self._set_status("Rounded {} elements to 5mm. Click 'Apply Changes' to save.".format(count))
+            self._redraw_rows()
+            self._set_status("Rounded {} element(s) to the nearest 5 mm. "
+                             "Click Apply Changes to move them.".format(count))
         else:
             self._set_status("No elements available to round.")
 
@@ -746,6 +872,7 @@ class LocationManagerWindow(T3WPFWindow):
         self._trigger("ClearOverrides")
 
     def apply_clicked(self, sender, e):
+        self._commit_grid_edit()
         self._trigger("ApplyChanges")
 
     def search_changed(self, sender, e):
@@ -777,6 +904,16 @@ class LocationManagerWindow(T3WPFWindow):
             uidoc.Selection.SetElementIds(ids)
         except Exception:
             pass
+
+    def cell_edit_ending(self, sender, e):
+        # Lúc event này chạy binding CHƯA ghi giá trị mới vào dòng, và Refresh
+        # ngay bây giờ ném "not allowed during an EditItem transaction" —
+        # đợi dispatcher rảnh rồi mới vẽ lại.
+        try:
+            self.Dispatcher.BeginInvoke(DispatcherPriority.Background,
+                                        Action(self._redraw_rows))
+        except Exception as ex:
+            logger.debug("LocationManager deferred redraw failed: {}".format(ex))
 
     def id_clicked(self, sender, e):
         data = sender.DataContext
