@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="ManaLoca"
+        Title="Location Manager"
         Width="1200" Height="740"
         MinWidth="1000" MinHeight="520"
         WindowStartupLocation="CenterScreen"
@@ -1666,311 +1666,401 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <!-- ═══ Outer Window Border (Zero-Gap Grid) ═══ -->
+    <!-- ═══ Outer Window Border ═══ -->
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1.5"
             Background="{StaticResource T3.Surface}" CornerRadius="12" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title Bar -->
-                <RowDefinition Height="*"/>       <!-- Row 1: Main Body with Sidebar Rail -->
-                <RowDefinition Height="48"/>      <!-- Row 2: Full-width Footer Bar -->
+                <RowDefinition Height="48"/>      <!-- Row 0: Title bar -->
+                <RowDefinition Height="44"/>      <!-- Row 1: Source bar -->
+                <RowDefinition Height="*"/>       <!-- Row 2: Categories | Elements -->
+                <RowDefinition Height="48"/>      <!-- Row 3: Footer -->
             </Grid.RowDefinitions>
 
-            <!-- ══════════════════ ROW 0: FULL-WIDTH TITLE BAR ══════════════════ -->
+            <!-- ══════════════════ ROW 0: TITLE BAR ══════════════════ -->
             <Border Grid.Row="0" Style="{StaticResource T3.TitleBar}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Title and Subtitle -->
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,0"
-                                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Image x:Name="logo_image" Height="28" Margin="0,0,12,0"
-                                   VerticalAlignment="Center"
-                                   RenderOptions.BitmapScalingMode="HighQuality"/>
-                            <StackPanel Orientation="Vertical" VerticalAlignment="Center">
-                                <TextBlock Text="Location Manager" Style="{StaticResource T3.Title}"/>
-                                <TextBlock Text="Review and adjust element coordinates and locations" Style="{StaticResource T3.Subtitle}"/>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <!-- Search Box in Title Bar -->
-                        <TextBox Grid.Column="1" x:Name="txt_search"
-                                 Style="{StaticResource T3.Search}"
-                                 Tag="Search by category, type, level or ID..."
-                                 HorizontalAlignment="Center" Width="320"
-                                 TextChanged="search_changed"
-                                 shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-
-                        <!-- Window Controls -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal"
-                                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize"
-                                    Click="minimize_button_clicked">
-                                <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
-                            </Button>
-                            <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize"
-                                    Click="maximize_button_clicked">
-                                <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
-                            </Button>
-                            <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close"
-                                    Click="close_button_clicked" IsCancel="True">
-                                <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
-                            </Button>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-            <!-- ══════════════════ ROW 1: WORKSPACE WITH REFINED SIDEBAR ══════════════════ -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="58"/>    <!-- Col 0: Left Navigation Icon Rail -->
-                    <ColumnDefinition Width="*"/>     <!-- Col 1: Main Content Work Area -->
-                </Grid.ColumnDefinitions>
-
-                <!-- ══════════════════ COL 0: LEFT NAVIGATION ICON RAIL ══════════════════ -->
-                <Border Grid.Column="0"
-                    Background="{StaticResource T3.SurfaceSunken}"
-                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                <Grid Margin="0,12,0,12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/> <!-- Current View Nav -->
-                        <RowDefinition Height="Auto"/> <!-- By Level Nav -->
-                        <RowDefinition Height="*"/>    <!-- Spacer -->
-                    </Grid.RowDefinitions>
-
-                    <!-- Mode: Current View -->
-                    <RadioButton x:Name="rb_current_view" Grid.Row="0"
-                                 GroupName="SourceMode" IsChecked="True"
-                                 Checked="mode_changed"
-                                 Style="{StaticResource T3.Rail.Tile}"
-                                 ToolTip="Current View: Load all elements from the active view"
-                                 HorizontalAlignment="Center" Margin="0,0,0,8">
-                        <Path Data="M4 7 H20 M4 12 H20 M4 17 H20"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                              StrokeThickness="1.8" StrokeLineJoin="Round"
-                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </RadioButton>
-
-                    <!-- Mode: By Level -->
-                    <RadioButton x:Name="rb_by_level" Grid.Row="1"
-                                 GroupName="SourceMode" IsChecked="False"
-                                 Checked="mode_changed"
-                                 Style="{StaticResource T3.Rail.Tile}"
-                                 ToolTip="By Level: Load elements by level"
-                                 HorizontalAlignment="Center" Margin="0,0,0,8">
-                        <Path Data="M4 4 H20 M12 4 V20 M4 12 H20 M4 20 H20"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                              StrokeThickness="1.8" StrokeLineJoin="Round"
-                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </RadioButton>
-                </Grid>
-            </Border>
-
-                <!-- ══════════════════ COL 1: MAIN WORKSPACE ══════════════════ -->
-                <Grid Grid.Column="1">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" MinHeight="44"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <!-- ══════════════════ ROW 1: ACTION TOOLBAR ══════════════════ -->
-                <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                        Padding="16,8">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Left Buttons -->
-                        <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button x:Name="btn_refresh" Content="Refresh"
-                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
-                                    Click="refresh_clicked" ToolTip="Reload elements for the current source mode"/>
-                            <Button x:Name="btn_get_sel" Content="Get Selection"
-                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
-                                    Click="get_selection_clicked" ToolTip="Load currently selected elements in Revit"/>
-                            <Button x:Name="btn_pick" Content="Pick Elements"
-                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
-                                    Click="pick_elements_clicked" ToolTip="Pick elements directly from Revit canvas"/>
-                            <Button x:Name="btn_sync_sel" Content="Sync Selection"
-                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
-                                    Click="sync_selection_clicked" ToolTip="Select highlighted rows in Revit"/>
-
-                            <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="4,0,12,0" VerticalAlignment="Center"/>
-
-                            <Button x:Name="btn_round_5mm" Content="Round 5mm"
-                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
-                                    Click="round_to_5mm_clicked" ToolTip="Round coordinates to nearest 5mm (selected rows, or all if none)"/>
-                            <Button x:Name="btn_override_odd" Content="Override Odd"
-                                    Style="{StaticResource T3.Button.Danger}" Margin="0,0,8,0"
-                                    Click="override_odd_clicked" ToolTip="Highlight elements with non-integer mm coordinates — red fill"/>
-                            <Button x:Name="btn_clear_override" Content="Clear Override"
-                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
-                                    Click="clear_overrides_clicked" ToolTip="Remove graphic overrides from all loaded elements"/>
-
-                            <ComboBox x:Name="cmb_level"
-                                      DisplayMemberPath="Name"
-                                      Visibility="Collapsed"
-                                      Style="{StaticResource T3.ComboBox}"
-                                      ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                                      Width="180" Margin="4,0,0,0"
-                                      SelectionChanged="level_selection_changed"
-                                      ToolTip="Select a level to load elements from"/>
-                        </WrapPanel>
-
-                        <!-- Right Action -->
-                        <Button Grid.Column="1" x:Name="btn_apply" Content="Apply Changes"
-                                Style="{StaticResource T3.Button.Primary}" IsDefault="True"
-                                VerticalAlignment="Center"
-                                Click="apply_clicked" ToolTip="Move elements to edited coordinates"/>
-                    </Grid>
-                </Border>
-
-                <!-- ══════════════════ ROW 2: CONTENT SPLIT ══════════════════ -->
-                <Grid Grid.Row="1" Background="{StaticResource T3.Surface}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="260" MinWidth="200" MaxWidth="340"/>
-                        <ColumnDefinition Width="1"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Left: Category Filter Panel -->
-                    <Grid Grid.Column="0" Background="{StaticResource T3.Surface}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/> <!-- Category Toolbar -->
-                            <RowDefinition Height="*"/>    <!-- Category List -->
-                        </Grid.RowDefinitions>
-
-                        <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                Padding="12,8">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="CATEGORIES" Style="{StaticResource T3.Label}"
-                                           VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                    <Button x:Name="btn_select_all_cats" Content="All"
-                                            Style="{StaticResource T3.Button.Secondary}"
-                                            Height="24" Padding="8,0" Margin="0,0,4,0"
-                                            Click="select_all_categories_clicked" ToolTip="Show all categories"/>
-                                    <Button x:Name="btn_clear_cats" Content="None"
-                                            Style="{StaticResource T3.Button.Secondary}"
-                                            Height="24" Padding="8,0"
-                                            Click="clear_all_categories_clicked" ToolTip="Hide all categories"/>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-
-                        <ListBox x:Name="lst_categories" Grid.Row="1"
-                                 Style="{StaticResource T3.ListBox}"
-                                 BorderThickness="0"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 Padding="8">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid>
-                                        <TextBlock x:Name="row_is_checked_text" Text="{Binding IsChecked}" Visibility="Collapsed"/>
-                                        <CheckBox IsChecked="{Binding Text, ElementName=row_is_checked_text, Mode=OneWay}"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  Click="category_filter_changed"
-                                                  Margin="0,4">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Name}" Style="{StaticResource T3.Body}"
-                                                           MaxWidth="160" TextTrimming="CharacterEllipsis"
-                                                           ToolTip="{Binding Name}"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding CountText}"
-                                                           Style="{StaticResource T3.Caption}" Margin="4,0,0,0"
-                                                           VerticalAlignment="Center"/>
-                                            </Grid>
-                                        </CheckBox>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                        <TextBlock x:Name="lst_categories_empty" Grid.Row="1"
-                                   Style="{StaticResource T3.Empty}"
-                                   Text="No categories available."
-                                   Margin="16" Visibility="Collapsed"/>
-                    </Grid>
-
-                    <!-- Divider -->
-                    <Border Grid.Column="1" Background="{StaticResource T3.Border}"/>
-
-                    <!-- Right: Elements DataGrid -->
-                    <Grid Grid.Column="2" Background="{StaticResource T3.Surface}">
-                        <DataGrid x:Name="elem_datagrid" Style="{StaticResource T3.DataGrid}"
-                                  CanUserAddRows="False" CanUserDeleteRows="False"
-                                  IsReadOnly="False" BorderThickness="0"
-                                  SelectionChanged="datagrid_selection_changed">
-                            <DataGrid.Columns>
-                                <DataGridTemplateColumn Header="ID" Width="90" IsReadOnly="True">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Margin="8,0" VerticalAlignment="Center">
-                                                <Hyperlink Click="id_clicked">
-                                                    <Run Text="{Binding Id}"/>
-                                                </Hyperlink>
-                                            </TextBlock>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="CATEGORY" Binding="{Binding Category}" Width="140" IsReadOnly="True"
-                                                    ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                <DataGridTextColumn Header="TYPE / NAME" Binding="{Binding Type}" Width="*" MinWidth="130" IsReadOnly="True"/>
-                                <DataGridTextColumn Header="LEVEL" Binding="{Binding Level}" Width="120" IsReadOnly="True"
-                                                    ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                <DataGridTextColumn Header="X (MM)" Binding="{Binding X, StringFormat={}{0:F2}, Mode=TwoWay}" Width="100"
-                                                    ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                <DataGridTextColumn Header="Y (MM)" Binding="{Binding Y, StringFormat={}{0:F2}, Mode=TwoWay}" Width="100"
-                                                    ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                <DataGridTextColumn Header="Z (MM)" Binding="{Binding Z, StringFormat={}{0:F2}, Mode=TwoWay}" Width="100"
-                                                    ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                        <TextBlock x:Name="elem_datagrid_empty" Style="{StaticResource T3.Empty}"
-                                   Text="No elements loaded." Margin="16" Visibility="Collapsed"/>
-                    </Grid>
-                </Grid>
-
-                <!-- ══════════════════ ROW 3: UNIFIED FOOTER BAR ══════════════════ -->
-                </Grid>
-            </Grid>
-
-            <!-- ══════════════════ ROW 2: UNIFIED FOOTER BAR ══════════════════ -->
-            <Border Grid.Row="2" Style="{StaticResource T3.FooterBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource T3.Copyright}"/>
-                        <Border Width="1" Height="16" Margin="12,0"
-                                Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="status_text" Text="Ready"
-                                   Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                        <Border Width="1" Height="16" Margin="12,0"
-                                Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="status_count" Text="0 elements"
-                                   Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Image x:Name="logo_image" Height="28" Margin="0,0,12,0"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+                            <TextBlock Text="Location Manager" Style="{StaticResource T3.Title}"/>
+                            <TextBlock Text="Review and adjust element coordinates and locations" Style="{StaticResource T3.Subtitle}"/>
+                        </StackPanel>
                     </StackPanel>
+
+                    <!-- Search filters the element table (category, type, level, ID) -->
+                    <TextBox Grid.Column="1" x:Name="txt_search"
+                             Style="{StaticResource T3.Search}"
+                             Tag="Search by category, type, level or ID..."
+                             HorizontalAlignment="Right" Width="320" Margin="24,0,16,0"
+                             VerticalAlignment="Center"
+                             TextChanged="search_changed"
+                             shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize"
+                                Click="minimize_button_clicked">
+                            <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
+                        </Button>
+                        <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize"
+                                Click="maximize_button_clicked">
+                            <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
+                        </Button>
+                        <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close"
+                                Click="close_button_clicked" IsCancel="True">
+                            <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ══════════════════ ROW 1: SOURCE BAR ══════════════════
+                 Where the rows come from. Two modes are chips (the checked chip is
+                 always what Refresh reloads); Get Selection / Pick are one-shot loads. -->
+            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
+                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                    Padding="16,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="SOURCE" Style="{StaticResource T3.Label}"
+                               VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <RadioButton x:Name="rb_current_view" Content="Current View"
+                                 GroupName="SourceMode" IsChecked="True"
+                                 Style="{StaticResource T3.Chip}"
+                                 Checked="mode_changed"
+                                 ToolTip="Load every element visible in the active view"/>
+                    <RadioButton x:Name="rb_by_level" Content="By Level"
+                                 GroupName="SourceMode"
+                                 Style="{StaticResource T3.Chip}"
+                                 Checked="mode_changed"
+                                 ToolTip="Load every element on a chosen level"/>
+                    <ComboBox x:Name="cmb_level"
+                              DisplayMemberPath="Name"
+                              Visibility="Collapsed"
+                              Style="{StaticResource T3.ComboBox}"
+                              ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
+                              Width="180" Margin="4,0,0,0"
+                              VerticalAlignment="Center"
+                              SelectionChanged="level_selection_changed"
+                              ToolTip="Level to load elements from"/>
+
+                    <Border Width="1" Height="16" Margin="12,0"
+                            Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
+
+                    <Button x:Name="btn_refresh" Content="Refresh"
+                            Style="{StaticResource T3.Button.Secondary}"
+                            Margin="0,0,8,0" VerticalAlignment="Center"
+                            Click="refresh_clicked" ToolTip="Reload elements for the checked source"/>
+                    <Button x:Name="btn_get_sel" Content="Get Selection"
+                            Style="{StaticResource T3.Button.Secondary}"
+                            Margin="0,0,8,0" VerticalAlignment="Center"
+                            Click="get_selection_clicked" ToolTip="Load the elements currently selected in Revit"/>
+                    <Button x:Name="btn_pick" Content="Pick Elements"
+                            Style="{StaticResource T3.Button.Secondary}"
+                            VerticalAlignment="Center"
+                            Click="pick_elements_clicked" ToolTip="Pick elements in the Revit canvas (groups are expanded)"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ══════════════════ ROW 2: CATEGORIES | ELEMENTS ══════════════════ -->
+            <Grid Grid.Row="2" Background="{StaticResource T3.Surface}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="248"/>
+                    <ColumnDefinition Width="1"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ── Left: category filter ── -->
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="44"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                            Padding="16,0,8,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="CATEGORIES" Style="{StaticResource T3.Label}"
+                                       VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="btn_select_all_cats" Content="All"
+                                        Style="{StaticResource T3.Button.Ghost}"
+                                        Click="select_all_categories_clicked" ToolTip="Show every category"/>
+                                <Button x:Name="btn_clear_cats" Content="None"
+                                        Style="{StaticResource T3.Button.Ghost}"
+                                        Click="clear_all_categories_clicked" ToolTip="Hide every category"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ListBox x:Name="lst_categories" Grid.Row="1"
+                             Style="{StaticResource T3.ListBox}"
+                             BorderThickness="0" Padding="0,4"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <TextBlock x:Name="row_is_checked_text" Text="{Binding IsChecked}" Visibility="Collapsed"/>
+                                    <CheckBox IsChecked="{Binding Text, ElementName=row_is_checked_text, Mode=OneWay}"
+                                              Style="{StaticResource T3.CheckBox}"
+                                              HorizontalContentAlignment="Stretch"
+                                              Click="category_filter_changed">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Name}" Style="{StaticResource T3.Body}"
+                                                       ToolTip="{Binding Name}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding CountText}"
+                                                       Style="{StaticResource T3.Mono}" Margin="8,0,0,0"/>
+                                        </Grid>
+                                    </CheckBox>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Empty state: only while lst_categories has no items -->
+                    <Grid Grid.Row="1" IsHitTestVisible="False" Panel.ZIndex="1" Margin="16">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasItems, ElementName=lst_categories}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <TextBlock Style="{StaticResource T3.Empty}"
+                                   Text="No categories yet. Load elements to fill this list."/>
+                    </Grid>
+                </Grid>
+
+                <!-- Divider -->
+                <Border Grid.Column="1" Background="{StaticResource T3.Border}"/>
+
+                <!-- ── Right: element table ── -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="44"/>   <!-- table actions -->
+                        <RowDefinition Height="*"/>    <!-- DataGrid -->
+                        <RowDefinition Height="Auto"/> <!-- tally -->
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                            Padding="16,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="ELEMENTS" Style="{StaticResource T3.Label}"
+                                       VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="btn_sync_sel" Content="Select in Revit"
+                                        Style="{StaticResource T3.Button.Ghost}" Margin="0,0,8,0"
+                                        Click="sync_selection_clicked" ToolTip="Select the highlighted rows in Revit"/>
+                                <Border Width="1" Height="16" Margin="4,0,12,0"
+                                        Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
+                                <Button x:Name="btn_round_5mm" Content="Round to 5 mm"
+                                        Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
+                                        Click="round_to_5mm_clicked"
+                                        ToolTip="Round X / Y / Z to the nearest 5 mm (highlighted rows, or every shown row). Nothing moves until Apply Changes."/>
+                                <Button x:Name="btn_override_odd" Content="Override Odd"
+                                        Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
+                                        Click="override_odd_clicked"
+                                        ToolTip="Paint elements with a non-whole-mm coordinate solid red in the active view"/>
+                                <Button x:Name="btn_clear_override" Content="Clear Overrides"
+                                        Style="{StaticResource T3.Button.Secondary}"
+                                        Click="clear_overrides_clicked"
+                                        ToolTip="Remove graphic overrides from every loaded element in the active view"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <DataGrid x:Name="elem_datagrid" Grid.Row="1" Style="{StaticResource T3.DataGrid}"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              IsReadOnly="False" BorderThickness="0"
+                              SelectionMode="Extended"
+                              HorizontalScrollBarVisibility="Disabled"
+                              EnableRowVirtualization="True"
+                              SelectionChanged="datagrid_selection_changed"
+                              CellEditEnding="cell_edit_ending">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="ID" Width="90" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Style="{StaticResource T3.Mono}" ToolTip="Show this element in Revit">
+                                            <Hyperlink Click="id_clicked" Foreground="{StaticResource T3.Text}">
+                                                <Run Text="{Binding Id}"/>
+                                            </Hyperlink>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="CATEGORY" Binding="{Binding Category}" Width="140" IsReadOnly="True"
+                                                ElementStyle="{StaticResource T3.Body.Secondary}"/>
+                            <DataGridTextColumn Header="TYPE / NAME" Binding="{Binding Type}" Width="*" MinWidth="100" IsReadOnly="True"
+                                                ElementStyle="{StaticResource T3.Body}"/>
+                            <DataGridTextColumn Header="LEVEL" Binding="{Binding Level}" Width="100" IsReadOnly="True"
+                                                ElementStyle="{StaticResource T3.Body.Secondary}"/>
+
+                            <!-- Coordinates: Consolas, right-aligned so the decimal points line up.
+                                 Amber cell = edited, waiting for Apply. Red digits = not a whole mm. -->
+                            <DataGridTextColumn Header="X (MM)" Binding="{Binding x_mm, Mode=TwoWay}" Width="100">
+                                <DataGridTextColumn.HeaderStyle>
+                                    <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
+                                        <Setter Property="HorizontalContentAlignment" Value="Right"/>
+                                        <Setter Property="Padding" Value="8,0,16,0"/>
+                                    </Style>
+                                </DataGridTextColumn.HeaderStyle>
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Number}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding odd_x_mm}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.CellStyle>
+                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding dirty_x_mm}" Value="True">
+                                                <Setter Property="Background"      Value="{StaticResource T3.Warning.Fill}"/>
+                                                <Setter Property="BorderBrush"     Value="{StaticResource T3.Warning.Accent}"/>
+                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.CellStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Y (MM)" Binding="{Binding y_mm, Mode=TwoWay}" Width="100">
+                                <DataGridTextColumn.HeaderStyle>
+                                    <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
+                                        <Setter Property="HorizontalContentAlignment" Value="Right"/>
+                                        <Setter Property="Padding" Value="8,0,16,0"/>
+                                    </Style>
+                                </DataGridTextColumn.HeaderStyle>
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Number}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding odd_y_mm}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.CellStyle>
+                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding dirty_y_mm}" Value="True">
+                                                <Setter Property="Background"      Value="{StaticResource T3.Warning.Fill}"/>
+                                                <Setter Property="BorderBrush"     Value="{StaticResource T3.Warning.Accent}"/>
+                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.CellStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Z (MM)" Binding="{Binding z_mm, Mode=TwoWay}" Width="100">
+                                <DataGridTextColumn.HeaderStyle>
+                                    <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
+                                        <Setter Property="HorizontalContentAlignment" Value="Right"/>
+                                        <Setter Property="Padding" Value="8,0,16,0"/>
+                                    </Style>
+                                </DataGridTextColumn.HeaderStyle>
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Number}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding odd_z_mm}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.CellStyle>
+                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding dirty_z_mm}" Value="True">
+                                                <Setter Property="Background"      Value="{StaticResource T3.Warning.Fill}"/>
+                                                <Setter Property="BorderBrush"     Value="{StaticResource T3.Warning.Accent}"/>
+                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.CellStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Empty state: only while elem_datagrid has no rows -->
+                    <Grid Grid.Row="1" IsHitTestVisible="False" Panel.ZIndex="1" Margin="32">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasItems, ElementName=elem_datagrid}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <TextBlock Style="{StaticResource T3.Empty}"
+                                   Text="No elements to show. Load them from the Source bar, or tick a category and clear the search."/>
+                    </Grid>
+
+                    <!-- Tally: same panel as the table, split by a 1px rule (no floating gap) -->
+                    <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
+                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
+                            Padding="16,8">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="status_count" Text="0 of 0 shown" Style="{StaticResource T3.Tally}"/>
+                            <Ellipse Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.Warning.Accent}"/>
+                            <TextBlock x:Name="txt_edited_count" Text="0 edited" Style="{StaticResource T3.Tally}"
+                                       ToolTip="Rows with a new X / Y / Z that Apply Changes will move"/>
+                            <Ellipse Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.Danger.Accent}"/>
+                            <TextBlock x:Name="txt_odd_count" Text="0 odd" Style="{StaticResource T3.Tally}"
+                                       ToolTip="Rows with at least one coordinate that is not a whole mm"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- ══════════════════ ROW 3: FOOTER ══════════════════ -->
+            <Border Grid.Row="3" Style="{StaticResource T3.FooterBar}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Style="{StaticResource T3.Copyright}"/>
+                    <Border Grid.Column="1" Width="1" Height="16" Margin="12,0"
+                            Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" x:Name="status_text" Text="Ready"
+                               Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    <Button Grid.Column="3" x:Name="btn_apply" Content="Apply Changes"
+                            Style="{StaticResource T3.Button.Primary}" IsDefault="True"
+                            Margin="16,0,0,0" VerticalAlignment="Center"
+                            Click="apply_clicked" ToolTip="Move every edited element to its new X / Y / Z (one undo step)"/>
                 </Grid>
             </Border>
         </Grid>
