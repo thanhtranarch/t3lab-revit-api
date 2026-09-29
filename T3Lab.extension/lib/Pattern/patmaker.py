@@ -13,6 +13,7 @@ import os
 import re
 import time
 from math import sqrt, pi, sin, cos, degrees, atan2
+from Snippets._compat import disposing
 
 # Fallback logger
 try:
@@ -482,7 +483,7 @@ class PatternCompiler(object):
                 target_fpe = elem
                 break
 
-        with DB.Transaction(doc, "T3Lab: Make Pattern") as t:
+        with disposing(DB.Transaction(doc, "T3Lab: Make Pattern")) as t:
             t.Start()
             try:
                 if target_fpe:

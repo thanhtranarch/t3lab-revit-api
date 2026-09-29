@@ -14,7 +14,7 @@ triệu chứng tương ứng.
 | Thành phần | Bắt buộc | Ghi chú |
 |---|---|---|
 | Windows 10/11 | ✅ | |
-| Revit 2023 – 2026 | ✅ | Đã kiểm trên 2023.1 và 2026.4 |
+| Revit 2022 – 2027 | ✅ | Dải hỗ trợ, gác bằng `dev/audit_revit_compat.py`. Đã chạy thật trên 2023.1 và 2026.5; 2022 / 2024 / 2025 / 2027 chưa QA trong Revit |
 | pyRevit **có CPython engine** | ✅ | Thư mục `bin\cengines\CPY3*`. Khuyến nghị bản ship `CPY3123` (Python 3.12) |
 | Microsoft Excel | ⛔ tuỳ chọn | Chỉ cần cho import/export Excel của IFC-SG, Parameter Manager, Sheet Manager |
 
@@ -77,10 +77,14 @@ Dialog `Command Failure for External Command` là **wrapper chung của Revit**,
 không phải lỗi thật. Lấy nguyên nhân thật theo thứ tự:
 
 1. **Bấm `Show details`** ngay trong dialog đó.
-2. **`%APPDATA%\T3LabAI\bootstrap.log`** — chỉ được ghi khi bootstrap không nạp
+2. **Dialog `T3Lab tools cannot start on this machine` lúc mở Revit** — do
+   `T3Lab.extension/startup.py` hiện. File này chạy bằng IronPython nên vẫn chạy
+   được khi engine CPython hỏng; nó nói rõ engine nào, DLL nào và lý do Windows
+   từ chối nạp. Bản ghi lại ở `%APPDATA%\T3LabAI\engine_check.log`.
+3. **`%APPDATA%\T3LabAI\bootstrap.log`** — chỉ được ghi khi bootstrap không nạp
    được stdlib. Nội dung cho biết tìm thấy clone/engine nào, engine nào được nạp,
    module nào còn thiếu.
-3. **Revit journal**:
+4. **Revit journal**:
    `%LOCALAPPDATA%\Autodesk\Revit\Autodesk Revit <Year>\Journals\journal.XXXX.txt`
    — có stack trace thật. Đây là nguồn chính thức theo rule của repo, tuyệt đối
    không đoán mò trước khi đọc nó.
@@ -91,7 +95,8 @@ không phải lỗi thật. Lấy nguyên nhân thật theo thứ tự:
 |---|---|---|
 | `No module named configparser` / `csv` / `_sqlite3` | pyRevit không có CPython engine, hoặc engine khác phiên bản Python đang chạy | Chạy `Install-T3Lab.ps1 -CheckOnly`; cài bản pyRevit có `CPY3*` |
 | `bad magic number in 'json'` | Đang trộn stdlib của minor version khác | Đã được chặn bằng version gate trong `lib/_cpython_bootstrap.py`; nếu vẫn thấy, kiểm tra biến môi trường `PYTHONPATH` toàn máy |
-| `set_PythonDLL: This property must be set before runtime is initialized` | Đổi engine / sửa runtime assembly khi Revit đang mở | Đóng Revit, chạy lại script, mở lại |
+| `The type initializer for 'Delegates' threw an exception` — mọi tool `#! python3` đều chết, tool IronPython của pyRevit vẫn chạy | pythonnet không nạp được `python3XX.dll` của engine, **trước khi** chạy tới dòng code T3Lab nào. Hay gặp nhất: IT chặn DLL trong `%APPDATA%` (AppLocker / WDAC / antivirus), hoặc pyRevit cài thiếu | Chạy `Install-T3Lab.ps1 -CheckOnly` — dòng `python312.dll cannot be loaded - Win32 error N` nói rõ lý do. Bị chặn → nhờ IT whitelist thư mục engine, hoặc cài pyRevit bản all-users (`C:\Program Files`). Sửa xong **phải khởi động lại Revit**: lỗi này dính đến khi đóng Revit |
+| `This property must be set before runtime is initialized`, hoặc `Object reference not set to an instance of an object` ở MỌI tool (Revit 2025+) | **pyRevit Reload** (kể cả bật/tắt extension trong Extensions manager) tắt engine CPython, mà pythonnet 3 không khởi động lại được trên .NET 8+. Runtime kẹt dở dang tới khi đóng Revit. Journal ghi `RuntimeData.RestoreRuntimeDataImpl` → `CPythonEngine.Start` → `set_PythonDLL` | Khởi động lại Revit (lúc Reload, `startup.py` hiện dialog *Restart Revit to use T3Lab tools again*). Tránh tái phát: T3Lab **tự vá pyRevit** lúc Revit khởi động (`startup.py` → `lib/pyrevit_patches.py`) để Reload giữ engine CPython — có hiệu lực từ lần restart sau khi vá. Chỉ cho pyRevit 6.5.5; tắt bằng `T3LAB_NO_PYREVIT_PATCH=1` hoặc file `%APPDATA%\T3LabAI\pyrevit_patch.disabled`; gỡ bằng `python T3Lab.extension/lib/pyrevit_patches.py restore`. Không bấm Ctrl+Alt+Shift+Click lên nút pyRevit (vẫn tắt engine) |
 | Cửa sổ modeless chết ở click đầu tiên | Chưa Reload pyRevit sau khi cài | pyRevit → Reload |
 | Tab T3Lab xuất hiện 2 lần, lỗi trỏ về code không khớp file trên đĩa | Có bản T3Lab thứ hai đang được load | Script báo ở mục "Duplicate T3Lab copies" — giữ đúng một bản |
 | Lỗi chỉ ở tool có import/export Excel | Máy không có Microsoft Excel | Cài Excel hoặc dùng CSV |

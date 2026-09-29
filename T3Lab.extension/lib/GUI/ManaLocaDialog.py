@@ -41,6 +41,7 @@ from Autodesk.Revit.DB import (
 )
 from Autodesk.Revit.UI import IExternalEventHandler, ExternalEvent
 from Autodesk.Revit.UI.Selection import ObjectType
+from Snippets._compat import disposing
 
 XAML_FILE = os.path.join(os.path.dirname(__file__), 'Tools', 'ManaLoca.xaml')
 LIB_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -424,7 +425,7 @@ class LocationManagerHandler(IExternalEventHandler):
         last_error = ""
 
         try:
-            with t.Tx(doc, "Move Elements") as tx:
+            with disposing(t.Tx(doc, "Move Elements")) as tx:
                 tx.Start()
                 for item in changed:
                     try:
@@ -509,7 +510,7 @@ class LocationManagerHandler(IExternalEventHandler):
             except Exception:
                 pass
 
-        with t.Tx(doc, "Override Odd-Coordinate Elements") as tx:
+        with disposing(t.Tx(doc, "Override Odd-Coordinate Elements")) as tx:
             tx.Start()
             count = 0
             for item in odd:
@@ -528,7 +529,7 @@ class LocationManagerHandler(IExternalEventHandler):
         t         = self._t
         view      = uidoc.ActiveView
         empty_ogs = t.OGS()
-        with t.Tx(doc, "Clear Element Overrides") as tx:
+        with disposing(t.Tx(doc, "Clear Element Overrides")) as tx:
             tx.Start()
             count = 0
             for item in self.window.all_elements:

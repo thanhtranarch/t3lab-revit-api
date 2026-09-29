@@ -181,6 +181,7 @@ if __name__ == '__main__':
 | S15 | **Khai báo `__namespace__` an toàn**: đưa class vào `lib/` HOẶC dùng namespace động `uuid` trong `script.py` | Engine CPython là interpreter **thường trú**; nếu class nằm trong `script.py` với tên tĩnh thì lần click thứ 2 ném `TypeError: Duplicate type name within an assembly`. Giải pháp: đưa class vào `lib/` (import 1 lần) hoặc dùng `__namespace__ = "T3Lab.<Name>_" + uuid.uuid4().hex[:8]`. Tuyệt đối không bỏ `__namespace__` vì sẽ gây `object does not implement <Interface>`. |
 | S16 | **Không dùng `pyrevit.forms.*` trực tiếp** — dùng `GUI.T3Dialog`, hoặc thêm API vào `_cpython_bootstrap.install_forms_shim()` | `pyrevit/forms/__init__.py` có module `__getattr__` ném `PyRevitCPythonNotSupported` cho **mọi** thuộc tính dưới CPython |
 | S17 | **Mọi sửa đổi trong `lib/` cần Reload pyRevit** mới có hiệu lực | `sys.modules` sống suốt phiên Revit. Triệu chứng đánh lừa: pyRevit in traceback theo **file hiện tại trên đĩa** nhưng chạy **code cũ**, nên số dòng không khớp lỗi. Thấy lỗi vô lý so với dòng được chỉ → nghi module cũ trước khi nghi code |
+| S19 | **Không `with DB.Transaction(...)` trần** — viết `with disposing(DB.Transaction(doc, "Tên")) as t:` (`from Snippets._compat import disposing`). Áp cho `Transaction` / `TransactionGroup` / `SubTransaction` / `FilteredElementCollector`. `revit.Transaction` của pyRevit thì dùng thẳng được | pythonnet 3 không biến `IDisposable` thành context manager: dòng `with` trần ném `TypeError: ... does not support the context manager protocol` và thao tác chính của tool chết (Datum Sync, 2026-09-29). `audit_cpython.py` C10 bắt lỗi này |
 | S18 | **Cấm Multiple Inheritance với CLR Class** (`Non .NET type used as super class for meta type`) | Trong PythonNet, class kế thừa CLR class (`T3WPFWindow` / `System.Windows.Window`) không được phép kế thừa thêm pure Python class/mixin. Toàn bộ progress/pause methods đã có sẵn trong `T3WPFWindow`; chỉ khai báo `class MyWindow(T3WPFWindow):`. |
 
 ---
@@ -204,6 +205,7 @@ if __name__ == '__main__':
 [ ] python3 dev/audit_t3.py --quiet      → xanh (0 vi phạm)
 [ ] python3 dev/audit_tools.py --quiet   → xanh (clean)
 [ ] python3 dev/audit_wiring.py --quiet  → xanh (W1/W2/W3/D1 = 0)
+[ ] python3 dev/audit_revit_compat.py --quiet → xanh (API Revit 2022–2027 có fallback)
 [ ] python3 dev/audit_cpython.py --quiet → 0 P0 (bẫy migration CPython)
 [ ] python3 dev/build_icons.py --check   → không lệch (icon đã build)
 [ ] python3 dev/audit_icons.py --quiet   → xanh (0 lỗi)

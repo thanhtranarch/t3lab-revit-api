@@ -40,6 +40,7 @@ from Autodesk.Revit.DB import (
     ElementId,
 )
 from Autodesk.Revit.UI import TaskDialog
+from Snippets._compat import disposing
 
 XAML_FILE = os.path.join(os.path.dirname(__file__), 'Tools', 'RoomToFloor.xaml')
 logger = script.get_logger()
@@ -68,7 +69,7 @@ class FloorGenerator(object):
         error_count = 0
         new_floors = []
 
-        with TransactionGroup(self.doc, "T3Lab: Room to Floor") as tg:
+        with disposing(TransactionGroup(self.doc, "T3Lab: Room to Floor")) as tg:
             tg.Start()
             total = len(room_elements)
             for idx, room in enumerate(room_elements):
@@ -111,7 +112,7 @@ class FloorGenerator(object):
             new_floor = None
 
             if REVIT_VERSION >= 2022:
-                with Transaction(self.doc, "T3Lab: Create Floor") as t:
+                with disposing(Transaction(self.doc, "T3Lab: Create Floor")) as t:
                     t.Start()
                     profile = List[CurveLoop]()
                     for loop in room_boundaries:
@@ -147,7 +148,7 @@ class FloorGenerator(object):
                 floor_shape = room_boundaries[0]
                 openings = list(room_boundaries)[1:] if len(room_boundaries) > 1 else []
 
-                with Transaction(self.doc, "T3Lab: Create Floor") as t:
+                with disposing(Transaction(self.doc, "T3Lab: Create Floor")) as t:
                     t.Start()
                     curve_array = CurveArray()
                     for seg in floor_shape:
@@ -168,7 +169,7 @@ class FloorGenerator(object):
                     t.Commit()
 
                 if new_floor and openings:
-                    with Transaction(self.doc, "T3Lab: Create Floor Openings") as t2:
+                    with disposing(Transaction(self.doc, "T3Lab: Create Floor Openings")) as t2:
                         t2.Start()
                         for opening in openings:
                             try:

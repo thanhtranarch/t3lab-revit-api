@@ -204,7 +204,8 @@ class ShippedXaml(unittest.TestCase):
                 self.assertRegex(bridge.get('Text') or '', r'^\{Binding \w+\}$', fname)
         # 25 template checkboxes + 13 former DataGridCheckBoxColumns + BatchOut
         # + DWGManagement (binding only, its UI stays frozen)
-        self.assertEqual(count, 40)
+        # + DatumSync, CropSync, FamilyTransfer x2 (2026-09-29)
+        self.assertEqual(count, 44)
 
     def test_read_only_workset_state_is_display_only(self):
         root = ET.parse(os.path.join(TOOLS, 'ManaWorkset.xaml')).getroot()
@@ -248,8 +249,8 @@ class CheckColumnAlignment(unittest.TestCase):
                         self.assertIsNone(box.get(geometry), where)
         # 15 aligned first, 16 more on 2026-09-26 (AutoWork, BatchLink, DoorThreshold,
         # FamiGen, ManaAnno, ManaFami, ManaGroup, ManaPara, PointCloud, QuickElement,
-        # RoomToFloor)
-        self.assertEqual(len(seen), 31, seen)
+        # RoomToFloor), then DatumSync, CropSync, FamilyTransfer x2 (2026-09-29)
+        self.assertEqual(len(seen), 35, seen)
 
     def test_renumber_tab_has_the_same_metrics_frame_as_the_sheets_tab(self):
         root = ET.parse(os.path.join(TOOLS, 'ManaSheets.xaml')).getroot()

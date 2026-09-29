@@ -68,6 +68,7 @@ except ImportError:
 
 import traceback
 from collections import defaultdict
+from Snippets._compat import disposing
 
 xaml_path = os.path.join(os.path.dirname(__file__), 'Tools', 'QuickElement.xaml')
 
@@ -876,7 +877,7 @@ class QuickSelectWindow(T3WPFWindow):
             id_list.Add(item.id)
         
         try:
-            with Transaction(self.doc, "Isolate Elements") as t:
+            with disposing(Transaction(self.doc, "Isolate Elements")) as t:
                 t.Start()
                 self.doc.ActiveView.IsolateElementsTemporary(id_list)
                 t.Commit()

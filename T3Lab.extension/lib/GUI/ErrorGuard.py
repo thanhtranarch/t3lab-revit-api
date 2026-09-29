@@ -48,8 +48,11 @@ _OWNED_MARKERS = ('Python.Runtime', 'System.Windows.Data', 'MS.Internal.Data')
 # per window so the log file does not fill with the same trace.
 _MAX_DISPATCHER_LOGS = 20
 
-_NEXT_STEP = ("Run pyRevit > Reload once and try again. If it happens again, "
-              "send the log file below to T3Lab.")
+# Never advise pyRevit > Reload here: on Revit 2025+ a reload shuts the CPython
+# engine down and it cannot restart, so every T3Lab tool then fails with "This
+# property must be set before runtime is initialized" until Revit restarts.
+_NEXT_STEP = ("Try again. If it happens again, save your work, restart Revit "
+              "(not pyRevit > Reload) and send the log file below to T3Lab.")
 
 
 def log_path():

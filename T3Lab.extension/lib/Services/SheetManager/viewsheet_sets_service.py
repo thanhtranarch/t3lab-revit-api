@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from Autodesk.Revit.DB import (
     FilteredElementCollector, PrintRange, ViewSet, ViewSheet, ViewSheetSet,
 )
+from Snippets._compat import disposing
 
 
 class ViewSheetSetsService(object):
@@ -26,7 +27,7 @@ class ViewSheetSetsService(object):
 
     def get_all_sheet_sets(self):
         """Return persisted elements and their real ElementIds; propagate errors."""
-        with FilteredElementCollector(self.doc) as collector:
+        with disposing(FilteredElementCollector(self.doc)) as collector:
             elements = collector.OfClass(ViewSheetSet).ToElements()
         return sorted(
             [{'element': item, 'name': item.Name, 'id': item.Id}

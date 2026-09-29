@@ -1,0 +1,10 @@
+title: "Family\nTransfer"
+tooltip: "Copy selected families - every type or only some - from a Revit link or another open project into a project. Links are read without opening their file."
+description: |
+  Source: any open project, or any Revit link loaded in one (read in place, no need to open the linked file).
+  Lists every loadable family of the source with its category, type count and whether it already exists in the target project.
+  Tick families, then tick exactly which of their types to copy.
+  Families already in the target can be skipped, topped up with missing types, or overwritten with the source version.
+  The whole transfer is a single undo step in the target project.
+author: "T3Lab"
+version: "1.0.0"

@@ -18,6 +18,7 @@ from Autodesk.Revit.DB.Architecture import *
 from Autodesk.Revit.UI.Selection import ISelectionFilter, ObjectType
 
 from pyrevit import revit, forms, script
+from Snippets._compat import disposing
 
 _BC = BrushConverter()
 
@@ -425,7 +426,7 @@ def run():
     counter = start_count
     failed = 0
 
-    with Transaction(doc, "DQT - Renumber Along Spline") as t:
+    with disposing(Transaction(doc, "DQT - Renumber Along Spline")) as t:
         t.Start()
         for elem, _ in el_param_list:
             if leading and leading > 0:
