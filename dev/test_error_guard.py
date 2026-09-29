@@ -223,6 +223,30 @@ class WpfBaseWiring(unittest.TestCase):
         load_src = ast.get_source_segment(self.src, methods['load_xaml'])
         self.assertIn('self._install_dispatcher_guard()', load_src)
 
+    def test_rounded_window_clip_is_installed_and_resize_aware(self):
+        tree = ast.parse(self.src)
+        cls = next(n for n in tree.body
+                   if isinstance(n, ast.ClassDef) and n.name == 'T3WPFWindow')
+        methods = {n.name: n for n in cls.body if isinstance(n, ast.FunctionDef)}
+        for name in ('_install_rounded_window_clip',
+                     '_refresh_rounded_window_clip',
+                     '_remove_rounded_window_clip'):
+            self.assertIn(name, methods)
+        load_src = ast.get_source_segment(self.src, methods['load_xaml'])
+        install_src = ast.get_source_segment(
+            self.src, methods['_install_rounded_window_clip'])
+        refresh_src = ast.get_source_segment(
+            self.src, methods['_refresh_rounded_window_clip'])
+        self.assertIn('self._install_rounded_window_clip()', load_src)
+        self.assertIn('root.SizeChanged +=', install_src)
+        self.assertIn('self.StateChanged +=', install_src)
+        self.assertIn('descriptor.AddValueChanged', install_src)
+        self.assertIn('RectangleGeometry', refresh_src)
+        self.assertIn('WindowState.Maximized', refresh_src)
+        self.assertIn("corner = getattr(root, 'CornerRadius', None)", refresh_src)
+        self.assertIn('if radius <= 0.0:', refresh_src)
+        self.assertIn('root.Clip = None', refresh_src)
+
     def test_handler_marks_owned_exceptions_handled(self):
         tree = ast.parse(self.src)
         cls = next(n for n in tree.body

@@ -70,6 +70,34 @@ Kích thước cửa sổ: S 420×260–320 (NoResize) · M 560×420–560 · L 
 
 ## Chrome cửa sổ & wizard — 8 component (thêm 2026-08-28)
 
+### Chrome bo góc — bề mặt Window phải trong suốt
+
+`CornerRadius` trên `Border` chỉ bo nội dung của Border; nó không bo HWND của
+`Window`. Vì vậy mọi cửa sổ custom chrome dùng `WindowStyle="None"` và outer
+Border bo góc bắt buộc dùng `AllowsTransparency="True"` +
+`Background="Transparent"` ngay trên `<Window>`. Outer Border dùng
+`T3.BorderStrong`, `T3.R.Window`, `ClipToBounds="True"` và viền **1px**. Nếu để
+Window có nền `T3.Canvas`/`T3.Surface`, bốn góc vuông của HWND sẽ lòi ra ngoài
+Border dù Border đã có `CornerRadius`.
+
+`ClipToBounds` của WPF chỉ cắt theo hình chữ nhật, không theo `CornerRadius`.
+`T3WPFWindow` vì vậy tự gắn `RectangleGeometry` theo kích thước outer Border và
+tự cập nhật khi resize; mọi cửa sổ này phải đi qua `T3WPFWindow`, không nạp XAML
+trực tiếp.
+
+```xml
+<Window WindowStyle="None" AllowsTransparency="True" Background="Transparent" ...>
+  ...
+  <Border Background="{StaticResource T3.Surface}"
+          BorderBrush="{StaticResource T3.BorderStrong}"
+          BorderThickness="1"
+          CornerRadius="{StaticResource T3.R.Window}"
+          ClipToBounds="True">
+    ...
+  </Border>
+</Window>
+```
+
 Tool nhiều bước có sidebar rail không khớp P1–P5. Thay vì tự chế pattern thứ 6,
 dùng 8 component này; chúng mang sẵn giá trị hình dạng riêng nên file tool không
 bao giờ phải tự viết số lạ:

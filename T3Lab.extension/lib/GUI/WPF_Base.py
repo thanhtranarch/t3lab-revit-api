@@ -495,11 +495,119 @@ class T3WPFWindow(Window):
             # CPython engine: use sanitized XamlReader
             self._load_via_xaml_reader(xaml_content)
 
+        # A Border's ClipToBounds only clips to its rectangular bounds; it does
+        # not honour CornerRadius.  Frameless windows therefore need an explicit
+        # rounded geometry or their title/footer backgrounds can still paint
+        # into the transparent HWND corners.  Install it centrally so every T3
+        # custom-chrome window behaves the same while resizing.
+        self._install_rounded_window_clip()
+
         if set_owner:
             self.setup_owner()
         if handle_esc:
             self.setup_default_handlers()
         self._install_dispatcher_guard()
+
+    def _install_rounded_window_clip(self):
+        """Clip a rounded root surface to its CornerRadius.
+
+        WPF ``Border.ClipToBounds`` clips children to a rectangle, not to the
+        rounded outline painted by ``Border.CornerRadius``.  With a transparent
+        frameless Window this otherwise leaves square title/footer pixels visible
+        in the corners.  The geometry follows the root surface during resize and
+        is disabled while maximized so the window fills the monitor edge-to-edge.
+        """
+        try:
+            from System.Windows import WindowStyle as _WindowStyle
+            frameless = getattr(_WindowStyle, 'None')
+            if self.WindowStyle != frameless or not bool(self.AllowsTransparency):
+                return
+
+            root = getattr(self, 'Content', None)
+            corner = getattr(root, 'CornerRadius', None)
+            if root is None or corner is None:
+                return
+
+            self._t3_rounded_window_root = root
+            self._t3_rounded_window_handler = self._refresh_rounded_window_clip
+            root.SizeChanged += self._t3_rounded_window_handler
+            self.Loaded += self._t3_rounded_window_handler
+            self.StateChanged += self._t3_rounded_window_handler
+            self.Closed += self._remove_rounded_window_clip
+
+            # Some hosted surfaces (notably the docked Assistant) deliberately
+            # switch CornerRadius between 12 and 0 without resizing. Listen to
+            # the dependency property so the clip follows that mode change
+            # immediately instead of preserving a stale floating-window radius.
+            try:
+                from System import EventHandler
+                from System.ComponentModel import DependencyPropertyDescriptor
+                from System.Windows.Controls import Border
+                descriptor = DependencyPropertyDescriptor.FromProperty(
+                    Border.CornerRadiusProperty, root.GetType())
+                if descriptor is not None:
+                    corner_handler = EventHandler(
+                        self._refresh_rounded_window_clip)
+                    descriptor.AddValueChanged(root, corner_handler)
+                    self._t3_rounded_window_corner_descriptor = descriptor
+                    self._t3_rounded_window_corner_handler = corner_handler
+            except BaseException:
+                pass
+            self._refresh_rounded_window_clip()
+        except BaseException:
+            # A non-Border root or a host without full WPF geometry support does
+            # not need rounded clipping; never prevent the tool from opening.
+            pass
+
+    def _refresh_rounded_window_clip(self, sender=None, e=None):
+        try:
+            root = self._t3_rounded_window_root
+            if getattr(self, 'WindowState', None) == WindowState.Maximized:
+                root.Clip = None
+                return
+
+            width = float(root.ActualWidth)
+            height = float(root.ActualHeight)
+            if width <= 0.0 or height <= 0.0:
+                return
+
+            corner = getattr(root, 'CornerRadius', None)
+            if corner is None:
+                root.Clip = None
+                return
+            radii = (float(corner.TopLeft), float(corner.TopRight),
+                     float(corner.BottomRight), float(corner.BottomLeft))
+            radius = min(radii)
+            if radius <= 0.0:
+                root.Clip = None
+                root.InvalidateVisual()
+                return
+
+            from System.Windows import Rect
+            from System.Windows.Media import RectangleGeometry
+            root.Clip = RectangleGeometry(Rect(0.0, 0.0, width, height),
+                                          radius, radius)
+            root.InvalidateVisual()
+        except BaseException:
+            pass
+
+    def _remove_rounded_window_clip(self, sender=None, e=None):
+        try:
+            root = getattr(self, '_t3_rounded_window_root', None)
+            handler = getattr(self, '_t3_rounded_window_handler', None)
+            if root is not None and handler is not None:
+                root.SizeChanged -= handler
+                descriptor = getattr(
+                    self, '_t3_rounded_window_corner_descriptor', None)
+                corner_handler = getattr(
+                    self, '_t3_rounded_window_corner_handler', None)
+                if descriptor is not None and corner_handler is not None:
+                    descriptor.RemoveValueChanged(root, corner_handler)
+            if handler is not None:
+                self.Loaded -= handler
+                self.StateChanged -= handler
+        except BaseException:
+            pass
 
     def _install_dispatcher_guard(self):
         """Catch exceptions WPF raises outside our handlers while this window

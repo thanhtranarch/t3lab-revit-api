@@ -7,8 +7,8 @@
         MinWidth="900" MinHeight="650"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        AllowsTransparency="False"
-        Background="{DynamicResource T3.SurfaceSunken}"
+        AllowsTransparency="True"
+        Background="Transparent"
         Foreground="{DynamicResource T3.Text}"
         FontFamily="Segoe UI"
         FontSize="13"
@@ -1667,7 +1667,7 @@
     </Window.Resources>
 
     <!-- ═══ Outer Window Border (Zero-Gap Grid) ═══ -->
-    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1.5"
+    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
             Background="{StaticResource T3.Surface}" CornerRadius="12" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>

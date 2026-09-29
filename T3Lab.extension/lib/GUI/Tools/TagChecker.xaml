@@ -9,8 +9,8 @@
         Width="540" Height="720"
         MinWidth="480" MinHeight="600"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="None" AllowsTransparency="False"
-        Background="{DynamicResource T3.Surface}"
+        WindowStyle="None" AllowsTransparency="True"
+        Background="Transparent"
         FontFamily="Segoe UI"
         FontSize="13"
         UseLayoutRounding="True"
@@ -1668,7 +1668,7 @@
     </Window.Resources>
 
     <!-- ═══ Outer Window Border ═══ -->
-    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1.5"
+    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
             CornerRadius="12" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
         <Grid>
             <Grid.RowDefinitions>

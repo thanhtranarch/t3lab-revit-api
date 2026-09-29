@@ -7,10 +7,10 @@
         Width="1280" Height="780"
         MinWidth="1200" MinHeight="650"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="None" AllowsTransparency="False"
+        WindowStyle="None" AllowsTransparency="True"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="True"
-        Background="{DynamicResource T3.Canvas}"
+        Background="Transparent"
         FontFamily="Segoe UI" FontSize="13"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
@@ -1667,7 +1667,7 @@
     </Window.Resources>
 
     <!-- ═══ Outer Border: CornerRadius + ClipToBounds (T3 standard) ═══ -->
-    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1.5" CornerRadius="12" ClipToBounds="True" Background="{StaticResource T3.Canvas}">
+    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1" CornerRadius="12" ClipToBounds="True" Background="{StaticResource T3.Canvas}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title bar -->

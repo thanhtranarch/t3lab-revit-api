@@ -60,6 +60,22 @@ for ($i = 0; $i -lt 6; $i++) {
     [Windows.Threading.DispatcherPriority]::SystemIdle, [action]{}) | Out-Null
 }
 
+# Match T3WPFWindow's runtime chrome: Border.ClipToBounds clips to a rectangle,
+# not to CornerRadius, so custom-chrome content needs an explicit rounded clip.
+if ($content -is [Windows.Controls.Border]) {
+  $corner = $content.CornerRadius
+  $radius = [Math]::Min([Math]::Min($corner.TopLeft, $corner.TopRight),
+                        [Math]::Min($corner.BottomRight, $corner.BottomLeft))
+  if ($radius -gt 0 -and $content.ActualWidth -gt 0 -and $content.ActualHeight -gt 0) {
+    $rect = New-Object Windows.Rect(0, 0, $content.ActualWidth, $content.ActualHeight)
+    $content.Clip = New-Object Windows.Media.RectangleGeometry($rect, $radius, $radius)
+    $content.InvalidateVisual()
+    $shell.UpdateLayout()
+    [Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke(
+      [Windows.Threading.DispatcherPriority]::Render, [action]{}) | Out-Null
+  }
+}
+
 $rtb = New-Object Windows.Media.Imaging.RenderTargetBitmap($W, $H, 96, 96,
         [Windows.Media.PixelFormats]::Pbgra32)
 $rtb.Render($shell)

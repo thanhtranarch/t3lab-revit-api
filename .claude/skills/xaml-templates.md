@@ -58,6 +58,32 @@ XAML thì không. `audit_t3.py` bắt lỗi này bằng cách dò dấu tiếng 
 
 ## Title bar (48px)
 
+### Vỏ cửa sổ custom chrome có bo góc
+
+Khi `<Window>` dùng `WindowStyle="None"`, nền của chính Window phải trong suốt;
+nếu không, bốn góc vuông của HWND sẽ lộ ra sau outer Border đã bo góc.
+
+```xml
+<Window ...
+        WindowStyle="None" AllowsTransparency="True"
+        Background="Transparent">
+  ...
+  <Border Background="{StaticResource T3.Surface}"
+          BorderBrush="{StaticResource T3.BorderStrong}"
+          BorderThickness="1"
+          CornerRadius="{StaticResource T3.R.Window}"
+          ClipToBounds="True">
+    ...
+  </Border>
+</Window>
+```
+
+`Background="Transparent"` là ngoại lệ kỹ thuật duy nhất ở root Window cho custom
+chrome; màu bề mặt thật vẫn do outer Border lấy từ token `T3.*`.
+`T3WPFWindow` tự cắt cây con theo đúng `CornerRadius` khi resize vì
+`ClipToBounds="True"` của WPF chỉ cắt hình chữ nhật; không tự gọi
+`XamlReader.Load()` để mở cửa sổ này.
+
 ```xml
 <Border Style="{StaticResource T3.TitleBar}" Padding="12,0,8,0">
   <Grid>

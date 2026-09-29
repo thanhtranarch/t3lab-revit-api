@@ -123,6 +123,11 @@ FONTS_OK = {"Segoe UI", "Consolas",
 SIZES_OK = {"19", "15", "13", "11.5", "11", "12.5"}
 SPACING_OK = {0, 4, 8, 12, 16, 24, 32}
 RADIUS_OK = {0, 2, 4, 6, 8, 10, 12, 14, 16, 18}
+RADIUS_RESOURCES = {
+    "{StaticResource T3.R.Window}",
+    "{StaticResource T3.R.Control}",
+    "{StaticResource T3.R.Pill}",
+}
 WINDOW_ATTRS = ("UseLayoutRounding", "SnapsToDevicePixels", "MinWidth", "MinHeight")
 
 # Palette của các hệ đã bị bỏ — dấu hiệu nhận dạng file legacy.
@@ -296,6 +301,8 @@ def audit(src, base, keys):
                     issues.append(("P3", "<%s> %s=\"%s\" — %s không thuộc 4/8/12/16/24/32"
                                    % (tag, name, val, "/".join(bad))))
             elif name == "CornerRadius":
+                if val.strip() in RADIUS_RESOURCES:
+                    continue
                 for n in NUM_RE.findall(val):
                     if float(n) not in RADIUS_OK:
                         issues.append(("P3", "<%s> CornerRadius=\"%s\" — chỉ 0/2/4/6/8/10/12"

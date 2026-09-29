@@ -5,10 +5,10 @@
         Width="820" Height="560"
         MinWidth="720" MinHeight="460"
         WindowStartupLocation="CenterOwner"
-        WindowStyle="None" AllowsTransparency="False"
+        WindowStyle="None" AllowsTransparency="True"
         ResizeMode="CanResizeWithGrip"
         ShowInTaskbar="False"
-        Background="{DynamicResource T3.Canvas}"
+        Background="Transparent"
         FontFamily="Segoe UI" FontSize="13"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
@@ -1665,7 +1665,7 @@
 
     <Border Background="{StaticResource T3.Surface}"
             BorderBrush="{StaticResource T3.BorderStrong}"
-            BorderThickness="1.5"
+            BorderThickness="1"
             CornerRadius="12" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
