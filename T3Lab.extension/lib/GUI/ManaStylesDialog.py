@@ -7,6 +7,7 @@ import re
 import random
 import time
 import json
+import math
 import System
 from collections import OrderedDict
 
@@ -34,8 +35,8 @@ from Autodesk.Revit.DB import (
 
 from pyrevit import forms, revit
 from GUI.WPF_Base import T3WPFWindow
-from System.Windows import WindowState, Visibility, Thickness, CornerRadius, GridLength, GridUnitType, MessageBox, MessageBoxButton, MessageBoxImage, MessageBoxResult, Rect, Point
-from System.Windows.Media import SolidColorBrush, Color, DoubleCollection, DrawingBrush, GeometryDrawing, GeometryGroup, LineGeometry, Pen, TileMode, BrushMappingMode
+from System.Windows import WindowState, Visibility, Thickness, CornerRadius, GridLength, GridUnitType, MessageBox, MessageBoxButton, MessageBoxImage, MessageBoxResult
+from System.Windows.Media import SolidColorBrush, Color, DoubleCollection
 from System.Windows.Controls import (
     Grid,
     RowDefinition,
@@ -81,6 +82,66 @@ def _make_double_collection(values):
         return dc
     except Exception:
         return None
+
+# ── Cột ILLUSTRATION ──────────────────────────────────────────────────────
+# Dòng là object Python nên WPF nhận thuộc tính dưới dạng PyObject: đổi sang
+# chữ được, nhưng KHÔNG đổi được sang Brush / double / DoubleCollection /
+# Geometry — binding thẳng `Stroke="{Binding color_hex}"` hỏng im lặng và cột
+# ILLUSTRATION trống trơn. Vì vậy mọi giá trị hình vẽ ở đây là CHUỖI, XAML đọc
+# qua TextBlock ẩn (string bridge, như checkbox) rồi để TypeConverter của WPF
+# parse chuỗi đó.
+
+# Ô preview fill pattern: Border 60×18 viền 1px → vùng vẽ 58×16.
+_FILL_PREVIEW_W = 58.0
+_FILL_PREVIEW_H = 16.0
+_FILL_PREVIEW_SOLID = "M0,0 H58 V16 H0 Z"
+
+
+def _dash_view(dash_str, thickness):
+    """Dash (px) → StrokeDashArray của WPF, vốn tính theo BỘI SỐ StrokeThickness.
+
+    Nét càng dày thì dash được kéo dài theo (tối thiểu x1, x nửa độ dày) để nét
+    đứt của line weight lớn vẫn đọc ra là nét đứt thay vì một dải chấm.
+    """
+    if not dash_str:
+        return ""
+    try:
+        t = float(thickness) or 1.0
+        scale = max(1.0, t / 2.0)
+        return " ".join("{:.2f}".format(float(v) * scale / t) for v in dash_str.split())
+    except (TypeError, ValueError):
+        return ""
+
+
+def _parallel_lines(angle, step):
+    """Họ đường song song (góc Revit, radian, ngược chiều kim đồng hồ) phủ kín ô preview."""
+    w, h = _FILL_PREVIEW_W, _FILL_PREVIEW_H
+    cx, cy = w / 2.0, h / 2.0
+    reach = math.hypot(w, h) / 2.0 + 1.0
+    dx, dy = math.cos(angle), -math.sin(angle)   # màn hình: trục y hướng xuống
+    nx, ny = -dy, dx
+    count = int(math.ceil(reach / step))
+    parts = []
+    for k in range(-count, count + 1):
+        px, py = cx + nx * k * step, cy + ny * k * step
+        parts.append("M{:.1f},{:.1f} L{:.1f},{:.1f}".format(
+            px - dx * reach, py - dy * reach, px + dx * reach, py + dy * reach))
+    return " ".join(parts)
+
+
+def _hatch_geometry(grids):
+    """Path Data cho các fill grid: đúng góc, khoảng cách quy về 3–12 px."""
+    parts = []
+    for grid in grids or []:
+        try:
+            angle = float(grid.Angle)
+            spacing_mm = abs(float(grid.Offset)) * 304.8
+        except Exception:
+            continue
+        step = max(3.0, min(12.0, spacing_mm * 1.5)) if spacing_mm > 0 else 6.0
+        parts.append(_parallel_lines(angle, step))
+    return " ".join(parts)
+
 
 # ============================================================================
 # STYLE MANAGER WORKER ENTITIES
@@ -128,59 +189,25 @@ class FillPatternItem(_Reactive):
             
         self._is_system = "Solid fill" in self._name or self._name.startswith("<") or self._name.startswith("Solid")
 
-        # Construct wpf_brush
-        self._wpf_brush = None
+        # Preview: Path Data (chuỗi) vẽ đúng góc + mật độ các fill grid thật
         is_solid = False
+        grids = None
         try:
             fill_pattern = element.GetFillPattern()
             if fill_pattern:
                 is_solid = fill_pattern.IsSolidFill
-        except:
+                grids = fill_pattern.GetFillGrids()
+        except Exception:
             pass
-            
+
         if is_solid or "solid" in self._name.lower():
-            self._wpf_brush = SolidColorBrush(Color.FromRgb(161, 161, 170)) # Zinc-400
-            try:
-                self._wpf_brush.Freeze()
-            except Exception:
-                pass
+            self._preview_geometry = _FILL_PREVIEW_SOLID
         else:
-            try:
-                db = DrawingBrush()
-                db.TileMode = TileMode.Tile
-                db.Viewport = Rect(0, 0, 10, 10)
-                db.ViewportUnits = BrushMappingMode.Absolute
-                
-                group = GeometryGroup()
-                pen = Pen(SolidColorBrush(Color.FromRgb(161, 161, 170)), 1)
-                try:
-                    pen.Freeze()
-                except Exception:
-                    pass
-                
-                if self._settings == "Parallel lines":
-                    group.Children.Add(LineGeometry(Point(0, 5), Point(10, 5)))
-                elif self._settings == "Crosshatch":
-                    group.Children.Add(LineGeometry(Point(0, 5), Point(10, 5)))
-                    group.Children.Add(LineGeometry(Point(5, 0), Point(5, 10)))
-                else:
-                    group.Children.Add(LineGeometry(Point(0, 0), Point(10, 10)))
-                    
-                db.Drawing = GeometryDrawing(None, pen, group)
-                try:
-                    db.Freeze()
-                except Exception:
-                    pass
-                self._wpf_brush = db
-            except Exception:
-                self._wpf_brush = SolidColorBrush(Color.FromRgb(228, 228, 231))
-                try:
-                    self._wpf_brush.Freeze()
-                except Exception:
-                    pass
+            self._preview_geometry = (_hatch_geometry(grids)
+                                      or _parallel_lines(math.pi / 4.0, 6.0))
 
     @property
-    def wpf_brush(self): return self._wpf_brush
+    def preview_geometry(self): return self._preview_geometry
 
     @property
     def element(self): return self._element
@@ -338,6 +365,8 @@ class LineStyleItem(_Reactive):
     @property
     def dash_str(self): return self._dash_str
     @property
+    def dash_view(self): return _dash_view(self._dash_str, self._thickness_val)
+    @property
     def wpf_brush(self): return self._wpf_brush
     @property
     def thickness_val(self): return self._thickness_val
@@ -479,6 +508,8 @@ class LinePatternItem(_Reactive):
     def thickness_val(self): return self._thickness_val
     @property
     def dash_str(self): return self._dash_str
+    @property
+    def dash_view(self): return _dash_view(self._dash_str, self._thickness_val)
     @property
     def wpf_brush(self): return self._wpf_brush
     @property
