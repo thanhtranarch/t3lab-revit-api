@@ -1800,7 +1800,8 @@
                     <DataGrid x:Name="DWGDataGrid"
                               Style="{StaticResource T3.DataGrid}"
                               BorderThickness="0"
-                              SelectionMode="Extended" SelectionUnit="FullRow">
+                              SelectionMode="Extended" SelectionUnit="FullRow"
+                              PreviewMouseLeftButtonDown="view_name_mouse_down">
                         <DataGrid.Columns>
                             <!-- Checkbox Column -->
                             <DataGridTemplateColumn Width="36" CanUserSort="False" CanUserResize="False">
@@ -1880,7 +1881,22 @@
                             </DataGridTemplateColumn>
 
                             <!-- Views Column -->
-                            <DataGridTextColumn Header="VIEWS" Binding="{Binding ViewNames}" Width="160" CanUserSort="False"/>
+                            <DataGridTemplateColumn Header="VIEWS" Width="160" CanUserSort="False" IsReadOnly="True">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock x:Name="DWGViewName" Text="{Binding ViewNames}"
+                                                   Style="{StaticResource T3.Body}" ClipToBounds="True"
+                                                   TextTrimming="CharacterEllipsis" Cursor="Hand">
+                                            <TextBlock.ToolTip>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding ViewNames}" Style="{StaticResource T3.Body}"/>
+                                                    <TextBlock Text="Double-click to open the view" Style="{StaticResource T3.Caption}"/>
+                                                </StackPanel>
+                                            </TextBlock.ToolTip>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
 
                             <!-- View Count Column -->
                             <DataGridTextColumn Header="VIEW COUNT" Binding="{Binding ViewCount}" Width="90" CanUserSort="True"

@@ -19,12 +19,14 @@ clr.AddReference('PresentationCore')
 clr.AddReference('WindowsBase')
 clr.AddReference('System')
 
-from System.Windows import WindowState
+from System.Windows import WindowState, LogicalTreeHelper
+from System.Windows.Media import VisualTreeHelper
 from Autodesk.Revit.DB import (
     FilteredElementCollector,
     ImportInstance,
     Transaction,
     ElementId,
+    View,
 )
 
 XAML_FILE = os.path.join(os.path.dirname(__file__), 'Tools', 'DWGManagement.xaml')
@@ -37,13 +39,14 @@ FILTER_LINKS   = "Links Only"
 
 class DWGItem(object):
     """View-model for one CAD import or CAD link instance."""
-    def __init__(self, instance, link_type, is_link, name, view_names, file_path):
+    def __init__(self, instance, link_type, is_link, name, view_names, file_path, owner_view_id=None):
         self.Instance   = instance
         self.LinkType   = link_type
         self.IsLink     = is_link
         self.DWGType    = "Link" if is_link else "Import"
         self.Name       = name
         self.ViewNames  = view_names
+        self.OwnerViewId = owner_view_id
         self.ViewCount  = 1
         self.FilePath   = file_path
         self.IsSelected = False
@@ -88,6 +91,7 @@ def collect_dwg_items(document):
                 except Exception:
                     pass
 
+            owner_view_id = None
             try:
                 owner_view_id = inst.OwnerViewId
                 if owner_view_id == ElementId.InvalidElementId:
@@ -98,12 +102,39 @@ def collect_dwg_items(document):
             except Exception:
                 view_names = "Unknown View"
 
-            items.append(DWGItem(inst, link_type, is_link, name, view_names, file_path))
+            items.append(DWGItem(inst, link_type, is_link, name, view_names, file_path, owner_view_id))
 
         except Exception as item_ex:
             logger.warning("Skipped one ImportInstance: {}".format(item_ex))
 
     return items
+
+
+def resolve_dwg_view(document, view_id):
+    """Resolve only the stored owner view, never a possibly ambiguous view name."""
+    if document is None or not document.IsValidObject:
+        raise ValueError("The Revit document is no longer available.")
+    if view_id is None or view_id == ElementId.InvalidElementId:
+        raise ValueError("This CAD item has no specific owner view (All Views / 3D).")
+    view = document.GetElement(view_id)
+    if view is None or not isinstance(view, View) or not view.IsValidObject:
+        raise ValueError("The owner view no longer exists. Refresh the CAD list.")
+    if view.IsTemplate:
+        raise ValueError("View templates cannot be opened.")
+    return view
+
+
+def request_dwg_view(document, view_id):
+    """Request navigation after the modal DWG window has closed."""
+    try:
+        uidoc = revit.uidoc
+        if uidoc is None or uidoc.Document != document:
+            raise ValueError("The active Revit document has changed. Reopen DWG Management.")
+        view = resolve_dwg_view(document, view_id)
+        uidoc.RequestViewChange(view)
+    except Exception as ex:
+        logger.warning("Could not open CAD owner view: {}".format(ex))
+        forms.alert("Could not open view:\n{}".format(ex), title="ManaDWG")
 
 
 class DWGManagementWindow(T3WPFWindow):
@@ -112,6 +143,7 @@ class DWGManagementWindow(T3WPFWindow):
     def __init__(self, doc=None):
         T3WPFWindow.__init__(self, XAML_FILE)
         self._doc = doc or revit.doc
+        self._requested_view_id = None
         self._all_items      = []
         self._filtered_items = []
         self._active_filter  = FILTER_ALL
@@ -224,6 +256,35 @@ class DWGManagementWindow(T3WPFWindow):
             self.DWGDataGrid.ItemsSource = to_items_source(self._filtered_items)
         except Exception:
             pass
+
+    def view_name_mouse_down(self, sender, e):
+        if e.ClickCount != 2:
+            return
+        source = e.OriginalSource
+        while source is not None and getattr(source, "Name", None) != "DWGViewName":
+            if source == sender:
+                return
+            try:
+                parent = VisualTreeHelper.GetParent(source)
+            except Exception:
+                parent = None
+            if parent is None:
+                try:
+                    parent = LogicalTreeHelper.GetParent(source)
+                except Exception:
+                    parent = None
+            source = parent
+        item = getattr(source, "DataContext", None)
+        if not isinstance(item, DWGItem):
+            return
+        e.Handled = True
+        try:
+            resolve_dwg_view(self._doc, item.OwnerViewId)
+        except Exception as ex:
+            forms.alert("Could not open view:\n{}".format(ex), title="ManaDWG")
+            return
+        self._requested_view_id = item.OwnerViewId
+        self.Close()
 
     def refresh_button_clicked(self, sender, e):
         self._load_data()
@@ -361,3 +422,5 @@ def show_dwg_manager(doc=None):
         return
     win = DWGManagementWindow(d)
     win.ShowDialog()
+    if win._requested_view_id is not None:
+        request_dwg_view(d, win._requested_view_id)

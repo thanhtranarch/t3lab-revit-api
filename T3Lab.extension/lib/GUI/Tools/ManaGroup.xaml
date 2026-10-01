@@ -2200,27 +2200,25 @@
                             <StackPanel Grid.Row="1" Margin="0,0,0,8">
                                 <TextBlock Text="Group kind" Margin="0,0,0,4"
                                            Style="{StaticResource T3.Caption}"/>
-                                <Border Style="{StaticResource T3.Pill}" HorizontalAlignment="Left"
-                                        Margin="0,0,0,12">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <RadioButton x:Name="chip_plot_model" Content="Model"
-                                                     GroupName="mg_plot_kind" IsChecked="True"
-                                                     Style="{StaticResource T3.Chip}"
-                                                     Checked="plot_kind_checked" Tag="Model"/>
-                                        <RadioButton x:Name="chip_plot_detail" Content="Detail"
-                                                     GroupName="mg_plot_kind"
-                                                     Style="{StaticResource T3.Chip}"
-                                                     Checked="plot_kind_checked" Tag="Detail"/>
-                                        <RadioButton x:Name="chip_plot_attached" Content="Attached"
-                                                     GroupName="mg_plot_kind"
-                                                     Style="{StaticResource T3.Chip}"
-                                                     Checked="plot_kind_checked" Tag="Attached"/>
-                                        <RadioButton x:Name="chip_plot_all" Content="All"
-                                                     GroupName="mg_plot_kind"
-                                                     Style="{StaticResource T3.Chip}"
-                                                     Checked="plot_kind_checked" Tag=""/>
-                                    </StackPanel>
-                                </Border>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"
+                                            VerticalAlignment="Center" Margin="0,0,0,12">
+                                    <RadioButton x:Name="chip_plot_model" Content="Model"
+                                                 GroupName="mg_plot_kind" IsChecked="True"
+                                                 Style="{StaticResource T3.Chip}"
+                                                 Checked="plot_kind_checked" Tag="Model"/>
+                                    <RadioButton x:Name="chip_plot_detail" Content="Detail"
+                                                 GroupName="mg_plot_kind"
+                                                 Style="{StaticResource T3.Chip}"
+                                                 Checked="plot_kind_checked" Tag="Detail"/>
+                                    <RadioButton x:Name="chip_plot_attached" Content="Attached"
+                                                 GroupName="mg_plot_kind"
+                                                 Style="{StaticResource T3.Chip}"
+                                                 Checked="plot_kind_checked" Tag="Attached"/>
+                                    <RadioButton x:Name="chip_plot_all" Content="All"
+                                                 GroupName="mg_plot_kind"
+                                                 Style="{StaticResource T3.Chip}"
+                                                 Checked="plot_kind_checked" Tag=""/>
+                                </StackPanel>
 
                                 <TextBlock Text="Level or view" Margin="0,0,0,4"
                                            Style="{StaticResource T3.Caption}"/>

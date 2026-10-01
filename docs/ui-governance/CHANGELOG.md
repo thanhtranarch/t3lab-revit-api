@@ -1,5 +1,9 @@
 # CHANGE HISTORY — lịch sử các cycle
 
+## UI consistency review — 2026-10-01
+
+Reviewed 65 tool XAML plus Python-generated surfaces. Standardized source chips, seven fixed bars, export selection boxes/chevrons, runtime semantic colors and dynamic control styling. Fixed ManaSelect sidebar wrapper identity. Existing session changes preserved; no shared stylesheet or Revit model-processing changes. Gates and focused tests pass; Windows/Revit/DPI verification remains. See [report](REVIEW-2026-10-01-CONSISTENCY.md).
+
 ## Đợt D — RibbonNames và export native — 2026-09-15
 
 Sửa danh tính tab qua nhiều lần đổi tên, restore, lưu JSON atomic và phản hồi lỗi

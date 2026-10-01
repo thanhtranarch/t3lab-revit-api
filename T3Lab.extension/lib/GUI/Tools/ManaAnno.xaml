@@ -2276,8 +2276,8 @@
                             </ScrollViewer>
 
                             <!-- Bottom Action Bar -->
-                            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0" Padding="16,8">
-                                <Grid>
+                            <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0" Padding="16,0">
+                                <Grid VerticalAlignment="Center">
                                     <Button x:Name="btn_clear_fields" Content="Clear Fields" HorizontalAlignment="Left"
                                             Style="{StaticResource T3.Button.Ghost}" Click="dimtext_clear_fields"/>
                                     <Button x:Name="btn_apply" Content="Apply" HorizontalAlignment="Right"

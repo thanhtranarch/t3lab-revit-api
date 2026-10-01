@@ -1,5 +1,9 @@
 # PRIORITY QUEUE — cập nhật 2026-09-15
 
+## UI verification queue — 2026-10-01
+
+Current source consistency changes and precise runtime checklist: [review](REVIEW-2026-10-01-CONSISTENCY.md). Priorities: Windows/Revit smoke checks at 100%/125% DPI; dynamic modal/card layout and light/dark theme; legacy Renaming/resource consumers; direct-XamlReader compatibility. Source gates pass; none of these runtime items is marked verified. Older queue/history below is retained.
+
 Hàng đợi hiện tại dựa trên [review có bằng chứng](REVIEW-2026-09-13.md).
 Các sửa transaction P1 đã hoàn tất ở mức source/test trong [đợt B](REVIEW-2026-09-14-PHASE-B.md).
 Đường BatchOut từ Assistant và selection/empty state đã sửa ở [đợt C](REVIEW-2026-09-14-PHASE-C.md); còn cần runtime verification.
