@@ -1521,11 +1521,11 @@ class TileLayoutWindow(T3WPFWindow):
         import System.Windows.Controls as WC
         from System.Windows.Media import SolidColorBrush, Color as WColor, FontFamily
 
-        brush_dark = SolidColorBrush(WColor.FromRgb(44, 62, 80))
-        brush_sub  = SolidColorBrush(WColor.FromRgb(127, 140, 141))
-        brush_ok   = SolidColorBrush(WColor.FromRgb(39, 174, 96))
-        brush_warn = SolidColorBrush(WColor.FromRgb(231, 76, 60))
-        brush_line = SolidColorBrush(WColor.FromRgb(236, 240, 241))
+        brush_dark = self.FindResource("T3.Text")
+        brush_sub = self.FindResource("T3.TextSecondary")
+        brush_ok = self.FindResource("T3.Success.Text")
+        brush_warn = self.FindResource("T3.Danger.Text")
+        brush_line = self.FindResource("T3.Border")
 
         win = SW.Window()
         win.Title = u"Option {}  \u2014  Floor #{}".format(
@@ -1533,8 +1533,13 @@ class TileLayoutWindow(T3WPFWindow):
         win.Width = 1180
         win.Height = 760
         win.WindowStartupLocation = SW.WindowStartupLocation.CenterOwner
-        win.Background = SolidColorBrush(WColor.FromRgb(255, 255, 255))
-        win.FontFamily = FontFamily("Segoe UI")
+        win.Resources.MergedDictionaries.Add(self.Resources)
+        win.MinWidth = 1000
+        win.MinHeight = 620
+        win.UseLayoutRounding = True
+        win.SnapsToDevicePixels = True
+        win.Background = self.FindResource("T3.Surface")
+        win.FontFamily = self.FindResource("T3.Font")
         try:
             win.Owner = self
         except Exception:
@@ -1549,10 +1554,10 @@ class TileLayoutWindow(T3WPFWindow):
 
         # ── Left: large preview host ──
         preview_host = WC.Border()
-        preview_host.Background = SolidColorBrush(WColor.FromRgb(250, 250, 250))
+        preview_host.Background = self.FindResource("T3.SurfaceSunken")
         preview_host.BorderBrush = brush_line
         preview_host.BorderThickness = SW.Thickness(1)
-        preview_host.CornerRadius = SW.CornerRadius(4)
+        preview_host.CornerRadius = self.FindResource("T3.R.Control")
         preview_host.Margin = SW.Thickness(0, 0, 16, 0)
         WC.Grid.SetColumn(preview_host, 0)
         root.Children.Add(preview_host)
@@ -1564,7 +1569,7 @@ class TileLayoutWindow(T3WPFWindow):
 
         title = WC.TextBlock()
         title.Text = u"Option {}".format(opt.option_id)
-        title.FontSize = 22; title.FontWeight = SW.FontWeights.Bold
+        title.FontSize = self.FindResource("T3.Size.Display"); title.FontWeight = SW.FontWeights.SemiBold
         title.Foreground = brush_dark
         panel.Children.Add(title)
 
@@ -1572,12 +1577,12 @@ class TileLayoutWindow(T3WPFWindow):
         floor_info.Text = u"Floor #{}  \u00b7  {:.1f} m\u00b2  \u00b7  {:.0f} \u00d7 {:.0f} mm".format(
             fi_idx + 1, fi.area_ft2 * FT2_TO_M2,
             fi.width_ft * FT_TO_MM, fi.height_ft * FT_TO_MM)
-        floor_info.FontSize = 11; floor_info.Foreground = brush_sub
+        floor_info.FontSize = self.FindResource("T3.Size.Caption"); floor_info.Foreground = brush_sub
         floor_info.Margin = SW.Thickness(0, 0, 0, 12)
         panel.Children.Add(floor_info)
 
         variant_lbl = WC.TextBlock()
-        variant_lbl.FontSize = 11; variant_lbl.Foreground = brush_sub
+        variant_lbl.FontSize = self.FindResource("T3.Size.Caption"); variant_lbl.Foreground = brush_sub
         variant_lbl.TextWrapping = SW.TextWrapping.Wrap
         variant_lbl.Margin = SW.Thickness(0, 0, 0, 12)
         panel.Children.Add(variant_lbl)
@@ -1589,7 +1594,7 @@ class TileLayoutWindow(T3WPFWindow):
         # Angle row
         def _row_label(t):
             b = WC.TextBlock()
-            b.Text = t; b.FontSize = 12; b.FontWeight = SW.FontWeights.SemiBold
+            b.Text = t; b.Style = self.FindResource("T3.Label")
             b.Foreground = brush_dark
             b.Margin = SW.Thickness(0, 8, 0, 4)
             return b
@@ -1597,19 +1602,19 @@ class TileLayoutWindow(T3WPFWindow):
         panel.Children.Add(_row_label("Angle"))
         angle_row = WC.StackPanel(); angle_row.Orientation = WC.Orientation.Horizontal
         btn_a_minus = WC.Button(); btn_a_minus.Content = u"\u2212"
-        btn_a_minus.Width = 28; btn_a_minus.Height = 26
-        btn_a_minus.Margin = SW.Thickness(0, 0, 3, 0)
+        btn_a_minus.Width = 28; btn_a_minus.Height = self.FindResource("T3.H.Control")
+        btn_a_minus.Margin = SW.Thickness(0, 0, 4, 0)
         btn_a_plus = WC.Button(); btn_a_plus.Content = "+"
-        btn_a_plus.Width = 28; btn_a_plus.Height = 26
-        btn_a_plus.Margin = SW.Thickness(3, 0, 6, 0)
+        btn_a_plus.Width = 28; btn_a_plus.Height = self.FindResource("T3.H.Control")
+        btn_a_plus.Margin = SW.Thickness(4, 0, 8, 0)
         txt_a = WC.TextBox()
-        txt_a.Width = 70; txt_a.Height = 26
+        txt_a.Width = 70; txt_a.Height = self.FindResource("T3.H.Control")
         txt_a.TextAlignment = SW.TextAlignment.Center
         txt_a.VerticalContentAlignment = SW.VerticalAlignment.Center
         btn_a_apply = WC.Button(); btn_a_apply.Content = "Apply"
-        btn_a_apply.Height = 26
+        btn_a_apply.Height = self.FindResource("T3.H.Control")
         btn_a_apply.Padding = SW.Thickness(10, 0, 10, 0)
-        btn_a_apply.Margin = SW.Thickness(6, 0, 0, 0)
+        btn_a_apply.Margin = SW.Thickness(8, 0, 0, 0)
         angle_row.Children.Add(btn_a_minus)
         angle_row.Children.Add(btn_a_plus)
         angle_row.Children.Add(txt_a)
@@ -1620,26 +1625,30 @@ class TileLayoutWindow(T3WPFWindow):
         panel.Children.Add(_row_label("Shift"))
         shift_row = WC.StackPanel(); shift_row.Orientation = WC.Orientation.Horizontal
         def _nav(content, tt):
-            b = WC.Button(); b.Content = content
+            b = WC.Button()
+            icon = WC.TextBlock()
+            icon.Text = content
+            icon.Style = self.FindResource("T3.Icon")
+            b.Content = icon
             b.Width = 32; b.Height = 28
-            b.Margin = SW.Thickness(0, 0, 3, 0); b.FontSize = 12
+            b.Margin = SW.Thickness(0, 0, 4, 0)
             b.ToolTip = tt
             return b
-        btn_s_left  = _nav(u"\u2190", "Shift left  (10% of tile width)")
-        btn_s_up    = _nav(u"\u2191", "Shift up    (10% of tile height)")
-        btn_s_down  = _nav(u"\u2193", "Shift down  (10% of tile height)")
-        btn_s_right = _nav(u"\u2192", "Shift right (10% of tile width)")
+        btn_s_left  = _nav(u"\uE76B", "Shift left  (10% of tile width)")
+        btn_s_up    = _nav(u"\uE70E", "Shift up    (10% of tile height)")
+        btn_s_down  = _nav(u"\uE70D", "Shift down  (10% of tile height)")
+        btn_s_right = _nav(u"\uE76C", "Shift right (10% of tile width)")
         btn_s_reset = WC.Button()
         btn_s_reset.Content = "Reset"; btn_s_reset.Height = 28
         btn_s_reset.Padding = SW.Thickness(10, 0, 10, 0)
-        btn_s_reset.Margin = SW.Thickness(6, 0, 0, 0)
+        btn_s_reset.Margin = SW.Thickness(8, 0, 0, 0)
         for b in (btn_s_left, btn_s_up, btn_s_down, btn_s_right, btn_s_reset):
             shift_row.Children.Add(b)
         panel.Children.Add(shift_row)
 
         shift_readout = WC.TextBlock()
-        shift_readout.FontSize = 11; shift_readout.Foreground = brush_sub
-        shift_readout.Margin = SW.Thickness(0, 6, 0, 0)
+        shift_readout.FontSize = self.FindResource("T3.Size.Caption"); shift_readout.Foreground = brush_sub
+        shift_readout.Margin = SW.Thickness(0, 8, 0, 0)
         panel.Children.Add(shift_readout)
 
         # Close button at bottom
@@ -1664,9 +1673,9 @@ class TileLayoutWindow(T3WPFWindow):
             def _stat(k, v, color=None):
                 r = WC.StackPanel(); r.Orientation = WC.Orientation.Horizontal
                 r.Margin = SW.Thickness(0, 2, 0, 2)
-                kt = WC.TextBlock(); kt.Text = k; kt.FontSize = 12
+                kt = WC.TextBlock(); kt.Text = k; kt.FontSize = self.FindResource("T3.Size.Caption")
                 kt.Foreground = brush_sub; kt.Width = 140
-                vt = WC.TextBlock(); vt.Text = v; vt.FontSize = 12
+                vt = WC.TextBlock(); vt.Text = v; vt.FontSize = self.FindResource("T3.Size.Caption")
                 vt.FontWeight = SW.FontWeights.SemiBold
                 vt.Foreground = color or brush_dark
                 r.Children.Add(kt); r.Children.Add(vt)
@@ -1729,6 +1738,16 @@ class TileLayoutWindow(T3WPFWindow):
         btn_s_reset.Click += _on_s_reset
         btn_close.Click   += _on_close
 
+        for control in (btn_a_minus, btn_a_plus, btn_a_apply, btn_s_left,
+                        btn_s_right, btn_s_up, btn_s_down, btn_s_reset, btn_close):
+            control.Style = self.FindResource("T3.Button.Secondary")
+        # Arrow buttons keep their compact width inside the fixed control panel.
+        for control in (btn_a_minus, btn_a_plus, btn_s_left, btn_s_right,
+                        btn_s_up, btn_s_down):
+            control.MinWidth = 0
+            control.Padding = SW.Thickness(4, 0, 4, 0)
+        btn_close.IsCancel = True
+        txt_a.Style = self.FindResource("T3.TextBox")
         win.Content = root
         _redraw()
         win.ShowDialog()

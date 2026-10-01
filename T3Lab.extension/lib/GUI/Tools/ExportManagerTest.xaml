@@ -1802,11 +1802,11 @@
 
                             <!-- Radio Buttons for Sheets/Views -->
                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                <RadioButton x:Name="sheets_radio" Content="Sheets" GroupName="selectionMode"
-                                             IsChecked="True" Margin="0,0,16,0"
-                                             Checked="selection_mode_changed" FontWeight="Medium"/>
-                                <RadioButton x:Name="views_radio" Content="Views" GroupName="selectionMode"
-                                             Checked="selection_mode_changed" FontWeight="Medium"/>
+                                <RadioButton x:Name="sheets_radio" Style="{StaticResource T3.Chip}" Content="Sheets" GroupName="selectionMode"
+                                             IsChecked="True"
+                                             Checked="selection_mode_changed"/>
+                                <RadioButton x:Name="views_radio" Style="{StaticResource T3.Chip}" Content="Views" GroupName="selectionMode"
+                                             Checked="selection_mode_changed"/>
                             </StackPanel>
 
                             <!-- View Type Filter (for Views) - Hidden by default -->
@@ -1957,7 +1957,7 @@
                                                         <Grid>
                                                             <TextBlock x:Name="row_is_selected_text" Text="{Binding IsSelected}" Visibility="Collapsed"/>
                                                             <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
-                                                                      Style="{StaticResource T3.CheckBox}"
+                                                                      Style="{StaticResource T3.CheckBox.Cell}"
                                                                       HorizontalAlignment="Center"/>
                                                         </Grid>
                                                     </DataTemplate>
@@ -2083,7 +2083,7 @@
                                                    FontSize="11" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center" Margin="12,0,0,0"/>
                                         <TextBlock x:Name="pdf_expand_arrow" Grid.Column="2"
-                                                   Text="▾" FontSize="13" Foreground="{StaticResource T3.Ink}"
+                                                   Text="&#xE70D;" Style="{StaticResource T3.Icon}" Foreground="{StaticResource T3.Ink}"
                                                    VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
@@ -2170,7 +2170,7 @@
                                                    FontSize="11" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center" Margin="12,0,0,0"/>
                                         <TextBlock x:Name="dwg_expand_arrow" Grid.Column="2"
-                                                   Text="▾" FontSize="13" Foreground="{StaticResource T3.TextSecondary}"
+                                                   Text="&#xE70D;" Style="{StaticResource T3.Icon}" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
@@ -2235,7 +2235,7 @@
                                                    FontSize="11" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center" Margin="12,0,0,0"/>
                                         <TextBlock x:Name="dgn_expand_arrow" Grid.Column="2"
-                                                   Text="▾" FontSize="13" Foreground="{StaticResource T3.TextSecondary}"
+                                                   Text="&#xE70D;" Style="{StaticResource T3.Icon}" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
@@ -2268,7 +2268,7 @@
                                                    FontSize="11" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center" Margin="12,0,0,0"/>
                                         <TextBlock x:Name="dwf_expand_arrow" Grid.Column="2"
-                                                   Text="▾" FontSize="13" Foreground="{StaticResource T3.TextSecondary}"
+                                                   Text="&#xE70D;" Style="{StaticResource T3.Icon}" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
@@ -2302,7 +2302,7 @@
                                                    FontSize="11" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center" Margin="12,0,0,0"/>
                                         <TextBlock x:Name="nwc_expand_arrow" Grid.Column="2"
-                                                   Text="▾" FontSize="13" Foreground="{StaticResource T3.TextSecondary}"
+                                                   Text="&#xE70D;" Style="{StaticResource T3.Icon}" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
@@ -2335,7 +2335,7 @@
                                                    FontSize="11" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center" Margin="12,0,0,0"/>
                                         <TextBlock x:Name="ifc_expand_arrow" Grid.Column="2"
-                                                   Text="▾" FontSize="13" Foreground="{StaticResource T3.TextSecondary}"
+                                                   Text="&#xE70D;" Style="{StaticResource T3.Icon}" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
@@ -2381,7 +2381,7 @@
                                                    FontSize="11" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center" Margin="12,0,0,0"/>
                                         <TextBlock x:Name="img_expand_arrow" Grid.Column="2"
-                                                   Text="▾" FontSize="13" Foreground="{StaticResource T3.TextSecondary}"
+                                                   Text="&#xE70D;" Style="{StaticResource T3.Icon}" Foreground="{StaticResource T3.TextSecondary}"
                                                    VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>

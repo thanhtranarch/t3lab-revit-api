@@ -1780,17 +1780,17 @@
                             <!-- Sub-nav bar -->
                             <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,8">
-                                <StackPanel Orientation="Horizontal">
+                                    Padding="16,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <RadioButton x:Name="btn_sub_line_styles" Content="Line Styles"
                                                  IsChecked="True" GroupName="StyleSubNav"
-                                                 Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0"/>
+                                                 Style="{StaticResource T3.Chip}"/>
                                     <RadioButton x:Name="btn_sub_line_patterns" Content="Line Patterns"
                                                  GroupName="StyleSubNav"
-                                                 Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0"/>
+                                                 Style="{StaticResource T3.Chip}"/>
                                     <RadioButton x:Name="btn_sub_fill_patterns" Content="Fill Patterns"
                                                  GroupName="StyleSubNav"
-                                                 Style="{StaticResource T3.RadioButton}"/>
+                                                 Style="{StaticResource T3.Chip}"/>
                                 </StackPanel>
                             </Border>
 
@@ -1813,8 +1813,8 @@
                                         <!-- Filter bar -->
                                         <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
                                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                                Padding="16,8">
-                                            <Grid>
+                                                Padding="16,0">
+                                            <Grid VerticalAlignment="Center">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="320"/>
                                                     <ColumnDefinition Width="*"/>
@@ -1937,8 +1937,8 @@
                                         <!-- Filter bar -->
                                         <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
                                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                                Padding="16,8">
-                                            <Grid>
+                                                Padding="16,0">
+                                            <Grid VerticalAlignment="Center">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="320"/>
                                                     <ColumnDefinition Width="*"/>
@@ -2052,8 +2052,8 @@
                                         <!-- Filter bar -->
                                         <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
                                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                                Padding="16,8">
-                                            <Grid>
+                                                Padding="16,0">
+                                            <Grid VerticalAlignment="Center">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="320"/>
                                                     <ColumnDefinition Width="160"/>

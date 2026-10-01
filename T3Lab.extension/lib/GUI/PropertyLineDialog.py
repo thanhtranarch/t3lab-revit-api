@@ -1972,24 +1972,16 @@ class PropertyLineDialog(T3WPFWindow):
     def _set_status(self, msg, error=False, success=False, busy=False):
         self.txt_status.Text = msg
         if error:
-            color = Color.FromRgb(255, 107, 107)
-            dot_color = Color.FromRgb(255, 107, 107)
-            label = "Error"
+            text_key, dot_key, label = "T3.Danger.Text", "T3.Danger.Accent", "Error"
         elif success:
-            color = Color.FromRgb(78, 201, 176)
-            dot_color = Color.FromRgb(78, 201, 176)
-            label = "Done"
+            text_key, dot_key, label = "T3.Success.Text", "T3.Success.Accent", "Done"
         elif busy:
-            color = Color.FromRgb(255, 197, 61)
-            dot_color = Color.FromRgb(255, 197, 61)
-            label = "Working..."
+            text_key, dot_key, label = "T3.Progress.Fill", "T3.Progress.Fill", "Working..."
         else:
-            color = Color.FromRgb(136, 136, 136)
-            dot_color = Color.FromRgb(136, 136, 136)
-            label = "Idle"
+            text_key, dot_key, label = "T3.TextMuted", "T3.TextMuted", "Idle"
 
-        self.txt_status.Foreground = SolidColorBrush(color)
-        self.dot_status.Fill = SolidColorBrush(dot_color)
+        self.txt_status.Foreground = self.FindResource(text_key)
+        self.dot_status.Fill = self.FindResource(dot_key)
         self.txt_status_label.Text = label
 
 

@@ -386,17 +386,17 @@ class ManaSelectWindow(T3WPFWindow):
     # MODE SWITCHING
     # =========================================================================
     def _on_nav_toggle_clicked(self, sender, e):
-        mapping = (
-            (self.nav_toggle_explore, MODE_EXPLORE),
-            (self.nav_toggle_quick_select, MODE_QUICK),
-            (self.nav_toggle_select_similar, MODE_SIMILAR),
-            (self.nav_toggle_select_sheets, MODE_SHEETS),
-            (self.nav_toggle_warnings, MODE_WARNINGS),
-        )
-        for toggle, mode in mapping:
-            if sender is toggle:
-                self._apply_mode(mode)
-                return
+        # PythonNet event senders may wrap the same CLR control differently.
+        mode = {
+            "nav_toggle_explore": MODE_EXPLORE,
+            "nav_toggle_quick_select": MODE_QUICK,
+            "nav_toggle_select_similar": MODE_SIMILAR,
+            "nav_toggle_select_sheets": MODE_SHEETS,
+            "nav_toggle_warnings": MODE_WARNINGS,
+        }.get(getattr(sender, "Name", None))
+        if mode is not None:
+            self._apply_mode(mode)
+            return
         # Bấm lại tile đang bật thì ToggleButton tự bỏ tick — ghim lại.
         self._apply_mode(self._mode)
 

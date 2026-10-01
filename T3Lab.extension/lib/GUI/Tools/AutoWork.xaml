@@ -1772,11 +1772,11 @@
                                     <!-- Scope Selector -->
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
                                         <TextBlock Text="SCOPE:" Style="{StaticResource T3.Label}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <RadioButton x:Name="rb_scope_active" Content="Active View" Style="{StaticResource T3.RadioButton}"
-                                                     GroupName="AuditScope" IsChecked="True" Margin="0,0,12,0"/>
-                                        <RadioButton x:Name="rb_scope_sheets" Content="Placed Views" Style="{StaticResource T3.RadioButton}"
-                                                     GroupName="AuditScope" Margin="0,0,12,0"/>
-                                        <RadioButton x:Name="rb_scope_project" Content="Entire Project" Style="{StaticResource T3.RadioButton}"
+                                        <RadioButton x:Name="rb_scope_active" Content="Active View" Style="{StaticResource T3.Chip}"
+                                                     GroupName="AuditScope" IsChecked="True"/>
+                                        <RadioButton x:Name="rb_scope_sheets" Content="Placed Views" Style="{StaticResource T3.Chip}"
+                                                     GroupName="AuditScope"/>
+                                        <RadioButton x:Name="rb_scope_project" Content="Entire Project" Style="{StaticResource T3.Chip}"
                                                      GroupName="AuditScope"/>
                                     </StackPanel>
 

@@ -143,11 +143,8 @@ class FeedbackWindow(T3WPFWindow):
 
     def _set_status(self, text, error=False):
         self.status_text.Text = text
-        from System.Windows.Media import SolidColorBrush, Color
-        if error:
-            self.status_text.Foreground = SolidColorBrush(Color.FromRgb(231, 76, 60))
-        else:
-            self.status_text.Foreground = SolidColorBrush(Color.FromRgb(127, 140, 141))
+        self.status_text.Foreground = self.FindResource(
+            "T3.Danger.Text" if error else "T3.TextMuted")
 
     def send_feedback_clicked(self, sender, e):
         message = (self.message_text.Text or "").strip()

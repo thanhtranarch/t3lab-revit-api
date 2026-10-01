@@ -1719,11 +1719,11 @@
             <!-- ══════════════════ ROW 1: FILTER TOOLBAR ══════════════════ -->
             <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                    Padding="16,8">
+                    Padding="16,0">
                 <TextBox x:Name="textbox_filter"
                          Style="{StaticResource T3.Search}"
                          Tag="Filter items..."
-                         TextChanged="text_filter_updated"/>
+                         TextChanged="text_filter_updated" VerticalAlignment="Center"/>
             </Border>
 
             <!-- ══════════════════ ROW 2: LIST CONTENT AREA ══════════════════ -->
@@ -1771,8 +1771,8 @@
             <!-- ══════════════════ ROW 3: ACTION BUTTONS ══════════════════ -->
             <Border Grid.Row="3" Background="{StaticResource T3.SurfaceSunken}"
                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                    Padding="16,8">
-                <Grid>
+                    Padding="16,0">
+                <Grid VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>

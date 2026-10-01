@@ -24,6 +24,9 @@ from System.Windows.Data import Binding, BindingMode, UpdateSourceTrigger
 
 from pyrevit import forms
 from GUI.WPF_Base import T3WPFWindow, to_items_source
+from Intelligence.family_schema import (
+    build_system_prompt, generate_family_schema, validate_ai_schema,
+)
 import pyrevit.script as _pyrevit_script
 
 logger = _pyrevit_script.get_logger()
@@ -523,6 +526,10 @@ class FamilyCreatorDialog(T3WPFWindow):
         self._cancel_requested = False
         self._pause_requested  = False
         self._prev_json_backup = None
+        self._ai_generating = False
+        self._ai_request_id = 0
+        self._ai_closed = False
+        self._ai_control_states = []
 
         self._init_cad_panel()
         self._init_json_panel()
@@ -553,6 +560,13 @@ class FamilyCreatorDialog(T3WPFWindow):
     def close_button_clicked(self, sender, e):
         self.Close()
 
+    def ai_window_closed(self, sender, e):
+        """Discard pending responses when this window closes, including Alt+F4."""
+        self._ai_closed = True
+        self._ai_request_id += 1
+        self._ai_generating = False
+        self._ai_control_states = []
+
     # ── Mode switching ───────────────────────────────────────────────────────
 
     def nav_cad_clicked(self, sender, e):
@@ -580,6 +594,13 @@ class FamilyCreatorDialog(T3WPFWindow):
                 mode_cad.IsChecked = (mode == 'cad')
             if mode_json:
                 mode_json.IsChecked = (mode == 'json')
+            # The active workflow has one primary action and one Enter default.
+            self.btn_export.Style = self.FindResource(
+                'T3.Button.Primary' if mode == 'cad' else 'T3.Button.Secondary')
+            self.create_btn.Style = self.FindResource(
+                'T3.Button.Primary' if mode == 'json' else 'T3.Button.Secondary')
+            self.btn_export.IsDefault = (mode == 'cad')
+            self.create_btn.IsDefault = (mode == 'json')
         except Exception as ex:
             print("Error in _show_panel: {}".format(ex))
             try:                     # ScriptIO has no write() under CPython
@@ -2199,8 +2220,7 @@ class FamilyCreatorDialog(T3WPFWindow):
         return os.path.join(_PROMPTS_DIR, slug + '.md')
 
     def copy_prompt_clicked(self, sender, e):
-        # Each prompts/<slug>.md is a fully self-contained system prompt for the
-        # family type the user picked - just read and copy it directly.
+        # External models receive the same authoritative contract as AI Mode.
         cat = None
         try:
             cat = self.json_category_combo.SelectedItem
@@ -2208,12 +2228,18 @@ class FamilyCreatorDialog(T3WPFWindow):
             cat = None
 
         ppath = self._overlay_path(cat)
-        if not ppath or not os.path.isfile(ppath):
-            forms.alert("No prompt file found for '{}'.".format(cat))
+        if not cat:
+            forms.alert("Select a family category first.", title="Family Category")
             return
         try:
-            with codecs.open(ppath, 'r', 'utf-8') as f:
-                text = f.read()
+            overlay = ""
+            if ppath and os.path.isfile(ppath):
+                with codecs.open(ppath, 'r', 'utf-8') as f:
+                    overlay = f.read()
+            text = build_system_prompt(str(cat), overlay)
+            description = (self.ai_prompt_tb.Text or "").strip()
+            if description:
+                text += "\nFamily description:\n" + description
         except Exception as ex:
             forms.alert("Could not read prompt: {}".format(ex))
             return
@@ -2224,121 +2250,114 @@ class FamilyCreatorDialog(T3WPFWindow):
         except Exception as ex:
             forms.alert("Could not copy prompt: {}".format(ex))
 
-    def ai_generate_clicked(self, sender, e):
-        """Generate family JSON schema directly from user description via AI Mode."""
-        prompt_box = getattr(self, 'ai_prompt_tb', None) or self.FindName('ai_prompt_tb')
-        if not prompt_box:
-            return
-        user_prompt = (prompt_box.Text or "").strip()
-        if not user_prompt:
-            forms.alert("Please enter a description of the family to generate.", title="AI Prompt Required")
-            return
+    def _set_ai_generation_busy(self, busy):
+        """Restore each control's prior enabled state after an AI request."""
+        self._ai_generating = busy
+        if busy:
+            self._ai_control_states = []
+            for name in ('btn_ai_generate', 'ai_prompt_tb', 'json_category_combo',
+                         'json_tb', 'create_btn', 'btn_ai_undo', 'copy_prompt_btn',
+                         'mode_cad', 'mode_json'):
+                control = getattr(self, name, None)
+                if control is not None:
+                    self._ai_control_states.append((control, control.IsEnabled))
+                    control.IsEnabled = False
+        else:
+            states, self._ai_control_states = self._ai_control_states, []
+            for control, enabled in states:
+                try:
+                    control.IsEnabled = enabled
+                except Exception as ex:
+                    logger.warning("Could not restore an AI control: {}".format(ex))
 
+    def ai_generate_clicked(self, sender, e):
+        """Generate a checked definition without replacing a draft on failure."""
+        if self._ai_generating or self._ai_closed:
+            return
+        user_prompt = (self.ai_prompt_tb.Text or "").strip()
+        if not user_prompt:
+            forms.alert("Describe the family, including dimensions in mm.",
+                        title="AI Prompt Required")
+            return
+        category = self.json_category_combo.SelectedItem
+        if category is None:
+            forms.alert("Select a family category first.", title="Family Category")
+            return
+        category = str(category)
         if not self.ai_require():
             return
 
-        cat = None
-        try:
-            combo = getattr(self, 'json_category_combo', None) or self.FindName('json_category_combo')
-            if combo:
-                cat = combo.SelectedItem
-        except Exception:
-            cat = None
-
-        ppath = self._overlay_path(cat)
-        cat_instructions = ""
+        # Capture all inputs on the UI thread. The worker never reads controls.
+        bridge = self.ai_bridge
+        previous_json = self.json_tb.Text or ""
+        instructions = ""
+        ppath = self._overlay_path(category)
         if ppath and os.path.isfile(ppath):
             try:
-                with codecs.open(ppath, 'r', 'utf-8') as f:
-                    cat_instructions = f.read()
-            except Exception:
-                pass
+                with codecs.open(ppath, 'r', 'utf-8') as stream:
+                    instructions = stream.read()
+            except Exception as ex:
+                forms.alert("Could not read category guidelines:\n{}".format(ex),
+                            title="AI Generation")
+                return
 
-        system_prompt = (
-            "You are T3Lab BIM AI, an expert parametric family creator for Autodesk Revit.\n"
-            "Generate a complete, valid JSON schema defining the 3D geometry, forms, parameters and dimensions.\n"
-            "The JSON MUST follow the exact format for Revit Family generation with forms (Extrusion, Blend, Revolution, Sweep).\n"
-            "Strictly output valid JSON only without conversational preamble or markdown outside code fences.\n"
-        )
-        if cat:
-            system_prompt += "\nTarget Family Category: " + str(cat) + "\n"
-        if cat_instructions:
-            system_prompt += "\nCategory Guidelines & Schema Reference:\n" + cat_instructions
-
-        lbl = getattr(self, 'lbl_status', None) or self.FindName('lbl_status')
-        if lbl:
-            lbl.Text = "AI is generating the family definition..."
-
-        btn = getattr(self, 'btn_ai_generate', None) or self.FindName('btn_ai_generate')
-        self.ai_busy(btn, True)
+        self._ai_request_id += 1
+        request_id = self._ai_request_id
 
         def _bg_task():
-            b = self.ai_bridge
-            if not b:
-                return None
-            return b.ask_json(user_prompt, system_prompt=system_prompt, max_tokens=3000)
+            return generate_family_schema(bridge, user_prompt, category, instructions)
 
-        def _on_done(res):
-            b_el = getattr(self, 'btn_ai_generate', None) or self.FindName('btn_ai_generate')
-            self.ai_busy(b_el, False)
+        def _on_done(schema):
+            if self._ai_closed or request_id != self._ai_request_id:
+                return
+            try:
+                errors = validate_ai_schema(schema, category)
+                if errors:
+                    raise ValueError("\n".join(errors))
+                if (self.json_tb.Text or "") != previous_json:
+                    self.lbl_status.Text = "Draft changed during generation. It was preserved; generate again to replace it."
+                    return
+                formatted = json.dumps(schema, indent=2, ensure_ascii=False, allow_nan=False)
+                self._prev_json_backup = previous_json
+                self.json_tb.Text = formatted
+                self.btn_ai_undo.Visibility = WinVis.Visible
+                self.lbl_status.Text = (
+                    "JSON checked: {} part(s), {}. Review dimensions, then Create Family. "
+                    "Revit will check the geometry during creation."
+                ).format(len(schema['geometry']), category)
+            except Exception as ex:
+                self.lbl_status.Text = "AI JSON could not be used. Your previous draft is unchanged."
+                forms.alert("AI JSON validation failed:\n{}".format(ex), title="AI Generation")
+            finally:
+                self._set_ai_generation_busy(False)
 
-            l_el = getattr(self, 'lbl_status', None) or self.FindName('lbl_status')
-            j_tb = getattr(self, 'json_tb', None) or self.FindName('json_tb')
-            u_btn = getattr(self, 'btn_ai_undo', None) or self.FindName('btn_ai_undo')
+        def _on_err(error):
+            if self._ai_closed or request_id != self._ai_request_id:
+                return
+            self._set_ai_generation_busy(False)
+            self.lbl_status.Text = "AI generation failed. Your previous draft is unchanged."
+            forms.alert("AI generation failed:\n{}".format(error), title="AI Generation")
 
-            if res and isinstance(res, (dict, list)):
-                try:
-                    # Basic schema pre-validation: check for geometry/forms or dict keys
-                    geom_count = 0
-                    if isinstance(res, dict):
-                        for k in ('geometry', 'shapes', 'primitives', 'elements', 'forms'):
-                            if k in res and isinstance(res[k], list):
-                                geom_count = len(res[k])
-                                break
-                    elif isinstance(res, list):
-                        geom_count = len(res)
-
-                    pretty_json = json.dumps(res, indent=2, ensure_ascii=False)
-                    if j_tb:
-                        old_text = (j_tb.Text or "").strip()
-                        if old_text and old_text != "Paste your JSON schema here...":
-                            self._prev_json_backup = old_text
-                            if u_btn:
-                                u_btn.Visibility = Visibility.Visible
-                        j_tb.Text = pretty_json
-
-                    if l_el:
-                        count_msg = " ({} part(s))".format(geom_count) if geom_count > 0 else ""
-                        l_el.Text = "AI generated the JSON{} - review it, then click 'Create Family'.".format(count_msg)
-                except Exception as ex:
-                    if l_el:
-                        l_el.Text = "Error formatting JSON: " + str(ex)
-            else:
-                if l_el:
-                    l_el.Text = "AI generation returned invalid format. Try again."
-                forms.alert("AI model did not return a valid JSON structure. Please retry or refine your prompt.", title="AI Generation")
-
-        def _on_err(err):
-            b_el = getattr(self, 'btn_ai_generate', None) or self.FindName('btn_ai_generate')
-            self.ai_busy(b_el, False)
-            l_el = getattr(self, 'lbl_status', None) or self.FindName('lbl_status')
-            if l_el:
-                l_el.Text = "AI Error: " + str(err)
-            forms.alert("AI Generation Error:\n" + str(err), title="AI Error")
-
-        self.run_ai_async(_bg_task, _on_done, _on_err)
+        try:
+            self._set_ai_generation_busy(True)
+            self.lbl_status.Text = "Generating and checking family JSON. Your current draft is preserved."
+            self.run_ai_async(_bg_task, _on_done, _on_err)
+        except Exception as ex:
+            _on_err(ex)
 
     def ai_undo_clicked(self, sender, e):
         """Revert to previous JSON content before AI generation."""
+        if self._ai_generating:
+            return
         try:
-            if self._prev_json_backup:
+            if self._prev_json_backup is not None:
                 j_tb = getattr(self, 'json_tb', None) or self.FindName('json_tb')
                 if j_tb:
                     j_tb.Text = self._prev_json_backup
                 self._prev_json_backup = None
                 u_btn = getattr(self, 'btn_ai_undo', None) or self.FindName('btn_ai_undo')
                 if u_btn:
-                    u_btn.Visibility = Visibility.Collapsed
+                    u_btn.Visibility = WinVis.Collapsed
                 l_el = getattr(self, 'lbl_status', None) or self.FindName('lbl_status')
                 if l_el:
                     l_el.Text = "Reverted to previous JSON content."
@@ -2349,6 +2368,8 @@ class FamilyCreatorDialog(T3WPFWindow):
         self.Close()
 
     def create_clicked(self, sender, e):
+        if self._ai_generating:
+            return
         raw = self.json_tb.Text
         if not raw or raw.strip() in ("", "Paste your JSON schema here..."):
             forms.alert("Please paste a valid JSON schema first.")
@@ -2357,6 +2378,14 @@ class FamilyCreatorDialog(T3WPFWindow):
             schema = json.loads(raw)
         except ValueError as ex:
             forms.alert("Invalid JSON:\n\n{}".format(ex), title="JSON Error")
+            return
+        if (not isinstance(schema, dict)
+                or not isinstance(schema.get("geometry"), list)
+                or not schema["geometry"]
+                or any(not isinstance(part, dict) for part in schema["geometry"])):
+            forms.alert("Use a JSON object with a nonempty 'geometry' array of part objects.\n"
+                        "Generate a new definition or fix the JSON before creating a family.",
+                        title="JSON Error")
             return
         self.lbl_status.Text = "Creating family..."
         if self._doc.IsFamilyDocument:
@@ -3054,4 +3083,3 @@ class FamilyCreatorDialog(T3WPFWindow):
 
 def show_family_creator(revit_doc, revit_app, initial_mode='cad'):
     FamilyCreatorDialog(revit_doc, revit_app, initial_mode).ShowDialog()
-
