@@ -1718,11 +1718,11 @@
             <!-- ══════════════════ ROW 1: FILTER TOOLBAR ══════════════════ -->
             <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                    Padding="16,8">
+                    Padding="16,0">
                 <TextBox x:Name="SearchBox"
                          Style="{StaticResource T3.Search}"
                          Tag="Search tabs..."
-                         TextChanged="SearchBox_TextChanged"/>
+                         TextChanged="SearchBox_TextChanged" VerticalAlignment="Center"/>
             </Border>
 
             <!-- ══════════════════ ROW 2: LIST OF TABS ══════════════════ -->

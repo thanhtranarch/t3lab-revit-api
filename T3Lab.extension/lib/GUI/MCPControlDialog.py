@@ -50,31 +50,20 @@ except Exception:
 logger = script.get_logger()
 
 
-def _brush(hex_color):
-    """Safely convert a hex color string to a WPF SolidColorBrush."""
-    if not hex_color:
-        return None
-    try:
-        from System.Windows.Media import BrushConverter
-        return BrushConverter().ConvertFromString(hex_color)
-    except Exception:
-        pass
-    try:
-        from System.Windows.Media import SolidColorBrush, Color
-        hex_c = hex_color.lstrip('#')
-        if len(hex_c) == 6:
-            r = int(hex_c[0:2], 16)
-            g = int(hex_c[2:4], 16)
-            b = int(hex_c[4:6], 16)
-            return SolidColorBrush(Color.FromRgb(r, g, b))
-        elif len(hex_c) == 8:
-            a = int(hex_c[0:2], 16)
-            r = int(hex_c[2:4], 16)
-            g = int(hex_c[4:6], 16)
-            b = int(hex_c[6:8], 16)
-            return SolidColorBrush(Color.FromArgb(a, r, g, b))
-    except Exception:
-        pass
+def _brush(key, target=None, resources=None):
+    """Resolve a shared T3 semantic brush for standalone or embedded widgets."""
+    if target is not None:
+        try:
+            brush = target.TryFindResource(key)
+            if brush is not None:
+                return brush
+        except Exception:
+            pass
+    if resources is not None:
+        try:
+            return resources[key]
+        except Exception:
+            pass
     return None
 
 
@@ -112,32 +101,32 @@ def apply_server_status(status, indicator, label, btn, resources=None):
     if not status:
         status = {}
     if status.get('error'):
-        color, text = '#D23B3B', 'Error: {}'.format(status['error'])
+        color, text = 'T3.Danger.Accent', 'Error: {}'.format(status['error'])
         btn_content, btn_style_key = 'Start Server', 'T3.Button.Primary'
         enabled = True
     elif status.get('running') and status.get('foreign'):
         # Live and serving, but owned by another pyRevit engine in this Revit
         # session — its Python object is not callable from here, so Stop would
         # only throw. Say who owns it and what actually releases it.
-        color       = '#157038'
+        color       = 'T3.Success.Accent'
         text        = ('Connected — port {} (started by another pyRevit engine; '
                        'restart Revit to stop it)').format(status.get('port', 48884))
         btn_content = 'Stop Server'
         btn_style_key = 'T3.Button.Danger'
         enabled     = False
     elif status.get('running'):
-        color       = '#157038'
+        color       = 'T3.Success.Accent'
         text        = 'Connected — port {}'.format(status.get('port', 48884))
         btn_content = 'Stop Server'
         btn_style_key = 'T3.Button.Danger'
         enabled     = True
     else:
-        color, text = '#71717A', 'Disconnected'
+        color, text = 'T3.TextMuted', 'Disconnected'
         btn_content, btn_style_key = 'Start Server', 'T3.Button.Primary'
         enabled = True
 
     if indicator:
-        b = _brush(color)
+        b = _brush(color, indicator, resources)
         if b is not None:
             indicator.Background = b
     if label:
@@ -157,7 +146,7 @@ def apply_watcher_status(status, indicator, label, btn, resources=None):
     if not HAS_SERVICE or status.get('error'):
         err = status.get('error', 'Service unavailable') if status else 'Service unavailable'
         if indicator:
-            b = _brush('#9A9AA2')
+            b = _brush('T3.TextDisabled', indicator, resources)
             if b is not None:
                 indicator.Background = b
         if label:
@@ -167,16 +156,16 @@ def apply_watcher_status(status, indicator, label, btn, resources=None):
         return
 
     if status.get('running'):
-        color = '#157038'
+        color = 'T3.Success.Accent'
         text  = 'File watcher active — monitoring task.json'
         btn_content, btn_style_key = 'Stop Watcher', 'T3.Button.Danger'
     else:
-        color = '#71717A'
+        color = 'T3.TextMuted'
         text  = 'File watcher stopped'
         btn_content, btn_style_key = 'Start Watcher', 'T3.Button.Secondary'
 
     if indicator:
-        b = _brush(color)
+        b = _brush(color, indicator, resources)
         if b is not None:
             indicator.Background = b
     if label:
@@ -328,7 +317,7 @@ class MCPControlWindow(T3WPFWindow):
     def _refresh_server(self):
         if not HAS_SERVICE:
             if self.status_indicator:
-                b = _brush('#94A3B8')
+                b = _brush('T3.TextDisabled', resources=self.Resources)
                 if b: self.status_indicator.Background = b
             if self.status_label:
                 self.status_label.Text = 'Service unavailable: ' + _SVC_ERR_MSG
@@ -350,7 +339,7 @@ class MCPControlWindow(T3WPFWindow):
             return
         if not HAS_SERVICE:
             if self._doc_indicator:
-                b = _brush('#94A3B8')
+                b = _brush('T3.TextDisabled', resources=self.Resources)
                 if b: self._doc_indicator.Background = b
             self._doc_label.Text = 'Service unavailable'
             return
@@ -358,7 +347,7 @@ class MCPControlWindow(T3WPFWindow):
         docs, err = MCPService.list_open_documents()
         if err:
             if self._doc_indicator:
-                b = _brush('#EF4444')
+                b = _brush('T3.Danger.Accent', resources=self.Resources)
                 if b: self._doc_indicator.Background = b
             self._doc_label.Text = 'Error: {}'.format(err)
             return
@@ -366,17 +355,17 @@ class MCPControlWindow(T3WPFWindow):
         active_title = next((d['title'] for d in (docs or []) if d.get('is_active')), None)
         if active_title:
             if self._doc_indicator:
-                b = _brush('#10B981')
+                b = _brush('T3.Success.Accent', resources=self.Resources)
                 if b: self._doc_indicator.Background = b
             self._doc_label.Text = 'Active: {}'.format(active_title)
         elif docs:
             if self._doc_indicator:
-                b = _brush('#F59E0B')
+                b = _brush('T3.Warning.Accent', resources=self.Resources)
                 if b: self._doc_indicator.Background = b
             self._doc_label.Text = '{} open — none active (click a tab in Revit)'.format(len(docs))
         else:
             if self._doc_indicator:
-                b = _brush('#94A3B8')
+                b = _brush('T3.TextDisabled', resources=self.Resources)
                 if b: self._doc_indicator.Background = b
             self._doc_label.Text = 'No document open'
 
@@ -446,7 +435,7 @@ class MCPControlWindow(T3WPFWindow):
         if not HAS_SERVICE:
             for widgets in self._client_widgets.values():
                 if widgets.get('indicator'):
-                    b = _brush('#94A3B8')
+                    b = _brush('T3.TextDisabled', resources=self.Resources)
                     if b: widgets['indicator'].Background = b
                 if widgets.get('label'):
                     widgets['label'].Text = 'Service unavailable'
@@ -461,20 +450,20 @@ class MCPControlWindow(T3WPFWindow):
                 status = {'error': str(ex)}
 
             if status.get('error'):
-                color = '#EF4444'
+                color = 'T3.Danger.Accent'
                 text  = 'Error: {}'.format(status['error'])
             elif not status.get('file_exists'):
-                color = '#F59E0B'
+                color = 'T3.Warning.Accent'
                 text  = 'Config not found — will be created on Configure'
             elif status.get('configured'):
-                color = '#10B981'
+                color = 'T3.Success.Accent'
                 text  = 'Configured — t3lab-revit entry present'
             else:
-                color = '#EF4444'
+                color = 'T3.Danger.Accent'
                 text  = 'Not configured — click Configure to add entry'
 
             if widgets.get('indicator'):
-                b = _brush(color)
+                b = _brush(color, resources=self.Resources)
                 if b: widgets['indicator'].Background = b
             if widgets.get('label'):
                 widgets['label'].Text = text
@@ -567,7 +556,7 @@ class MCPControlWindow(T3WPFWindow):
         if self._teaching_toggle is not None:
             self._teaching_toggle.IsChecked = enabled
         if self._teaching_indicator is not None:
-            b = _brush('#10B981' if enabled else '#94A3B8')
+            b = _brush('T3.Success.Accent' if enabled else 'T3.TextDisabled', resources=self.Resources)
             if b: self._teaching_indicator.Background = b
         recorded = status.get('sessions_recorded', 0)
         if status.get('error'):

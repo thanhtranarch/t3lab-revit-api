@@ -3,6 +3,7 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="FamiGen"
+        Closed="ai_window_closed"
         Width="1180" Height="800"
         MinWidth="960" MinHeight="640"
         WindowStartupLocation="CenterScreen"
@@ -1762,7 +1763,7 @@
                     <ToggleButton x:Name="mode_json" Grid.Row="1"
                                   Style="{StaticResource T3.Rail.Tile}"
                                   Margin="0,0,0,8"
-                                  ToolTip="From JSON"
+                                  ToolTip="AI / JSON — create a family from a description or JSON"
                                   Click="nav_json_clicked">
                         <Path Data="M16 18l6-6-6-6 M8 6l-6 6 6 6"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
@@ -1983,71 +1984,92 @@
                             <RowDefinition Height="Auto"/>  <!-- Action bar -->
                         </Grid.RowDefinitions>
 
-                        <!-- AI Prompt Bar & Tip Callout -->
+                        <!-- Describe the family and generate a reviewable definition. -->
                         <Border Grid.Row="0" Margin="16,12,16,0"
                                 Background="{StaticResource T3.SurfaceSunken}"
                                 BorderBrush="{StaticResource T3.Border}"
-                                BorderThickness="1" CornerRadius="4" Padding="16,12">
+                                BorderThickness="1" CornerRadius="{StaticResource T3.R.Control}" Padding="16,12">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                                    <TextBlock Text="&#xE946;" Style="{StaticResource T3.Callout.Icon}"/>
-                                    <TextBlock Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center">
-                                        <Run Text="AI Mode: " FontWeight="Bold" Foreground="{StaticResource T3.Ink}"/>
-                                        <Run Text="Describe the family below and click 'AI Generate' to create JSON directly, or choose a category and 'Copy Prompt' for external LLMs."/>
-                                    </TextBlock>
-                                </StackPanel>
-                                <Grid Grid.Row="1">
+                                <TextBlock Grid.Row="0" Text="Describe → Generate JSON → Review → Create Family"
+                                           Style="{StaticResource T3.Caption}" Margin="0,0,0,12" TextWrapping="Wrap"/>
+                                <Grid Grid.Row="1" Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="8"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="ai_prompt_tb" Grid.Column="0" Height="28"
-                                             Style="{StaticResource T3.TextBox}"
-                                             ToolTip="Describe family geometry &amp; dimensions (e.g. Dining table 2400x1200x750mm with 6 legs, rounded corners)"/>
-                                    <Button x:Name="btn_ai_generate" Grid.Column="2"
-                                            Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="16,0"
-                                            Click="ai_generate_clicked"
-                                            ToolTip="Write the family JSON from the description on the left">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                            <TextBlock Text="AI Generate" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Button>
-                                    <Button x:Name="btn_ai_undo" Grid.Column="4" Content="Undo AI"
-                                            Style="{StaticResource T3.Button.Ghost}" Height="28" Padding="12,0"
-                                            Click="ai_undo_clicked" Visibility="Collapsed"
-                                            ToolTip="Restore previous JSON content before AI generation"/>
+                                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                        <TextBlock Text="Family category" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="json_category_combo" Width="180" HorizontalAlignment="Left"
+                                                  Style="{StaticResource T3.ComboBox}"
+                                                  ToolTip="Choose the category before generating the family definition"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="Use mm for dimensions. Include shapes and any existing template parameters to set."
+                                               Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
+                                </Grid>
+                                <Grid Grid.Row="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <TextBlock Text="Family description" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="ai_prompt_tb" Height="84" AcceptsReturn="True" TextWrapping="Wrap"
+                                                 VerticalScrollBarVisibility="Auto" Style="{StaticResource T3.TextBox}"
+                                                 ToolTip="Describe geometry, dimensions in mm, and parameters to generate"/>
+                                        <TextBlock Text="Example: Dining table 2400 × 1200 × 750 mm, tabletop 40 mm, four round legs with radius 30 mm."
+                                                   Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <Button x:Name="btn_ai_generate" Style="{StaticResource T3.Button.Secondary}"
+                                                Padding="16,0" Click="ai_generate_clicked" Margin="0,0,0,8"
+                                                ToolTip="Generate a JSON definition to review before creating the family">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="AI Generate" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="btn_ai_undo" Content="Undo AI"
+                                                Style="{StaticResource T3.Button.Ghost}" Padding="12,0"
+                                                Click="ai_undo_clicked" Visibility="Collapsed"
+                                                ToolTip="Restore the JSON definition from before the last generation"/>
+                                    </StackPanel>
                                 </Grid>
                             </Grid>
                         </Border>
 
                         <!-- JSON Editor -->
-                        <TextBox x:Name="json_tb" Grid.Row="1" Margin="16,12,16,12"
+                        <Grid Grid.Row="1" Margin="16,12,16,12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Review family JSON" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                            <TextBox x:Name="json_tb" Grid.Row="1"
                                  AcceptsReturn="True" TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                                  FontFamily="Consolas" FontSize="12.5"
                                  Style="{StaticResource T3.TextBox}"
                                  Text="Paste your JSON schema here..."/>
+                        </Grid>
 
                         <!-- JSON Action Bar -->
                         <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                 Padding="16,8">
                             <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
                                 <TextBlock x:Name="lbl_status" Text="Ready"
                                            Style="{StaticResource T3.Body.Secondary}"
-                                           VerticalAlignment="Center" HorizontalAlignment="Left"/>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                    <TextBlock Text="Family type:" Style="{StaticResource T3.Label}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <ComboBox x:Name="json_category_combo" Width="180" Height="28"
-                                              Style="{StaticResource T3.ComboBox}" Margin="0,0,12,0"/>
+                                           VerticalAlignment="Center" HorizontalAlignment="Left" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                     <Button x:Name="copy_prompt_btn" Content="Copy Prompt"
                                             Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0"
                                             Click="copy_prompt_clicked" Margin="0,0,8,0"/>

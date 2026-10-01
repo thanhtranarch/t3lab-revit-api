@@ -1,5 +1,9 @@
 # BASELINE — kiểm kê xác minh ngày 2026-09-13
 
+## Current source review — 2026-10-01
+
+65 tool XAML reviewed; repository inventory: 92 XAML including archive/reference surfaces. T3/static/sync/wiring checks pass, zero active stylesheet drift; runtime rendering and DPI remain NEEDS VERIFICATION. No UX score inferred. See [UI consistency review](REVIEW-2026-10-01-CONSISTENCY.md) for changes, inventory, evidence and remaining findings. Historical snapshots below are retained.
+
 > Snapshot này thay thế bảng bootstrap và kết luận UX 100/100 cũ.
 > Gate đạt chuẩn T3 không phải điểm UX hoặc chứng nhận logic đúng trong Revit.
 

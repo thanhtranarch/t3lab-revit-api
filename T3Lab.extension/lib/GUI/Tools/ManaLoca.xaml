@@ -1729,46 +1729,55 @@
                  always what Refresh reloads); Get Selection / Pick are one-shot loads. -->
             <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                    Padding="16,0">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="SOURCE" Style="{StaticResource T3.Label}"
-                               VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <RadioButton x:Name="rb_current_view" Content="Current View"
-                                 GroupName="SourceMode" IsChecked="True"
-                                 Style="{StaticResource T3.Chip}"
-                                 Checked="mode_changed"
-                                 ToolTip="Load every element visible in the active view"/>
-                    <RadioButton x:Name="rb_by_level" Content="By Level"
-                                 GroupName="SourceMode"
-                                 Style="{StaticResource T3.Chip}"
-                                 Checked="mode_changed"
-                                 ToolTip="Load every element on a chosen level"/>
-                    <ComboBox x:Name="cmb_level"
-                              DisplayMemberPath="Name"
-                              Visibility="Collapsed"
-                              Style="{StaticResource T3.ComboBox}"
-                              ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                              Width="180" Margin="4,0,0,0"
-                              VerticalAlignment="Center"
-                              SelectionChanged="level_selection_changed"
-                              ToolTip="Level to load elements from"/>
+                    Padding="0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="248"/>
+                        <ColumnDefinition Width="1"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="SOURCE" Style="{StaticResource T3.Label}"
+                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <RadioButton x:Name="rb_current_view" Content="Current View"
+                                     GroupName="SourceMode" IsChecked="True"
+                                     Style="{StaticResource T3.Chip}"
+                                     Checked="mode_changed"
+                                     ToolTip="Load every element visible in the active view"/>
+                        <RadioButton x:Name="rb_by_level" Content="By Level"
+                                     GroupName="SourceMode"
+                                     Style="{StaticResource T3.Chip}"
+                                     Checked="mode_changed"
+                                     ToolTip="Load every element on a chosen level"/>
+                    </StackPanel>
 
-                    <Border Width="1" Height="16" Margin="12,0"
+                    <Border Grid.Column="1" Height="16"
                             Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
 
-                    <Button x:Name="btn_refresh" Content="Refresh"
-                            Style="{StaticResource T3.Button.Secondary}"
-                            Margin="0,0,8,0" VerticalAlignment="Center"
-                            Click="refresh_clicked" ToolTip="Reload elements for the checked source"/>
-                    <Button x:Name="btn_get_sel" Content="Get Selection"
-                            Style="{StaticResource T3.Button.Secondary}"
-                            Margin="0,0,8,0" VerticalAlignment="Center"
-                            Click="get_selection_clicked" ToolTip="Load the elements currently selected in Revit"/>
-                    <Button x:Name="btn_pick" Content="Pick Elements"
-                            Style="{StaticResource T3.Button.Secondary}"
-                            VerticalAlignment="Center"
-                            Click="pick_elements_clicked" ToolTip="Pick elements in the Revit canvas (groups are expanded)"/>
-                </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0">
+                        <Button x:Name="btn_refresh" Content="Refresh"
+                                Style="{StaticResource T3.Button.Secondary}"
+                                Margin="0,0,8,0" VerticalAlignment="Center"
+                                Click="refresh_clicked" ToolTip="Reload elements for the checked source"/>
+                        <Button x:Name="btn_get_sel" Content="Get Selection"
+                                Style="{StaticResource T3.Button.Secondary}"
+                                Margin="0,0,8,0" VerticalAlignment="Center"
+                                Click="get_selection_clicked" ToolTip="Load the elements currently selected in Revit"/>
+                        <Button x:Name="btn_pick" Content="Pick Elements"
+                                Style="{StaticResource T3.Button.Secondary}"
+                                VerticalAlignment="Center"
+                                Click="pick_elements_clicked" ToolTip="Pick elements in the Revit canvas (groups are expanded)"/>
+                        <ComboBox x:Name="cmb_level"
+                                  DisplayMemberPath="Name"
+                                  Visibility="Collapsed"
+                                  Style="{StaticResource T3.ComboBox}"
+                                  ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
+                                  Width="180" Margin="12,0,0,0"
+                                  VerticalAlignment="Center"
+                                  SelectionChanged="level_selection_changed"
+                                  ToolTip="Level to load elements from"/>
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <!-- ══════════════════ ROW 2: CATEGORIES | ELEMENTS ══════════════════ -->

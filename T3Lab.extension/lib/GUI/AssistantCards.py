@@ -60,7 +60,7 @@ _TEXT = {
     'no_content':   (u"(markup không có nội dung chữ)",
                      u"(markup has no text content)"),
     'proposal':     (u"Đề xuất: [{}] {}",           u"Proposed: [{}] {}"),
-    'run':          (u"▶ Thực hiện",                u"▶ Run"),
+    'run':          (u"Thực hiện",                u"Run"),
     'run_tip':      (u"Chạy phương án qua AI agent",
                      u"Run this proposal through the AI agent"),
     'note':         (u"Ghi chú vào sheet",          u"Note on sheet"),
@@ -100,13 +100,8 @@ def _mini_button(label, tooltip, fg=(82, 82, 91)):
     import System.Windows.Input
     btn = Button()
     btn.Content = label
-    btn.FontSize = 10
-    btn.FontFamily = _font()
-    btn.Foreground = _brush(*fg)
-    btn.Background = _brush(244, 244, 246)
-    btn.BorderBrush = _brush(230, 230, 234)
-    btn.BorderThickness = Thickness(1)
-    btn.Padding = Thickness(8, 2, 8, 3)
+    # Resolve the shared style after insertion into the owner resource tree.
+    btn.SetResourceReference(Button.StyleProperty, "T3.Button.Secondary")
     btn.Margin = Thickness(0, 0, 4, 0)
     btn.Cursor = System.Windows.Input.Cursors.Hand
     btn.ToolTip = tooltip
@@ -130,22 +125,22 @@ def build_comment_report_card(report, on_run, on_note, on_skip, viet=False):
     import System.Windows
 
     card = Border()
-    card.Background = _brush(255, 255, 255)
-    card.BorderBrush = _brush(230, 230, 234)
+    card.SetResourceReference(Border.BackgroundProperty, "T3.Surface")
+    card.SetResourceReference(Border.BorderBrushProperty, "T3.Border")
     card.BorderThickness = Thickness(1)
-    card.CornerRadius = CornerRadius(8)
-    card.Padding = Thickness(14, 10, 14, 12)
-    card.Margin = Thickness(34, 0, 40, 10)
+    card.SetResourceReference(Border.CornerRadiusProperty, "T3.R.Control")
+    card.Padding = Thickness(12)
+    card.Margin = Thickness(32, 0, 40, 12)
 
     root = StackPanel()
 
     # ── header ──
     title = TextBlock()
     title.Text = _t('title', viet) + (report.get('pdf_name') or '')
-    title.FontSize = 12.5
+    title.SetResourceReference(TextBlock.FontSizeProperty, "T3.Size.Body")
     title.FontWeight = System.Windows.FontWeights.SemiBold
     title.FontFamily = _font()
-    title.Foreground = _brush(24, 24, 27)
+    title.SetResourceReference(TextBlock.ForegroundProperty, "T3.Ink")
     title.TextWrapping = TextWrapping.Wrap
     root.Children.Add(title)
 
@@ -154,31 +149,31 @@ def build_comment_report_card(report, on_run, on_note, on_skip, viet=False):
     if match:
         sub.Text = _t('sheet_match', viet).format(
             match.get('number', ''), match.get('name', ''))
-        sub.Foreground = _brush(16, 185, 129)
+        sub.SetResourceReference(TextBlock.ForegroundProperty, "T3.Success.Text")
     elif report.get('needs_switch'):
         sub.Text = _t('needs_switch', viet)
-        sub.Foreground = _brush(245, 158, 11)
+        sub.SetResourceReference(TextBlock.ForegroundProperty, "T3.Warning.Text")
     else:
         sub.Text = _t('no_match', viet)
-        sub.Foreground = _brush(239, 68, 68)
-    sub.FontSize = 10.5
+        sub.SetResourceReference(TextBlock.ForegroundProperty, "T3.Danger.Text")
+    sub.SetResourceReference(TextBlock.FontSizeProperty, "T3.Size.Caption")
     sub.FontFamily = _font()
     sub.TextWrapping = TextWrapping.Wrap
-    sub.Margin = Thickness(0, 2, 0, 0)
+    sub.Margin = Thickness(0, 4, 0, 0)
     root.Children.Add(sub)
 
     if report.get('partial_extraction'):
         warn = TextBlock()
         warn.Text = _t('partial', viet)
-        warn.FontSize = 9.5
+        warn.SetResourceReference(TextBlock.FontSizeProperty, "T3.Size.Caption")
         warn.FontFamily = _font()
-        warn.Foreground = _brush(161, 161, 170)
-        warn.Margin = Thickness(0, 2, 0, 0)
+        warn.SetResourceReference(TextBlock.ForegroundProperty, "T3.TextMuted")
+        warn.Margin = Thickness(0, 4, 0, 0)
         root.Children.Add(warn)
 
     sep = Border()
     sep.Height = 1
-    sep.Background = _brush(240, 240, 243)
+    sep.SetResourceReference(Border.BackgroundProperty, "T3.Border")
     sep.Margin = Thickness(0, 8, 0, 8)
     root.Children.Add(sep)
 
@@ -199,12 +194,12 @@ def _build_item_row(item, report, on_run, on_note, on_skip, viet=False):
 
     prop = item.get('proposal') or {}
     row = Border()
-    row.Background = _brush(250, 250, 251)
-    row.BorderBrush = _brush(236, 236, 239)
+    row.SetResourceReference(Border.BackgroundProperty, "T3.SurfaceSunken")
+    row.SetResourceReference(Border.BorderBrushProperty, "T3.Border")
     row.BorderThickness = Thickness(1)
     row.CornerRadius = CornerRadius(4)
-    row.Padding = Thickness(10, 7, 10, 8)
-    row.Margin = Thickness(0, 0, 0, 6)
+    row.Padding = Thickness(8)
+    row.Margin = Thickness(0, 0, 0, 8)
 
     box = StackPanel()
 
@@ -212,19 +207,19 @@ def _build_item_row(item, report, on_run, on_note, on_skip, viet=False):
     head.Text = _t('row_head', viet).format(
         item.get('id', ''), item.get('page', ''),
         item.get('subtype', ''), item.get('author') or _t('no_author', viet))
-    head.FontSize = 9.5
+    head.SetResourceReference(TextBlock.FontSizeProperty, "T3.Size.Caption")
     head.FontFamily = _font()
-    head.Foreground = _brush(161, 161, 170)
+    head.SetResourceReference(TextBlock.ForegroundProperty, "T3.TextMuted")
     box.Children.Add(head)
 
     content = TextBlock()
     content.Text = (item.get('content') or item.get('subject')
                     or _t('no_content', viet))
-    content.FontSize = 12
+    content.SetResourceReference(TextBlock.FontSizeProperty, "T3.Size.Body")
     content.FontFamily = _font()
-    content.Foreground = _brush(39, 39, 42)
+    content.SetResourceReference(TextBlock.ForegroundProperty, "T3.Text")
     content.TextWrapping = TextWrapping.Wrap
-    content.Margin = Thickness(0, 2, 0, 0)
+    content.Margin = Thickness(0, 4, 0, 0)
     box.Children.Add(content)
 
     proposal = TextBlock()
@@ -233,22 +228,22 @@ def _build_item_row(item, report, on_run, on_note, on_skip, viet=False):
     label = labels.get(action, action)
     desc = prop.get('description') or ''
     proposal.Text = _t('proposal', viet).format(label, desc)
-    proposal.FontSize = 10.5
+    proposal.SetResourceReference(TextBlock.FontSizeProperty, "T3.Size.Caption")
     proposal.FontFamily = _font()
-    proposal.Foreground = _brush(59, 130, 246)
+    proposal.SetResourceReference(TextBlock.ForegroundProperty, "T3.TextSecondary")
     proposal.TextWrapping = TextWrapping.Wrap
-    proposal.Margin = Thickness(0, 3, 0, 0)
+    proposal.Margin = Thickness(0, 4, 0, 0)
     box.Children.Add(proposal)
 
     # buttons + status
     bar = StackPanel()
     bar.Orientation = Orientation.Horizontal
-    bar.Margin = Thickness(0, 6, 0, 0)
+    bar.Margin = Thickness(0, 8, 0, 0)
 
     status = TextBlock()
-    status.FontSize = 10
+    status.SetResourceReference(TextBlock.FontSizeProperty, "T3.Size.Caption")
     status.FontFamily = _font()
-    status.Foreground = _brush(161, 161, 170)
+    status.SetResourceReference(TextBlock.ForegroundProperty, "T3.TextMuted")
     status.VerticalAlignment = System.Windows.VerticalAlignment.Center
     status.Margin = Thickness(4, 0, 0, 0)
 
@@ -256,8 +251,8 @@ def _build_item_row(item, report, on_run, on_note, on_skip, viet=False):
         def _set(text, ok):
             try:
                 _status.Text = text
-                _status.Foreground = (_brush(16, 185, 129) if ok
-                                      else _brush(161, 161, 170))
+                _status.SetResourceReference(TextBlock.ForegroundProperty,
+                                             "T3.Success.Text" if ok else "T3.TextMuted")
             except Exception:
                 pass
         return _set

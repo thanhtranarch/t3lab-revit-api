@@ -237,12 +237,15 @@ class WorksetManagerWindow(T3WPFWindow):
 
     def nav_toggle_clicked(self, sender, e):
         try:
-            if sender is self.nav_worksets:
-                self.tab_control.SelectedIndex = 0
-            elif sender is self.nav_bulk:
-                self.tab_control.SelectedIndex = 1
-            elif sender is self.nav_views:
-                self.tab_control.SelectedIndex = 2
+            # PythonNet can return different Python wrappers for the same CLR
+            # control. Route by the stable XAML name, not Python identity.
+            index = {
+                "nav_worksets": 0,
+                "nav_bulk": 1,
+                "nav_views": 2,
+            }.get(getattr(sender, "Name", None))
+            if index is not None:
+                self.tab_control.SelectedIndex = index
         except Exception:
             pass
 

@@ -1110,10 +1110,8 @@ class TagCheckerWindow(object):
         for name in names:
             cb = System.Windows.Controls.CheckBox()
             cb.Content = name
-            cb.FontSize = 12
-            cb.Margin = Thickness(2, 2, 2, 2)
-            cb.Foreground = System.Windows.Media.BrushConverter() \
-                .ConvertFromString("#0F172A")
+            cb.Style = self.window.FindResource("T3.CheckBox")
+            cb.Margin = Thickness(0, 0, 0, 4)
             cb.IsChecked = TagCheckerWindow._shared_checked.get(name, False)
             self.spCategories.Children.Add(cb)
             self._checkboxes[name] = cb
@@ -1314,13 +1312,12 @@ class TagCheckerWindow(object):
         except:
             self.borderProgress.Width = 200
 
-        bc = System.Windows.Media.BrushConverter()
         if pct >= 90:
-            self.borderProgress.Background = bc.ConvertFromString("#6BBF59")
+            self.borderProgress.Background = self.window.FindResource("T3.Success.Accent")
         elif pct >= 60:
-            self.borderProgress.Background = bc.ConvertFromString("#0F172A")
+            self.borderProgress.Background = self.window.FindResource("T3.Ink")
         else:
-            self.borderProgress.Background = bc.ConvertFromString("#DC3C3C")
+            self.borderProgress.Background = self.window.FindResource("T3.Danger.Text")
 
         self.tbTagResult.Visibility = Visibility.Collapsed
 

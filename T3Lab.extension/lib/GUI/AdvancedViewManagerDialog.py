@@ -911,11 +911,17 @@ class AdvancedViewManagerWindow(T3WPFWindow):
             dialog.Width = 500
             dialog.Height = 400
             dialog.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen
-            dialog.Background = Brushes.White
-            dialog.FontFamily = System.Windows.Media.FontFamily("Inter")
+            dialog.Resources.MergedDictionaries.Add(self.Resources)
+            dialog.Owner = self
+            dialog.MinWidth = 500
+            dialog.MinHeight = 400
+            dialog.UseLayoutRounding = True
+            dialog.SnapsToDevicePixels = True
+            dialog.Background = self.FindResource("T3.Surface")
+            dialog.FontFamily = self.FindResource("T3.Font")
             
             main_grid = Grid()
-            main_grid.Margin = Thickness(20)
+            main_grid.Margin = Thickness(16)
             main_grid.RowDefinitions.Add(RowDefinition(Height=GridLength(50)))
             main_grid.RowDefinitions.Add(RowDefinition(Height=GridLength(1, GridUnitType.Star)))
             main_grid.RowDefinitions.Add(RowDefinition(Height=GridLength(60)))
@@ -925,55 +931,52 @@ class AdvancedViewManagerWindow(T3WPFWindow):
             
             title = TextBlock()
             title.Text = "Select Parameter to Add as Column"
-            title.FontSize = 14
-            title.FontWeight = System.Windows.FontWeights.Bold
-            title.Foreground = SolidColorBrush(Color.FromRgb(15, 23, 42))
-            title.Margin = Thickness(0, 0, 0, 5)
+            title.Style = self.FindResource("T3.Title")
+            title.FontWeight = System.Windows.FontWeights.SemiBold
+            title.Foreground = self.FindResource("T3.Text")
+            title.Margin = Thickness(0, 0, 0, 4)
             title_panel.Children.Add(title)
             
             instruction = TextBlock()
             instruction.Text = "Choose a view parameter from the list below:"
-            instruction.FontSize = 11
-            gray_color = Color.FromRgb(100, 116, 139)
-            instruction.Foreground = SolidColorBrush(gray_color)
+            instruction.Style = self.FindResource("T3.Caption")
+            instruction.Foreground = self.FindResource("T3.TextSecondary")
             title_panel.Children.Add(instruction)
             main_grid.Children.Add(title_panel)
             
             list_container = Grid()
-            list_container.Margin = Thickness(0, 10, 0, 10)
+            list_container.Margin = Thickness(0, 8, 0, 8)
             Grid.SetRow(list_container, 1)
-            list_container.RowDefinitions.Add(RowDefinition(Height=GridLength(35)))
+            list_container.RowDefinitions.Add(RowDefinition(Height=GridLength(52)))
             list_container.RowDefinitions.Add(RowDefinition(Height=GridLength(1, GridUnitType.Star)))
             
             search_label = TextBlock()
-            search_label.Text = "Search:"
-            search_label.Margin = Thickness(0, 0, 0, 5)
-            search_label.FontSize = 10
-            search_label.Foreground = SolidColorBrush(Color.FromRgb(15, 23, 42))
+            search_label.Text = "SEARCH"
+            search_label.Margin = Thickness(0, 0, 0, 4)
+            search_label.Style = self.FindResource("T3.Label")
+            search_label.Foreground = self.FindResource("T3.TextSecondary")
             Grid.SetRow(search_label, 0)
             list_container.Children.Add(search_label)
             
             search_box = TextBox()
-            search_box.Margin = Thickness(50, 0, 0, 5)
-            search_box.Padding = Thickness(6, 4, 6, 4)
-            search_box.BorderBrush = SolidColorBrush(Color.FromRgb(203, 213, 225))
+            search_box.Margin = Thickness(0, 20, 0, 4)
+            search_box.Padding = Thickness(8, 0, 8, 0)
+            search_box.Style = self.FindResource("T3.TextBox")
             Grid.SetRow(search_box, 0)
             
             scroll = ScrollViewer()
             scroll.VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto
-            gray_border = Color.FromRgb(226, 232, 240)
-            scroll.BorderBrush = SolidColorBrush(gray_border)
+            scroll.BorderBrush = self.FindResource("T3.Border")
             scroll.BorderThickness = Thickness(1)
             Grid.SetRow(scroll, 1)
             
             param_listbox = ListBox()
-            param_listbox.Padding = Thickness(5)
+            param_listbox.Style = self.FindResource("T3.ListBox")
             
             for param_name in params:
                 item = ListBoxItem()
                 item.Content = param_name
-                item.Padding = Thickness(8, 6, 8, 6)
-                item.FontSize = 12
+                item.Style = self.FindResource("T3.ListBoxItem")
                 param_listbox.Items.Add(item)
             
             if param_listbox.Items.Count > 0:
@@ -989,8 +992,7 @@ class AdvancedViewManagerWindow(T3WPFWindow):
                     if not search_text or search_text in param_name.lower():
                         item = ListBoxItem()
                         item.Content = param_name
-                        item.Padding = Thickness(8, 6, 8, 6)
-                        item.FontSize = 12
+                        item.Style = self.FindResource("T3.ListBoxItem")
                         param_listbox.Items.Add(item)
                 if param_listbox.Items.Count > 0:
                     param_listbox.SelectedIndex = 0
@@ -1001,11 +1003,10 @@ class AdvancedViewManagerWindow(T3WPFWindow):
             
             info_text = TextBlock()
             info_text.Text = "{} parameters available".format(len(params))
-            info_text.FontSize = 10
-            gray_info = Color.FromRgb(100, 116, 139)
-            info_text.Foreground = SolidColorBrush(gray_info)
+            info_text.Style = self.FindResource("T3.Caption")
+            info_text.Foreground = self.FindResource("T3.TextSecondary")
             info_text.HorizontalAlignment = System.Windows.HorizontalAlignment.Left
-            info_text.Margin = Thickness(0, 0, 0, 10)
+            info_text.Margin = Thickness(0, 0, 0, 8)
             Grid.SetRow(info_text, 2)
             main_grid.Children.Add(info_text)
             
@@ -1031,40 +1032,41 @@ class AdvancedViewManagerWindow(T3WPFWindow):
             ok_btn = Button()
             ok_btn.Content = "Add Column"
             ok_btn.Width = 100
-            ok_btn.Height = 32
-            ok_btn.Margin = Thickness(5, 0, 5, 0)
-            green_color = Color.FromRgb(16, 185, 129)
-            ok_btn.Background = SolidColorBrush(green_color)
-            ok_btn.Foreground = Brushes.White
+            ok_btn.IsDefault = True
+            ok_btn.Style = self.FindResource("T3.Button.Primary")
+            ok_btn.Margin = Thickness(8, 0, 0, 0)
+            ok_btn.Background = self.FindResource("T3.Ink")
+            ok_btn.Foreground = self.FindResource("T3.Surface")
             ok_btn.BorderThickness = Thickness(0)
             ok_btn.FontWeight = System.Windows.FontWeights.SemiBold
             ok_btn.Cursor = System.Windows.Input.Cursors.Hand
             ok_btn.Click += on_ok
-            btn_panel.Children.Add(ok_btn)
             
             cancel_btn = Button()
             cancel_btn.Content = "Cancel"
             cancel_btn.Width = 100
-            cancel_btn.Height = 32
-            cancel_btn.Background = Brushes.White
-            cancel_btn.Foreground = SolidColorBrush(Color.FromRgb(15, 23, 42))
-            cancel_btn.BorderBrush = SolidColorBrush(Color.FromRgb(15, 23, 42))
+            cancel_btn.IsCancel = True
+            cancel_btn.Style = self.FindResource("T3.Button.Ghost")
+            cancel_btn.Background = self.FindResource("T3.Surface")
+            cancel_btn.Foreground = self.FindResource("T3.Text")
+            cancel_btn.BorderBrush = self.FindResource("T3.Border")
             cancel_btn.BorderThickness = Thickness(1)
             cancel_btn.Cursor = System.Windows.Input.Cursors.Hand
             cancel_btn.Click += on_cancel
             btn_panel.Children.Add(cancel_btn)
+            btn_panel.Children.Add(ok_btn)
             main_grid.Children.Add(btn_panel)
             
             copyright_block = TextBlock()
             copyright_block.Text = u"© Copyright by T3Lab"
             copyright_block.FontSize = 11
-            copyright_block.Foreground = SolidColorBrush(Color.FromRgb(245, 158, 11))
-            copyright_block.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
+            copyright_block.Foreground = self.FindResource("T3.Copyright")
+            copyright_block.HorizontalAlignment = System.Windows.HorizontalAlignment.Left
             copyright_block.VerticalAlignment = System.Windows.VerticalAlignment.Bottom
             copyright_block.IsHitTestVisible = False
-            copyright_block.Margin = Thickness(0, 0, 14, 8)
+            copyright_block.Margin = Thickness(0, 0, 0, 8)
             System.Windows.Controls.Panel.SetZIndex(copyright_block, 999)
-            Grid.SetRowSpan(copyright_block, 3)
+            Grid.SetRow(copyright_block, 2)
             main_grid.Children.Add(copyright_block)
             
             dialog.Content = main_grid

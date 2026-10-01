@@ -1679,8 +1679,8 @@ class ManaContainsWindow(T3WPFWindow):
     def _t2_make_check_row(self, text, data_item, tag):
         cb = CheckBox()
         cb.Content = text
-        cb.FontSize = 12
-        cb.Margin = Thickness(4, 1, 4, 1)
+        cb.Style = self.FindResource("T3.CheckBox")
+        cb.Margin = Thickness(4, 0, 4, 4)
         cb.IsChecked = data_item.is_selected
         cb.Tag = data_item
         cb.Checked += self._t2_on_check_changed
@@ -1884,14 +1884,15 @@ class ManaContainsWindow(T3WPFWindow):
 
     def _t2_make_result_header(self):
         bd = Border()
-        bd.Background = brush(PRIMARY)
-        bd.Padding = Thickness(4, 6, 4, 6)
+        bd.Background = self.FindResource("T3.SurfaceSunken")
+        bd.Padding = Thickness(4)
 
         sp = StackPanel()
         sp.Orientation = Orientation.Horizontal
 
         # Header checkbox acts as select all/none
         cb_all = CheckBox()
+        cb_all.Style = self.FindResource("T3.CheckBox.Cell")
         cb_all.Width = 28
         cb_all.Margin = Thickness(4, 0, 0, 0)
         cb_all.Checked += self._t2_sel_all_results
@@ -1904,9 +1905,9 @@ class ManaContainsWindow(T3WPFWindow):
             t = TextBlock()
             t.Text = label
             t.Width = w
-            t.FontSize = 12
+            t.Style = self.FindResource("T3.Body")
             t.FontWeight = FontWeights.SemiBold
-            t.Foreground = brush(WHITE)
+            t.Foreground = self.FindResource("T3.TextMuted")
             t.Margin = Thickness(4, 0, 0, 0)
             sp.Children.Add(t)
 
@@ -1916,13 +1917,14 @@ class ManaContainsWindow(T3WPFWindow):
     def _t2_make_result_row(self, result):
         bd = Border()
         bd.Padding = Thickness(4)
-        bd.BorderBrush = brush(BORDER)
+        bd.BorderBrush = self.FindResource("T3.Border")
         bd.BorderThickness = Thickness(0, 0, 0, 1)
         
         sp = StackPanel()
         sp.Orientation = Orientation.Horizontal
         
         cb = CheckBox()
+        cb.Style = self.FindResource("T3.CheckBox.Cell")
         cb.Width = 28
         cb.Margin = Thickness(4, 0, 0, 0)
         cb.IsChecked = result.is_selected
@@ -1943,8 +1945,8 @@ class ManaContainsWindow(T3WPFWindow):
             t = TextBlock()
             t.Text = val
             t.Width = w
-            t.FontSize = 12
-            t.Foreground = brush(TEXT_DARK)
+            t.Style = self.FindResource("T3.Body")
+            t.Foreground = self.FindResource("T3.Text")
             t.Margin = Thickness(4, 0, 0, 0)
             sp.Children.Add(t)
             

@@ -2941,57 +2941,51 @@ class ExportManagerWindow(T3WPFWindow):
             self.status_text.Text = "Output folder: {}".format(dialog.SelectedPath)
 
     # ── Accordion toggle helpers ──────────────────────────────────────────
-    def _toggle_format_panel(self, body_name, arrow_name, border_name, accent_color, header_bg):
+    def _toggle_format_panel(self, body_name, arrow_name, border_name):
         """Expand or collapse a format settings panel."""
         try:
             body = getattr(self, body_name)
             arrow = getattr(self, arrow_name)
             border = getattr(self, border_name)
             from System.Windows import Visibility
-            from System.Windows.Media import SolidColorBrush, Color
-
             if body.Visibility == Visibility.Collapsed:
                 body.Visibility = Visibility.Visible
-                arrow.Text = "▴"
-                # Highlight border when expanded
-                r = int(accent_color[1:3], 16)
-                g = int(accent_color[3:5], 16)
-                b = int(accent_color[5:7], 16)
-                border.BorderBrush = SolidColorBrush(Color.FromRgb(r, g, b))
+                arrow.Text = "\uE70E"
+                border.BorderBrush = self.FindResource("T3.Ink")
             else:
                 body.Visibility = Visibility.Collapsed
-                arrow.Text = "▾"
-                border.BorderBrush = SolidColorBrush(Color.FromRgb(0xBD, 0xC3, 0xC7))
+                arrow.Text = "\uE70D"
+                border.BorderBrush = self.FindResource("T3.Border")
         except Exception as ex:
             logger.debug("Error toggling panel {}: {}".format(body_name, ex))
 
     def pdf_header_clicked(self, sender, e):
         self._toggle_format_panel("pdf_settings_body", "pdf_expand_arrow",
-                                  "pdf_panel_border", "#3498DB", "#E8F4F8")
+                                  "pdf_panel_border")
 
     def dwg_header_clicked(self, sender, e):
         self._toggle_format_panel("dwg_settings_body", "dwg_expand_arrow",
-                                  "dwg_panel_border", "#3498DB", "#F8F9FA")
+                                  "dwg_panel_border")
 
     def dgn_header_clicked(self, sender, e):
         self._toggle_format_panel("dgn_settings_body", "dgn_expand_arrow",
-                                  "dgn_panel_border", "#3498DB", "#F8F9FA")
+                                  "dgn_panel_border")
 
     def dwf_header_clicked(self, sender, e):
         self._toggle_format_panel("dwf_settings_body", "dwf_expand_arrow",
-                                  "dwf_panel_border", "#3498DB", "#F8F9FA")
+                                  "dwf_panel_border")
 
     def nwc_header_clicked(self, sender, e):
         self._toggle_format_panel("nwc_settings_body", "nwc_expand_arrow",
-                                  "nwc_panel_border", "#3498DB", "#F8F9FA")
+                                  "nwc_panel_border")
 
     def ifc_header_clicked(self, sender, e):
         self._toggle_format_panel("ifc_settings_body", "ifc_expand_arrow",
-                                  "ifc_panel_border", "#3498DB", "#F8F9FA")
+                                  "ifc_panel_border")
 
     def img_header_clicked(self, sender, e):
         self._toggle_format_panel("img_settings_body", "img_expand_arrow",
-                                  "img_panel_border", "#3498DB", "#F8F9FA")
+                                  "img_panel_border")
     # ─────────────────────────────────────────────────────────────────────
 
     def format_changed(self, sender, e):
