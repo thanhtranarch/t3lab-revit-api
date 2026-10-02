@@ -989,6 +989,46 @@ def get_tool_title(intent):
 
 LEGACY_DOC_KEY = "default"
 
+# Transcripts are personal (what the user asked about which model), so they
+# live per user in %APPDATA%\T3LabAI\chat_history — never in the extension,
+# which is a shared, public git clone. The old lib/config/chat_history/ is
+# read ONCE: its files are copied over on first use and then left alone.
+_LEGACY_CHAT_HISTORY_DIR = os.path.join(lib_dir, 'config', 'chat_history')
+
+# Archived conversations (History tab) kept on disk, newest first. Each "new
+# chat" archives one file; nothing ever removed them before.
+MAX_ARCHIVED_SESSIONS = 100
+
+
+def _chat_history_dir(sub=None):
+    """%APPDATA%\\T3LabAI\\chat_history (or its `sub` folder), created on
+    demand. The matching legacy folder is imported once per destination."""
+    from core.paths import settings_dir
+    from core import housekeeping
+    base = os.path.join(settings_dir(), 'chat_history')
+    folder = os.path.join(base, sub) if sub else base
+    if not os.path.isdir(folder):
+        try:
+            os.makedirs(folder)
+        except OSError:
+            pass
+    legacy = (os.path.join(_LEGACY_CHAT_HISTORY_DIR, sub) if sub
+              else _LEGACY_CHAT_HISTORY_DIR)
+    housekeeping.run_once(u'chat_history_legacy:' + folder,
+                          housekeeping.import_legacy_folder,
+                          legacy, folder, ('.json',))
+    return folder
+
+
+def _prune_archived_sessions(sessions_dir, keep=MAX_ARCHIVED_SESSIONS):
+    """Keep the newest `keep` archived sessions. Returns how many went."""
+    try:
+        from core import housekeeping
+        return housekeeping.prune_files(sessions_dir, keep_newest=keep,
+                                        suffixes=('.json',), min_age_s=0)
+    except Exception:
+        return 0
+
 
 def _get_doc_key():
     """Return a filesystem-safe key for the current Revit document.
@@ -1029,13 +1069,7 @@ def _history_file(doc_key):
             return _ps.history_path(_pid, doc_key)
     except Exception:
         pass
-    config_dir = os.path.join(lib_dir, 'config', 'chat_history')
-    if not os.path.exists(config_dir):
-        try:
-            os.makedirs(config_dir)
-        except Exception:
-            pass
-    return os.path.join(config_dir, '{}.json'.format(doc_key))
+    return os.path.join(_chat_history_dir(), '{}.json'.format(doc_key))
 
 
 def save_chat_history(doc_key, messages, summary=u""):
@@ -2383,12 +2417,7 @@ class T3LabAssistantWindow(T3WPFWindow):
             if not getattr(self, '_persisted_msgs', None):
                 return None
             from core import jsonsafe
-            sessions_dir = os.path.join(lib_dir, 'config', 'chat_history', 'sessions')
-            if not os.path.exists(sessions_dir):
-                try:
-                    os.makedirs(sessions_dir)
-                except Exception:
-                    pass
+            sessions_dir = _chat_history_dir('sessions')
 
             title = u"Conversation"
             for m in self._persisted_msgs:
@@ -2417,6 +2446,7 @@ class T3LabAssistantWindow(T3WPFWindow):
             data = jsonsafe.dumps(session_data, indent=2)
             with io.open(fpath, 'w', encoding='utf-8') as f:
                 f.write(data)
+            _prune_archived_sessions(sessions_dir)
             return fpath
         except Exception as ex:
             logger.debug(u"_archive_current_session error: {}".format(_exc_text(ex)))
@@ -2486,9 +2516,7 @@ class T3LabAssistantWindow(T3WPFWindow):
         """Retrieve list of saved session metadata for this document."""
         sessions = []
         try:
-            sessions_dir = os.path.join(lib_dir, 'config', 'chat_history', 'sessions')
-            if not os.path.exists(sessions_dir):
-                return []
+            sessions_dir = _chat_history_dir('sessions')
             prefix = "{}_".format(self._doc_key)
             files = [f for f in os.listdir(sessions_dir) if f.endswith('.json')]
             files.sort(reverse=True)
@@ -6205,6 +6233,13 @@ class T3LabAssistantWindow(T3WPFWindow):
             d = os.path.join(tempfile.gettempdir(), 'T3LabAssistant', 'links')
             if not os.path.isdir(d):
                 os.makedirs(d)
+            try:
+                from core import housekeeping
+                housekeeping.run_once('assistant.link_cache',
+                                      housekeeping.prune_files, d,
+                                      max_age_days=7)
+            except Exception:
+                pass
             return d
         except Exception:
             return None
@@ -8871,6 +8906,7 @@ class T3LabAssistantWindow(T3WPFWindow):
         if rag_context:
             user_content = rag_context + u"\n\n" + captured
         _vision_files = list(image_files or [])
+        shot = None
         if self._wants_view_snapshot(captured, provider):
             self._safe_update_typing_text(
                 u"● ● ●  Đang chụp active view…" if viet
@@ -8887,6 +8923,13 @@ class T3LabAssistantWindow(T3WPFWindow):
                     user_content, _vision_files)
             except Exception as _vx:
                 logger.debug(u"vision block build error: {}".format(_exc_text(_vx)))
+        if shot:
+            # The PNG is now base64 inside user_content: the file itself is
+            # done with, and %TEMP%\T3Lab_ViewShots used to keep every one.
+            try:
+                os.remove(shot)
+            except Exception:
+                pass
 
         # Live state rides with THIS turn instead of the cached system block.
         # It never reaches _conversation_history (which stores the raw user
@@ -10182,6 +10225,15 @@ class T3LabAssistantWindow(T3WPFWindow):
         try:
             import tempfile
             folder = os.path.join(tempfile.gettempdir(), 'T3Lab_ViewShots')
+            # Shots are deleted once sent (_run_native_agent); this clears
+            # the ones a crashed or cancelled turn left behind.
+            try:
+                from core import housekeeping
+                housekeeping.run_once('assistant.viewshots',
+                                      housekeeping.prune_files, folder,
+                                      max_age_days=1)
+            except Exception:
+                pass
             res = srv._execute_tool('export_image',
                                     {'width': 1280, 'output_folder': folder})
             files = (res or {}).get('files') or []

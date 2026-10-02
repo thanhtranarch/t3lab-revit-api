@@ -76,15 +76,36 @@ def _apply_initial_dock_state(data):
             "InitialState not applied: %s", ex)
         return False
 
+# ─── Debug log ─────────────────────────────────────────────────────────────────
+# OFF by default. This used to append to
+# ~/T3Lab_AI_Data/dockable_pane_startup.log on every Revit start, forever, and
+# nothing ever read it; failures already reach the pyRevit logger below. Set
+# T3LAB_PANE_DEBUG=1 only while diagnosing the pane registration.
+_LOG_ENABLED = bool(os.environ.get("T3LAB_PANE_DEBUG"))
+_LOG_MAX_BYTES = 256 * 1024
+_LOG_PATH = os.path.join(os.path.expanduser("~"), "T3Lab_AI_Data",
+                         "dockable_pane_startup.log")
+
+
 def _log_pane(msg):
+    """Append a timestamped line to the debug log. Never raises. No-op unless
+    debugging is explicitly enabled."""
+    if not _LOG_ENABLED:
+        return
     try:
         import datetime
-        _dlog_path = os.path.join(os.path.expanduser("~"), "T3Lab_AI_Data", "dockable_pane_startup.log")
-        _d = os.path.dirname(_dlog_path)
+        import io
+        _d = os.path.dirname(_LOG_PATH)
         if not os.path.isdir(_d):
             os.makedirs(_d)
+        # Truncate rather than grow without bound.
+        try:
+            if os.path.getsize(_LOG_PATH) > _LOG_MAX_BYTES:
+                os.remove(_LOG_PATH)
+        except Exception:
+            pass
         stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open(_dlog_path, "a", encoding="utf-8") as f:
+        with io.open(_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(u"[{}] [PaneProvider] {}\n".format(stamp, msg))
     except Exception:
         pass

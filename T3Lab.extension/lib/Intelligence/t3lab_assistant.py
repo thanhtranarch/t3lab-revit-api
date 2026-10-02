@@ -198,15 +198,18 @@ def _build_system_prompt(revit_context=u""):
 
 # ─── Learned patterns ─────────────────────────────────────────────────────────
 
+# The user's own phrasings and what they routed to: per-user data, kept in
+# %APPDATA%/T3LabAI/assistant — never in the extension folder (a shared,
+# public git clone; this file used to be committed with the owner's usage).
+# The old in-extension file is copied over once.
+_LEGACY_PATTERNS_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'config', 'learned_patterns.json')
+
+
 def _patterns_file():
-    lib_dir = os.path.dirname(os.path.abspath(__file__))
-    config_dir = os.path.join(lib_dir, 'config')
-    if not os.path.exists(config_dir):
-        try:
-            os.makedirs(config_dir)
-        except Exception:
-            pass
-    return os.path.join(config_dir, 'learned_patterns.json')
+    from core.paths import user_data_path
+    return user_data_path('assistant', 'learned_patterns.json',
+                          legacy=[_LEGACY_PATTERNS_FILE])
 
 
 def load_learned_patterns():

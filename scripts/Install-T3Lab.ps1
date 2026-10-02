@@ -196,7 +196,8 @@ if ($deepest) {
     }
 }
 
-# Writable: chat history / tool registry are written back into lib\config.
+# Writable: per-user data lives in %APPDATA%\T3LabAI, but the extension still
+# writes caches beside its own files (__pycache__, generated icons).
 $probe = Join-Path $ExtensionPath "lib\config\.t3lab_write_probe"
 try {
     New-Item -ItemType Directory -Force -Path (Split-Path $probe) | Out-Null
@@ -204,7 +205,7 @@ try {
     Remove-Item $probe -Force
     Write-Ok "Folder is writable"
 } catch {
-    Write-Warn "Folder is NOT writable - the assistant cannot save its tool registry or chat history."
+    Write-Warn "Folder is NOT writable - Python caches and generated files cannot be saved."
     Write-Info "Install under a user-writable path instead of C:\Program Files."
 }
 

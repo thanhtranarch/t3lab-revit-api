@@ -9,9 +9,9 @@ Locks down the memory-editing feature (update_fact / forget_fact) added so a
 revised project convention supersedes the stale one instead of both being
 injected into the system prompt every turn.
 
-NOTE: assistant memory persists to lib/Intelligence/config/assistant_memory.json
-INSIDE the repo (not %APPDATA%), so every test repoints M._memory_file at a
-throwaway temp file first — the real config is never touched.
+NOTE: assistant memory persists per user to
+%APPDATA%/T3LabAI/assistant/assistant_memory.json, so every test repoints
+M._memory_file at a throwaway temp file first — the real file is never touched.
 """
 from __future__ import unicode_literals
 

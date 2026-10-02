@@ -99,6 +99,42 @@ except ImportError:
 HAS_REVIT_UI = False
 
 
+# ── store_* / query_stored_data location ─────────────────────────────────────
+# These tools used to write <model folder>\T3Lab_AI_Data\*.json — next to the
+# model, often a shared project folder or network share — and
+# ~/T3Lab_AI_Data for an unsaved model. The data is the user's scratch copy,
+# so it now lives per user under %APPDATA%\T3LabAI\stored_data\<model key>\.
+# The old file is copied over once, so data stored before the move still reads.
+
+def _stored_data_key(doc_path, doc_title):
+    """Folder name for one model: readable stem + a short hash of the full
+    path, so two "Model.rvt" in different folders never share data."""
+    import hashlib
+    import re as _re
+    doc_path = doc_path or u''
+    if doc_path:
+        stem = os.path.splitext(os.path.basename(doc_path))[0]
+    else:
+        stem = doc_title or u'Untitled'
+    safe = _re.sub(r'[^A-Za-z0-9_.-]+', u'_', stem).strip(u'._')[:60] or u'Untitled'
+    ident = (doc_path or doc_title or u'').lower()
+    digest = hashlib.md5(ident.encode('utf-8')).hexdigest()[:8]
+    return u'{}_{}'.format(safe, digest)
+
+
+def _legacy_stored_data_file(doc_path, fname):
+    """Where older builds wrote this file (next to the model, or ~)."""
+    base = os.path.dirname(doc_path) if doc_path else os.path.expanduser('~')
+    return os.path.join(base, 'T3Lab_AI_Data', fname)
+
+
+def _stored_data_file(doc_path, doc_title, fname):
+    """Per-user path of a stored_data file, the legacy file carried over once."""
+    from core.paths import user_data_path
+    return user_data_path('stored_data', _stored_data_key(doc_path, doc_title),
+                          fname, legacy=[_legacy_stored_data_file(doc_path, fname)])
+
+
 class _ToolTask(object):
     """One tool call marshalled onto Revit's UI thread via ExternalEvent.
 
@@ -1745,7 +1781,7 @@ class T3LabAIServer(object):
             },
             'store_room_data': {
                 'name': 'store_room_data',
-                'description': 'Store all room metadata to a local JSON file in the project folder',
+                'description': "Store all room metadata to a local JSON file in the user's T3Lab data folder for later querying",
                 'inputSchema': {'type': 'object', 'properties': {}, 'required': []}
             },
             'query_stored_data': {
@@ -8180,12 +8216,7 @@ class T3LabAIServer(object):
                 'status': info.Status,
                 'doc_path': doc.PathName,
             }
-            out_dir  = os.path.join(os.path.dirname(doc.PathName) if doc.PathName else os.path.expanduser('~'), 'T3Lab_AI_Data')
-            try:
-                os.makedirs(out_dir)
-            except OSError:
-                pass
-            out_path = os.path.join(out_dir, 'project_data.json')
+            out_path = _stored_data_file(doc.PathName, doc.Title, 'project_data.json')
             with open(out_path, 'w') as f:
                 _json.dump(data, f, indent=2)
             return {'success': True, 'file': out_path, 'data': data}
@@ -8212,12 +8243,7 @@ class T3LabAIServer(object):
                     })
                 except Exception:
                     pass
-            out_dir  = os.path.join(os.path.dirname(doc.PathName) if doc.PathName else os.path.expanduser('~'), 'T3Lab_AI_Data')
-            try:
-                os.makedirs(out_dir)
-            except OSError:
-                pass
-            out_path = os.path.join(out_dir, 'room_data.json')
+            out_path = _stored_data_file(doc.PathName, doc.Title, 'room_data.json')
             with open(out_path, 'w') as f:
                 _json.dump({'rooms': rooms_out}, f, indent=2)
             return {'success': True, 'file': out_path, 'room_count': len(rooms_out)}
@@ -8232,9 +8258,8 @@ class T3LabAIServer(object):
                 return {'error': "Unknown data_type '{}'.".format(data_type),
                         'supported_data_types': ['project', 'rooms'],
                         'hint': 'Retry with one of supported_data_types.'}
-            out_dir   = os.path.join(os.path.dirname(doc.PathName) if doc.PathName else os.path.expanduser('~'), 'T3Lab_AI_Data')
             fname     = 'project_data.json' if data_type == 'project' else 'room_data.json'
-            fpath     = os.path.join(out_dir, fname)
+            fpath     = _stored_data_file(doc.PathName, doc.Title, fname)
             if not os.path.isfile(fpath):
                 return {'error': 'No stored data found. Run store_project_data or store_room_data first.', 'path': fpath}
             with open(fpath, 'r') as f:
@@ -10490,90 +10515,104 @@ class T3LabAIServer(object):
                 type_name = (arguments.get('type') or 'Text')
 
                 app = doc.Application
-                # Ensure a shared-parameter file exists.
+                # Ensure a shared-parameter file exists. When the user has
+                # none, T3Lab's own file is used for THIS call only:
+                # SharedParametersFilename is the user's Revit setting
+                # (Revit.ini) and this tool used to switch it for good. The
+                # original value is put back in the finally below, the way
+                # ManaParaDialog restores it.
+                original_sp = None
                 sp_path = app.SharedParametersFilename
                 if not sp_path or not _os.path.isfile(sp_path):
                     data_dir = _os.path.join(_os.path.expanduser('~'), 'T3Lab_AI_Data')
                     if not _os.path.isdir(data_dir):
                         _os.makedirs(data_dir)
-                    sp_path = _os.path.join(data_dir, 'T3Lab_SharedParameters.txt')
-                    if not _os.path.isfile(sp_path):
-                        open(sp_path, 'w').close()
-                    app.SharedParametersFilename = sp_path
-                def_file = app.OpenSharedParameterFile()
-                if def_file is None:
-                    return {'error': 'Could not open shared parameter file.'}
-
-                grp = def_file.Groups.get_Item('T3Lab') or def_file.Groups.Create('T3Lab')
-
-                # Resolve the data type across Revit versions (SpecTypeId vs ParameterType).
-                spec = None
+                    t3_sp_path = _os.path.join(data_dir, 'T3Lab_SharedParameters.txt')
+                    if not _os.path.isfile(t3_sp_path):
+                        open(t3_sp_path, 'w').close()
+                    original_sp = sp_path or ''
+                    app.SharedParametersFilename = t3_sp_path
                 try:
-                    from Autodesk.Revit.DB import SpecTypeId
-                    spec_map = {
-                        'text': SpecTypeId.String.Text, 'integer': SpecTypeId.Int.Integer,
-                        'number': SpecTypeId.Number, 'length': SpecTypeId.Length,
-                        'area': SpecTypeId.Area, 'yesno': SpecTypeId.Boolean.YesNo,
-                    }
-                    spec = spec_map.get(type_name.lower(), SpecTypeId.String.Text)
-                    ext_opts = ExternalDefinitionCreationOptions(name, spec)
-                except Exception:
-                    from Autodesk.Revit.DB import ParameterType
-                    pt_map = {
-                        'text': ParameterType.Text, 'integer': ParameterType.Integer,
-                        'number': ParameterType.Number, 'length': ParameterType.Length,
-                        'area': ParameterType.Area, 'yesno': ParameterType.YesNo,
-                    }
-                    ext_opts = ExternalDefinitionCreationOptions(name, pt_map.get(type_name.lower(), ParameterType.Text))
+                    def_file = app.OpenSharedParameterFile()
+                    if def_file is None:
+                        return {'error': 'Could not open shared parameter file.'}
 
-                ext_def = None
-                for d in grp.Definitions:
-                    if d.Name == name:
-                        ext_def = d; break
-                if ext_def is None:
-                    ext_def = grp.Definitions.Create(ext_opts)
+                    grp = def_file.Groups.get_Item('T3Lab') or def_file.Groups.Create('T3Lab')
 
-                cat_set = app.Create.NewCategorySet()
-                for c in cats:
-                    bic = self._bic_map().get(c)
-                    if bic is None:
-                        continue
+                    # Resolve the data type across Revit versions (SpecTypeId vs ParameterType).
+                    spec = None
                     try:
-                        cat_set.Insert(doc.Settings.Categories.get_Item(bic))
+                        from Autodesk.Revit.DB import SpecTypeId
+                        spec_map = {
+                            'text': SpecTypeId.String.Text, 'integer': SpecTypeId.Int.Integer,
+                            'number': SpecTypeId.Number, 'length': SpecTypeId.Length,
+                            'area': SpecTypeId.Area, 'yesno': SpecTypeId.Boolean.YesNo,
+                        }
+                        spec = spec_map.get(type_name.lower(), SpecTypeId.String.Text)
+                        ext_opts = ExternalDefinitionCreationOptions(name, spec)
                     except Exception:
-                        pass
-                if cat_set.IsEmpty:
-                    return {'error': 'No valid categories resolved.'}
+                        from Autodesk.Revit.DB import ParameterType
+                        pt_map = {
+                            'text': ParameterType.Text, 'integer': ParameterType.Integer,
+                            'number': ParameterType.Number, 'length': ParameterType.Length,
+                            'area': ParameterType.Area, 'yesno': ParameterType.YesNo,
+                        }
+                        ext_opts = ExternalDefinitionCreationOptions(name, pt_map.get(type_name.lower(), ParameterType.Text))
 
-                binding = (app.Create.NewInstanceBinding(cat_set) if instance
-                           else app.Create.NewTypeBinding(cat_set))
+                    ext_def = None
+                    for d in grp.Definitions:
+                        if d.Name == name:
+                            ext_def = d; break
+                    if ext_def is None:
+                        ext_def = grp.Definitions.Create(ext_opts)
 
-                t = Transaction(doc, 'T3Lab AI Create Project Parameter')
-                t.Start()
-                try:
-                    group_param = None
+                    cat_set = app.Create.NewCategorySet()
+                    for c in cats:
+                        bic = self._bic_map().get(c)
+                        if bic is None:
+                            continue
+                        try:
+                            cat_set.Insert(doc.Settings.Categories.get_Item(bic))
+                        except Exception:
+                            pass
+                    if cat_set.IsEmpty:
+                        return {'error': 'No valid categories resolved.'}
+
+                    binding = (app.Create.NewInstanceBinding(cat_set) if instance
+                               else app.Create.NewTypeBinding(cat_set))
+
+                    t = Transaction(doc, 'T3Lab AI Create Project Parameter')
+                    t.Start()
                     try:
-                        from Autodesk.Revit.DB import GroupTypeId
-                        group_param = GroupTypeId.Data
-                    except Exception:
-                        from Autodesk.Revit.DB import BuiltInParameterGroup
-                        group_param = BuiltInParameterGroup.PG_DATA
+                        group_param = None
+                        try:
+                            from Autodesk.Revit.DB import GroupTypeId
+                            group_param = GroupTypeId.Data
+                        except Exception:
+                            from Autodesk.Revit.DB import BuiltInParameterGroup
+                            group_param = BuiltInParameterGroup.PG_DATA
 
-                    try:
-                        ok = doc.ParameterBindings.Insert(ext_def, binding, group_param)
-                        if not ok:
-                            ok = doc.ParameterBindings.ReInsert(ext_def, binding, group_param)
-                    except Exception:
-                        from Autodesk.Revit.DB import BuiltInParameterGroup
-                        ok = doc.ParameterBindings.Insert(ext_def, binding, BuiltInParameterGroup.PG_DATA)
-                        if not ok:
-                            ok = doc.ParameterBindings.ReInsert(ext_def, binding, BuiltInParameterGroup.PG_DATA)
-                    t.Commit()
-                except Exception as e:
-                    t.RollBack()
-                    return {'error': str(e), 'tool': tool_name}
-                return {'success': True, 'parameter': name, 'binding': 'instance' if instance else 'type',
-                        'categories': cats}
+                        try:
+                            ok = doc.ParameterBindings.Insert(ext_def, binding, group_param)
+                            if not ok:
+                                ok = doc.ParameterBindings.ReInsert(ext_def, binding, group_param)
+                        except Exception:
+                            from Autodesk.Revit.DB import BuiltInParameterGroup
+                            ok = doc.ParameterBindings.Insert(ext_def, binding, BuiltInParameterGroup.PG_DATA)
+                            if not ok:
+                                ok = doc.ParameterBindings.ReInsert(ext_def, binding, BuiltInParameterGroup.PG_DATA)
+                        t.Commit()
+                    except Exception as e:
+                        t.RollBack()
+                        return {'error': str(e), 'tool': tool_name}
+                    return {'success': True, 'parameter': name, 'binding': 'instance' if instance else 'type',
+                            'categories': cats}
+                finally:
+                    if original_sp is not None:
+                        try:
+                            app.SharedParametersFilename = original_sp
+                        except Exception:
+                            pass
             except Exception as e:
                 return {'error': str(e), 'tool': tool_name}
 

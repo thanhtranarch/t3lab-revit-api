@@ -491,25 +491,6 @@ class T3LabAISettings(object):
         return bool(toggles.get(tool_name, True))
 
 
-    def log_model_usage(self, action, provider, model):
-        """Log model usage/setup to a log file for audit and fast setup verification."""
-        try:
-            import datetime
-            app_data = os.environ.get('APPDATA', '')
-            settings_dir = os.path.join(app_data, 'T3LabAI')
-            if not os.path.exists(settings_dir):
-                os.makedirs(settings_dir)
-            log_file = os.path.join(settings_dir, 'model_setup.log')
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            log_line = "[{}] Action: {} | Provider: {} | Model: {}\n".format(
-                timestamp, action, provider, model
-            )
-            with open(log_file, 'a') as f:
-                f.write(log_line)
-        except Exception:
-            pass
-
-
 def get_settings():
     """Get the singleton settings instance"""
     return T3LabAISettings()

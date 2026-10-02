@@ -20,10 +20,13 @@ Facts get in three ways:
        the model saves facts it judges durable during a conversation.
     3. The /memory command family (view / forget N / clear).
 
-Storage: lib/Intelligence/config/assistant_memory.json — same location and
-same ASCII-serialize-then-write pattern as learned_patterns.json (guards
-against the IronPython 2.7 UnicodeEncodeError mid-write that truncates the
-file to 0 bytes).
+Storage: %APPDATA%/T3LabAI/assistant/assistant_memory.json — per user. The
+facts are personal (preferences, client conventions), so they never live in
+the extension folder, which is a shared, public git clone; the old
+lib/Intelligence/config/assistant_memory.json is copied over once. Same
+ASCII-serialize-then-write pattern as learned_patterns.json (guards against
+the IronPython 2.7 UnicodeEncodeError mid-write that truncates the file to
+0 bytes).
 
 Author: Tran Tien Thanh
 Mail: trantienthanh909@gmail.com
@@ -51,15 +54,15 @@ _LOCK = threading.Lock()
 
 # ─── Storage ──────────────────────────────────────────────────────────────────
 
+# Where older builds kept the facts (inside the extension). Read once.
+_LEGACY_MEMORY_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'config', 'assistant_memory.json')
+
+
 def _memory_file():
-    lib_dir = os.path.dirname(os.path.abspath(__file__))
-    config_dir = os.path.join(lib_dir, 'config')
-    if not os.path.exists(config_dir):
-        try:
-            os.makedirs(config_dir)
-        except Exception:
-            pass
-    return os.path.join(config_dir, 'assistant_memory.json')
+    from core.paths import user_data_path
+    return user_data_path('assistant', 'assistant_memory.json',
+                          legacy=[_LEGACY_MEMORY_FILE])
 
 
 def _load():

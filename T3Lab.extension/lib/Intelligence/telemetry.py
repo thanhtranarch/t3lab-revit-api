@@ -206,6 +206,8 @@ def record(turn, path=None):
         line = json.dumps(data, ensure_ascii=True, sort_keys=True)
         if isinstance(line, bytes):
             line = line.decode('ascii')
+        if path is None:
+            prune_once()
         target = path or _log_path()
         with io.open(target, 'a', encoding='utf-8') as f:
             f.write(line + u'\n')
@@ -215,24 +217,52 @@ def record(turn, path=None):
 
 
 def prune(days=_RETENTION_DAYS, now=None):
-    """Delete telemetry files older than `days`. Best-effort; returns count."""
+    """Delete telemetry files older than `days`. Best-effort; returns count.
+
+    Covers both sinks that share this directory: the per-turn files here and
+    the graph traces graph/observability.py writes into telemetry/graph/ —
+    one retention policy for both, as observability.py promises.
+    """
     removed = 0
     try:
         cutoff = (now or time.time()) - days * 86400.0
         d = telemetry_dir()
-        for name in os.listdir(d):
-            if not name.endswith('.jsonl'):
-                continue
-            full = os.path.join(d, name)
+        for folder in (d, os.path.join(d, 'graph')):
             try:
-                if os.path.getmtime(full) < cutoff:
-                    os.remove(full)
-                    removed += 1
+                names = os.listdir(folder)
             except Exception:
                 continue
+            for name in names:
+                if not name.endswith('.jsonl'):
+                    continue
+                full = os.path.join(folder, name)
+                try:
+                    if os.path.getmtime(full) < cutoff:
+                        os.remove(full)
+                        removed += 1
+                except Exception:
+                    continue
     except Exception:
         pass
     return removed
+
+
+_PRUNED = []
+
+
+def prune_once():
+    """prune() the first time any sink writes in this session. Never raises.
+
+    Nothing called prune() before, so the "one file per day, older ones
+    pruned" promise above was never kept and the folder only grew.
+    """
+    if _PRUNED:
+        return 0
+    _PRUNED.append(True)
+    try:
+        return prune()
+    except Exception:
+        return 0
 
 
 def read_turns(path):

@@ -452,6 +452,64 @@ class ProjectStore(object):
             return False
 
     # ── attachments archive + daily activity log ──────────────────────────
+    #
+    # Retention. Attachments are COPIES (the original stays where the user
+    # had it) plus pasted screenshots and downloaded links of up to 20 MB
+    # each; the activity log is a journal, one file per day. Both only ever
+    # grew. prune_storage() trims every scope (the T3LabAI root and each
+    # project), at most once per Revit session, from the worker threads that
+    # archive and journal — never on the UI thread.
+    ATTACHMENTS_MAX_AGE_DAYS = 30
+    ATTACHMENTS_MAX_TOTAL_BYTES = 500 * 1024 * 1024    # across every scope
+    ACTIVITY_LOG_MAX_AGE_DAYS = 90
+
+    def _scope_dirs(self):
+        """The T3LabAI root scope plus every project folder."""
+        scopes = [self._scope_dir(None)]
+        root = self._root()
+        try:
+            for name in sorted(os.listdir(root)):
+                d = os.path.join(root, name)
+                if os.path.isdir(d):
+                    scopes.append(d)
+        except OSError:
+            pass
+        return scopes
+
+    def prune_storage(self, now=None):
+        """Apply the retention rules. Returns {'attachments': n, 'logs': n}.
+
+        Attachments: older than ATTACHMENTS_MAX_AGE_DAYS go, then the oldest
+        until all scopes together fit ATTACHMENTS_MAX_TOTAL_BYTES. Activity
+        logs: older than ACTIVITY_LOG_MAX_AGE_DAYS. Files from the last hour
+        are never touched (a pasted image may still be waiting to be sent).
+        Never raises.
+        """
+        out = {'attachments': 0, 'logs': 0}
+        try:
+            from core import housekeeping
+            scopes = self._scope_dirs()
+            out['attachments'] = housekeeping.prune_files(
+                [os.path.join(sc, 'attachments') for sc in scopes],
+                max_age_days=self.ATTACHMENTS_MAX_AGE_DAYS,
+                max_total_bytes=self.ATTACHMENTS_MAX_TOTAL_BYTES,
+                recursive=True, now=now)
+            out['logs'] = housekeeping.prune_files(
+                [os.path.join(sc, 'logs') for sc in scopes],
+                max_age_days=self.ACTIVITY_LOG_MAX_AGE_DAYS,
+                suffixes=('.md',), now=now)
+        except Exception:
+            pass
+        return out
+
+    def prune_storage_once(self):
+        """prune_storage() the first time this is called in the session."""
+        try:
+            from core import housekeeping
+            housekeeping.run_once('project_store.prune_storage',
+                                  self.prune_storage)
+        except Exception:
+            pass
 
     def _scope_dir(self, pid):
         """projects/<pid> when a project is given, else the T3LabAI root
@@ -479,6 +537,7 @@ class ProjectStore(object):
         original path). Existing names get a _N suffix, never overwritten.
         """
         out = []
+        self.prune_storage_once()          # before today's folder is made
         dest_dir = self.attachments_dir(pid)
         for src in (paths or []):
             try:
@@ -512,6 +571,7 @@ class ProjectStore(object):
 
     def append_activity(self, text, pid=None):
         """Append one timestamped markdown bullet to today's log. Never raises."""
+        self.prune_storage_once()
         try:
             path = self.activity_log_path(pid)
             is_new = not os.path.exists(path)

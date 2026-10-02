@@ -36,8 +36,19 @@ from Autodesk.Revit.DB import (
 from Autodesk.Revit.UI import TaskDialog, TaskDialogCommonButtons, TaskDialogResult
 
 XAML_FILE = os.path.join(os.path.dirname(__file__), 'Tools', 'AutoJoin.xaml')
-RULES_FILE = os.path.join(os.path.dirname(__file__), 'join_rules.json')
+# The rules the user last ran are per-user state: they live in
+# %APPDATA%\T3LabAI\autojoin, never next to this file in the extension (the
+# clone is shared and updated by git). The old in-extension file is copied
+# over once so nobody loses their rules.
+_LEGACY_RULES_FILE = os.path.join(os.path.dirname(__file__), 'join_rules.json')
 logger = script.get_logger()
+
+
+def _rules_file():
+    from core.paths import user_data_path
+    return user_data_path('autojoin', 'join_rules.json',
+                          legacy=[_LEGACY_RULES_FILE])
+
 
 from Services.join_service import (
     JOINABLE_CATEGORIES,
@@ -91,7 +102,7 @@ class RuleItem(object):
 
 
 def save_rules_to_file(rules, filepath=None):
-    filepath = filepath or RULES_FILE
+    filepath = filepath or _rules_file()
     try:
         with open(filepath, "w") as f:
             json.dump(rules, f, indent=2)
@@ -100,7 +111,7 @@ def save_rules_to_file(rules, filepath=None):
 
 
 def load_rules_from_file(filepath=None):
-    filepath = filepath or RULES_FILE
+    filepath = filepath or _rules_file()
     if os.path.isfile(filepath):
         try:
             with open(filepath, "r") as f:

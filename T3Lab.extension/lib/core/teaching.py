@@ -89,9 +89,42 @@ def session_dir(appdata=None):
     return d
 
 
+# Session files the miner has ingested (renamed .done once their content is in
+# the dataset) kept on disk, newest first. Nothing reads them again, so they
+# are capped. Never deleted: an unprocessed *.jsonl (the miner still needs it)
+# and a .nolabel (set aside without a goal — its only copy, not in the dataset).
+MAX_PROCESSED_SESSIONS = 500
+_PROCESSED_SUFFIXES = ('.jsonl.done',)
+_PRUNED_DIRS = set()
+
+
+def prune_sessions(directory=None, keep=None):
+    """Keep the newest `keep` (default MAX_PROCESSED_SESSIONS) processed
+    session files. Returns how many went. Never raises."""
+    try:
+        from core import housekeeping
+        if keep is None:
+            keep = MAX_PROCESSED_SESSIONS
+        return housekeeping.prune_files(directory or session_dir(),
+                                        keep_newest=keep,
+                                        suffixes=_PROCESSED_SUFFIXES)
+    except Exception:
+        return 0
+
+
 def append_step_line(path, goal, step):
     """Stream-append one {goal, step} record to a session file. ASCII-serialize-
-    then-write via jsonsafe (IronPython 2.7 safe); never raises."""
+    then-write via jsonsafe (IronPython 2.7 safe); never raises.
+
+    The first write into a folder in this session also caps the processed
+    session files there (prune_sessions)."""
+    try:
+        folder = os.path.dirname(path)
+        if folder not in _PRUNED_DIRS:
+            _PRUNED_DIRS.add(folder)
+            prune_sessions(folder)
+    except Exception:
+        pass
     try:
         payload = jsonsafe.dumps({'goal': goal or u'', 'step': step})
         with io.open(path, 'a', encoding='utf-8') as f:

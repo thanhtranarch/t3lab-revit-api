@@ -238,19 +238,51 @@ def describe_environment():
     return '\n'.join(lines)
 
 
+_BOOTSTRAP_LOG_MAX_BYTES = 256 * 1024     # then rotated to bootstrap.log.1
+_LOGGED_REPORTS = set()                   # reports already written this session
+
+
 def _log_diagnosis():
     """Append the report to %APPDATA%/T3LabAI/bootstrap.log when something is
-    wrong. Silent on a healthy machine, so the log stays a signal."""
+    wrong. Silent on a healthy machine, so the log stays a signal.
+
+    Written once per state: init_cpython_paths() runs on EVERY click, and a
+    machine with a broken engine used to append the same full report each
+    time. A report identical to the one already at the end of the log (or
+    already written in this session) is skipped; past the size cap the log
+    is rotated to bootstrap.log.1.
+    """
     if not ENGINE_DIAGNOSIS.get('stdlib_missing'):
         return
+    report = describe_environment()
+    if report in _LOGGED_REPORTS:
+        return
+    _LOGGED_REPORTS.add(report)
     try:
         base = os.environ.get('APPDATA', '') or os.path.expanduser('~')
         d = os.path.join(base, 'T3LabAI')
         if not os.path.isdir(d):
             os.makedirs(d)
+        path = os.path.join(d, 'bootstrap.log')
+        entry = report + u'\n\n'
+        if os.path.exists(path):
+            size = os.path.getsize(path)
+            raw = entry.encode('utf-8')
+            # Only the tail is read, in binary; io.open wrote \r\n on Windows,
+            # so line endings are normalised before comparing.
+            with open(path, 'rb') as f:
+                f.seek(max(0, size - 2 * len(raw) - 16))
+                tail = f.read().replace(b'\r\n', b'\n')
+            if tail.endswith(raw):
+                return
+            if size > _BOOTSTRAP_LOG_MAX_BYTES:
+                try:
+                    os.replace(path, path + '.1')
+                except Exception:
+                    os.remove(path)
         import io as _io
-        with _io.open(os.path.join(d, 'bootstrap.log'), 'a', encoding='utf-8') as f:
-            f.write(describe_environment() + u'\n\n')
+        with _io.open(path, 'a', encoding='utf-8') as f:
+            f.write(entry)
     except Exception:
         pass
 

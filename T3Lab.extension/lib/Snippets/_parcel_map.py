@@ -83,6 +83,11 @@ MAX_TILES = 36
 MEMORY_CACHE_TILES = 512
 DISK_CACHE_DAYS = 7
 DISK_CACHE_DIR = os.path.join(tempfile.gettempdir(), "t3lab_osm_tiles")
+# Expired tiles used to be ignored but never deleted, so the folder only grew.
+# prune_disk_cache() runs once per session (first tile written) and also caps
+# the count: a tile is ~10-40 KB, so 2000 stay well under 100 MB.
+DISK_CACHE_MAX_TILES = 2000
+_DISK_PRUNED = []
 
 _logger = None
 
@@ -410,7 +415,29 @@ def _disk_get(key):
     return data if looks_like_image(data) else None
 
 
+def prune_disk_cache(now=None):
+    """Delete expired tiles (older than DISK_CACHE_DAYS), the oldest beyond
+    DISK_CACHE_MAX_TILES, and .part files a crashed write left behind.
+    Returns how many files went. Never raises."""
+    try:
+        from core import housekeeping
+        removed = housekeeping.prune_files(
+            DISK_CACHE_DIR, max_age_days=DISK_CACHE_DAYS,
+            keep_newest=DISK_CACHE_MAX_TILES, suffixes=(".png",),
+            recursive=True, now=now)
+        removed += housekeeping.prune_files(
+            DISK_CACHE_DIR, max_age_days=1, suffixes=(".part",),
+            recursive=True, now=now)
+        return removed
+    except Exception as ex:
+        _log("Tile cache prune skipped: {}".format(ex))
+        return 0
+
+
 def _disk_put(key, data):
+    if not _DISK_PRUNED:
+        _DISK_PRUNED.append(True)
+        prune_disk_cache()
     path = _disk_path(key)
     tmp = "{}.{}.part".format(path, threading.current_thread().ident)
     try:
