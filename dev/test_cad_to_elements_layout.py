@@ -62,6 +62,16 @@ class OneShell(unittest.TestCase):
         cls.names = by_name(cls.root)
         cls.parent = {c: p for p in cls.root.iter() for c in p}
 
+    def test_source_row_lines_up_with_the_cards_below(self):
+        # CAD SOURCE | LEVEL share the column split of OPTIONS | LAYERS, so the
+        # two combos end exactly where the two cards end (owner, 2026-10-02).
+        cols = lambda g: [c.get("Width") for c in g.find(P + "Grid.ColumnDefinitions")]
+        source = self.parent[self.parent[self.names["cmb_cad_files"]]]
+        body = self.parent[source]
+        cards = [g for g in body if g.tag == P + "Grid" and g.get("Grid.Row") == "4"]
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cols(source), cols(cards[0]))
+
     def test_window_is_size_class_l_and_not_sized_to_content(self):
         self.assertEqual((self.root.get("Width"), self.root.get("Height")), ("1000", "620"))
         self.assertIsNone(self.root.get("SizeToContent"))
@@ -108,10 +118,13 @@ class OneShell(unittest.TestCase):
 
     def test_one_shared_layer_list_toolbar_and_footer(self):
         src = read(XAML)
-        for name in ("grid_layers", "txt_layer_search", "btn_ai_select", "btn_layers_all",
-                     "btn_layers_clear", "txt_layer_tally", "txt_layers_empty",
+        for name in ("grid_layers", "txt_layer_search", "btn_ai_select",
+                     "txt_layer_tally", "txt_layers_empty",
                      "cmb_cad_files", "cmb_levels", "btn_run", "btn_refresh"):
             self.assertEqual(src.count('x:Name="%s"' % name), 1, name)
+        # The header checkbox selects / clears every layer: no separate buttons.
+        for name in ("btn_layers_all", "btn_layers_clear"):
+            self.assertNotIn('x:Name="%s"' % name, src)
         # The title-bar X is the only close control (2026-10-02): no footer Close.
         self.assertNotIn('x:Name="btn_close_bar"', src)
         self.assertEqual(len(list(self.root.iter(P + "DataGrid"))), 1)

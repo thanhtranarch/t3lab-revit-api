@@ -565,16 +565,6 @@ class CADToElementsWindow(T3WPFWindow):
         self._store_selection()
         self._refresh_rows()
 
-    def layers_select_all_clicked(self, sender, e):
-        self.toggle_all_rows(self.grid_layers, "is_selected", True)
-        self._store_selection()
-        self._refresh_rows()
-
-    def layers_clear_clicked(self, sender, e):
-        self.toggle_all_rows(self.grid_layers, "is_selected", False)
-        self._store_selection()
-        self._refresh_rows()
-
     def _on_row_checkbox_click(self, sender, e):
         self._store_selection()
         self._sync_header()
