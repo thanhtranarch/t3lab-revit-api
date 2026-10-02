@@ -234,6 +234,9 @@ class TestXamlWiring(unittest.TestCase):
         ('ManaViews.xaml', 'ManaViewsDialog.py', 'VIEW_EDIT_FIELDS'),
         ('ManaViews.xaml', 'ManaViewsDialog.py', 'TMPL_EDIT_FIELDS'),
         ('ManaSheets.xaml', 'ManaSheetsDialog.py', 'SHEET_EDIT_FIELDS'),
+        # Annotation Manager stages type renames / note text on DataTable rows
+        # (flag = a string column); its NAME columns use the same cell bridge.
+        ('ManaAnno.xaml', 'ManaAnnoDialog.py', 'ANNO_EDIT_FIELDS'),
     )
     # Tools that compute the flag themselves instead of staging through
     # GridPendingEdits — same highlight, same bridge.
@@ -286,7 +289,8 @@ class TestXamlWiring(unittest.TestCase):
             self._assert_bridged(xaml, fields, xaml)
 
     def test_no_trigger_binds_a_dirty_flag_directly(self):
-        for xaml in ('ManaViews.xaml', 'ManaSheets.xaml', 'ManaGroup.xaml', 'ManaLoca.xaml'):
+        for xaml in ('ManaViews.xaml', 'ManaSheets.xaml', 'ManaGroup.xaml', 'ManaLoca.xaml',
+                     'ManaAnno.xaml'):
             source = _read(os.path.join(TOOLS, xaml))
             self.assertNotRegex(source, r'<DataTrigger Binding="\{Binding dirty_',
                                 xaml + ": a DataTrigger on a Python flag never fires")
@@ -320,9 +324,11 @@ class TestXamlWiring(unittest.TestCase):
             'views_grid': self._declared_fields('ManaViewsDialog.py', 'VIEW_EDIT_FIELDS'),
             'tmpl_grid': self._declared_fields('ManaViewsDialog.py', 'TMPL_EDIT_FIELDS'),
             'sheets_grid': self._declared_fields('ManaSheetsDialog.py', 'SHEET_EDIT_FIELDS'),
+            'dg_dim': self._declared_fields('ManaAnnoDialog.py', 'ANNO_EDIT_FIELDS'),
+            'dg_txt': self._declared_fields('ManaAnnoDialog.py', 'ANNO_EDIT_FIELDS'),
         }
         seen = set()
-        for xaml in ('ManaViews.xaml', 'ManaSheets.xaml'):
+        for xaml in ('ManaViews.xaml', 'ManaSheets.xaml', 'ManaAnno.xaml'):
             root = ET.fromstring(_read(os.path.join(TOOLS, xaml)))
             for grid in root.iter():
                 name = grid.get(XNS + 'Name')

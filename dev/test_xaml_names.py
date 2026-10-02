@@ -22,7 +22,10 @@ REQUIRED = {
                       'sp_rules', 'nav_dim', 'nav_txt', 'nav_dimtext',
                       'main_tabs', 'btn_primary', 'lb_dimtext_presets',
                       'dimtext_scope_count', 'dim_hint', 'txt_hint',
-                      'dim_checked_count', 'txt_checked_count'],
+                      'dim_checked_count', 'txt_checked_count',
+                      # staged renames: Apply buttons, grids, mode chips
+                      'btn_dim_apply', 'btn_txt_apply', 'dg_dim', 'dg_txt',
+                      'rb_dim_inst', 'rb_dim_type', 'rb_notes', 'rb_types'],
     'DimText.xaml': ['chk_leader', 'rb_view', 'chk_filter_enable',
                      'sp_filter_config', 'combo_combine', 'sp_rules', 'lbl_status'],
     'ContainsDefineValue.xaml': ['avail_list', 'selected_list', 'txt_sep',

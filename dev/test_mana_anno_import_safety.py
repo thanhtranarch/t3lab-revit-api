@@ -15,6 +15,7 @@ import os
 import re
 import sys
 import unittest
+from types import SimpleNamespace
 
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -166,7 +167,7 @@ class ManaAnnoPageStatus(unittest.TestCase):
         win.status = SimpleNamespace(Text="", ToolTip="")
         win.status_dot = SimpleNamespace(Fill=None)
         win.FindResource = lambda key: key
-        win.btn_primary = SimpleNamespace(Content="", IsEnabled=True, ToolTip="")
+        win.btn_primary = SimpleNamespace(Content="", IsEnabled=True, ToolTip="", IsDefault=True)
         win._dimtext_update_scope = lambda: None
         win._dim_submode, win._txt_submode = "instances", "notes"
         win._page = scope["PAGE_DIM"]
@@ -195,6 +196,42 @@ class ManaAnnoPageStatus(unittest.TestCase):
         self.assertEqual((win.btn_primary.Content, win.btn_primary.IsEnabled),
                          ("Apply Overrides", True))
 
+    def test_enter_never_applies_dim_text_overrides(self):
+        """Owner decision 2026-10-02: on Dim Text the primary writes to the
+        model and the page is TextBoxes, so Enter must not press it. It stays
+        the default button (Enter) where it only jumps to a view."""
+        win, scope = self.window()
+        win._on_page_shown(scope["PAGE_DIMTEXT"])
+        self.assertIs(win.btn_primary.IsDefault, False)
+        win._on_page_shown(scope["PAGE_DIM"])
+        self.assertIs(win.btn_primary.IsDefault, True)
+        win._on_page_shown(scope["PAGE_DIMTEXT"])
+        win._on_page_shown(scope["PAGE_TXT"])
+        self.assertIs(win.btn_primary.IsDefault, True)
+        win._txt_submode = "types"                     # disabled, still not Apply
+        win._sync_primary()
+        self.assertIs(win.btn_primary.IsDefault, True)
+
+    def test_is_default_is_set_per_page_in_sync_primary_only(self):
+        tree = ast.parse(_read(MANA_ANNO), filename=MANA_ANNO)
+        writes = []
+        for fn in ast.walk(tree):
+            if not isinstance(fn, ast.FunctionDef):
+                continue
+            for node in ast.walk(fn):
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, ast.Attribute) and target.attr == "IsDefault":
+                            writes.append((fn.name, ast.unparse(node.value)))
+        self.assertEqual(sorted(writes), [("_sync_primary", "False"), ("_sync_primary", "True")])
+        sync = next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.FunctionDef) and n.name == "_sync_primary")
+        dimtext = next(n for n in sync.body if isinstance(n, ast.If)
+                       and "PAGE_DIMTEXT" in ast.unparse(n.test))
+        self.assertIn("btn.IsDefault = False", ast.unparse(dimtext))
+        self.assertNotIn("IsDefault = True", ast.unparse(dimtext))
+        # The XAML keeps IsDefault="True" (rule 9) - test_one_primary_in_the_footer.
+
 
 
 class ActiveDocumentPerLaunch(unittest.TestCase):
@@ -219,6 +256,553 @@ class ActiveDocumentPerLaunch(unittest.TestCase):
                                           "show_dialog"))
         self.assertIn("global doc, uidoc", show)
         self.assertLess(show.index("revit.doc"), show.index("DimTextWindow()"))
+
+
+# ── Staged NAME / TEXT edits (owner decision 2026-10-02) ──────────────────
+# Editing a type name (or a note's text) only STAGES it: yellow cell, Apply
+# Changes writes every staged edit in one transaction. The window code is
+# exec'd from the source with fakes in place of WPF / Revit, like the page tests.
+
+STAGING_CONSTS = {
+    "PAGE_DIM", "PAGE_TXT", "PAGE_DIMTEXT", "_DOT_KEYS", "_PAGE_NAMES",
+    "_TYPE_ONLY_COLUMNS", "_INSTANCE_ONLY_COLUMNS",
+    "ANNO_EDIT_FIELDS", "EDIT_FIELD", "ORIG_PREFIX", "DIRTY_PREFIX", "TIP_PREFIX",
+    "STAGE_CLEAN", "STAGE_PENDING", "STAGE_FAILED", "_TYPE_KINDS", "_EDITABLE_KINDS",
+}
+STAGING_FUNCS = {
+    "_one_line", "_stage_edit", "_cell_flags", "_apply_label", "_failure_reason",
+    "_write_staged", "_settle_staged", "_apply_summary", "_discard_prompt",
+}
+STAGING_METHODS = {
+    "_status", "_paint_status", "_sync_primary", "_set_mode_columns", "_grid",
+    "_nav_button", "_flush_edit", "_commit_row_later", "_paint_staged", "_sync_apply",
+    "_stage_cell_edit", "_discard_staged", "_confirm_discard", "_discard_or_keep",
+    "_leave_page", "_on_closing", "_prune_staged", "_staged_element", "_apply_staged",
+    "_settle_before_rename_all", "_update_nav_states", "_dt_add",
+    "dim_cell_edit_ending", "txt_cell_edit_ending", "dim_apply", "txt_apply",
+    "dim_submode", "txt_submode",
+}
+
+
+def _assign_names(node):
+    names = set()
+    for target in node.targets:
+        for leaf in ast.walk(target):
+            if isinstance(leaf, ast.Name):
+                names.add(leaf.id)
+    return names
+
+
+def _staging_scope(extra=None, methods=STAGING_METHODS):
+    """Module constants + pure helpers + the window class (chosen methods only),
+    exec'd from ManaAnnoDialog.py with `extra` fakes for WPF / Revit names."""
+    sys.path.insert(0, LIB_DIR)
+    try:
+        from GUI.GridPendingEdits import column_key, editor_text, revert_editor
+        from Snippets._compat import disposing
+    finally:
+        sys.path.remove(LIB_DIR)
+    tree = ast.parse(_read(MANA_ANNO), filename=MANA_ANNO)
+    body = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and _assign_names(node) & STAGING_CONSTS:
+            body.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in STAGING_FUNCS:
+            body.append(node)
+        elif (isinstance(node, ast.ClassDef) and node.name == "AnnotationManagerWindow"
+              and methods):
+            node.bases = []
+            node.body = [m for m in node.body
+                         if isinstance(m, ast.FunctionDef) and m.name in methods]
+            body.append(node)
+    scope = {
+        "column_key": column_key, "editor_text": editor_text,
+        "revert_editor": revert_editor, "disposing": disposing,
+        "Action": lambda fn: fn,
+        "DispatcherPriority": SimpleNamespace(Background="Background"),
+        "DataGridEditingUnit": SimpleNamespace(Cell="Cell", Row="Row"),
+        "Visibility": SimpleNamespace(Visible="Visible", Collapsed="Collapsed"),
+        "doc": object(),
+    }
+    scope.update(extra or {})
+    exec(compile(ast.Module(body=body, type_ignores=[]), MANA_ANNO, "exec"), scope)
+    return scope
+
+
+class _Row(dict):
+    """A DataRowView stand-in: rows are read and written by column name."""
+
+
+class _Toggle(object):
+    """Rail button / chip stand-in; compared by identity like a WPF control."""
+
+    def __init__(self, checked=False):
+        self.IsChecked = checked
+
+
+class _Grid(object):
+    def __init__(self):
+        self.commits = []
+        self.Columns = []
+
+    def CommitEdit(self, unit, exit_editing):
+        self.commits.append(unit)
+        return True
+
+
+class _Dialogs(object):
+    """T3Dialog stand-in: confirm answers are queued, every call is recorded."""
+
+    def __init__(self, *answers):
+        self.answers = list(answers)
+        self.confirms, self.warnings = [], []
+
+    def confirm(self, message, **kw):
+        self.confirms.append((message, kw))
+        return self.answers.pop(0) if self.answers else False
+
+    def show_warning(self, message, **kw):
+        self.warnings.append((message, kw))
+
+
+_STATUS = SimpleNamespace(Started="Started", Committed="Committed", RolledBack="RolledBack")
+
+
+class _Transaction(object):
+    """Revit Transaction stand-in that records what happened to it."""
+    made = []
+    commit_result = "Committed"
+
+    def __init__(self, doc, name):
+        self.name, self.events = name, []
+        self.started = self.ended = False
+        _Transaction.made.append(self)
+
+    def Start(self):
+        self.started = True
+        self.events.append("start")
+        return _STATUS.Started
+
+    def GetFailureHandlingOptions(self):
+        return SimpleNamespace(SetForcedModalHandling=lambda value: None)
+
+    def SetFailureHandlingOptions(self, options):
+        pass
+
+    def Commit(self):
+        self.ended = True
+        self.events.append("commit")
+        return _Transaction.commit_result
+
+    def RollBack(self):
+        self.ended = True
+        self.events.append("rollback")
+
+    def HasStarted(self):
+        return self.started
+
+    def HasEnded(self):
+        return self.ended
+
+    def Dispose(self):
+        self.events.append("dispose")
+
+
+class _NoTransaction(object):
+    def __init__(self, *args):
+        raise AssertionError("a cell edit opened a Revit transaction")
+
+
+class _Type(object):
+    """ElementType stand-in: Revit refuses a name another type already has."""
+
+    def __init__(self, name, taken):
+        self._name, self._taken = name, taken
+
+    @property
+    def Name(self):
+        return self._name
+
+    @Name.setter
+    def Name(self, value):
+        if value in self._taken:
+            raise ValueError("The name '{}' is already in use.\nParameter name: name".format(value))
+        self._taken.discard(self._name)
+        self._taken.add(value)
+        self._name = value
+
+
+def _type_row(elem_id, name, cat="DimType"):
+    return _Row({"_id": elem_id, "_cat": cat, "Name": name, "Status": "Active",
+                 "orig_Name": name, "dirty_Name": "False", "tip_Name": ""})
+
+
+def _edit(row, typed, field="Name", action="Commit"):
+    """DataGridCellEditEndingEventArgs stand-in."""
+    column = SimpleNamespace(Binding=SimpleNamespace(Path=SimpleNamespace(Path=field)),
+                             SortMemberPath=field, Header="SOMETHING ELSE")
+    return SimpleNamespace(Column=column, EditAction=action, Row=SimpleNamespace(Item=row),
+                           EditingElement=SimpleNamespace(Text=typed), Cancel=False)
+
+
+class ManaAnnoStagingHelpers(unittest.TestCase):
+    """The pure staging rules (no WPF, no Revit)."""
+
+    def setUp(self):
+        self.s = _staging_scope(methods=set())
+
+    def test_stage_then_type_back_unstages(self):
+        store = {}
+        self.assertTrue(self.s["_stage_edit"](store, "7", "DimType", "Old", "New"))
+        self.assertEqual(store["7"]["value"], "New")
+        self.assertFalse(self.s["_stage_edit"](store, "7", "DimType", "Old", "Old"))
+        self.assertEqual(store, {})
+
+    def test_restaging_clears_a_refused_reason(self):
+        store = {}
+        self.s["_stage_edit"](store, "7", "DimType", "Old", "Dup")
+        store["7"]["error"] = "name already in use"
+        self.s["_stage_edit"](store, "7", "DimType", "Old", "Fresh")
+        self.assertEqual(store["7"]["error"], "")
+
+    def test_cell_flags_per_state(self):
+        flags = self.s["_cell_flags"]
+        self.assertEqual(flags(None), ("False", ""))
+        flag, tip = flags({"original": "Old", "value": "New", "error": ""})
+        self.assertEqual(flag, "True")
+        self.assertIn("'Old'", tip)
+        flag, tip = flags({"original": "Old", "value": "Dup", "error": "name already in use"})
+        self.assertEqual(flag, "Failed")
+        self.assertIn("name already in use", tip)
+
+    def test_flag_values_match_the_xaml_triggers(self):
+        xaml = _read(MANA_ANNO_XAML)
+        for value in (self.s["STAGE_PENDING"], self.s["STAGE_FAILED"]):
+            self.assertEqual(xaml.count(
+                '<Trigger Property="AutomationProperties.ItemStatus" Value="%s">' % value), 2)
+
+    def test_apply_label_carries_the_count(self):
+        self.assertEqual(self.s["_apply_label"](0), "Apply Changes")
+        self.assertEqual(self.s["_apply_label"](3), "Apply Changes (3)")
+
+    def test_one_refused_write_fails_only_its_row(self):
+        def write(key, entry):
+            if key == "2":
+                raise ValueError("The name is already in use.\nParameter name: name")
+        items = [("1", {}), ("2", {}), ("3", {})]
+        done, failed = self.s["_write_staged"](items, write)
+        self.assertEqual(done, ["1", "3"])
+        self.assertEqual(failed, [("2", "The name is already in use.")])
+
+    def test_settle_keeps_refused_edits_staged_with_reason(self):
+        store = {"1": {"value": "A", "error": ""}, "2": {"value": "B", "error": ""}}
+        self.s["_settle_staged"](store, ["1"], [("2", "duplicate")])
+        self.assertEqual(list(store), ["2"])
+        self.assertEqual(store["2"]["error"], "duplicate")
+
+    def test_summary_counts_and_names_the_failure(self):
+        summary = self.s["_apply_summary"]
+        self.assertEqual(summary(3, []), ("Renamed 3 type(s).", "ok"))
+        self.assertEqual(summary(2, [], notes=True), ("Updated 2 text note(s).", "ok"))
+        msg, kind = summary(1, [("ARC_DIM", "already in use"), ("X", "bad")])
+        self.assertTrue(msg.startswith("Renamed 1 type(s). 2 could not be renamed: "
+                                       "'ARC_DIM' - already in use (+1 more)"))
+        self.assertEqual(kind, "warning")
+        self.assertEqual(summary(0, [("X", "bad")])[1], "error")
+
+    def test_discard_prompt_names_the_count(self):
+        message, ok = self.s["_discard_prompt"](2, "close Annotation Manager")
+        self.assertEqual(ok, "Discard 2 change(s)")
+        self.assertIn("2 unapplied change(s)", message)
+
+
+class ManaAnnoStagedEdits(unittest.TestCase):
+    """Window behaviour around staged edits, with WPF / Revit faked."""
+
+    def make(self, *answers, transaction=_NoTransaction):
+        self.dialogs = _Dialogs(*answers)
+        _Transaction.made = []
+        _Transaction.commit_result = "Committed"
+        s = _staging_scope({"T3Dialog": self.dialogs, "Transaction": transaction,
+                            "DB": SimpleNamespace(TransactionStatus=_STATUS)})
+        win = s["AnnotationManagerWindow"].__new__(s["AnnotationManagerWindow"])
+        win.status = SimpleNamespace(Text="", ToolTip="")
+        win.status_dot = SimpleNamespace(Fill=None)
+        win.FindResource = lambda key: key
+        win.btn_primary = SimpleNamespace(Content="", IsEnabled=True, ToolTip="", IsDefault=True)
+        for name in ("btn_dim_apply", "btn_txt_apply"):
+            setattr(win, name, SimpleNamespace(Content="Apply Changes", IsEnabled=False,
+                                               ToolTip="", Visibility="Visible"))
+        win.dg_dim, win.dg_txt = _Grid(), _Grid()
+        win.Dispatcher = SimpleNamespace(BeginInvoke=lambda priority, action: action())
+        for name in ("nav_dim", "nav_txt", "nav_dimtext", "rb_dim_inst", "rb_dim_type",
+                     "rb_notes", "rb_types"):
+            setattr(win, name, _Toggle())
+        win.nav_dim.IsChecked = True
+        win._dim_dt = win._txt_dt = object()           # the handlers' "init done" guard
+        win._dim_search_timer = SimpleNamespace(Stop=lambda: None)
+        win._txt_search_timer = SimpleNamespace(Stop=lambda: None)
+        win._page = s["PAGE_DIM"]
+        win._page_status = {0: ("Ready.", "idle"), 1: ("Ready.", "idle"), 2: ("Ready.", "idle")}
+        win._staged = {s["PAGE_DIM"]: {}, s["PAGE_TXT"]: {}}
+        win._dim_submode, win._txt_submode = "types", "notes"
+        self.calls = []
+        for name in ("_fill_dims", "_fill_txts", "_refresh_dim_cache", "_refresh_txt_cache",
+                     "_load_sidebar_lists", "_apply_dim_mode", "_apply_txt_mode",
+                     "_dimtext_update_scope"):
+            setattr(win, name, (lambda n: lambda *a, **k: self.calls.append(n))(name))
+        self.taken = {"Old A", "Old B", "Taken"}
+        win._dim_type_by_id = {"1": _Type("Old A", self.taken), "2": _Type("Old B", self.taken)}
+        win._txt_type_by_id, win._txt_record_by_id = {}, {}
+        self.s, self.win = s, win
+        return win
+
+    def stage(self, row, typed, page=None):
+        page = self.s["PAGE_DIM"] if page is None else page
+        grid = self.win._grid(page)
+        handler = self.win.dim_cell_edit_ending if page == self.s["PAGE_DIM"] \
+            else self.win.txt_cell_edit_ending
+        args = _edit(row, typed)
+        handler(grid, args)
+        return args
+
+    def test_typing_a_name_stages_it_and_writes_nothing(self):
+        win = self.make()                                  # Transaction() would raise
+        row = _type_row("1", "Old A")
+        self.stage(row, "New A")
+        self.assertEqual(win._staged[0]["1"]["value"], "New A")
+        self.assertEqual(row["dirty_Name"], "True")
+        self.assertIn("'Old A'", row["tip_Name"])
+        self.assertEqual(win._dim_type_by_id["1"].Name, "Old A")
+        self.assertEqual((win.btn_dim_apply.Content, win.btn_dim_apply.IsEnabled),
+                         ("Apply Changes (1)", True))
+        self.assertEqual(win.dg_dim.commits, ["Row"])      # row committed after the cell
+
+    def test_typed_back_to_the_model_value_is_unstaged(self):
+        win = self.make()
+        row = _type_row("1", "Old A")
+        self.stage(row, "New A")
+        row["Name"] = "New A"                              # what the binding wrote
+        self.stage(row, "Old A")
+        self.assertEqual(win._staged[0], {})
+        self.assertEqual(row["dirty_Name"], "False")
+        self.assertEqual((win.btn_dim_apply.Content, win.btn_dim_apply.IsEnabled),
+                         ("Apply Changes", False))
+
+    def test_type_name_is_trimmed_and_empty_is_refused(self):
+        win = self.make()
+        row = _type_row("1", "Old A")
+        args = self.stage(row, "  New A  ")
+        self.assertEqual(args.EditingElement.Text, "New A")   # the cell commits it trimmed
+        self.assertEqual(win._staged[0]["1"]["value"], "New A")
+        other = _type_row("2", "Old B")
+        args = self.stage(other, "   ")
+        self.assertEqual(args.EditingElement.Text, "Old B")
+        self.assertNotIn("2", win._staged[0])
+
+    def test_note_text_keeps_its_spaces(self):
+        win = self.make()
+        row = _type_row("9", "Note", cat="TxtInst")
+        self.stage(row, " Note 2 ", page=self.s["PAGE_TXT"])
+        self.assertEqual(win._staged[1]["9"]["value"], " Note 2 ")
+
+    def test_only_the_name_column_on_commit_is_staged(self):
+        win = self.make()
+        row = _type_row("1", "Old A")
+        win.dim_cell_edit_ending(win.dg_dim, _edit(row, "x", field="Status"))
+        win.dim_cell_edit_ending(win.dg_dim, _edit(row, "x", action="Cancel"))
+        self.assertEqual(win._staged[0], {})
+
+    def test_dimension_instances_are_not_staged(self):
+        win = self.make()
+        row = _type_row("5", "Some Type", cat="DimInst")
+        args = self.stage(row, "Renamed")
+        self.assertEqual(args.EditingElement.Text, "Some Type")
+        self.assertEqual(win._staged[0], {})
+
+    def test_rebuilt_row_reads_its_staged_edit_back(self):
+        """The table is rebuilt on every filter keystroke; the store is not."""
+        win = self.make()
+        win._staged[0]["1"] = {"kind": "DimType", "original": "Old A", "value": "New A",
+                               "error": "", "status": "AI Fix"}
+        rows = []
+        table = SimpleNamespace(NewRow=_Row, Rows=SimpleNamespace(Add=rows.append))
+        win._dt_add(table, "1", "DimType", "Old A", "Dimension Type", page=0)
+        win._dt_add(table, "2", "DimType", "Old B", "Dimension Type", page=0)
+        self.assertEqual((rows[0]["Name"], rows[0]["orig_Name"], rows[0]["dirty_Name"],
+                          rows[0]["Status"]), ("New A", "Old A", "True", "AI Fix"))
+        self.assertEqual((rows[1]["Name"], rows[1]["dirty_Name"]), ("Old B", "False"))
+
+    def test_apply_writes_all_in_one_transaction_and_keeps_refused_rows(self):
+        win = self.make(transaction=_Transaction)
+        self.stage(_type_row("1", "Old A"), "New A")
+        self.stage(_type_row("2", "Old B"), "Taken")      # duplicate name
+        win.dim_apply(None, None)
+        self.assertEqual(len(_Transaction.made), 1)
+        self.assertEqual(_Transaction.made[0].events, ["start", "commit", "dispose"])
+        self.assertEqual(win._dim_type_by_id["1"].Name, "New A")
+        self.assertEqual(list(win._staged[0]), ["2"])
+        self.assertIn("already in use", win._staged[0]["2"]["error"])
+        self.assertTrue(win.status.Text.startswith("Renamed 1 type(s). 1 could not be renamed"))
+        self.assertEqual(len(self.dialogs.warnings), 1)
+        self.assertIn("'Old B' → 'Taken'", self.dialogs.warnings[0][1]["details"])
+        self.assertEqual(win.btn_dim_apply.Content, "Apply Changes (1)")
+        self.assertIn("_fill_dims", self.calls)          # rebuilt: yellow cleared, red kept
+
+    def test_apply_with_every_row_refused_rolls_back(self):
+        win = self.make(transaction=_Transaction)
+        self.stage(_type_row("2", "Old B"), "Taken")
+        win.dim_apply(None, None)
+        self.assertEqual(_Transaction.made[0].events, ["start", "rollback", "dispose"])
+        self.assertEqual(win._staged[0]["2"]["value"], "Taken")
+
+    def test_commit_refused_by_revit_keeps_everything_staged(self):
+        win = self.make(transaction=_Transaction)
+        _Transaction.commit_result = "RolledBack"
+        self.stage(_type_row("1", "Old A"), "New A")
+        win.dim_apply(None, None)
+        self.assertEqual(win._staged[0]["1"]["error"], "")
+        self.assertIn("Apply failed; nothing was written", win.status.Text)
+        self.assertNotIn("_fill_dims", self.calls)
+
+    def test_mode_switch_keep_editing_puts_the_chip_back(self):
+        win = self.make(False)
+        self.stage(_type_row("1", "Old A"), "New A")
+        win.rb_dim_inst.IsChecked, win.rb_dim_type.IsChecked = True, False
+        win.dim_submode(None, None)
+        self.assertEqual(win._dim_submode, "types")
+        self.assertIs(win.rb_dim_type.IsChecked, True)
+        self.assertEqual(len(win._staged[0]), 1)
+        message, kw = self.dialogs.confirms[0]
+        self.assertEqual(kw["ok_text"], "Discard 1 change(s)")
+        self.assertEqual((kw["danger"], kw["cancel_text"]), (True, "Keep editing"))
+
+    def test_mode_switch_discard_drops_the_edits(self):
+        win = self.make(True)
+        self.stage(_type_row("1", "Old A"), "New A")
+        win.rb_dim_inst.IsChecked, win.rb_dim_type.IsChecked = True, False
+        win.dim_submode(None, None)
+        self.assertEqual((win._dim_submode, win._staged[0]), ("instances", {}))
+
+    def test_leaving_the_page_keep_editing_stays(self):
+        win = self.make(False)
+        self.stage(_type_row("1", "Old A"), "New A")
+        win.nav_dim.IsChecked, win.nav_txt.IsChecked = False, True   # the click
+        self.assertFalse(win._leave_page(self.s["PAGE_TXT"]))
+        self.assertEqual((win.nav_dim.IsChecked, win.nav_txt.IsChecked), (True, False))
+        self.assertTrue(win._leave_page(self.s["PAGE_DIM"]))      # same page: no question
+        self.assertEqual(len(self.dialogs.confirms), 1)
+
+    def test_close_with_pending_edits_asks(self):
+        win = self.make(False, True)
+        self.stage(_type_row("1", "Old A"), "New A")
+        args = SimpleNamespace(Cancel=False)
+        win._on_closing(None, args)
+        self.assertIs(args.Cancel, True)
+        args = SimpleNamespace(Cancel=False)
+        win._on_closing(None, args)
+        self.assertIs(args.Cancel, False)
+        self.assertEqual(self.dialogs.confirms[0][1]["ok_text"], "Discard 1 change(s)")
+
+    def test_deleted_element_drops_its_staged_edit(self):
+        win = self.make()
+        self.stage(_type_row("1", "Old A"), "New A")
+        self.stage(_type_row("2", "Old B"), "New B")
+        del win._dim_type_by_id["2"]                       # Delete Selected removed it
+        win._prune_staged(self.s["PAGE_DIM"])
+        self.assertEqual(list(win._staged[0]), ["1"])
+        self.assertEqual(win.btn_dim_apply.Content, "Apply Changes (1)")
+
+    def test_close_without_pending_edits_does_not_ask(self):
+        win = self.make()
+        args = SimpleNamespace(Cancel=False)
+        win._on_closing(None, args)
+        self.assertEqual((args.Cancel, self.dialogs.confirms), (False, []))
+
+    def test_rename_all_applies_or_discards_pending_renames_first(self):
+        win = self.make(True, transaction=_Transaction)            # Apply first
+        self.stage(_type_row("1", "Old A"), "New A")
+        self.assertTrue(win._settle_before_rename_all(0))
+        self.assertEqual((win._staged[0], win._dim_type_by_id["1"].Name), ({}, "New A"))
+
+        win = self.make(False, True)                               # Don't apply → Discard
+        self.stage(_type_row("1", "Old A"), "New A")
+        self.assertTrue(win._settle_before_rename_all(0))
+        self.assertEqual(win._staged[0], {})
+
+        win = self.make(False, False)                              # Don't apply → Keep editing
+        self.stage(_type_row("1", "Old A"), "New A")
+        self.assertFalse(win._settle_before_rename_all(0))
+        self.assertEqual(len(win._staged[0]), 1)
+
+
+class ManaAnnoStagingSource(unittest.TestCase):
+    """Source checks that keep the model writes where they belong."""
+
+    def setUp(self):
+        self.tree = ast.parse(_read(MANA_ANNO), filename=MANA_ANNO)
+        cls = next(n for n in self.tree.body if isinstance(n, ast.ClassDef)
+                   and n.name == "AnnotationManagerWindow")
+        self.methods = {m.name: m for m in cls.body if isinstance(m, ast.FunctionDef)}
+
+    def test_cell_edit_handlers_never_write_to_the_model(self):
+        for name in ("dim_cell_edit_ending", "txt_cell_edit_ending", "_stage_cell_edit"):
+            fn = self.methods[name]
+            names = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name)}
+            self.assertFalse(names & {"Transaction", "disposing", "_run_transaction",
+                                      "doc", "setattr"}, name)
+            for node in ast.walk(fn):
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        self.assertFalse(isinstance(target, ast.Attribute)
+                                         and target.attr in ("Name", "Text"),
+                                         "%s assigns %s" % (name, ast.unparse(target)))
+
+    def test_apply_uses_one_disposing_transaction_checked_for_commit(self):
+        fn = self.methods["_apply_staged"]
+        source = ast.unparse(fn)
+        made = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                and getattr(n.func, "id", "") == "Transaction"]
+        self.assertEqual(len(made), 1)
+        withs = [n for n in ast.walk(fn) if isinstance(n, ast.With)]
+        self.assertEqual(len(withs), 1)
+        context = withs[0].items[0].context_expr
+        self.assertEqual(getattr(context.func, "id", ""), "disposing")
+        self.assertIs(context.args[0], made[0])
+        self.assertIn("transaction.Commit() != DB.TransactionStatus.Committed", source)
+        self.assertIn("transaction.Start() != DB.TransactionStatus.Started", source)
+        self.assertIn("_write_staged(items, write)", source)
+        self.assertNotIn("_run_transaction", source)
+        for loop in (n for n in ast.walk(fn) if isinstance(n, (ast.For, ast.While))):
+            self.assertNotIn("Transaction(", ast.unparse(loop))
+
+    def test_apply_buttons_and_rename_all_go_through_the_store(self):
+        for name in ("dim_apply", "txt_apply"):
+            self.assertIn("self._apply_staged(", ast.unparse(self.methods[name]))
+        for name in ("dim_rename_all", "txt_rename_all"):
+            first = ast.unparse(self.methods[name].body[0])
+            self.assertIn("self._settle_before_rename_all(", first, name)
+
+    def test_every_way_out_asks_before_dropping_edits(self):
+        init = ast.unparse(self.methods["__init__"])
+        self.assertIn("self.Closing += self._on_closing", init)
+        self.assertLess(init.index("self._staged = "), init.index("self._fill_dims"
+                                                                   if "self._fill_dims" in init
+                                                                   else "self._load_all_dims"))
+        for name in ("nav_dimensions_checked", "nav_textnotes_checked", "nav_dimtext_checked"):
+            self.assertIn("self._leave_page(", ast.unparse(self.methods[name].body[0]), name)
+        for name, fill in (("dim_submode", "self._fill_dims()"), ("txt_submode", "self._fill_txts()")):
+            source = ast.unparse(self.methods[name])
+            self.assertLess(source.index("self._discard_or_keep("), source.index(fill), name)
+
+    def test_rebuilds_commit_an_open_cell_first(self):
+        source = ast.unparse(self.methods["_replace_table"])
+        self.assertLess(source.index("self._flush_edit(grid)"), source.index("ItemsSource = None"))
+
+    def test_ai_spellcheck_stages_through_the_store(self):
+        source = ast.unparse(self.methods["on_txt_ai_qa_clicked"])
+        self.assertIn("_stage_edit(store", source)
+        self.assertIn("self._sync_apply(PAGE_TXT)", source)
 
 if __name__ == "__main__":
     sys.exit(0 if unittest.main(exit=False).result.wasSuccessful() else 1)
