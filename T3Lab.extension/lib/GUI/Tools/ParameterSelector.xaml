@@ -1927,8 +1927,8 @@
                                     MinWidth="0" Height="28" Padding="8,0"
                                     ToolTip="Reset to default selection">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE72C;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                    <TextBlock Text="Reset" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Text}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="&#xE72C;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Reset" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
@@ -1984,12 +1984,10 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="button_cancel" Content="Cancel"
-                                Style="{StaticResource T3.Button.Secondary}"
-                                Width="80" Margin="0,0,8,0"
+                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
                                 IsCancel="True"/>
                         <Button x:Name="button_ok" Content="OK"
                                 Style="{StaticResource T3.Button.Primary}"
-                                Width="80"
                                 IsDefault="True"/>
                     </StackPanel>
                 </Grid>

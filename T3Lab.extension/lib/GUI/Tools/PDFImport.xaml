@@ -2038,10 +2038,10 @@
                     <!-- Right: Action buttons -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="btn_cancel" Style="{StaticResource T3.Button.Secondary}"
-                                Content="Cancel" Height="28" Padding="16,0" Margin="0,0,8,0"
+                                Content="Cancel" Margin="0,0,8,0"
                                 Click="close_button_clicked"/>
                         <Button x:Name="btn_import" Style="{StaticResource T3.Button.Primary}" IsDefault="True"
-                                Content="Import PDF" Height="28" Padding="16,0" IsEnabled="False"
+                                Content="Import PDF" IsEnabled="False"
                                 Click="import_clicked"/>
                     </StackPanel>
                 </Grid>

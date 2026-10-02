@@ -2179,7 +2179,7 @@
                         <!-- Right primary button -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <Button x:Name="btn_create" Content="Create Property Lines in Revit"
-                                    Style="{StaticResource T3.Button.Primary}" Height="28" Padding="16,0"
+                                    Style="{StaticResource T3.Button.Primary}"
                                     IsEnabled="False" Click="btn_create_Click" IsDefault="True"/>
                         </StackPanel>
                     </Grid>

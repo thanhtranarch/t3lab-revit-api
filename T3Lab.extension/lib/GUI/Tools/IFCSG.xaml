@@ -2315,18 +2315,22 @@
                         <StackPanel x:Name="ifc_progress_panel"
                                     Orientation="Horizontal" VerticalAlignment="Center"
                                     Visibility="Collapsed" Margin="0,0,16,0">
-                            <ProgressBar x:Name="ifc_pb" Width="160" Height="8"
+                            <ProgressBar x:Name="ifc_pb" Width="160"
                                          Style="{StaticResource T3.ProgressBar}" Margin="0,0,8,0"/>
                             <Button x:Name="ifc_btn_pause" Style="{StaticResource T3.Button.Secondary}"
-                                    Margin="0,0,4,0">
+                                    Margin="0,0,8,0">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock x:Name="ifc_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                    <TextBlock x:Name="ifc_btn_pause_label" Text="Pause"
-                                               Style="{StaticResource T3.Caption}"/>
+                                    <TextBlock x:Name="ifc_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                    <TextBlock x:Name="ifc_btn_pause_label" Text="Pause" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="ifc_btn_stop" Content="Stop"
-                                    Style="{StaticResource T3.Button.Danger}"/>
+                            <Button x:Name="ifc_btn_stop"
+                                    Style="{StaticResource T3.Button.Danger}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Stop" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
 
                         <!-- Assigner actions: visible only while page 0 is shown -->

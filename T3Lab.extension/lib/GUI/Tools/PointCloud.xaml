@@ -1964,17 +1964,14 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btn_cancel" Content="Cancel" Style="{StaticResource T3.Button.Ghost}"
-                                Height="28" Padding="12,0" Margin="0,0,8,0" Click="btn_cancel_clicked" IsCancel="True"/>
-                        <Button x:Name="btn_analyze" Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="16,0" Margin="0,0,8,0" Click="btn_analyze_clicked">
+                        <Button x:Name="btn_cancel" Content="Cancel" Style="{StaticResource T3.Button.Ghost}" Margin="0,0,8,0" Click="btn_cancel_clicked" IsCancel="True"/>
+                        <Button x:Name="btn_analyze" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0" Click="btn_analyze_clicked">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE768;" Style="{StaticResource T3.Icon.Lead}"/>
                                 <TextBlock Text="Analyze"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="btn_generate" Content="Generate Selected" Style="{StaticResource T3.Button.Primary}"
-                                Height="28" Padding="16,0" IsEnabled="False" Click="btn_generate_clicked" IsDefault="True"/>
+                        <Button x:Name="btn_generate" Content="Generate Selected" Style="{StaticResource T3.Button.Primary}" IsEnabled="False" Click="btn_generate_clicked" IsDefault="True"/>
                     </StackPanel>
                 </Grid>
             </Border>

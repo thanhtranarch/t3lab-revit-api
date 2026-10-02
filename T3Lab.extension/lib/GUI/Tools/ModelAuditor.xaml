@@ -2494,26 +2494,24 @@
                         <Grid x:Name="ma_progress_panel" Visibility="Collapsed"
                               HorizontalAlignment="Right" VerticalAlignment="Center" Margin="16,0,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="160"/>
                                 <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <ProgressBar x:Name="progress_bar" Grid.Column="0" Height="8" Minimum="0" Maximum="100" Value="0"
+                            <ProgressBar x:Name="progress_bar" Grid.Column="0" Minimum="0" Maximum="100" Value="0"
                                          Style="{StaticResource T3.ProgressBar}" VerticalAlignment="Center"/>
-                            <Button x:Name="ma_btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}"
-                                    Height="28" Padding="8,0">
+                            <Button x:Name="ma_btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock x:Name="ma_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                    <TextBlock x:Name="ma_btn_pause_label" Text="Pause" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="ma_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                    <TextBlock x:Name="ma_btn_pause_label" Text="Pause" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="ma_btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}"
-                                    Height="28" Padding="8,0">
+                            <Button x:Name="ma_btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                    <TextBlock Text="Stop" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Surface}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Stop" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </Grid>

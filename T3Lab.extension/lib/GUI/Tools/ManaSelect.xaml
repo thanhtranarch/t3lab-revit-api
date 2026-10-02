@@ -1990,14 +1990,11 @@
                     </Grid>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btn_close_footer" Content="Close" Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="12,0" Margin="0,0,8,0"/>
+                        <Button x:Name="btn_close_footer" Content="Close" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                         <Button x:Name="btn_add_selection" Content="Add to Selection"
-                                Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="12,0" Margin="0,0,8,0"
+                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
                                 ToolTip="Add the checked elements to what is already selected in Revit"/>
-                        <Button x:Name="btn_apply" Content="Select" Style="{StaticResource T3.Button.Primary}"
-                                Height="28" Padding="16,0" IsDefault="True"
+                        <Button x:Name="btn_apply" Content="Select" Style="{StaticResource T3.Button.Primary}" IsDefault="True"
                                 ToolTip="Replace the Revit selection with the checked elements"/>
                     </StackPanel>
                 </Grid>

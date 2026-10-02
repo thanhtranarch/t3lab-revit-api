@@ -1810,12 +1810,12 @@
 
                     <!-- Action Buttons -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="BtnShort" Content="Apply Short"
-                                Style="{StaticResource T3.Button.Primary}" IsDefault="True" Margin="0,0,8,0" MinWidth="82"/>
-                        <Button x:Name="BtnFull" Content="Restore Full"
-                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0" MinWidth="82"/>
                         <Button x:Name="BtnClose" Content="Close"
-                                Style="{StaticResource T3.Button.Secondary}" MinWidth="60"/>
+                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                        <Button x:Name="BtnFull" Content="Restore Full"
+                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                        <Button x:Name="BtnShort" Content="Apply Short"
+                                Style="{StaticResource T3.Button.Primary}" IsDefault="True"/>
                     </StackPanel>
                 </Grid>
             </Border>

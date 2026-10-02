@@ -77,6 +77,10 @@ CHROME_EXEMPT = {
     "T3LabAssistant.xaml",  # bề mặt chat theo theme Revit, đổi bo 12 ↔ 0 khi dock
 }
 
+# ── Luật 27b · Nhãn nút kế thừa font/màu của nút ──────────────────────────
+# Bề mặt chat tô nút theo theme Revit ({DynamicResource T3Theme*}) — giữ riêng.
+BUTTON_LABEL_EXEMPT = {"T3LabAssistant.xaml"}
+
 # ── Luật 23 · Select-all ở header cột checkbox ───────────────────────────
 # Miễn trừ: cột KHÔNG phải để chọn dòng mà là thuộc tính của chính dòng đó.
 # ManaWorkset ACTIVE/OPEN/EDITABLE là trạng thái từng workset trong Revit —
@@ -573,6 +577,52 @@ def audit(src, base, keys):
                       for a in ancestors(el))):
             issues.append(("P1", "Visibility=\"%s\" trong template dòng — thuộc tính Python "
                                  "không đổi được sang Visibility; đọc qua string bridge" % flat))
+
+    # ── Luật 27 · Nút đồng bộ: footer, nhãn, thứ tự (thêm 2026-10-02) ───────
+    # (a) Nút trong T3.FooterBar giữ kích thước của style (cao T3.H.Action 30,
+    #     padding mặc định): 22 tool từng tự đặt Height 26/28 + Padding riêng,
+    #     nên Pause/Stop/Cancel/Apply cạnh nhau cao thấp khác nhau.
+    # (b) Nhãn chữ trong nút Primary/Secondary/Danger kế thừa font + màu của
+    #     nút — không Style T3.Caption, không Foreground/FontSize riêng: Stop
+    #     từng hiện chữ xám 11.5 trên nền đỏ (SheetGen 2026-10-02). Nút Ghost
+    #     dạng link nhỏ trong form thì được phép.
+    # (c) Trong footer, nút Primary là nút T3 cuối cùng (ngoài cùng phải).
+    for foot in root.iter():
+        if local(foot.tag) != "Border" or "T3.FooterBar" not in foot.attrib.get("Style", ""):
+            continue
+        styles = []
+        for el in foot.iter():
+            if local(el.tag) != "Button":
+                continue
+            attrs = {local(k): v for k, v in el.attrib.items()}
+            st = re.search(r"T3\.Button\.(\w+)", attrs.get("Style", ""))
+            if not st:
+                continue
+            styles.append(st.group(1))
+            bad = [a for a in ("Height", "Padding") if a in attrs]
+            if bad:
+                issues.append(("P2", "nút footer %s tự đặt %s — bỏ để giữ chiều cao/padding "
+                                     "chuẩn của style (luật 27a)"
+                               % (attrs.get("Name", attrs.get("Content", "?")), "/".join(bad))))
+        if "Primary" in styles and styles[-1] != "Primary":
+            issues.append(("P2", "footer: nút Primary phải ở ngoài cùng phải — thứ tự hiện "
+                                 "tại %s (luật 27c)" % " → ".join(styles)))
+    for btn in (root.iter() if base not in BUTTON_LABEL_EXEMPT else ()):
+        if local(btn.tag) != "Button":
+            continue
+        st = re.search(r"T3\.Button\.(Primary|Secondary|Danger)", btn.attrib.get("Style", ""))
+        if not st:
+            continue
+        for tb in btn.iter():
+            if local(tb.tag) != "TextBlock" or tb is btn:
+                continue
+            a = {local(k): v for k, v in tb.attrib.items()}
+            if "T3.Icon" in a.get("Style", ""):
+                continue
+            if ("T3.Caption" in a.get("Style", "") or "Foreground" in a or "FontSize" in a):
+                issues.append(("P2", "nhãn \"%s\" trong nút %s tự đặt style/màu/cỡ chữ — để "
+                                     "nhãn kế thừa font và màu của nút (luật 27b)"
+                               % (a.get("Text", "?"), st.group(1))))
 
     # ── Luật 22 · ICON — một bộ icon cho toàn extension ───────────────────
     # (a) Font icon duy nhất là Segoe MDL2 Assets, và LUÔN qua style T3.Icon.*

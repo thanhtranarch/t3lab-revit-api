@@ -1976,12 +1976,12 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btnReload" Content="Reload" Style="{StaticResource T3.Button.Secondary}" Height="28" Margin="0,0,8,0"/>
-                        <Button x:Name="btnZoom" Content="Zoom to Issue" Style="{StaticResource T3.Button.Secondary}" Height="28" Margin="0,0,8,0"/>
-                        <Button x:Name="btnExport" Content="Export CSV" Style="{StaticResource T3.Button.Secondary}" Height="28" Margin="0,0,8,0"/>
-                        <Button x:Name="btnExportBCF" Content="Export BCF" Style="{StaticResource T3.Button.Secondary}" Height="28" Margin="0,0,8,0"/>
-                        <Button x:Name="btnExportPDF" Content="Export PDF" Style="{StaticResource T3.Button.Secondary}" Height="28" Margin="0,0,8,0"/>
-                        <Button x:Name="btnOpen" Content="Load BCF" Style="{StaticResource T3.Button.Primary}" IsDefault="True" Height="28" Padding="16,0"/>
+                        <Button x:Name="btnReload" Content="Reload" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                        <Button x:Name="btnZoom" Content="Zoom to Issue" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                        <Button x:Name="btnExport" Content="Export CSV" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                        <Button x:Name="btnExportBCF" Content="Export BCF" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                        <Button x:Name="btnExportPDF" Content="Export PDF" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                        <Button x:Name="btnOpen" Content="Load BCF" Style="{StaticResource T3.Button.Primary}" IsDefault="True"/>
                     </StackPanel>
                 </Grid>
             </Border>

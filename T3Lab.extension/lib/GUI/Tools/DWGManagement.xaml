@@ -1976,16 +1976,16 @@
                         <!-- Right: Action buttons -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <Button x:Name="RefreshButton" Content="Refresh"
-                                    Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,8,0"
+                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
                                     Click="refresh_button_clicked" ToolTip="Reload DWG imports and links"/>
 
-                            <Button x:Name="RenameButton" Content="Rename"
-                                    Style="{StaticResource T3.Button.Primary}" IsDefault="True" Height="28" Padding="16,0" Margin="0,0,8,0"
-                                    Click="rename_button_clicked" ToolTip="Rename the selected item"/>
-
                             <Button x:Name="DeleteButton" Content="Delete Selected"
-                                    Style="{StaticResource T3.Button.Danger}" Height="28" Padding="12,0"
+                                    Style="{StaticResource T3.Button.Danger}" Margin="0,0,8,0"
                                     Click="delete_button_clicked" ToolTip="Delete all selected CAD imports or links"/>
+
+                            <Button x:Name="RenameButton" Content="Rename"
+                                    Style="{StaticResource T3.Button.Primary}" IsDefault="True"
+                                    Click="rename_button_clicked" ToolTip="Rename the selected item"/>
                         </StackPanel>
                     </Grid>
                 </Border>

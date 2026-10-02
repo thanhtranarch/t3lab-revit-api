@@ -1975,8 +1975,7 @@
                                 VerticalAlignment="Center" Margin="0,0,16,0" Visibility="Collapsed">
                         <ProgressBar x:Name="pb_run" Style="{StaticResource T3.ProgressBar}" Width="160"
                                      VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <Button x:Name="btn_stop" Style="{StaticResource T3.Button.Secondary}" Height="28"
-                                Padding="12,0" Click="stop_clicked" ToolTip="Stop after the current family">
+                        <Button x:Name="btn_stop" Style="{StaticResource T3.Button.Secondary}" Click="stop_clicked" ToolTip="Stop after the current family">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon.Lead}"/>
                                 <TextBlock Text="Stop"/>
@@ -1986,10 +1985,10 @@
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="btn_cancel" Content="Close" Style="{StaticResource T3.Button.Ghost}"
-                                Margin="0,0,8,0" Click="close_button_clicked" Height="28" Padding="12,0"
+                                Margin="0,0,8,0" Click="close_button_clicked"
                                 IsCancel="True"/>
                         <Button x:Name="btn_transfer" Content="Transfer" Style="{StaticResource T3.Button.Primary}"
-                                Click="transfer_clicked" Height="28" Padding="16,0" IsDefault="True"/>
+                                Click="transfer_clicked" IsDefault="True"/>
                     </StackPanel>
                 </Grid>
             </Border>

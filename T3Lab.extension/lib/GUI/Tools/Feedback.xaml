@@ -1842,10 +1842,10 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="btn_cancel" Content="Cancel"
-                                Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="16,0" Margin="0,0,8,0"
+                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
                                 Click="close_button_clicked"/>
                         <Button x:Name="btn_send" Content="Send feedback"
-                                Style="{StaticResource T3.Button.Primary}" IsDefault="True" Height="28" Padding="16,0"
+                                Style="{StaticResource T3.Button.Primary}" IsDefault="True"
                                 Click="send_feedback_clicked"/>
                     </StackPanel>
                 </Grid>

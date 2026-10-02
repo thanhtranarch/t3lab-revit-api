@@ -2195,7 +2195,7 @@
                     <!-- Progress panel: bar + Pause + Stop (ProgressPauseMixin) -->
                     <Grid x:Name="sg_progress_panel" Grid.Column="1" Visibility="Collapsed" VerticalAlignment="Center" Margin="0,0,12,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="160"/>
                             <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="8"/>
@@ -2203,19 +2203,16 @@
                         </Grid.ColumnDefinitions>
                         <ProgressBar x:Name="sg_pb" Grid.Column="0" Style="{StaticResource T3.ProgressBar}"
                                      Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center"/>
-                        <Button x:Name="sg_btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="8,0" Click="pause_resume_clicked">
+                        <Button x:Name="sg_btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}" Click="pause_resume_clicked">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="sg_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                <TextBlock x:Name="sg_btn_pause_label" Text="Pause" Style="{StaticResource T3.Caption}"
-                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="sg_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                <TextBlock x:Name="sg_btn_pause_label" Text="Pause" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="sg_btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}"
-                                Height="28" Padding="8,0" Click="stop_clicked">
+                        <Button x:Name="sg_btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}" Click="stop_clicked">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                <TextBlock Text="Stop" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+                                <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                <TextBlock Text="Stop" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                     </Grid>

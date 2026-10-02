@@ -2340,19 +2340,16 @@ Binding="{Binding usage_percentage}" Width="80" IsReadOnly="True"
                         </Grid.ColumnDefinitions>
                         <ProgressBar x:Name="mv_pb" Grid.Column="0" Style="{StaticResource T3.ProgressBar}"
                                      Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center"/>
-                        <Button x:Name="mv_btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="8,0">
+                        <Button x:Name="mv_btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="mv_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                <TextBlock x:Name="mv_btn_pause_label" Text="Pause" Style="{StaticResource T3.Caption}"
-                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="mv_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                <TextBlock x:Name="mv_btn_pause_label" Text="Pause" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="mv_btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}"
-                                Height="28" Padding="8,0">
+                        <Button x:Name="mv_btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                <TextBlock Text="Stop" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+                                <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                <TextBlock Text="Stop" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                     </Grid>

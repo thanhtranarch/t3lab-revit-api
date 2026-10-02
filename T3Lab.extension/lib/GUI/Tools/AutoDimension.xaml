@@ -2088,9 +2088,9 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="btn_close" Content="Close" Style="{StaticResource T3.Button.Secondary}"
-                                Click="close_clicked" Height="28" Padding="16,0" Margin="0,0,8,0" IsCancel="True"/>
+                                Click="close_clicked" Margin="0,0,8,0" IsCancel="True"/>
                         <Button x:Name="btn_run" Content="Run Auto Dimension" Style="{StaticResource T3.Button.Primary}"
-                                Click="run_clicked" Height="28" Padding="16,0" IsDefault="True"/>
+                                Click="run_clicked" IsDefault="True"/>
                     </StackPanel>
                 </Grid>
             </Border>

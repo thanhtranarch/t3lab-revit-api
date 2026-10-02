@@ -2614,7 +2614,7 @@
                                                             <RowDefinition Height="Auto"/>
                                                             <RowDefinition Height="Auto"/>
                                                         </Grid.RowDefinitions>
-                                                        <ProgressBar Grid.Row="0" Value="{Binding Progress}" Height="6" Minimum="0" Maximum="100" Margin="0,0,0,4" Style="{StaticResource T3.ProgressBar}"/>
+                                                        <ProgressBar Grid.Row="0" Value="{Binding Progress}" Minimum="0" Maximum="100" Margin="0,0,0,4" Style="{StaticResource T3.ProgressBar}"/>
                                                         <TextBlock Grid.Row="1" Text="{Binding Status}" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Success.Accent}">
                                                             <TextBlock.Style>
                                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Caption}">

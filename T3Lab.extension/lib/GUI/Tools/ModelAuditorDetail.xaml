@@ -1818,13 +1818,13 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="btn_detail_check_all" Style="{StaticResource T3.Button.Secondary}"
-                                Content="Select All" Height="28" Margin="0,0,8,0"/>
+                                Content="Select All" Margin="0,0,8,0"/>
                         <Button x:Name="btn_detail_uncheck_all" Style="{StaticResource T3.Button.Secondary}"
-                                Content="Deselect All" Height="28" Margin="0,0,8,0"/>
+                                Content="Deselect All" Margin="0,0,8,0"/>
                         <Button x:Name="btn_detail_export" Style="{StaticResource T3.Button.Secondary}"
-                                Content="Export CSV" Height="28" Margin="0,0,8,0" Padding="12,0"/>
+                                Content="Export CSV" Margin="0,0,8,0"/>
                         <Button x:Name="btn_detail_select" Style="{StaticResource T3.Button.Primary}"
-                                IsDefault="True" Content="Select in Model" Height="28" Padding="16,0"/>
+                                IsDefault="True" Content="Select in Model"/>
                     </StackPanel>
                 </Grid>
             </Border>

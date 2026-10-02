@@ -1939,9 +1939,9 @@
                     <!-- Footer Action Buttons -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="btn_cancel" Content="Cancel" Style="{StaticResource T3.Button.Ghost}"
-                                Margin="0,0,8,0" Click="close_button_clicked" Height="28" Padding="12,0" IsCancel="True"/>
+                                Margin="0,0,8,0" Click="close_button_clicked" IsCancel="True"/>
                         <Button x:Name="btn_sync" Content="Sync Datums" Style="{StaticResource T3.Button.Primary}"
-                                Click="sync_button_clicked" Height="28" Padding="16,0" IsDefault="True"/>
+                                Click="sync_button_clicked" IsDefault="True"/>
                     </StackPanel>
                 </Grid>
             </Border>

@@ -37,6 +37,9 @@ Kích thước cửa sổ: S 420×260–320 (NoResize) · M 560×420–560 · L 
 4. `HorizontalScrollBarVisibility="Disabled"` mọi grid/list. Không đủ chỗ thì bỏ bớt cột.
 5. Số căn phải (Consolas), text căn trái, Element ID căn trái Consolas.
 6. Footer cố định: trái = dot + câu trạng thái; phải = ghost huỷ → secondary → secondary → MỘT primary. Gap 8.
+   Nút footer giữ kích thước của style (không tự đặt Height/Padding); nhãn trong nút kế thừa font/màu của
+   nút (icon `T3.Icon` margin 8 + TextBlock trơn); Pause/Stop: thanh `T3.ProgressBar` 160px cao 8 (luật 27,
+   `audit_t3.py` bắt).
 7. Panel lồng tối đa 2 cấp. Chia section bằng label uppercase + `Separator`, không bằng card.
 8. `UseLayoutRounding="True"`, `SnapsToDevicePixels="True"`, `TextOptions.TextFormattingMode="Display"`
    trên Window. Luôn có MinWidth/MinHeight. Không set Height cho TextBlock. Không fix Width cho text dịch.
