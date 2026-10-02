@@ -64,3 +64,8 @@ T3Lab.extension/lib/GUI/Resources/ModelAuditorHistory/
 **/dqt_bg_config.json
 **/dqt_ribbon_*.json
 **/.ribbon-*.tmp
+
+# Visual Studio workspace / Copilot index caches
+.vs/
+# Personal Claude Code permissions (machine paths) — keep local, never commit
+.claude/settings.local.json
