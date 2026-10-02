@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- thanh thep uon (L) + to giay .abs, mui ten amber = xuat ra file may uon -->
+  <polyline points="4.5,27.5 4.5,8.5 14.5,8.5 14.5,20.5" fill="none" stroke="#000000" stroke-width="2"/>
+  <rect x="17.5" y="2.5" width="12" height="15" fill="#F3F3F3" stroke="#000000" stroke-width="1"/>
+  <polygon points="23,3 29,3 29,9" fill="#858585"/>
+  <polygon points="24,20 28,20 28,24 30,24 26,29 22,24 24,24" fill="#E07B00"/>
+</svg>
