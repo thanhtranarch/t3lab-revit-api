@@ -88,6 +88,13 @@ _MODE_TEXT = {
     ),
 }
 
+# Loader empty-state icons — glyphs from the T3 icon table
+# (pyRevit UI Design System/T3LAB_UI_STANDARD.md, "Icon").
+_GLYPH_OPEN_FILE = "\uE8E5"
+_GLYPH_REFRESH = "\uE72C"
+_GLYPH_SEARCH = "\uE721"
+_GLYPH_ERROR = "\uE783"
+
 
 # CONFIGURATION HELPERS
 # ==============================================================================
@@ -336,6 +343,9 @@ class ManaFamiWindow(T3WPFWindow):
         self._cancel_requested = False
         self._thumb_cancel = False
         self._is_updating = False
+        # 'idle' (no folder) | 'scanning' | 'done' | 'cancelled' | 'error' —
+        # only words the Loader empty states, see _update_loader_empty_states.
+        self._loader_phase = 'idle'
 
         # Management initialization
         self._all_rows = []
@@ -412,6 +422,14 @@ class ManaFamiWindow(T3WPFWindow):
         self.btn_select_none_loader = _get('btn_select_none_loader')
         self.btn_load = _get('btn_load')
         self.btn_cancel_loader = _get('btn_cancel_loader')
+        # Loader pane header count + empty states
+        self.txt_category_count = _get('txt_category_count')
+        self.txt_categories_empty_title = _get('txt_categories_empty_title')
+        self.txt_categories_empty_hint = _get('txt_categories_empty_hint')
+        self.txt_families_empty_icon = _get('txt_families_empty_icon')
+        self.txt_families_empty_title = _get('txt_families_empty_title')
+        self.txt_families_empty_hint = _get('txt_families_empty_hint')
+        self.btn_empty_select_folder = _get('btn_empty_select_folder')
 
         # Management settings sidebar
         self.rb_scope_all = _get('rb_scope_all')
@@ -467,6 +485,9 @@ class ManaFamiWindow(T3WPFWindow):
         self.btn_select_none_loader.Click += self.select_none_loader_clicked
         self.btn_load.Click += self.load_clicked
         self.btn_cancel_loader.Click += self.cancel_loader_clicked
+        # Empty-state call to action: same handler as the toolbar folder button.
+        if self.btn_empty_select_folder is not None:
+            self.btn_empty_select_folder.Click += self.select_folder_clicked
 
 
         # Management Event Handlers
@@ -513,7 +534,10 @@ class ManaFamiWindow(T3WPFWindow):
                 self.txt_current_folder.Text = saved_folder
                 self.scan_families()
             else:
-                self.txt_current_folder.Text = "Click 'Update Folder' to select a folder or switch to Cloud mode"
+                # Guidance lives in the empty states, not in the toolbar.
+                self.txt_current_folder.Text = "No folder selected"
+                self._loader_phase = 'idle'
+                self._update_loader_empty_states()
         except Exception as ex:
             logger.error("Error loading saved folder: {}".format(ex))
 
@@ -589,6 +613,8 @@ class ManaFamiWindow(T3WPFWindow):
         self._thumb_cancel = True
         self._cancel_requested = False
         self._clear_families_ui()
+        self._loader_phase = 'scanning'
+        self._update_loader_empty_states()
         self.btn_select_folder.IsEnabled = False
         self.btn_load.IsEnabled = False
         self.txt_current_folder.Text = "{} (Scanning...)".format(self.current_folder)
@@ -609,6 +635,8 @@ class ManaFamiWindow(T3WPFWindow):
             self.filtered_families.Clear()
             self.category_structure = {}
             self.tree_categories.Items.Clear()
+            if self.txt_category_count is not None:
+                self.txt_category_count.Text = "0"
             self.txt_result_count.Text = "0 families found"
             self.txt_selected_count.Text = "0 families selected"
             self.btn_load.IsEnabled = False
@@ -722,6 +750,14 @@ class ManaFamiWindow(T3WPFWindow):
             else:
                 self.category_structure = category_structure
 
+            if error:
+                self._loader_phase = 'error'
+            elif cancelled:
+                self._loader_phase = 'cancelled'
+            else:
+                self._loader_phase = 'done'
+            self._update_loader_empty_states()
+
             self.btn_select_folder.IsEnabled = True
             self.txt_current_folder.Text = self.current_folder
 
@@ -743,13 +779,34 @@ class ManaFamiWindow(T3WPFWindow):
         except Exception as ex:
             logger.error("Error completing scan UI: {}".format(ex))
 
+    def _new_tree_item(self, header, tag):
+        """A category node in the T3 tree look.
+
+        A TreeViewItem added straight to `.Items` is its own container, so the
+        TreeView's ItemContainerStyle never reaches it — set the style here
+        (see the TREEVIEW note in T3Lab.Styles.xaml).
+        """
+        item = TreeViewItem()
+        try:
+            item.Style = self.FindResource("T3.TreeViewItem")
+        except Exception:
+            pass
+        item.Header = header
+        item.Tag = tag
+        item.IsExpanded = True
+        return item
+
     def update_category_tree(self):
         try:
             self.tree_categories.Items.Clear()
-            all_item = TreeViewItem()
-            all_item.Header = "All ({})".format(len(self.all_families))
-            all_item.Tag = "ALL"
-            all_item.IsExpanded = True
+            if self.txt_category_count is not None:
+                self.txt_category_count.Text = "0"
+            if not self.all_families:
+                # Leave the tree empty so its empty state explains why,
+                # instead of a lone "All (0)" node.
+                return
+            all_item = self._new_tree_item(
+                "All ({})".format(len(self.all_families)), "ALL")
             self.tree_categories.Items.Add(all_item)
 
             tree_dict = {}
@@ -763,24 +820,33 @@ class ManaFamiWindow(T3WPFWindow):
                 
                 path_key = os.sep.join(parts) if parts != ['Root'] else 'Root'
                 if path_key in self.category_structure:
-                    tree_dict_leaf = tree_dict
+                    # Walk down through '_children': indexing the node itself
+                    # raised KeyError on the 2nd level, so any library with a
+                    # nested subfolder showed only "All (n)".
+                    level = tree_dict
+                    tree_dict_leaf = None
                     for part in parts:
-                        tree_dict_leaf = tree_dict_leaf[part]
+                        tree_dict_leaf = level[part]
+                        level = tree_dict_leaf['_children']
                     tree_dict_leaf['_families'] = self.category_structure[path_key]
+
+            node_count = [0]
 
             def add_tree_items(parent_item, tree_data, path_prefix=""):
                 for folder_name, data in sorted(tree_data.items()):
                     folder_path = os.path.join(path_prefix, folder_name) if path_prefix else folder_name
                     total_families = self._count_families_in_tree(data)
-                    item = TreeViewItem()
-                    item.Header = "{} ({})".format(folder_name, total_families)
-                    item.Tag = folder_path if folder_path != 'Root' else 'Root'
-                    item.IsExpanded = True
+                    item = self._new_tree_item(
+                        "{} ({})".format(folder_name, total_families),
+                        folder_path if folder_path != 'Root' else 'Root')
                     parent_item.Items.Add(item)
+                    node_count[0] += 1
                     if data['_children']:
                         add_tree_items(item, data['_children'], folder_path)
 
             add_tree_items(self.tree_categories, tree_dict)
+            if self.txt_category_count is not None:
+                self.txt_category_count.Text = str(node_count[0])
         except Exception as ex:
             logger.debug("Error category tree: {}".format(ex))
 
@@ -804,8 +870,69 @@ class ManaFamiWindow(T3WPFWindow):
                 family.PropertyChanged += self.on_family_property_changed
                 self.filtered_families.Add(family)
             self.update_result_count()
+            # A search / category filter can empty the cards: say so.
+            self._update_loader_empty_states()
         except Exception as ex:
             logger.debug("Error display update: {}".format(ex))
+
+    def _update_loader_empty_states(self):
+        """Word the Loader empty states for the current scan phase.
+
+        They show and hide by themselves (XAML DataTrigger on HasItems of
+        tree_categories / items_families); this only sets what they say and
+        whether the Choose Folder button belongs in them.
+        """
+        phase = self._loader_phase
+        if phase == 'scanning':
+            cats = ("Scanning folder...",
+                    "Categories appear when the scan finishes.")
+            fams = (_GLYPH_REFRESH, "Scanning folder...",
+                    "Families appear here as they are found.", False)
+        elif phase == 'cancelled':
+            cats = ("Scan cancelled",
+                    "Choose the folder again to list its categories.")
+            fams = (_GLYPH_OPEN_FILE, "Scan cancelled",
+                    "No families were found before the scan stopped. "
+                    "Choose the folder again to rescan it.", True)
+        elif phase == 'error':
+            cats = ("Folder could not be read",
+                    "Choose another folder.")
+            fams = (_GLYPH_ERROR, "Folder could not be read",
+                    "Check that the folder still exists and that you can "
+                    "open it, then choose it again.", True)
+        elif phase == 'done':
+            cats = ("No categories",
+                    "No .rfa files were found in this folder.")
+            fams = (_GLYPH_OPEN_FILE, "No families in this folder",
+                    "No .rfa files were found in it or its subfolders. "
+                    "Choose another folder.", True)
+        else:
+            cats = ("No categories yet",
+                    "Subfolders of the chosen folder appear here.")
+            fams = (_GLYPH_OPEN_FILE, "No folder loaded",
+                    "Choose a folder of .rfa files. Its subfolders become "
+                    "the categories on the left.", True)
+        # Families exist but none is shown: the search or category hid them.
+        if phase != 'scanning' and self.all_families:
+            fams = (_GLYPH_SEARCH, "No families match",
+                    "Clear the search box or pick another category.", False)
+
+        try:
+            if self.txt_categories_empty_title is not None:
+                self.txt_categories_empty_title.Text = cats[0]
+            if self.txt_categories_empty_hint is not None:
+                self.txt_categories_empty_hint.Text = cats[1]
+            if self.txt_families_empty_icon is not None:
+                self.txt_families_empty_icon.Text = fams[0]
+            if self.txt_families_empty_title is not None:
+                self.txt_families_empty_title.Text = fams[1]
+            if self.txt_families_empty_hint is not None:
+                self.txt_families_empty_hint.Text = fams[2]
+            if self.btn_empty_select_folder is not None:
+                self.btn_empty_select_folder.Visibility = (
+                    Visibility.Visible if fams[3] else Visibility.Collapsed)
+        except Exception as ex:
+            logger.debug("Error loader empty states: {}".format(ex))
 
     def on_family_property_changed(self, sender, e):
         if e.PropertyName == "IsChecked" and not self._is_updating:
