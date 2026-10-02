@@ -1367,7 +1367,7 @@ class PropertyLineDialog(T3WPFWindow):
         if user_facing:
             # Already says what failed, where, and what to do next.
             msg = error_msg
-            logger.warning("Boundary search stopped: {}".format(error_msg))
+            logger.debug("Boundary search stopped: {}".format(error_msg))
         else:
             err_lower = error_msg.lower()
             is_network = any(k in err_lower for k in (
@@ -1376,7 +1376,8 @@ class PropertyLineDialog(T3WPFWindow):
                 "reset", "httperror", "urlerror", "ioerror", "errno",
                 "resolve", "proxy"))
             if is_network:
-                logger.warning("Boundary lookup network error: {}".format(error_msg))
+                # Shown in the window below; debug so the output window stays shut.
+                logger.debug("Boundary lookup network error: {}".format(error_msg))
                 msg = (u"Could not reach the map data service — check the "
                        u"internet connection (and proxy settings), then "
                        u"search again.")
@@ -1620,7 +1621,10 @@ class PropertyLineDialog(T3WPFWindow):
                 result = parcel_map.fetch_tiles(specs, on_tile=on_tile,
                                                 is_live=is_live)
             except Exception as ex:
-                logger.warning("Basemap download failed: {}".format(
+                # Debug only: the map note already tells the user, and a
+                # warning from this worker thread pops the pyRevit output
+                # window of whatever tool is running at that moment.
+                logger.debug("Basemap download failed: {}".format(
                     traceback.format_exc()))
                 result = (0, len(specs), u"{}".format(ex))
             if result is None or not token["live"]:
@@ -1647,7 +1651,10 @@ class PropertyLineDialog(T3WPFWindow):
             return
         if self.cnv_map_tiles.Children.Count == 0:
             reason = error or u"no tile could be decoded"
-            logger.warning("Basemap unavailable: {}".format(reason))
+            # The "offline" map note below is the user-facing message; a
+            # warning here also opened the output window of another tool
+            # (CAD to Elements, 2026-10-02).
+            logger.debug("Basemap unavailable: {}".format(reason))
             self._set_map_note(
                 "offline", u"Basemap unavailable",
                 u"No map tiles from tile.openstreetmap.org ({}). The boundary "
