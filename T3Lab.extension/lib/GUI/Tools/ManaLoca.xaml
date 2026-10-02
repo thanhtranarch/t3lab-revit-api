@@ -1976,12 +1976,14 @@
                                                 ElementStyle="{StaticResource T3.Body.Secondary}"/>
 
                             <!-- Coordinates: Consolas, right-aligned so the decimal points line up.
-                                 Amber cell = edited, waiting for Apply. Red digits = not a whole mm.
+                                 Amber cell = edited, waiting for Apply. Red digits = off the odd step
+                                 (whole mm in a metric project, 1/8 inch in an imperial one).
+                                 Header, step and tooltips are set from the project unit in Python.
                                  Both flags are Python properties, so WPF receives a PyObject: a
                                  DataTrigger on {Binding dirty_x_mm} never equals "True". Each style
                                  copies its flag into the element's own AutomationProperties.ItemStatus
                                  (a string property) and a property Trigger tests that string. -->
-                            <DataGridTextColumn Header="X (MM)" Binding="{Binding x_mm, Mode=TwoWay}" Width="100">
+                            <DataGridTextColumn x:Name="col_x" Header="X (MM)" Binding="{Binding x_mm, Mode=TwoWay}" Width="120">
                                 <DataGridTextColumn.HeaderStyle>
                                     <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
                                         <Setter Property="HorizontalContentAlignment" Value="Right"/>
@@ -2011,7 +2013,7 @@
                                     </Style>
                                 </DataGridTextColumn.CellStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Y (MM)" Binding="{Binding y_mm, Mode=TwoWay}" Width="100">
+                            <DataGridTextColumn x:Name="col_y" Header="Y (MM)" Binding="{Binding y_mm, Mode=TwoWay}" Width="120">
                                 <DataGridTextColumn.HeaderStyle>
                                     <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
                                         <Setter Property="HorizontalContentAlignment" Value="Right"/>
@@ -2041,7 +2043,7 @@
                                     </Style>
                                 </DataGridTextColumn.CellStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Z (MM)" Binding="{Binding z_mm, Mode=TwoWay}" Width="100">
+                            <DataGridTextColumn x:Name="col_z" Header="Z (MM)" Binding="{Binding z_mm, Mode=TwoWay}" Width="120">
                                 <DataGridTextColumn.HeaderStyle>
                                     <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
                                         <Setter Property="HorizontalContentAlignment" Value="Right"/>

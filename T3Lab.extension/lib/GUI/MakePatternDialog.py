@@ -8,7 +8,6 @@ and live large-surface tiling preview.
 """
 
 import os
-import re
 import math
 from math import sqrt, pi, sin, cos, degrees
 
@@ -42,15 +41,48 @@ if HAS_REVIT:
     from Autodesk.Revit import DB
     from pyrevit import revit
 
+# The module is drawn and stored in mm (the pattern engine's unit). What the
+# user sees and types follows the target: a MODEL pattern is a real-world
+# length (project unit), a DRAFTING pattern is measured on paper (mm in a
+# metric project, inches in an imperial one).
+from Snippets._units import project_length_unit, paper_unit, MM_PER_FT, MILLIMETERS
+
 
 XAML_FILE = os.path.join(os.path.dirname(__file__), "Tools", "MakePattern.xaml")
 
+# (width mm, height mm, shift-mode index, name) — cmb_presets items 1..7.
+PRESETS = [
+    (600.0, 300.0, 1, "Running Bond"),
+    (600.0, 600.0, 0, "Square Tile"),
+    (300.0, 300.0, 0, "Square Tile"),
+    (200.0, 400.0, 1, "Subway Tile"),
+    (150.0, 600.0, 1, "Plank / Wood"),
+    (1200.0, 600.0, 0, "Large Slab"),
+    (100.0, 100.0, 0, "Mosaic"),
+]
+# Snap grid steps (mm) — cmb_grid_step items.
+GRID_STEPS = [10.0, 25.0, 50.0, 100.0]
+MIN_MODULE_MM = 10.0
 
-def parse_float(val, default_val=0.0):
+
+def _active_doc():
+    if not HAS_REVIT:
+        return None
     try:
-        return float(re.sub(r'[^\d.-]', '', str(val)))
+        return revit.doc
     except Exception:
-        return default_val
+        return None
+
+
+def length_label(unit, mm):
+    """A length the dialog keeps in mm, for a sentence: '600 mm', '0.6 m',
+    1' - 11 5/8\"."""
+    return unit.show(MILLIMETERS.to_feet(mm))
+
+
+def size_label(unit, w_mm, h_mm, sep=" x "):
+    """'600 x 300 mm' / 1' - 11 5/8\" x 11 13/16\" (the unit once, at the end)."""
+    return unit.default_text(w_mm) + sep + length_label(unit, h_mm)
 
 
 class MakePatternDialog(T3WPFWindow):
@@ -90,9 +122,14 @@ class MakePatternDialog(T3WPFWindow):
         self._brush_prev_tile = SolidColorBrush(Color.FromArgb(40, 180, 180, 190))
         self._brush_prev_line = SolidColorBrush(Color.FromArgb(230, 24, 24, 27))
 
+        # Units: read from the active document every time the window opens.
+        self._model_unit = project_length_unit(_active_doc())
+        self._paper_unit = paper_unit(self._model_unit)
+        self._shown_dims = (None, None)   # text last written into the boxes
+
         # Setup and wire controls
         self._wire_events()
-        self._sync_inputs_from_state()
+        self._apply_units()
 
         # Initial render when loaded
         self.canvas_editor.SizeChanged += self._on_canvas_size_changed
@@ -103,6 +140,8 @@ class MakePatternDialog(T3WPFWindow):
         self.txt_mod_w.LostFocus += self._on_dim_text_changed
         self.txt_mod_h.LostFocus += self._on_dim_text_changed
         self.cmb_presets.SelectionChanged += self._on_preset_changed
+        self.rb_type_model.Checked += self._on_target_changed
+        self.rb_type_drafting.Checked += self._on_target_changed
         self.cmb_shift_mode.SelectionChanged += self._on_shift_mode_changed
 
         # Snapping & options
@@ -138,9 +177,74 @@ class MakePatternDialog(T3WPFWindow):
         self.btn_export_pat.Click += self._on_export_pat_click
         self.btn_create_pattern.Click += self._on_create_pattern_click
 
+    # ── UNITS ────────────────────────────────────────────────────────────────
+
+    def _display_unit(self):
+        """Model pattern → project unit; drafting pattern → paper unit."""
+        if self.rb_type_drafting.IsChecked:
+            return self._paper_unit
+        return self._model_unit
+
+    def _apply_units(self):
+        """Labels, presets, snap steps and the size boxes in the unit of the
+        current target. Values stay in mm; only their text changes."""
+        unit = self._display_unit()
+        self.lbl_module_size.Text = unit.label("MODULE SIZE")
+        self.rb_type_model.Content = "Model ({})".format(self._model_unit.tag)
+        items = self.cmb_presets.Items
+        for i, (w_mm, h_mm, _shift, name) in enumerate(PRESETS):
+            if i + 1 < items.Count:
+                items[i + 1].Content = "{} ({})".format(size_label(unit, w_mm, h_mm), name)
+        steps = self.cmb_grid_step.Items
+        for i, step_mm in enumerate(GRID_STEPS):
+            if i < steps.Count:
+                steps[i].Content = length_label(unit, step_mm)
+        self._sync_inputs_from_state()
+
+    def _on_target_changed(self, sender, e):
+        self._apply_units()
+        self._redraw_all()
+
     def _sync_inputs_from_state(self):
-        self.txt_mod_w.Text = str(int(self.mod_w)) if self.mod_w.is_integer() else "{:.1f}".format(self.mod_w)
-        self.txt_mod_h.Text = str(int(self.mod_h)) if self.mod_h.is_integer() else "{:.1f}".format(self.mod_h)
+        unit = self._display_unit()
+        self._shown_dims = (unit.default_text(self.mod_w), unit.default_text(self.mod_h))
+        self.txt_mod_w.Text, self.txt_mod_h.Text = self._shown_dims
+
+    def _parse_dims(self):
+        """(width mm, height mm) from the size boxes. A bare number is in the
+        display unit; '600 mm', '2\'', '24\"' always work. Text left as it was
+        shown keeps the exact value (the box is rounded for display).
+        Raises ValueError naming the box."""
+        unit = self._display_unit()
+        out = []
+        for ctrl, name, current, shown in (
+                (self.txt_mod_w, "Module width", self.mod_w, self._shown_dims[0]),
+                (self.txt_mod_h, "Module height", self.mod_h, self._shown_dims[1])):
+            text = (ctrl.Text or "").strip()
+            if shown is not None and text == shown:
+                out.append(current)
+                continue
+            try:
+                value = unit.parse_mm(text)
+            except ValueError as ex:
+                raise ValueError("{}: {}".format(name, ex))
+            out.append(max(MIN_MODULE_MM, value))
+        return out
+
+    def _commit_dims(self):
+        """Read the size boxes into the module; False (status shows why)
+        when one of them is not a length."""
+        try:
+            nw, nh = self._parse_dims()
+        except ValueError as ex:
+            self._set_status(str(ex), is_error=True)
+            return False
+        if nw != self.mod_w or nh != self.mod_h:
+            self.mod_w = nw
+            self.mod_h = nh
+            self._sync_inputs_from_state()
+            self._redraw_all()
+        return True
 
     def _set_tool(self, tool_name):
         self.active_tool = tool_name
@@ -148,35 +252,13 @@ class MakePatternDialog(T3WPFWindow):
     # ── EVENT HANDLERS: INPUTS ────────────────────────────────────────────────
 
     def _on_dim_text_changed(self, sender, e):
-        nw = max(10.0, parse_float(self.txt_mod_w.Text, self.mod_w))
-        nh = max(10.0, parse_float(self.txt_mod_h.Text, self.mod_h))
-        if nw != self.mod_w or nh != self.mod_h:
-            self.mod_w = nw
-            self.mod_h = nh
-            self._redraw_all()
+        self._commit_dims()
 
     def _on_preset_changed(self, sender, e):
         sel = self.cmb_presets.SelectedIndex
-        # Presets:
-        # 0: Custom Size
-        # 1: 600 x 300 mm (Running Bond)
-        # 2: 600 x 600 mm (Square Tile)
-        # 3: 300 x 300 mm (Square Tile)
-        # 4: 200 x 400 mm (Subway Tile)
-        # 5: 150 x 600 mm (Plank / Wood)
-        # 6: 1200 x 600 mm (Large Slab)
-        # 7: 100 x 100 mm (Mosaic)
-        presets = {
-            1: (600.0, 300.0, 1),
-            2: (600.0, 600.0, 0),
-            3: (300.0, 300.0, 0),
-            4: (200.0, 400.0, 1),
-            5: (150.0, 600.0, 1),
-            6: (1200.0, 600.0, 0),
-            7: (100.0, 100.0, 0),
-        }
-        if sel in presets:
-            pw, ph, shift_idx = presets[sel]
+        # 0 = Custom size; 1..7 = PRESETS (labels written by _apply_units).
+        if 1 <= sel <= len(PRESETS):
+            pw, ph, shift_idx, _name = PRESETS[sel - 1]
             self.mod_w = pw
             self.mod_h = ph
             self.cmb_shift_mode.SelectedIndex = shift_idx
@@ -198,10 +280,9 @@ class MakePatternDialog(T3WPFWindow):
         self.snap_enabled = bool(self.chk_snap.IsChecked)
 
     def _on_grid_step_changed(self, sender, e):
-        steps = [10.0, 25.0, 50.0, 100.0]
         sel = self.cmb_grid_step.SelectedIndex
-        if 0 <= sel < len(steps):
-            self.snap_step = steps[sel]
+        if 0 <= sel < len(GRID_STEPS):
+            self.snap_step = GRID_STEPS[sel]
             self._redraw_editor()
 
     def _on_ortho_toggled(self, sender, e):
@@ -327,12 +408,16 @@ class MakePatternDialog(T3WPFWindow):
             self.temp_line_shape.Y2 = p2_px[1]
 
             length = sqrt((cur_mm[0] - self.start_pt_mm[0])**2 + (cur_mm[1] - self.start_pt_mm[1])**2)
-            self.txt_cursor_info.Text = "X:{:.0f} Y:{:.0f} mm | L:{:.0f} mm | {} lines".format(
-                cur_mm[0], cur_mm[1], length, len(self.lines)
+            unit = self._display_unit()
+            self.txt_cursor_info.Text = "X:{} Y:{} | L:{} | {} lines".format(
+                length_label(unit, cur_mm[0]), length_label(unit, cur_mm[1]),
+                length_label(unit, length), len(self.lines)
             )
         else:
-            self.txt_cursor_info.Text = "X:{:.0f} Y:{:.0f} mm | {} lines".format(
-                snap_mm[0], snap_mm[1], len(self.lines)
+            unit = self._display_unit()
+            self.txt_cursor_info.Text = "X:{} Y:{} | {} lines".format(
+                length_label(unit, snap_mm[0]), length_label(unit, snap_mm[1]),
+                len(self.lines)
             )
 
     def _on_canvas_mouse_up(self, sender, e):
@@ -455,8 +540,8 @@ class MakePatternDialog(T3WPFWindow):
             self._set_status("No valid curves found in current selection.", is_error=True)
             return
 
-        # Convert feet to mm: 1 ft = 304.8 mm
-        ft_to_mm = 304.8
+        # Revit feet → the module's mm
+        ft_to_mm = MM_PER_FT
         mod_w = max(50.0, (u_max - u_min) * ft_to_mm)
         mod_h = max(50.0, (v_max - v_min) * ft_to_mm)
 
@@ -573,8 +658,9 @@ class MakePatternDialog(T3WPFWindow):
             self.canvas_editor.Children.Add(l)
 
         # Update counter
-        self.txt_cursor_info.Text = "Module: {:.0f} × {:.0f} mm | {} lines".format(
-            self.mod_w, self.mod_h, len(self.lines)
+        self.txt_cursor_info.Text = "Module: {} | {} lines".format(
+            size_label(self._display_unit(), self.mod_w, self.mod_h, " × "),
+            len(self.lines)
         )
 
     # ── RENDERING: LARGE SURFACE PREVIEW ──────────────────────────────────────
@@ -635,8 +721,9 @@ class MakePatternDialog(T3WPFWindow):
         # Update stats
         cov_w = repeats * self.mod_w
         cov_h = repeats * self.mod_h
-        self.txt_preview_stats.Text = "Coverage: {:.0f} × {:.0f} mm ({}×{} tiles)".format(
-            cov_w, cov_h, repeats, repeats
+        self.txt_preview_stats.Text = "Coverage: {} ({}×{} tiles)".format(
+            size_label(self._display_unit(), cov_w, cov_h, " × "),
+            repeats, repeats
         )
 
         # Compile check
@@ -662,6 +749,8 @@ class MakePatternDialog(T3WPFWindow):
             pass
 
     def _on_export_pat_click(self, sender, e):
+        if not self._commit_dims():
+            return
         if not self.lines:
             self._set_status("Please draw or import lines before exporting.", is_error=True)
             return
@@ -684,13 +773,16 @@ class MakePatternDialog(T3WPFWindow):
                     self.mod_h,
                     is_model=is_model,
                     shift_ratio=self.shift_ratio,
-                    unit='MM'
+                    # .pat in the project's unit system: MM (metric) / INCH
+                    unit='MM' if self._model_unit.is_metric else 'INCH'
                 )
                 self._set_status("Exported pattern successfully to {}".format(os.path.basename(sfd.FileName)))
             except Exception as ex:
                 self._set_status("Export failed: {}".format(str(ex)), is_error=True)
 
     def _on_create_pattern_click(self, sender, e):
+        if not self._commit_dims():
+            return
         if not self.lines:
             self._set_status("No lines defined. Draw module lines on canvas or import from Revit.", is_error=True)
             return

@@ -30,6 +30,53 @@ MIN_AREA  = 1e-9              # ft² — anything smaller discarded
 MIN_CUT_WIDTH_MM = 50.0
 MIN_CUT_WIDTH_FT = MIN_CUT_WIDTH_MM * MM_TO_FT
 
+
+# ── Lengths shown to the user ─────────────────────────────────────────────────
+# `unit` is a Snippets._units.LengthUnit (the project's length unit), passed in
+# by the dialog so this module stays stdlib-only: unit.text(ft) is the number,
+# unit.show(ft) the number with its unit. None = millimetres, the way the
+# engine has always been described (and what the harness expects).
+
+def _text(feet, unit):
+    return "{:.0f}".format(feet * FT_TO_MM) if unit is None else unit.text(feet)
+
+
+def _show(feet, unit):
+    return _text(feet, None) + " mm" if unit is None else unit.show(feet)
+
+
+def signed(text):
+    """'150 mm' → '+150 mm' (negative text keeps its '-')."""
+    return text if text.startswith("-") else "+" + text
+
+
+def size_text(w, h, unit=None, sep=u" \u00d7 "):
+    """'600 × 300 mm' / 1' - 11 5/8" × 11 13/16" — the unit once, at the end."""
+    return _text(w, unit) + sep + _show(h, unit)
+
+
+def shift_text(dx, dy, unit=None):
+    """Grid origin shift for option labels: '+150/+0 mm' (feet-inches get
+    spaces around the slash: +0' - 6" / -0' - 3/4")."""
+    sep = "/" if unit is None or unit.style == "decimal" else " / "
+    return signed(_text(dx, unit)) + sep + signed(_show(dy, unit))
+
+
+def length_text(feet, unit=None, extra=0):
+    """unit.show(feet); `extra` adds decimals to a decimal unit for small
+    sizes (a 1.5 mm joint would otherwise read '2 mm')."""
+    if not extra or (unit is not None and unit.style != "decimal"):
+        return _show(feet, unit)
+    value = feet * FT_TO_MM if unit is None else unit.from_feet(feet)
+    places = (0 if unit is None else unit.decimals) + extra
+    text = "{:.{}f}".format(value, places).rstrip("0").rstrip(".")
+    return "{} {}".format(text, "mm" if unit is None else unit.tag)
+
+
+def variant_desc(dx, dy, angle, unit=None):
+    return u"shift {}, angle {:+.1f}\u00b0".format(shift_text(dx, dy, unit), angle)
+
+
 # ── Tile patterns ─────────────────────────────────────────────────────────────
 # (key, combo label) — order defines the Step-2 pattern dropdown.
 PATTERNS = [
@@ -636,7 +683,7 @@ class LayoutOption(object):
         self.tile_area   = tile_area_ft2
         # Parameters needed to regenerate this option with a tweaked angle.
         # Keys: pattern, angle, dx, dy, tile_w, tile_h, joint, use_nesting,
-        #       floor_pts.
+        #       floor_pts, unit (display unit of the labels; None = mm).
         self.gen_params  = gen_params or {}
 
         self._renumber_pieces()
@@ -784,8 +831,7 @@ class LayoutOption(object):
         gp['angle'] = angle
         gp['dx']    = dx
         gp['dy']    = dy
-        self.variant = "shift {:+.0f}/{:+.0f} mm, angle {:+.1f}°".format(
-            dx * FT_TO_MM, dy * FT_TO_MM, angle)
+        self.variant = variant_desc(dx, dy, angle, gp.get('unit'))
         self._renumber_pieces()
         self._recompute_stats()
         return True
@@ -872,12 +918,13 @@ class OptionGenerator(object):
     _FAST_TILE_COUNT  = 600            # est. tiles/variant beyond which the
                                        # reduced sweep kicks in
 
-    def __init__(self, tile_w, tile_h, joint, use_nesting, top_n=4):
+    def __init__(self, tile_w, tile_h, joint, use_nesting, top_n=4, unit=None):
         self.tile_w = tile_w
         self.tile_h = tile_h
         self.joint  = joint
         self.use_nesting = use_nesting
         self.top_n  = top_n
+        self.unit   = unit      # project length unit for option labels (None = mm)
 
     def build_variant(self, floor_info, pattern, angle, dx, dy):
         """Build ONE LayoutOption for an explicit (angle, dx, dy) using the
@@ -890,8 +937,7 @@ class OptionGenerator(object):
                                self.use_nesting, floor_info.pts)
         pieces = engine.process(tiles)
 
-        desc = "shift {:+.0f}/{:+.0f} mm, angle {:+.1f}°".format(
-            dx * FT_TO_MM, dy * FT_TO_MM, angle)
+        desc = variant_desc(dx, dy, angle, self.unit)
         gen_params = {
             'pattern'     : pattern,
             'angle'       : angle,
@@ -902,6 +948,7 @@ class OptionGenerator(object):
             'joint'       : self.joint,
             'use_nesting' : self.use_nesting,
             'floor_pts'   : floor_info.pts,
+            'unit'        : self.unit,      # label unit only — never geometry
         }
         # Option id assigned by the caller (after sorting/dedup)
         opt = LayoutOption('?', pieces, desc,

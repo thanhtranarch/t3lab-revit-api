@@ -1888,7 +1888,7 @@
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="DIMENSIONS (MM)" Width="160">
+                                        <GridViewColumn x:Name="col_dimensions" Header="DIMENSIONS (MM)" Width="160">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding Dimensions}" Style="{StaticResource T3.Cell.Mono}"/>
@@ -1959,19 +1959,19 @@
 
                                     <!-- Width -->
                                     <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Width (mm):" Style="{StaticResource T3.Body.Secondary}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="lbl_tile_w" Text="Width (mm):" Style="{StaticResource T3.Body.Secondary}" Margin="0,0,0,4"/>
                                         <TextBox x:Name="txt_tile_w" Style="{StaticResource T3.TextBox}" Height="28" Text="600"/>
                                     </StackPanel>
 
                                     <!-- Height -->
                                     <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Height (mm):" Style="{StaticResource T3.Body.Secondary}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="lbl_tile_h" Text="Height (mm):" Style="{StaticResource T3.Body.Secondary}" Margin="0,0,0,4"/>
                                         <TextBox x:Name="txt_tile_h" Style="{StaticResource T3.TextBox}" Height="28" Text="600"/>
                                     </StackPanel>
 
                                     <!-- Joint / Grout -->
                                     <StackPanel Grid.Column="4">
-                                        <TextBlock Text="Joint / Grout (mm):" Style="{StaticResource T3.Body.Secondary}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="lbl_joint" Text="Joint / Grout (mm):" Style="{StaticResource T3.Body.Secondary}" Margin="0,0,0,4"/>
                                         <TextBox x:Name="txt_joint" Style="{StaticResource T3.TextBox}" Height="28" Text="3"/>
                                     </StackPanel>
 

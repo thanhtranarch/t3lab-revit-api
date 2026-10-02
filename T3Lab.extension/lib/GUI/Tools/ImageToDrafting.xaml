@@ -1785,9 +1785,9 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="OUTPUT WIDTH (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="lbl_output_width" Text="OUTPUT WIDTH (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
                                 <TextBox x:Name="WidthInput" Text="300" Style="{StaticResource T3.TextBox}" Height="28"
-                                         ToolTip="Target width in Revit (mm). Height scales proportionally."/>
+                                         ToolTip="Width of the traced lines in the drafting view, in the project unit (or type a unit: 300 mm, 1'). Height scales proportionally."/>
                             </StackPanel>
                         </Grid>
 

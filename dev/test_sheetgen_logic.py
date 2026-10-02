@@ -9,11 +9,14 @@ from contextlib import contextmanager
 import math
 from pathlib import Path
 from types import SimpleNamespace as NS
+import sys
 import unittest
 from unittest.mock import Mock
 
 
 PATH = Path(__file__).resolve().parents[1] / 'T3Lab.extension/lib/GUI/SheetGenDialog.py'
+sys.path.insert(0, str(PATH.parents[1]))
+from Snippets import _units as U  # noqa: E402  (pure Python)
 STATUS = NS(Uninitialized='Uninitialized', Started='Started', Committed='Committed',
             RolledBack='RolledBack', Pending='Pending')
 
@@ -82,7 +85,10 @@ class SheetGenTests(unittest.TestCase):
                      ViewType=NS(FloorPlan=1, CeilingPlan=2, DrawingSheet=3),
                      XYZ=lambda *args: args, math=math, forms=Mock(), revit=Mock(),
                      ElevationMarker=NS(CreateElevationMarker=Mock(return_value=Mock())),
-                     ElementTransformUtils=Mock())
+                     ElementTransformUtils=Mock(),
+                     project_length_unit=U.project_length_unit, paper_unit=U.paper_unit,
+                     MILLIMETERS=U.MILLIMETERS, DEFAULT_OFFSET_MM=1000.0,
+                     DEFAULT_STRIP_MM=70.0)
         tree = ast.parse(PATH.read_text(encoding='utf-8'))
         tree.body = [n for n in tree.body if isinstance(n, (ast.ClassDef, ast.FunctionDef))]
         exec(compile(tree, str(PATH), 'exec'), scope)
@@ -101,6 +107,9 @@ class SheetGenTests(unittest.TestCase):
         w.cmb_titleblock = NS(SelectedItem='A1')
         w._titleblock_map = {'A1': 40}
         w.txt_offset = NS(Text='1')
+        # A metres project: a bare '1' is the old 1 m crop offset.
+        w._unit = U.LengthUnit('meters')
+        w._paper = U.paper_unit(w._unit)
         for name in ('plan', 'rcp', 'elev'):
             setattr(w, 'cmb_' + name + '_template', NS(SelectedItem='<None>'))
             setattr(w, '_' + name + '_template_map', {})

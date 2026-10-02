@@ -1836,7 +1836,7 @@
                             <Separator Style="{StaticResource T3.Rule}" Margin="0,0,0,16"/>
 
                             <!-- Module size -->
-                            <TextBlock Text="MODULE SIZE (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="lbl_module_size" Text="MODULE SIZE (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
                             <Grid Margin="0,0,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
