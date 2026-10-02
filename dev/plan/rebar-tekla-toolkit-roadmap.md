@@ -1,285 +1,247 @@
 # Rebar Toolkit cho người dùng chuyển từ Tekla — Phương án xây dựng
 
-> Ngày lập: 2026-10-02 · Trạng thái: **ĐỀ XUẤT — chưa có dòng code nào**
+> Ngày lập: 2026-10-02 · Sửa lần 2 cùng ngày theo hai ràng buộc của chủ extension:
+> **(1) không tool nào trùng / lặp chức năng Revit đã có sẵn; (2) Revit đang dùng là 2027.**
+> Trạng thái: **ĐỀ XUẤT — chưa có dòng code nào**
 > Panel mới: `T3Lab.extension/T3Lab_Dev.tab/Rebar & Assembly.panel/`
-> Phạm vi Revit: 2022 → 2027 (gate `dev/audit_revit_compat.py`) · CPython 3 + WPF theo `.claude/rules/new-tool-standard.md`
-> Mục tiêu: người quen Tekla Structures mở Revit là **làm việc được ngay với từ vựng và thao tác quen**,
-> và mọi tool **hoạt động đúng cả khi phần tử nằm trong Assembly** (cast unit của Revit).
+> Mục tiêu: người quen Tekla Structures mở Revit là làm việc được ngay với từ vựng và thao tác quen,
+> và mọi tool hoạt động đúng cả khi phần tử nằm trong Assembly (cast unit của Revit).
 
 ---
 
-## 0. Vì sao cần bộ tool này
+## 0. Hai nguyên tắc chốt
 
-| Người Tekla quen có | Revit stock có | Khoảng trống |
+**N1 — Chỉ lấp khoảng trống, không làm lại Revit.** Một chức năng chỉ được đưa vào tool khi Revit 2027
+*không làm được*, hoặc chỉ làm được *từng phần tử một* trong khi giá trị của tool nằm ở việc chạy hàng loạt
+theo quy tắc. Chức năng Revit đã có thì tool **gọi thẳng lệnh Revit** hoặc ghi vào hướng dẫn "dùng lệnh X của
+Revit", không bọc lại bằng UI riêng. Mục 1 là bảng rà soát từng đề xuất.
+
+**N2 — Thiết kế và QA trên Revit 2027.** Code dùng API mới nhất khi có lợi (Bending Detail 2023+, ElementId
+`Value`, …). Gate `dev/audit_revit_compat.py` vẫn bắt dải 2022→2027 nên API thêm sau 2022 phải đi qua
+`lib/Snippets/_compat.py` để không nổ import trên máy khác, nhưng **không QA và không hứa hành vi** trên
+2022–2026 cho bộ tool này. Revit 2027 chạy .NET 8: mọi window modeless/ExternalEvent theo luật
+`__persistentengine__` + `detect_persistent_engine()`; sửa `lib/` thì restart Revit, không Reload.
+
+---
+
+## 1. Rà soát trùng chức năng với Revit 2027 (quyết định giữ / cắt)
+
+> Cột "Revit 2027 có sẵn" ghi theo hiểu biết đến bản 2026 cộng những gì chắc chắn còn nguyên ở 2027.
+> Dòng đánh dấu **(xác minh)** là chức năng tôi *không chắc* 2027 đã có hay chưa — kiểm tra trong GĐ0 trước
+> khi code, nếu Revit đã có thì cắt nốt. Không được giữ một tool chỉ vì "tiện hơn một chút".
+
+| Đề xuất ban đầu | Revit 2027 có sẵn | Quyết định |
 |---|---|---|
-| **Cast unit** = part chính + part phụ + **toàn bộ rebar tự thuộc về** | Assembly: phải tự chọn từng rebar để add; rebar thêm sau không tự vào | Tool tự gom rebar theo host |
-| **Numbering series** (prefix + start number, đánh số lại, khoá số) | Rebar Number tự động theo Partition, không prefix, không start number theo ý | Numbering Manager |
-| **Cast unit drawing + Clone drawing** từ bản vẽ mẫu | Assembly views tạo tay từng cái; không có "clone" | **Clone Drawing** — tool trọng tâm |
-| **System component** (Beam reinforcement 63, Column 83, Pad footing 77 …) | Không có; chỉ Rebar / Rebar Set vẽ tay | Rebar Wizard |
-| **Copy special → to another object** | Copy/Paste rồi rebar vẫn trỏ host cũ | Copy Rebar to Similar Hosts |
-| **Report** (bending schedule, cast unit list, weight by diameter) | Schedule tự dựng; Bending Detail chỉ từ 2023 | BBS Export |
-| Bật/tắt hiển thị rebar theo view bằng một nút | Unobscured / Solid chỉnh **từng** thanh, **từng** view | Rebar View |
-| **Numbering / clash / unassigned check** | Không có | Rebar Check |
+| Rebar View: bật Unobscured / Solid hàng loạt theo view | **Có.** Properties của rebar → *View Visibility States* đặt Unobscured + Solid cho mọi view trong một bảng; View Filter + Visibility/Graphics; Rebar Set presentation (show all / first-last / middle) | **CẮT** |
+| Rebar Numbering: prefix + start number theo partition | **Có.** *Reinforcement Numbering* (Structure → Reinforcement) quản lý partition, đánh số lại, xoá khoảng trống; Schedule Mark là tham số có sẵn | **CẮT** phần đánh số. Giữ duy nhất **gán Partition theo quy tắc** (partition = mark assembly / level / host type) — Revit chỉ gán partition tay từng thanh → gộp vào Cast Unit Manager |
+| BBS Export: bảng uốn + trọng lượng ra Excel | **Có phần lớn.** Rebar Schedule có Shape, tham số hình A–F, Total Bar Length, Quantity; *Rebar Bending Detail* (2023+) chèn hình uốn vào schedule và vào view; schedule export ra txt/csv | **CẮT.** Khoảng trống còn lại (kg/m theo tiêu chuẩn, tổng theo Ø) giải quyết bằng **một schedule template + shared parameter `T3_WeightPerMetre` trên RebarBarType + calculated field** — là nội dung hướng dẫn, không phải tool |
+| Copy Rebar sang host tương tự | **Có phần lớn.** Copy / Paste Aligned → rebar dán vào host hợp lệ sẽ tự nhận host mới; Mirror có sẵn | **CẮT** tool riêng. Phần Revit *không* làm: rebar dán vào host đang trong assembly không tự vào assembly → đây là việc của *Sync rebar* trong Cast Unit Manager |
+| Cast Unit Manager: tạo / sửa / tách assembly | **Có một phần.** Create Assembly, Edit Assembly, Disassemble, Naming Category — nhưng **từng assembly một**, phải chọn tay từng rebar để add, không có "đồng bộ rebar", không đổi tên hàng loạt theo series | **GIỮ, cắt gọn**: bỏ create/edit/disassemble đơn lẻ (dùng lệnh Revit); giữ batch create một-assembly-mỗi-host có tự gom rebar, Sync rebar, Rename theo series, trạng thái drawing, gán partition theo quy tắc |
+| Clone Drawing — Mode A tạo bộ view theo preset | **Có.** Assembly → *Create Views* tạo 3D, plan, elevation, section, Part List, Material Takeoff, sheet với view template + titleblock | **CẮT Mode A.** Bản vẽ mẫu phải tạo bằng lệnh Create Views của Revit |
+| Clone Drawing — Mode B nhân bản bản vẽ mẫu sang assembly khác | **Không có.** Revit không có cách nào mang view + sheet + dim + tag từ một assembly sang assembly khác; instance tách type là mất bản vẽ, làm lại từ đầu | **GIỮ — tool trọng tâm** |
+| Rebar Check | **Không có.** Interference Check chỉ va chạm hình học; không có kiểm tra rebar mồ côi, rebar chưa vào assembly, assembly chưa có bản vẽ, trùng số khác hình | **GIỮ** |
+| Rebar Wizard (system component dầm / cột / móng) | **Chưa thấy có** trong sản phẩm; Autodesk Rebar Extensions đã ngừng từ lâu **(xác minh ở 2027)** | **GIỮ, giai đoạn cuối**; nếu 2027 có auto-reinforcement thì cắt |
 
-Nguyên tắc xuyên suốt: **không giả lập Tekla**, chỉ *đặt tên và tổ chức thao tác* theo cách người Tekla đã quen, còn phía dưới là đối tượng Revit chuẩn (Assembly, Rebar, Partition, View Template). Người dùng học Revit thật, không học một lớp vỏ.
+Kết quả: **8 → 4 tool**, trong đó 3 tool làm ngay, 1 tool làm sau.
 
 ---
 
-## 1. Bảng ánh xạ thuật ngữ Tekla → Revit (dùng trong UI, tooltip, docs)
+## 2. Bảng ánh xạ thuật ngữ Tekla → Revit (dùng trong tooltip, docs onboarding)
 
-> UI là tiếng Anh. Nhãn dùng **thuật ngữ Revit**; thuật ngữ Tekla đặt trong tooltip dạng `Assembly (Tekla: cast unit)` để người mới tra được. Không đổi tên khái niệm Revit.
+> UI tiếng Anh, nhãn dùng **thuật ngữ Revit**; thuật ngữ Tekla đặt trong tooltip dạng `Assembly (Tekla: cast unit)`.
+> Bảng này cũng là xương sống của một trang hướng dẫn "Tekla → Revit 2027" trong `docs/` — vì phần lớn
+> việc "quen tay" được giải quyết bằng *biết lệnh Revit nào tương ứng*, không phải bằng tool.
 
-| Tekla | Revit | Ghi chú kỹ thuật |
+| Tekla | Revit 2027 | Tool T3Lab liên quan |
 |---|---|---|
-| Cast unit (in-situ / precast) | `AssemblyInstance` + `AssemblyType` | Revit tự gộp các assembly **giống hệt hình học** thành cùng type — giống Tekla gán cùng mark cho cast unit giống nhau |
-| Main part | Element đặt tên cho assembly (`NamingCategoryId`) | |
-| Cast unit mark (C-1, B-12) | `AssemblyInstance.AssemblyTypeName` | Tool đặt tên theo series prefix + số |
-| Rebar numbering series / partition | Rebar **Partition** (`NUMBER_PARTITION_PARAM`) + Rebar Number (`REBAR_NUMBER`) | `NumberingSchema` cho phép prefix / số bắt đầu theo partition |
-| Reinforcing bar group | Rebar Set (layout Fixed Number / Maximum Spacing / Number with Spacing / Minimum Clear Spacing) | `RebarShapeDrivenAccessor` |
-| Rebar shape catalog (shape code) | Rebar Shape family + `RebarShape` | Shape code BS 8666 / ACI / TCVN tuỳ family nạp |
-| Pull-out picture | Rebar Bending Detail (2023+) | 2022: fallback ảnh shape trong schedule |
-| Cover | `RebarCoverType` + `RebarHostData.SetCoverType` | |
-| Hook | `RebarHookType` | |
-| Coupler / end anchor | `RebarCoupler` | |
-| Cast unit drawing | Bộ view của assembly (3D ortho, Front/Top/Side/Section, Part List, Material Takeoff, schedule) + Sheet | `AssemblyViewUtils.*` |
-| GA drawing | Sheet thường | ngoài phạm vi |
-| Clone drawing | **Không có** → tool #2 | |
-| Drawing list | Sheet browser lọc theo assembly → tool #2 tab "Drawings" | |
-| Report | Schedule + export Excel → tool #7 | |
-| Phase / Organizer | Phase / Workset (đã có `ManaWorkset`) | không làm lại |
+| Cast unit | `AssemblyInstance` + `AssemblyType` (instance giống hệt → cùng type, giống Tekla cùng mark) | Cast Unit Manager |
+| Main part | Element đặt tên (`NamingCategoryId`) | Cast Unit Manager |
+| Cast unit mark (C-1, B-12) | `AssemblyTypeName` | Cast Unit Manager (rename series) |
+| Numbering series | Rebar Partition + Reinforcement Numbering (**lệnh Revit**) | Cast Unit Manager (gán partition theo quy tắc) |
+| Reinforcing bar group | Rebar Set (Fixed Number / Maximum Spacing / Number with Spacing / Minimum Clear Spacing) | — |
+| Shape catalog | Rebar Shape family | — |
+| Pull-out picture | Rebar Bending Detail (**lệnh Revit**) | — |
+| Cover / hook / coupler | `RebarCoverType` / `RebarHookType` / `RebarCoupler` | — |
+| Cast unit drawing | Assembly → Create Views (**lệnh Revit**) | — |
+| Clone drawing | **không có** | Clone Drawing |
+| Report (bending schedule, weight) | Rebar Schedule + Bending Detail + template T3 (hướng dẫn) | — |
+| Numbering / clash check | Interference Check (hình học) · còn lại không có | Rebar Check |
+| System component | **không có** (xác minh 2027) | Rebar Wizard |
+| Phase / Organizer | Phase / Workset (`ManaWorkset` đã có) | — |
 
 ---
 
-## 2. Luật "hoạt động tốt với Assembly" — áp cho MỌI tool trong bộ
+## 3. Luật "hoạt động tốt với Assembly" — áp cho MỌI tool trong bộ
 
-Đây là yêu cầu khó nhất của đề bài, viết thành luật để test được:
-
-| # | Luật | Vì sao / API |
+| # | Luật | API / lý do |
 |---|---|---|
-| A1 | Mọi tool **chọn host** phải chấp nhận cả: element rời, element trong assembly, và chính AssemblyInstance (chọn assembly = chọn tất cả member hợp lệ). | `AssemblyInstance.GetMemberIds()`; `Element.AssemblyInstanceId` |
-| A2 | Rebar sinh ra cho host nằm trong assembly phải **được add vào assembly đó** ngay trong cùng Transaction. | `AssemblyInstance.AddMemberIds`; nếu không, rebar "mồ côi", schedule của assembly thiếu thanh — lỗi phổ biến nhất của người Tekla khi mới sang |
-| A3 | Rebar bị xoá / đổi host phải được **remove khỏi assembly cũ** trước, add vào assembly mới sau. Không được để phần tử thuộc hai assembly (Revit từ chối). | `AreElementsValidForAssembly(doc, ids, ElementId.InvalidElementId)` kiểm tra trước khi add |
-| A4 | Thay đổi hình học/thành phần có thể làm Revit **tách type** (assembly không còn giống nhau) → tool phải báo số assembly bị tách type và mark bị đổi, không im lặng. | So `AssemblyTypeName` trước/sau trong cùng lần chạy |
-| A5 | Không được add: phần tử đang trong Group, phần tử của link, assembly khác (không lồng). Tool lọc trước, báo rõ "skipped: in group". | ràng buộc Revit |
-| A6 | Thao tác trên nhiều assembly: **một `TransactionGroup` assimilate** cho một lần bấm; mỗi assembly một `Transaction` con để lỗi 1 cái không hỏng cả lô. Ctrl+Z vẫn là một bước. | S1/S2 của new-tool-standard; `disposing(...)` theo S19 |
-| A7 | View của assembly chỉ hợp lệ cho assembly đó; tool tạo view phải đọc lại `View.AssociatedAssemblyInstanceId` để không tạo trùng. | |
-| A8 | Mọi tool có cột "Assembly" trong bảng kết quả, và lọc được "only in assemblies / only loose". | UI nhất quán |
-
-**Cần xác minh trong Revit (spike GĐ0):** các instance **cùng** AssemblyType có dùng chung bộ view trong Project Browser hay không, và khi một instance tách type thì bộ view đi theo instance nào. Đây là điểm quyết định thiết kế Clone Drawing (mục 3.2) — không được giả định.
+| A1 | Tool **chọn host** chấp nhận cả: element rời, element trong assembly, và chính AssemblyInstance (= toàn bộ member hợp lệ) | `AssemblyInstance.GetMemberIds()`; `Element.AssemblyInstanceId` |
+| A2 | Rebar sinh ra cho host nằm trong assembly phải **được add vào assembly đó** trong cùng Transaction | `AddMemberIds`; nếu không, rebar mồ côi, schedule assembly thiếu thanh — lỗi phổ biến nhất của người Tekla mới sang |
+| A3 | Đổi host / xoá: remove khỏi assembly cũ trước, add vào assembly mới sau; một phần tử không thuộc hai assembly | `AreElementsValidForAssembly(doc, ids, ElementId.InvalidElementId)` kiểm tra trước |
+| A4 | Thay đổi có thể làm Revit **tách type** → tool báo số assembly bị tách và mark bị đổi, không im lặng | so `AssemblyTypeName` trước / sau |
+| A5 | Không add: phần tử trong Group, phần tử của link, assembly khác (không lồng). Lọc trước, báo `skipped: in group` | ràng buộc Revit |
+| A6 | Thao tác nhiều assembly: một `TransactionGroup` assimilate cho một lần bấm; mỗi assembly một `Transaction` con | S1/S2; `disposing(...)` theo S19 |
+| A7 | View của assembly chỉ hợp lệ cho assembly đó; đọc `View.AssociatedAssemblyInstanceId` để không tạo trùng | |
+| A8 | Mọi bảng kết quả có cột "Assembly", lọc được *only in assemblies / only loose* | UI nhất quán |
 
 ---
 
-## 3. Bộ tool đề xuất (8 tool, 1 panel)
+## 4. Bộ tool sau rà soát (4 tool)
 
-Thứ tự dưới đây cũng là **thứ tự ưu tiên build**. Pattern/size class theo `new-tool-standard.md` §0.
-
-| # | Tool | Tekla tương đương | Pattern | Size | Sửa model | Ưu tiên |
+| # | Tool | Khoảng trống Revit 2027 mà nó lấp | Pattern | Size | Sửa model | Ưu tiên |
 |---|---|---|---|---|---|---|
-| 1 | **Cast Unit Manager** (`CastUnit`) | Cast unit + numbering cast unit | P2 + P4 | L | Có | **P1** |
-| 2 | **Clone Drawing** (`CloneDrawing`) | Clone drawing / Create cast unit drawings | P2 + P3 + P5 | L | Có (view/sheet) | **P1** |
-| 3 | **Rebar Numbering** (`RebarNumbering`) | Numbering settings / Numbering series | P1 + P4 | M | Có | P1 |
-| 4 | **Rebar View** (`RebarView`) | Rebar visibility / representation | P2 | S | Có (view-only) | P2 (quick win) |
-| 5 | **BBS Export** (`BBSExport`) | Report: bending schedule, weight list | P4 | L | Không | P2 |
-| 6 | **Copy Rebar** (`CopyRebar`) | Copy special → to another object | P2 + P5 | M | Có | P2 |
-| 7 | **Rebar Check** (`RebarCheck`) | Numbering check / Clash check manager | P4 | L | Không (chỉ select/isolate) | P3 |
-| 8 | **Rebar Wizard** (`RebarWizard`) | System components 63 / 83 / 77 / 92 | P1 + P5 | L | Có | P3 (lớn, làm sau) |
+| 1 | **Cast Unit Manager** (`CastUnit`) | Tạo assembly hàng loạt có tự gom rebar · Sync rebar · rename series · gán partition theo quy tắc · trạng thái bản vẽ | P2 + P4 | L | Có | P1 |
+| 2 | **Clone Drawing** (`CloneDrawing`) | Nhân bản bản vẽ assembly mẫu sang assembly khác | P2 + P3 + P5 | L | Có (view / sheet) | **P1 — trọng tâm** |
+| 3 | **Rebar Check** (`RebarCheck`) | Kiểm tra rebar / assembly ở mức dữ liệu | P4 | L | Không (select / isolate; Fix chỉ gọi 1 và 2) | P2 |
+| 4 | **Rebar Wizard** (`RebarWizard`) | System component dầm / cột / móng | P1 + P5 | L | Có | P3, sau cùng |
 
-### 3.1 Cast Unit Manager — `CastUnit.pushbutton`
+### 4.1 Cast Unit Manager — `CastUnit.pushbutton`
 
-Một cửa sổ, hai trang (rail trái): **Create** và **Manage**.
+Một cửa sổ, rail trái 3 trang. Không có nút Create / Edit / Disassemble đơn lẻ — việc đó là lệnh Revit.
 
-**Create**
-- Chọn host(s) trên model hoặc theo bộ lọc (Category + Type + Level + Workset).
-- Checkbox mặc định bật: *Include hosted rebar* (gom `Rebar`, `RebarInSystem`, `AreaReinforcement`, `PathReinforcement`, `RebarCoupler`, `FabricSheet` có `GetHostId()` = host) → đúng hành vi cast unit Tekla.
-- Tuỳ chọn: *Include joined / hosted elements* (door/window/opening, embedded parts), *Naming category*.
-- Chế độ **batch**: "One assembly per host" (mỗi cột precast thành một cast unit) hoặc "All selected into one".
-- Trước khi tạo: bảng preview `Host | Rebar count | Will skip (reason) | Mark (dự kiến)`; `AreElementsValidForAssembly` chạy trước, lý do skip hiện chữ (`in group`, `already in assembly`, `linked`).
+**Batch create** (Revit: từng assembly một, chọn tay rebar)
+- Chọn host trên model hoặc theo bộ lọc (Category + Type + Level + Workset).
+- *Include hosted rebar* mặc định bật: gom `Rebar`, `RebarInSystem`, `AreaReinforcement`, `PathReinforcement`, `RebarCoupler`, `FabricSheet` có `GetHostId()` = host → đúng hành vi cast unit Tekla.
+- *One assembly per host* (mỗi cột precast một cast unit) hoặc *All selected into one*.
+- Preview `Host | Rebar | Will skip (reason) | Mark (dự kiến)`; `AreElementsValidForAssembly` chạy trước, lý do skip bằng chữ.
 
-**Manage**
-- Bảng mọi AssemblyInstance: `Mark (type name) | Instances | Members | Rebar | Views | Sheets | Level`.
-- Hành động: Rename theo series (prefix + start + step, giữ cùng type cùng mark), Add/Remove member, **Sync rebar** (quét rebar có host trong assembly nhưng chưa là member → add; báo số), Disassemble.
-- Cột `Views` = số view có `AssociatedAssemblyInstanceId` trỏ về instance → người dùng thấy ngay cast unit nào chưa có drawing (bắc cầu sang tool #2).
+**Manage** (Revit: không có bảng tổng hợp)
+- Bảng mọi AssemblyInstance: `Mark | Instances | Members | Rebar | Views | Sheets | Level`.
+- **Sync rebar**: quét rebar có host trong assembly nhưng chưa là member → add; báo số. Đây cũng là bước sau khi người dùng Copy / Paste Aligned rebar bằng lệnh Revit.
+- **Rename series**: prefix + start + step, cùng type giữ cùng mark (A4 báo nếu có type tách).
+- Cột `Views` / `Sheets` đếm theo `AssociatedAssemblyInstanceId` → thấy ngay cast unit nào chưa có bản vẽ, bắc cầu sang tool 2.
 
-API chính: `AssemblyInstance.Create / AddMemberIds / RemoveMemberIds / GetMemberIds / AssemblyTypeName / NamingCategoryId`, `AreElementsValidForAssembly`, `Rebar.GetHostId`, `RebarInSystem`, `FilteredElementCollector.OfClass(AssemblyInstance)`.
-Helper mới: `lib/Snippets/_assembly.py` (mục 5).
+**Partition by rule** (Revit: gán partition tay từng thanh)
+- partition = `{AssemblyMark}` / `{Level}` / `{HostType}` / `{Workset}` / chuỗi cố định, phạm vi: selection / assembly / toàn model.
+- Chỉ ghi `NUMBER_PARTITION_PARAM`; **không** đụng Rebar Number — Revit tự đánh số lại; sau đó người dùng mở Reinforcement Numbering của Revit nếu muốn chỉnh tay.
 
-### 3.2 Clone Drawing — `CloneDrawing.pushbutton` (tool trọng tâm)
+### 4.2 Clone Drawing — `CloneDrawing.pushbutton` (tool trọng tâm)
 
-Hai chế độ, cùng một cửa sổ:
+Tiền đề: bản vẽ mẫu đã làm **bằng lệnh Revit** (Assembly → Create Views, dim, tag, text, sheet). Tool chỉ nhân bản.
 
-**Mode A — From preset** (tương đương "Create cast unit drawings" hàng loạt)
-- Chọn danh sách assembly (bảng từ 3.1, lọc "no views yet").
-- Preset lưu JSON ở `%APPDATA%\T3LabAI\rebar_drawing_presets.json`: bộ view cần tạo (3D ortho, Front/Top/Right/Section…), View Template cho từng view, scale, titleblock, vị trí viewport trên sheet (toạ độ theo sheet), schedule nào kèm (Part List / Material Takeoff / Rebar schedule theo category), quy tắc tên sheet (`{mark}` / `{level}` / `{seq}`).
-- Chạy theo P3: progress + log từng assembly; mỗi assembly một Transaction con (A6).
-
-**Mode B — From master assembly** (clone drawing thật)
-- Chọn **một** assembly mẫu đã có view + sheet hoàn chỉnh (đã dim, tag, text).
-- Chọn các assembly đích. Tool chấm điểm "giống nhau" (cùng category host, cùng kích thước bao ±tolerance, cùng số rebar) để cảnh báo trước khi clone sang assembly khác hẳn.
-- Thực hiện 3 tầng, mỗi tầng có thể bật/tắt, kết quả báo theo tầng:
+- Chọn một assembly mẫu có view + sheet; chọn các assembly đích. Tool chấm "độ giống" (cùng category host, kích thước bao ± tolerance, cùng số rebar) và cảnh báo trước khi clone sang assembly khác hẳn.
+- Ba tầng, bật / tắt được, báo kết quả theo tầng:
 
 | Tầng | Nội dung | Cách làm | Độ chắc |
 |---|---|---|---|
-| T1 | Bộ view (cùng loại, cùng orientation, template, scale, crop offset, detail level), sheet cùng titleblock, viewport cùng vị trí | `AssemblyViewUtils.*` tạo mới; copy thuộc tính view; `Viewport.Create` ở toạ độ lấy từ sheet mẫu (toạ độ tương đối với tâm assembly: `AssemblyInstance.GetCenter()` / `GetTransform()`) | Cao |
-| T2 | Annotation **không có reference**: text, detail line, detail item, filled region, symbol, revision cloud | `ElementTransformUtils.CopyElements(sourceView, ids, destView, transform, options)` với transform = chuyển hệ toạ độ assembly mẫu → assembly đích | Cao (cần spike xác nhận copy giữa 2 assembly view) |
-| T3 | Annotation **có reference**: rebar tag, multi-rebar annotation, dimension, spot elevation | **Tạo lại**, không copy: khớp phần tử mẫu ↔ phần tử đích bằng *fingerprint* (category + shape + vị trí tương đối với tâm assembly + chỉ số rebar trong set), rồi `IndependentTag.Create` / `MultiReferenceAnnotation.Create` / `doc.Create.NewDimension` với reference lấy từ phần tử đích tương ứng. Dimension bám mặt bê tông: khớp face theo normal + khoảng cách tới tâm | Trung bình — ghi rõ số tag/dim **không khớp được** vào log, không im lặng |
+| T1 | Bộ view cùng loại / orientation / template / scale / crop / detail level; sheet cùng titleblock; viewport cùng vị trí | `AssemblyViewUtils.Create3DOrthographic / CreateDetailSection / CreatePartList / CreateMaterialTakeoff / CreateSingleCategorySchedule`; copy thuộc tính view; `Viewport.Create` theo toạ độ sheet mẫu | Cao |
+| T2 | Annotation **không reference**: text, detail line, detail item, filled region, symbol | `ElementTransformUtils.CopyElements(sourceView, ids, destView, transform, options)`, transform = hệ assembly mẫu → đích (`GetTransform()` / `GetCenter()`) | Cao (spike G2) |
+| T3 | Annotation **có reference**: rebar tag, multi-rebar annotation, dimension, spot elevation | **Tạo lại**: khớp phần tử mẫu ↔ đích bằng fingerprint (category + shape + vị trí tương đối tâm assembly + chỉ số trong set) → `IndependentTag.Create` / `MultiReferenceAnnotation.Create` / `doc.Create.NewDimension`; dim bám mặt bê tông khớp face theo normal + khoảng cách tới tâm | Trung bình — log rõ số **unmatched** |
 
-- Sau clone, bảng kết quả: `Assembly | Views created | Sheet | Annotations copied | Tags re-created | Dims re-created | Unmatched` + nút *Open sheet*.
-- P5 confirm: "Create N views and M sheets for K assemblies?". Không bao giờ xoá view/sheet có sẵn; assembly đã có drawing thì skip hoặc "add missing only".
+- Kết quả: `Assembly | Views | Sheet | Copied | Tags re-created | Dims re-created | Unmatched` + *Open sheet*.
+- P5 confirm với số lượng. Không xoá view / sheet có sẵn; assembly đã có bản vẽ → skip hoặc *add missing only*.
+- Ràng buộc đã biết: `CopyElements` chỉ giữa view cùng loại; dim / tag copy chéo assembly mất reference → T3 phải tạo lại.
 
-Ràng buộc đã biết: `CopyElements` chỉ copy được giữa view **cùng loại** (section→section, drafting→drafting); view 3D ortho của assembly không nhận annotation 2D. Dimension/tag copy chéo assembly bằng `CopyElements` sẽ **mất reference** → vì thế T3 phải tạo lại.
-
-### 3.3 Rebar Numbering — `RebarNumbering.pushbutton`
-
-- Bảng Partition: `Partition | Prefix | Start number | Next number | Rebar count | Duplicates`.
-- Sửa prefix / start number theo partition (`NumberingSchema` — `NumberingSchemaTypes.StructuralNumberingSchemas.Rebar`; chữ ký method xác nhận trong spike).
-- **Assign partition by rule**: partition = `{AssemblyMark}` / `{Level}` / `{HostType}` / `{Workset}` → đúng cách Tekla đánh số theo series từng cast unit; áp cho rebar trong assembly thì lấy mark assembly làm partition mặc định.
-- Renumber: Revit tự đánh số lại khi đổi partition; tool chỉ báo bảng trước/sau. **Không** ghi đè `REBAR_NUMBER` bằng tay (read-only khi numbering bật).
-- Schedule Mark (`REBAR_ELEM_SCHEDULE_MARK`): tuỳ chọn ghi `{prefix}{number}` để người Tekla có cột "Bar mark" quen thuộc trên schedule/tag.
-
-### 3.4 Rebar View — `RebarView.pushbutton`
-
-- Chọn view (hiện tại / nhiều view / tất cả view của N assembly).
-- Hành động theo lô: Unobscured on/off, Solid in 3D on/off, Host transparency (override graphic), bật/tắt category Structural Rebar, ẩn rebar không thuộc assembly của view.
-- API: `Rebar.SetUnobscuredInView`, `Rebar.SetSolidInView(View3D, bool)`, `View.SetCategoryHidden`, `OverrideGraphicSettings.SetSurfaceTransparency`.
-- Chạy trong 1 Transaction; tác vụ > 2 s (model nhiều rebar) có progress (S5).
-
-### 3.5 BBS Export — `BBSExport.pushbutton`
-
-- Nguồn: toàn model / theo assembly / theo partition / theo selection.
-- Cột chuẩn: `Mark | Partition | Assembly | Shape code | Bar type | Ø (BarNominalDiameter) | Qty | Length (TotalLength / Quantity) | A B C D E F | Weight/m | Total weight | Host`.
-- Kích thước A–F: đọc parameter của rebar theo `RebarShape` (shape-driven) — các tham số `RebarShapeParameters`; free-form rebar báo "n/a".
-- Tổng hợp: theo Ø, theo assembly, theo partition. Xuất **CSV + XLSX** (openpyxl đã có trong engine? — *xác nhận*; không thì CSV + `.xlsx` qua COM Excel như `ManaSheets` đang làm).
-- 2023+: kèm cột ảnh Bending Detail nếu người dùng bật (`RebarBendingDetail` — chữ ký API xác nhận trong spike, có `_compat` guard; 2022 bỏ qua cột này và báo).
-- Không sửa model.
-
-### 3.6 Copy Rebar — `CopyRebar.pushbutton`
-
-- Chọn host nguồn (hoặc assembly nguồn) → chọn host đích (nhiều).
-- Kiểm tra tương thích: cùng category, cùng family type (hoặc cùng kích thước tiết diện ±tol), host hợp lệ (`RebarHostData.IsValidHost`).
-- Thực hiện: `ElementTransformUtils.CopyElements` với transform từ `host.Location` + hướng (kể cả mirror tuỳ chọn) → `rebar.SetHostId(doc, targetHostId)` → nếu đích trong assembly thì `AddMemberIds` (A2), nếu nguồn trong assembly và đích không thì rebar đi theo đích (không giữ assembly cũ).
-- P5 confirm với số lượng; kết quả bảng `Target host | Copied | Rehosted | Added to assembly | Failed (reason)`.
-
-### 3.7 Rebar Check — `RebarCheck.pushbutton`
-
-Bảng phát hiện, mỗi dòng có *Select* / *Isolate in view*:
+### 4.3 Rebar Check — `RebarCheck.pushbutton`
 
 | Check | Cách phát hiện |
 |---|---|
 | Rebar không có host hợp lệ / host đã xoá | `GetHostId()` invalid |
-| Rebar có host trong assembly nhưng **không** là member | so `Element.AssemblyInstanceId` của rebar với host |
+| Rebar có host trong assembly nhưng **không** là member | so `AssemblyInstanceId` của rebar với host |
 | Assembly chưa có view / chưa có sheet | A7 |
-| Trùng Rebar Number trong cùng partition với hình khác (số bị khoá cũ) | group theo partition + number, so shape/dia/length |
-| Rebar nằm ngoài bounding box host (vẽ nhầm) | `BoundingBoxXYZ` của rebar vs host (có tolerance) |
-| Rebar không thuộc partition nào ("<unassigned>") | tham số rỗng |
-| Shape-driven rebar bị "Shape not recognized" | `RebarShapeDrivenAccessor` + shape id invalid |
+| Trùng Rebar Number trong partition nhưng khác hình / Ø / dài | group theo partition + number |
+| Rebar nằm ngoài bounding box host | `BoundingBoxXYZ` ± tolerance |
+| Rebar chưa có partition | tham số rỗng |
+| Shape-driven rebar "shape not recognized" | `RebarShapeDrivenAccessor` + shape id invalid |
 
-Không sửa model; nút *Fix* chỉ cho hai mục an toàn: *Sync rebar into assembly* và *Assign partition* (gọi lại logic 3.1/3.3).
+Mỗi dòng: *Select* / *Isolate in view*. Nút *Fix* chỉ cho hai mục an toàn, gọi lại logic tool 1: *Sync rebar into assembly* và *Assign partition*. Không có check va chạm — dùng Interference Check của Revit.
 
-### 3.8 Rebar Wizard — `RebarWizard.pushbutton` (giai đoạn sau)
+### 4.4 Rebar Wizard — `RebarWizard.pushbutton` (sau cùng, xác minh 2027 trước)
 
-Thay cho system component của Tekla; làm **từng host một**, form P1 với preview text số thanh:
-- **Beam**: thanh trên/dưới theo nhịp (số lượng, Ø, lớp), đai theo **3 vùng** (hai đầu dày / giữa thưa), cover, hook.
-- **Column**: thanh dọc theo cạnh, đai + đai phụ, vùng đai dày chân/đỉnh, lap length.
-- **Pad footing**: lưới trên/dưới, hook lên.
-- **Wall / Slab**: dùng `AreaReinforcement` theo Ø + spacing hai lớp.
-- Sinh bằng `Rebar.CreateFromCurves` / `CreateFromRebarShape` + `RebarShapeDrivenAccessor.SetLayoutAs*`; mọi thanh add vào assembly của host nếu có (A2).
-- Preset JSON để người dùng lưu "component" của mình giống lưu attribute file trong Tekla.
-
-Rủi ro: hình học host không chữ nhật, dầm nghiêng, cột tròn — khoanh phạm vi V1 là **tiết diện chữ nhật, host thẳng**; ngoài phạm vi báo rõ.
+- Beam: thanh trên / dưới, đai 3 vùng, cover, hook · Column: thanh dọc, đai + đai phụ, vùng đai dày · Pad footing: lưới hai lớp · Wall / Slab: `AreaReinforcement`.
+- `Rebar.CreateFromCurves` / `CreateFromRebarShape` + `RebarShapeDrivenAccessor.SetLayoutAs*`; mọi thanh add vào assembly của host (A2).
+- Preset JSON `%APPDATA%\T3LabAI\rebar_wizard_presets.json` — tương đương lưu attribute file trong Tekla.
+- V1: tiết diện chữ nhật, host thẳng; ngoài phạm vi báo rõ.
 
 ---
 
-## 4. Giai đoạn thực hiện
+## 5. Giai đoạn thực hiện
 
 | GĐ | Nội dung | Deliverable | Ước lượng |
 |---|---|---|---|
-| **0 · Spike** | Xác minh 6 giả định API trong Revit 2022 + 2026 (mục 6) bằng script chạy trong RPS/pyRevit console; ghi kết quả vào mục 6 | mục 6 tick ✅/❌ + quyết định thiết kế T2/T3 của Clone Drawing | 2–3 ngày |
-| **1 · Nền** | `lib/Snippets/_assembly.py`, `lib/Snippets/_rebar.py` (+ `_compat` guard cho `BarNominalDiameter`, `RebarBendingDetail`); test thuần Python `dev/test_assembly_rules.py`, `dev/test_rebar_fingerprint.py`; panel `Rebar & Assembly.panel` + icon theo chuẩn 09 | helper + test xanh + panel rỗng hiện trên ribbon | 2 ngày |
-| **2 · Quick win** | Tool #1 Cast Unit Manager, tool #4 Rebar View | 2 tool QA trong Revit | 4 ngày |
-| **3 · Clone Drawing** | Mode A preset → Mode B T1 → T2 → T3 | tool #2, log unmatched rõ ràng | 6–8 ngày |
-| **4 · Numbering + BBS** | Tool #3, tool #5 | 2 tool, xuất file khớp số liệu schedule Revit | 4 ngày |
-| **5 · Copy + Check** | Tool #6, tool #7 | 2 tool | 4 ngày |
-| **6 · Wizard** | Tool #8 (V1: beam + column chữ nhật) | tool #8 | 6+ ngày, mở roadmap riêng khi tới |
+| **0 · Spike** | Trên Revit 2027: xác minh G1–G8 (mục 7) bằng `dev/debug/spike_rebar_assembly.py`; đồng thời rà "What's New 2027" cho hai mục **(xác minh)** ở mục 1 | mục 7 tick ✅ / ❌; danh sách tool chốt | 2 ngày |
+| **1 · Nền** | `lib/Snippets/_assembly.py`, `_rebar.py`, `_drawing_clone.py` (+ `_compat` guard); test thuần Python; panel + icon theo chuẩn 09; trang `docs/tekla-to-revit-2027.md` từ bảng mục 2 | helper + test xanh + panel rỗng + docs | 2 ngày |
+| **2 · Cast Unit Manager** | Tool 1 | QA Revit 2027 | 3 ngày |
+| **3 · Clone Drawing** | T1 → T2 → T3 | Tool 2, log unmatched | 6–8 ngày |
+| **4 · Rebar Check** | Tool 3 | QA Revit 2027 | 2 ngày |
+| **5 · Wizard** | Tool 4 (V1 dầm + cột chữ nhật) nếu GĐ0 xác nhận Revit 2027 chưa có | mở roadmap riêng khi tới | 6+ ngày |
 
-Mỗi GĐ kết thúc bằng: 4 gate (`audit_t3`, `audit_tools`, `audit_wiring`, `audit_revit_compat`) xanh + `audit_cpython` 0 P0 + `check_xaml_load` / `check_xaml_wpf.ps1` 0 FAILED + checklist QA Revit ở mục 7 — chưa QA thì ghi `NEEDS VERIFICATION`, không tick.
+Mỗi GĐ kết thúc bằng: 4 gate (`audit_t3`, `audit_tools`, `audit_wiring`, `audit_revit_compat`) xanh + `audit_cpython` 0 P0 + `check_xaml_load` / `check_xaml_wpf.ps1` 0 FAILED + checklist mục 8 trên Revit 2027. Chưa QA thì ghi `NEEDS VERIFICATION`, không tick.
 
 ---
 
-## 5. Cấu trúc file dự kiến
+## 6. Cấu trúc file dự kiến
 
 ```
 T3Lab.extension/
 ├── T3Lab_Dev.tab/Rebar & Assembly.panel/
-│   ├── bundle.yaml                    # layout: CastUnit · CloneDrawing · RebarNumbering · RebarTools(stack) · RebarWizard
+│   ├── bundle.yaml                 # layout: CastUnit · CloneDrawing · RebarCheck · RebarWizard
 │   ├── CastUnit.pushbutton/
 │   ├── CloneDrawing.pushbutton/
-│   ├── RebarNumbering.pushbutton/
-│   ├── RebarTools.stack/              # RebarView · CopyRebar · RebarCheck · BBSExport
-│   └── RebarWizard.pushbutton/
-├── lib/GUI/Tools/
-│   ├── CastUnit.xaml · CloneDrawing.xaml · RebarNumbering.xaml · RebarView.xaml
-│   ├── CopyRebar.xaml · RebarCheck.xaml · BBSExport.xaml · RebarWizard.xaml
-├── lib/GUI/
-│   ├── CastUnitDialog.py · CloneDrawingDialog.py · RebarNumberingDialog.py · ...
+│   ├── RebarCheck.pushbutton/
+│   └── RebarWizard.pushbutton/     # GĐ5
+├── lib/GUI/Tools/   CastUnit.xaml · CloneDrawing.xaml · RebarCheck.xaml · RebarWizard.xaml
+├── lib/GUI/         CastUnitDialog.py · CloneDrawingDialog.py · RebarCheckDialog.py · RebarWizardDialog.py
 └── lib/Snippets/
-    ├── _assembly.py     # collect, validate, create, add/remove, sync rebar, views/sheets of assembly, center/transform
-    ├── _rebar.py        # host→rebar map, diameter/length/weight (compat), partition/number, shape params A–F, fingerprint
-    └── _drawing_clone.py# preset schema, view-set replication, annotation copy (T2), reference re-create (T3)
+    ├── _assembly.py        # collect, validate, batch create, sync rebar, rename series, views/sheets, center/transform
+    ├── _rebar.py           # host→rebar map (cache 1 lần / lần mở tool), partition by rule, fingerprint
+    └── _drawing_clone.py   # view-set replication (T1), annotation copy (T2), reference re-create (T3)
 dev/
-├── test_assembly_rules.py      # A1–A8 trên object giả (không cần Revit)
-├── test_rebar_fingerprint.py   # khớp phần tử mẫu ↔ đích, tolerance, mirror
-├── test_bbs_export.py          # tổng hợp theo Ø/assembly/partition, format CSV
-└── plan/rebar-tekla-toolkit-roadmap.md   # file này
+├── debug/spike_rebar_assembly.py   # GĐ0, chạy trong pyRevit console
+├── test_assembly_rules.py          # A1–A8 trên object giả, không cần Revit
+├── test_rebar_fingerprint.py       # khớp mẫu ↔ đích, tolerance, mirror
+└── plan/rebar-tekla-toolkit-roadmap.md
+docs/tekla-to-revit-2027.md         # bảng mục 2 + lệnh Revit tương ứng cho từng thao tác Tekla
 ```
 
-Logic Revit API nằm trọn trong `lib/Snippets/`; `script.py` chỉ nối UI ↔ helper (luật tách bạch §1 new-tool-standard). Phần "tính toán thuần" (fingerprint, tổng hợp BBS, rule A5 lọc) tách khỏi API để test được ngoài Revit.
+Logic Revit API nằm trọn trong `lib/Snippets/`; `script.py` chỉ nối UI ↔ helper. Phần tính toán thuần (fingerprint, rule A5, partition rule) tách khỏi API để test ngoài Revit.
 
 ---
 
-## 6. Giả định API phải xác minh trước khi code (GĐ0)
+## 7. Giả định phải xác minh trên Revit 2027 trước khi code (GĐ0)
 
 | # | Giả định | Ảnh hưởng nếu sai | Kết quả |
 |---|---|---|---|
-| G1 | Các instance cùng `AssemblyType` dùng chung bộ view; instance tách type thì mất view | Quyết định Mode B clone theo *type* hay theo *instance* | ⬜ |
-| G2 | `ElementTransformUtils.CopyElements(viewA, ids, viewB, transform, opts)` copy được text/detail line giữa hai assembly detail view cùng orientation | T2 của Clone Drawing | ⬜ |
-| G3 | Dimension/tag copy bằng `CopyElements` sang assembly khác **mất** reference (như dự đoán) | Nếu copy được thì T3 đơn giản hơn nhiều | ⬜ |
-| G4 | `NumberingSchema` cho đọc/ghi prefix + start number theo partition trên 2022–2027; tên method chính xác | Tool #3 | ⬜ |
-| G5 | `RebarBendingDetail` tồn tại từ 2023, chữ ký `Create(...)`; 2022 không có → `_compat` guard | Tool #5 cột ảnh | ⬜ |
-| G6 | `Rebar.SetHostId(doc, id)` giữ nguyên hình học và layout của rebar set sau rehost | Tool #6 | ⬜ |
-| G7 | `AssemblyInstance.AddMemberIds` chấp nhận `RebarInSystem` / `AreaReinforcement` / `FabricSheet` làm member | Tool #1 "Include hosted rebar" | ⬜ |
-| G8 | `RebarBarType.BarNominalDiameter` có từ 2022 (thay `BarDiameter` deprecated) — thêm rule vào `audit_revit_compat.py` nếu cần | Tool #5 | ⬜ |
+| G1 | Instance cùng `AssemblyType` dùng chung bộ view; instance tách type thì mất view | Clone theo type hay theo instance | ⬜ |
+| G2 | `CopyElements(viewA, ids, viewB, transform, opts)` copy được text / detail line giữa hai assembly detail view cùng orientation | T2 | ⬜ |
+| G3 | Dim / tag copy bằng `CopyElements` sang assembly khác **mất** reference | Nếu còn reference thì T3 đơn giản hơn | ⬜ |
+| G4 | `AddMemberIds` chấp nhận `RebarInSystem` / `AreaReinforcement` / `FabricSheet` làm member | Batch create "Include hosted rebar" | ⬜ |
+| G5 | Rebar dán bằng Paste Aligned vào host trong assembly **không** tự vào assembly (lý do giữ Sync rebar) | Nếu 2027 tự add thì cắt Sync rebar | ⬜ |
+| G6 | Revit 2027 **không** có auto-reinforcement cho dầm / cột / móng | Giữ hay cắt Rebar Wizard | ⬜ |
+| G7 | Revit 2027 **không** có clone / propagate assembly views sang assembly khác | Giữ hay cắt Clone Drawing (nếu cắt thì bộ tool chỉ còn 1 + 3) | ⬜ |
+| G8 | `AssemblyViewUtils.*` và `Viewport.Create` chạy ổn trên .NET 8 qua pythonnet (không cần overload đặc biệt) | T1 | ⬜ |
 
-Cách xác minh: script `dev/debug/spike_rebar_assembly.py` chạy trong pyRevit console trên model test có 2 cast unit cột giống nhau + 1 khác, ghi output ra `%APPDATA%\T3LabAI\spike_rebar.log`. Người dùng chạy trên Revit 2022 và 2026 rồi dán log lại.
+Cách xác minh: model test có 2 cast unit cột giống nhau + 1 khác, mỗi cột có rebar; script ghi log ra `%APPDATA%\T3LabAI\spike_rebar.log`; G6 / G7 rà thêm trong Revit 2027 What's New.
 
 ---
 
-## 7. Checklist QA trong Revit cho mỗi tool (bổ sung checklist §5 new-tool-standard)
+## 8. Checklist QA trên Revit 2027 cho mỗi tool (bổ sung §5 new-tool-standard)
 
 ```
 [ ] Chọn element rời → chạy đúng
-[ ] Chọn element trong assembly → rebar sinh ra / copy sang là member của assembly (kiểm tra Project Browser + schedule assembly)
-[ ] Chọn chính AssemblyInstance → tool hiểu là chọn toàn bộ member hợp lệ
-[ ] Element trong Group / từ Link → báo "skipped: <reason>", không stacktrace
-[ ] Chạy trên 2 assembly giống hệt → sau khi chạy vẫn cùng type (hoặc tool báo rõ số type bị tách)
+[ ] Chọn element trong assembly → rebar sinh ra / đồng bộ là member của assembly (Project Browser + schedule assembly)
+[ ] Chọn chính AssemblyInstance → tool hiểu là toàn bộ member hợp lệ
+[ ] Element trong Group / từ Link → "skipped: <reason>", không stacktrace
+[ ] 2 assembly giống hệt → sau khi chạy vẫn cùng type (hoặc báo rõ số type bị tách)
 [ ] Ctrl+Z một lần hoàn tác toàn bộ lần bấm (TransactionGroup assimilate)
-[ ] Revit 2022 (.NET 4.8) và Revit 2026 (.NET 8) mở tool không lỗi
+[ ] Không có nút nào làm việc Revit đã có (so lại bảng mục 1 trước khi tick)
 [ ] Model 2 000+ rebar: thao tác > 2 s có progress, không treo Revit
 ```
 
 ---
 
-## 8. Rủi ro & giới hạn nói trước
+## 9. Rủi ro & giới hạn nói trước
 
-- **Clone Drawing T3 không bao giờ đạt 100 %**: dimension bám vào mặt phần tử; phần tử đích khác hình học thì không có mặt tương ứng. Tool phải xuất danh sách *unmatched* để người dùng dim tay phần còn lại — vẫn nhanh hơn làm từ đầu, nhưng không hứa "một nút xong".
-- **Tách type assembly** là hành vi lõi của Revit, không chặn được; chỉ phát hiện và báo (A4).
-- **Rebar Wizard** là tool lớn nhất và ít "tương thích Tekla" nhất vì Tekla component có hàng chục tham số; V1 chỉ dầm/cột chữ nhật, không nhận là xong việc thay thế component.
-- **Hiệu năng**: `FilteredElementCollector` trên rebar + `GetHostId()` cho mọi thanh là O(n); cache map host→rebar một lần mỗi lần mở tool (`_rebar.host_rebar_map(doc)`), không gọi lại trong vòng lặp.
-- **Ngoài phạm vi**: GA drawing, precast connections/embeds, export sang Tekla/IFC (đã có panel IFC-SG), tính toán kết cấu.
+- **Clone Drawing T3 không bao giờ 100 %**: dim bám mặt phần tử; đích khác hình thì không có mặt tương ứng → xuất *unmatched* để dim tay phần còn lại. Nhanh hơn làm từ đầu, không hứa "một nút xong".
+- **Tách type assembly** là hành vi lõi Revit, chỉ phát hiện và báo (A4).
+- **Rebar Wizard** là tool lớn nhất và dễ bị Revit bắt kịp nhất — vì thế để cuối và gác bằng G6.
+- **Hiệu năng**: `GetHostId()` cho mọi thanh là O(n); cache map host→rebar một lần mỗi lần mở tool.
+- **Ngoài phạm vi**: GA drawing, precast connections / embeds, export sang Tekla / IFC (đã có panel IFC-SG), tính toán kết cấu, mọi thứ ở cột "Revit 2027 có sẵn" của mục 1.
 
 ---
 
-## 9. Việc cần quyết định trước khi vào GĐ1
+## 10. Việc cần quyết định trước khi vào GĐ1
 
-1. Tiêu chuẩn shape code / bảng trọng lượng mặc định cho BBS: **BS 8666**, **ACI**, hay **TCVN** (đề xuất mặc định TCVN 5574 + tuỳ chọn BS 8666, bảng kg/m đặt trong JSON `lib/Snippets/data/rebar_weights.json`).
-2. Chỉ in-situ hay cả precast? (precast cần thêm embeds/lifting vào cast unit — đề xuất V1 làm chung, không phân biệt.)
-3. Có model test Revit nào sẵn (cột/dầm precast có rebar) để chạy spike GĐ0 không — nếu chưa thì GĐ0 bắt đầu bằng dựng model test 1 ngày.
+1. Chỉ in-situ hay cả precast? (precast cần thêm embeds / lifting vào cast unit — đề xuất V1 làm chung.)
+2. Có model test Revit 2027 sẵn (cột / dầm precast có rebar, 2 cast unit giống nhau) để chạy spike GĐ0 không — chưa thì GĐ0 thêm 1 ngày dựng model test.
+3. Trang `docs/tekla-to-revit-2027.md` có viết song ngữ (EN + VI) không, hay chỉ EN như UI?
