@@ -18,6 +18,37 @@ import os
 import json
 
 
+# Personal instructions (Claude's "personal preferences"): one free-text block
+# the user writes once in LLMs Setting → General, injected into EVERY chat and
+# EVERY project ahead of the project's own instructions. Capped so a pasted
+# document can never eat the system-prompt budget of every turn.
+MAX_USER_INSTRUCTIONS_CHARS = 2000
+
+# Values `agents.reply_language` accepts (get/set_reply_language below).
+REPLY_LANGUAGES = ('auto', 'en', 'vi')
+
+
+def _clean_instructions(text):
+    """Normalise personal-instruction text: str, LF newlines, trimmed, capped.
+
+    Interior blank lines are kept (they are how people group preferences);
+    only the outer whitespace and runs of 3+ newlines are folded.
+    """
+    if text is None:
+        return u''
+    if not isinstance(text, type(u'')):
+        try:
+            text = text.decode('utf-8')          # py2 str / bytes
+        except Exception:
+            text = u'{}'.format(text)
+    text = text.replace(u'\r\n', u'\n').replace(u'\r', u'\n').strip()
+    while u'\n\n\n' in text:
+        text = text.replace(u'\n\n\n', u'\n\n')
+    if len(text) > MAX_USER_INSTRUCTIONS_CHARS:
+        text = text[:MAX_USER_INSTRUCTIONS_CHARS].rstrip()
+    return text
+
+
 class T3LabAISettings(object):
     """Settings manager for T3LabAI"""
 
@@ -144,6 +175,10 @@ class T3LabAISettings(object):
                 'sidebar_open': False,
             },
             'active_project': None,
+            # Personal instructions — see MAX_USER_INSTRUCTIONS_CHARS.
+            'profile': {
+                'instructions': '',
+            },
             'knowledge': {
                 'dirs':               [],
                 'embeddings_enabled': True,
@@ -415,13 +450,64 @@ class T3LabAISettings(object):
         into the LLM system prompts so the model agrees with the UI.
         """
         lang = self._settings.get('agents', {}).get('reply_language', 'auto')
-        return lang if lang in ('auto', 'vi', 'en') else 'auto'
+        return lang if lang in REPLY_LANGUAGES else 'auto'
 
     def set_reply_language(self, lang):
         """Persist the reply-language preference ('auto' | 'vi' | 'en')."""
-        if lang not in ('auto', 'vi', 'en'):
+        if lang not in REPLY_LANGUAGES:
             lang = 'auto'
         return self.set_agent_option('reply_language', lang)
+
+    # ------------------------------------------------------------------
+    # Personal instructions (user level, every chat + every project)
+    # ------------------------------------------------------------------
+
+    def get_user_instructions(self):
+        """The user's personal instructions ('' when none).
+
+        Stored as settings.json → profile.instructions. A file written before
+        this existed has no "profile" block and reads as ''. Always returns
+        cleaned text within MAX_USER_INSTRUCTIONS_CHARS, even if the file was
+        hand-edited past the cap.
+        """
+        prof = self._settings.get('profile')
+        if not isinstance(prof, dict):
+            return u''
+        return _clean_instructions(prof.get('instructions'))
+
+    def set_user_instructions(self, text):
+        """Persist personal instructions (cleaned + capped). Returns bool.
+
+        Text over MAX_USER_INSTRUCTIONS_CHARS is clipped rather than refused,
+        so a save never silently loses the whole edit; the settings window
+        caps the box at the same length, so clipping only happens to callers
+        that skip the UI.
+        """
+        value = _clean_instructions(text)
+
+        def _m(s):
+            prof = s.get('profile')
+            if not isinstance(prof, dict):
+                prof = {}
+                s['profile'] = prof
+            prof['instructions'] = value
+        return self._update(_m)
+
+    def build_user_instructions_block(self):
+        """System-prompt section for the personal instructions ('' when none).
+
+        One shared wording, so every prompt path (native tool calling, legacy
+        JSON intent, specialists) frames the block the same way. Project
+        instructions come AFTER this block and refine it for that project.
+        """
+        text = self.get_user_instructions()
+        if not text:
+            return u''
+        return (u'## Personal instructions\n'
+                u"(The user's own standing preferences. They apply to every "
+                u'chat and every project; project instructions, when present, '
+                u'refine them for that project. A request made in the current '
+                u'message overrides both.)\n' + text)
 
     def get_agent_option(self, key, default=None):
         """Read a scalar switch from the agents block."""

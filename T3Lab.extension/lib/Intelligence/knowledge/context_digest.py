@@ -39,7 +39,10 @@ import time
 
 TEXT_EXTS = ('.txt', '.md')
 PDF_EXT = '.pdf'
-INDEXABLE_EXTS = TEXT_EXTS + (PDF_EXT,)
+# Same set as KnowledgeStore.INDEXABLE_EXTS — a linked folder's digest and its
+# search index must agree on what a document is.
+from Intelligence.knowledge.office_text import OFFICE_EXTS
+INDEXABLE_EXTS = TEXT_EXTS + (PDF_EXT,) + OFFICE_EXTS
 
 DEFAULT_OUT_SUBDIR = 'context'
 DEFAULT_OUT_NAME = 'CONTEXT.md'
@@ -709,8 +712,8 @@ def build_context_file(folder, out_subdir=DEFAULT_OUT_SUBDIR,
             lines.append(r['summary'])
             lines.append('')
     else:
-        lines.append('_No readable .pdf/.txt/.md document found in this '
-                     'folder._')
+        lines.append('_No readable .pdf/.docx/.xlsx/.txt/.md document found '
+                     'in this folder._')
         lines.append('')
     if dropped:
         # visible, not silent, and with the REAL cause: "needs a password" and

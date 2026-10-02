@@ -1822,6 +1822,87 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Personal instructions + reply language: user level, every chat and every project -->
+                        <TextBlock Text="PERSONALIZATION" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                        <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
+                                BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Personal instructions (apply to every chat and every project):"
+                                           Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                                <TextBox x:Name="user_instructions_box" Height="96"
+                                         Style="{StaticResource T3.TextBox}"
+                                         TextWrapping="Wrap" AcceptsReturn="True" MaxLength="2000"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto"
+                                         TextChanged="user_instructions_changed"/>
+                                <Grid Margin="0,4,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="user_instructions_counter" Grid.Column="0" Text="0 / 2000 characters"
+                                               Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Center"/>
+                                    <Button x:Name="save_user_instructions_btn" Grid.Column="2"
+                                            Style="{StaticResource T3.Button.Secondary}"
+                                            Content="Save Instructions" IsEnabled="False"
+                                            Click="save_user_instructions_clicked"/>
+                                </Grid>
+                                <TextBlock Text="Example: Answer briefly. Use millimetres. Always list element IDs. Project instructions (Projects tab) add to these for one project; what you ask in a message overrides both."
+                                           Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                                <Separator Margin="0,0,0,12"/>
+
+                                <TextBlock Text="Reply language:" Style="{StaticResource T3.Caption}" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="reply_language_combo" Style="{StaticResource T3.ComboBox}"
+                                          SelectionChanged="reply_language_changed">
+                                    <ComboBoxItem Content="Auto (match the language I write in)" Tag="auto"/>
+                                    <ComboBoxItem Content="English" Tag="en"/>
+                                    <ComboBoxItem Content="Vietnamese" Tag="vi"/>
+                                </ComboBox>
+                                <TextBlock x:Name="personal_saved_hint" Text="" Style="{StaticResource T3.Caption}"
+                                           Foreground="{StaticResource T3.Success.Text}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Global memory: facts injected into every chat and every project -->
+                        <TextBlock Text="GLOBAL MEMORY" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                        <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
+                                BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,16">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="global_memory_count" Grid.Column="0"
+                                               Text="Facts the assistant applies in every chat and every project."
+                                               Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Center"/>
+                                    <Button x:Name="global_memory_clear_btn" Grid.Column="2"
+                                            Style="{StaticResource T3.Button.Ghost}"
+                                            Content="Clear All" ToolTip="Remove every global fact"
+                                            Click="global_memory_clear_clicked"/>
+                                </Grid>
+                                <StackPanel x:Name="global_memory_panel" Margin="0,0,0,8"/>
+                                <TextBlock Text="Add a fact (one short sentence):" Style="{StaticResource T3.Caption}" Margin="0,0,0,4"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="global_memory_add_box" Grid.Column="0" Style="{StaticResource T3.TextBox}"
+                                             MaxLength="300" PreviewKeyDown="global_memory_add_keydown"/>
+                                    <Button x:Name="global_memory_add_btn" Grid.Column="2"
+                                            Style="{StaticResource T3.Button.Secondary}"
+                                            Content="Add" Click="global_memory_add_clicked"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
                         <TextBlock Text="PREFERENCES &amp; BEHAVIOR" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                         <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
                                 BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,16">
@@ -2072,6 +2153,14 @@
                                     <TextBlock Text="Project Name:" Style="{StaticResource T3.Caption}" Margin="0,0,0,4"/>
                                     <TextBox x:Name="project_name_box" Style="{StaticResource T3.TextBox}" Margin="0,0,0,12"/>
 
+                                    <TextBlock Text="Description (optional, what this project is about):"
+                                               Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="project_description_box" Height="56"
+                                             Style="{StaticResource T3.TextBox}"
+                                             TextWrapping="Wrap" MaxLength="500"
+                                             VerticalContentAlignment="Top"
+                                             VerticalScrollBarVisibility="Auto" Margin="0,0,0,12"/>
+
                                     <TextBlock Text="Custom System Instructions:" Style="{StaticResource T3.Caption}" Margin="0,0,0,4"/>
                                     <TextBox x:Name="project_instructions_box" Height="80"
                                              Style="{StaticResource T3.TextBox}"
@@ -2116,18 +2205,48 @@
                                         <Button x:Name="project_open_folder_btn" Style="{StaticResource T3.Button.Ghost}"
                                                 Content="Open Folder" Click="project_open_folder_clicked" Margin="0,0,0,4"/>
                                     </WrapPanel>
+                                    <TextBlock Text="Files in this project (PDF, Word, Excel, Markdown and text are searchable):"
+                                               Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                                    <StackPanel x:Name="project_files_panel" Margin="0,0,0,8"/>
                                     <StackPanel x:Name="project_dirs_panel"/>
                                 </StackPanel>
                             </Border>
 
-                            <!-- Remembered Facts Card -->
-                            <TextBlock Text="REMEMBERED FACTS" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                            <!-- Project memory: facts injected into this project's chats -->
+                            <TextBlock Text="PROJECT MEMORY" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                             <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
                                     BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,16">
                                 <StackPanel>
-                                    <TextBlock Text="Facts recalled for this project. Instruct 'remember ...' in chat to add."
-                                               Style="{StaticResource T3.Caption}" Margin="0,0,0,8"/>
-                                    <StackPanel x:Name="project_memory_panel"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="project_memory_count" Grid.Column="0"
+                                                   Text="Facts the assistant applies in this project's chats."
+                                                   Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                                   VerticalAlignment="Center"/>
+                                        <Button x:Name="project_memory_clear_btn" Grid.Column="2"
+                                                Style="{StaticResource T3.Button.Ghost}"
+                                                Content="Clear All" ToolTip="Remove every fact of this project (global memory is kept)"
+                                                Click="project_memory_clear_clicked"/>
+                                    </Grid>
+                                    <StackPanel x:Name="project_memory_panel" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Add a fact for this project (one short sentence):"
+                                               Style="{StaticResource T3.Caption}" Margin="0,0,0,4"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="project_memory_add_box" Grid.Column="0" Style="{StaticResource T3.TextBox}"
+                                                 MaxLength="300" PreviewKeyDown="project_memory_add_keydown"/>
+                                        <Button x:Name="project_memory_add_btn" Grid.Column="2"
+                                                Style="{StaticResource T3.Button.Secondary}"
+                                                Content="Add" Click="project_memory_add_clicked"/>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 

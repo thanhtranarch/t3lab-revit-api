@@ -32,6 +32,8 @@ import time
 
 TEXT_EXTS = ('.txt', '.md')
 PDF_EXT = '.pdf'
+# .docx / .xlsx — read with the stdlib in office_text (zip + XML).
+from Intelligence.knowledge.office_text import OFFICE_EXTS
 
 CACHE_VERSION = 1           # bump when the extractors change their output
 _MAX_CACHE_BYTES = 80 * 1024 * 1024
@@ -149,6 +151,9 @@ def _extract(path):
                 path, max_pages=1500)
             pages = [(p, t) for p, t in (pages or []) if (t or '').strip()]
             return pages, ('' if pages else (reason or 'no extractable text'))
+        if ext in OFFICE_EXTS:
+            from Intelligence.knowledge import office_text
+            return office_text.extract_pages(path)
     except Exception as ex:
         return [], 'reader error ({0})'.format(ex)
     return [], 'unsupported file type'

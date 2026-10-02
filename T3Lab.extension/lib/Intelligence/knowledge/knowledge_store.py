@@ -32,7 +32,10 @@ from Intelligence.knowledge.bm25_index import BM25Index, doc_id_of
 
 TEXT_EXTS = ('.txt', '.md')
 PDF_EXT = '.pdf'
-INDEXABLE_EXTS = TEXT_EXTS + (PDF_EXT,)
+# Word + Excel (office_text): the Projects UI has always advertised DOCX/XLSX
+# as knowledge files, but nothing read them until these were registered.
+from Intelligence.knowledge.office_text import OFFICE_EXTS
+INDEXABLE_EXTS = TEXT_EXTS + (PDF_EXT,) + OFFICE_EXTS
 
 # Files the assistant itself writes into an indexed folder. Never index them:
 # they are generated FROM the corpus, so re-ingesting them makes the model cite
