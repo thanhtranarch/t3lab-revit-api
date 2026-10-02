@@ -9,23 +9,32 @@ outside Revit.
 
 Supported: ``BF2D`` blocks (planar bars). A block is::
 
-    BF2D@Hj<project>@r<plan>@i<index>@p<position>@l<length>@n<quantity>@e<weight>@d<diameter>@g<grade>@s<roll dia>@m<>@v<>@
+    BF2D@Hj<project>@r<plan>@i<index>@p<position>@l<length>@n<quantity>@e<weight>@d<diameter>@g<grade>@s<mandrel dia>@v<>@
     Gl<L1>@w<A1>@l<L2>@w<A2>@...@l<Ln>@w0@
     C<checksum>@
 
-Every field ends with ``@``; the block is one line. The checksum follows the
-BVBS 2.0 rule: sum the ASCII codes of every character of the block up to and
-including the ``C`` that opens the checksum field, then
-``checksum = 96 - (sum % 32)``.
+Every field ends with ``@``; the block is one line terminated by CR LF. The
+header fields permitted for BF2D, in this order, are j r i p l n e d g s v
+(then optional a / t / c) — ``m`` is a mesh-only (BFMA/BFGT/BFAU) field and
+must NOT appear in a BF2D header (BVBS-Guideline 3.1, "Header block").
 
-NEEDS VERIFICATION: whether the sum includes that ``C`` must be confirmed
-against the BVBS 2.0 specification or a reference file before the export is
-used on a machine. The convention lives only in ``checksum()``.
+Checksum (CONFIRMED 2026-10-02 against the BVBS-Guideline "Data exchange of
+reinforcement data" v3.1, section "Checksum block", and its worked examples):
+sum the ASCII codes of every character from the start of the record up to and
+**including** the ``C`` that opens the checksum block, then
+``checksum = 96 - (sum % 32)``. Guideline example: ``"abcde@C"`` -> 78.
+Reference line from the guideline (example 1), used by dev/test_bvbs_writer.py::
 
-Segments and bend angles come from ``Snippets._rebar.centerline_to_segments``
-(or any caller) as ``[(length_mm, angle_deg), ...]`` where the angle is the
-bend *after* that segment (0 for the last one). Positive angle = bend to the
-left when travelling along the bar; the caller fixes the sign convention.
+    BF2D@HjTestPDF@r417@ia@p1@l1000@n10@e0.888@d12@gB500A@s48@v@Gl400@w90@l600@w0@C72@
+
+(excluding the ``C`` from the sum would give 75, so the rule is unambiguous).
+
+Lengths in the geometry block are OUTER (out-to-out) dimensions, not centreline
+lengths (guideline, "General"); ``Snippets._rebar.outer_legs`` does that
+conversion before records reach this module. Segments arrive as
+``[(length_mm, angle_deg), ...]`` where the angle is the bend *after* that
+segment (0 for the last one). Positive angle = bend to the left when
+travelling along the bar; the caller fixes the sign convention.
 
 Part of T3Lab Extension.
 """
@@ -37,6 +46,12 @@ __author__ = "Tran Tien Thanh"
 
 FIELD_SEP = "@"
 BLOCK_2D = "BF2D"
+
+# BVBS-Guideline 3.1, BF2D example 1 — the writer must reproduce this line
+# byte for byte, and verify_block() must accept it. The BVBS dialog runs this
+# self-test when it opens and refuses to export when it fails.
+REFERENCE_LINE_1 = ("BF2D@HjTestPDF@r417@ia@p1@l1000@n10@e0.888@d12@gB500A@s48@v@"
+                    "Gl400@w90@l600@w0@C72@")
 
 
 def _clean(text):
@@ -61,7 +76,7 @@ def _num(value, digits=3):
 
 
 def checksum(block_upto_c):
-    """BVBS checksum for the text ending with the opening ``C``."""
+    """BVBS checksum for the text ending with (and including) the opening ``C``."""
     total = sum(ord(ch) for ch in block_upto_c)
     return 96 - (total % 32)
 
@@ -118,7 +133,6 @@ def header_fields(rec):
         ("d", _int(rec.diameter_mm)),
         ("g", _clean(rec.grade)),
         ("s", _int(rec.roll_diameter_mm)),
-        ("m", ""),
         ("v", ""),
     ]
 
