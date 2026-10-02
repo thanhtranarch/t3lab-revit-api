@@ -1953,7 +1953,7 @@
                                                 <ColumnDefinition Width="8"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="OFFSET (M)" Style="{StaticResource T3.Caption}"
+                                            <TextBlock Grid.Column="0" x:Name="lbl_offset" Text="OFFSET (M)" Style="{StaticResource T3.Caption}"
                                                        VerticalAlignment="Center"/>
                                             <TextBox x:Name="txt_offset" Grid.Column="2" Text="1.0"
                                                      Style="{StaticResource T3.TextBox.Mono}"
@@ -2133,7 +2133,7 @@
                                                     <ColumnDefinition Width="8"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="HEADER SIZE (MM)" Style="{StaticResource T3.Caption}"
+                                                <TextBlock Grid.Column="0" x:Name="lbl_strip_size" Text="HEADER SIZE (MM)" Style="{StaticResource T3.Caption}"
                                                            VerticalAlignment="Center"/>
                                                 <TextBox x:Name="txt_strip_mm" Grid.Column="2" Text="70"
                                                          Style="{StaticResource T3.TextBox.Mono}"

@@ -61,6 +61,7 @@ from Autodesk.Revit.DB.Structure import StructuralType
 from Autodesk.Revit.UI import TaskDialog
 from pyrevit import revit, forms, script
 from GUI.WPF_Base import T3WPFWindow
+from Snippets._units import project_length_unit, paper_unit
 
 # PATH SETUP
 # ==================================================
@@ -102,6 +103,41 @@ PARALLEL_TOL = math.sin(math.radians(0.1))
 GROUPING_TOL = 500.0 * MM_TO_FEET
 # Rejected string → rebuild it greedily from at most this many start refs.
 SALVAGE_SEEDS = 3
+
+# Length fields: TextBox → (unit label beside it, default in mm, name in
+# messages). Every one is a MODEL distance — how far the dimension line sits
+# from the elements, a segment length, the facade search band — so they are
+# typed and shown in the project's length unit. Only the "Offsets from Scale"
+# sizes are paper distances (see offsets_from_scale).
+LENGTH_FIELDS = (
+    ('txt_offset',        'lbl_offset_unit',        1000, 'Offset'),
+    ('txt_l1',            'lbl_l1_unit',             500, 'L1 offset'),
+    ('txt_l2',            'lbl_l2_unit',            1000, 'L2 offset'),
+    ('txt_l3',            'lbl_l3_unit',            1500, 'L3 offset'),
+    ('txt_min_seg',       'lbl_min_seg_unit',        300, 'Minimum segment'),
+    ('txt_facade_offset', 'lbl_facade_offset_unit', 1200, 'Facade offset'),
+    ('txt_facade_tol',    'lbl_facade_tol_unit',    1800, 'Perimeter tolerance'),
+)
+
+# "Offsets from Scale": L1/L2/L3 = these sizes ON PAPER × the view scale, then
+# rounded in the model and never below a minimum. In the paper unit of the
+# project (paper_unit): mm in a metric project, inches in an imperial one.
+#           paper sizes (L1, L2, L3)  rounding step  minimum (L1, L2, L3)
+SCALE_OFFSETS = {
+    True:  ((6.0, 12.0, 18.0),        50.0,          (400.0, 800.0, 1200.0)),
+    False: ((0.25, 0.5, 0.75),        1.0,           (16.0, 32.0, 48.0)),
+}
+
+
+def offsets_from_scale(scale, unit):
+    """(L1, L2, L3) in internal feet for a view at 1:scale. Metric: 6 / 12 /
+    18 mm on paper rounded to 50 mm (1:100 → 600 / 1200 / 1800 mm). Imperial:
+    1/4 / 1/2 / 3/4 in on paper rounded to 1 in (1/8" = 1'-0" → 2' / 4' / 6')."""
+    paper = paper_unit(unit)
+    sizes, step, minimum = SCALE_OFFSETS[paper.is_metric]
+    scale = float(scale or 100)
+    return tuple(paper.to_feet(max(low, round(size * scale / step) * step))
+                 for size, low in zip(sizes, minimum))
 
 
 class WarningSwallower(IFailuresPreprocessor):
@@ -738,14 +774,42 @@ class AutoDimensionWindow(T3WPFWindow):
         self.doc   = doc_ref
         self._dim_types = []  # list of DimensionType elements
         self._views = []      # list of plan View elements
+        # Read per window: the module stays loaded across projects.
+        self._unit = project_length_unit(self.doc)
 
+        self._apply_units()
         self._populate_dim_types()
         self._populate_views()
         self._set_status("Ready")
 
 
+    # ── Project length unit ──────────────────────────────────────────────
+
+    def _apply_units(self):
+        """Unit labels, defaults and the Offsets-from-Scale tooltip in the
+        length unit the project displays (LENGTH_FIELDS)."""
+        for box, label, default_mm, _name in LENGTH_FIELDS:
+            getattr(self, label).Text = self._unit.tag
+            getattr(self, box).Text = self._unit.default_text(default_mm)
+        paper = paper_unit(self._unit)
+        sizes = SCALE_OFFSETS[paper.is_metric][0]
+        self.btn_offsets_from_scale.ToolTip = (
+            u"Set L1/L2/L3 to {} on paper at the active view scale".format(
+                u" / ".join(paper.show(paper.to_feet(v)) for v in sizes)))
+
+    def _read_length(self, box):
+        """Text of one LENGTH_FIELDS box → internal feet. A bare number is in
+        the project unit; "600 mm" or "2'-0\"" work anywhere. Raises
+        ValueError naming the field."""
+        name = next(n for b, _l, _d, n in LENGTH_FIELDS if b == box)
+        try:
+            return self._unit.parse(getattr(self, box).Text)
+        except ValueError as ex:
+            raise ValueError(u"{}: {}".format(name, ex))
+
     def on_offsets_from_scale_clicked(self, sender, args):
-        """L1/L2/L3 theo tỉ lệ view: 6 / 12 / 18 mm giấy, làm tròn 50 mm thực.
+        """L1/L2/L3 theo tỉ lệ view: 6 / 12 / 18 mm giấy (dự án imperial:
+        1/4 / 1/2 / 3/4 in), làm tròn 50 mm (1 in) thực — offsets_from_scale.
 
         Công thức tất định — cùng tỉ lệ luôn ra cùng khoảng cách (trước đây là
         nút "AI Auto-Offsets", AI chỉ đoán lại chính mấy con số này).
@@ -764,17 +828,16 @@ class AutoDimensionWindow(T3WPFWindow):
                 'l3': getattr(self.txt_l3, 'Text', ''),
                 'offset': getattr(self.txt_offset, 'Text', ''),
             }
-            l1 = max(400, int(round((scale * 6.0) / 50.0) * 50))
-            l2 = max(800, int(round((scale * 12.0) / 50.0) * 50))
-            l3 = max(1200, int(round((scale * 18.0) / 50.0) * 50))
+            l1, l2, l3 = offsets_from_scale(scale, self._unit)
             self.cmb_offset_mode.SelectedIndex = 1      # 3-Level auto
-            self.txt_l1.Text = str(l1)
-            self.txt_l2.Text = str(l2)
-            self.txt_l3.Text = str(l3)
-            self.txt_offset.Text = str(l2)
+            self.txt_l1.Text = self._unit.text(l1)
+            self.txt_l2.Text = self._unit.text(l2)
+            self.txt_l3.Text = self._unit.text(l3)
+            self.txt_offset.Text = self._unit.text(l2)
             self.btn_offsets_undo.Visibility = Visibility.Visible
-            self._set_status("Offsets for 1:{}: L1={} mm, L2={} mm, L3={} mm.".format(
-                scale, l1, l2, l3))
+            self._set_status(u"Offsets for 1:{}: L1={}, L2={}, L3={}.".format(
+                scale, self._unit.show(l1), self._unit.show(l2),
+                self._unit.show(l3)))
         except Exception as ex:
             logger.error("Offsets from scale failed: {}".format(ex))
             self._set_status("Could not compute offsets: {}".format(ex))
@@ -1007,31 +1070,43 @@ class AutoDimensionWindow(T3WPFWindow):
         except Exception:
             pass
 
-        if is_3level:
-            l1_feet = 500.0  * MM_TO_FEET
-            l2_feet = 1000.0 * MM_TO_FEET
-            l3_feet = 1500.0 * MM_TO_FEET
-            try:
-                l1_feet = float(self.txt_l1.Text.strip()) * MM_TO_FEET
-            except Exception:
-                pass
-            try:
-                l2_feet = float(self.txt_l2.Text.strip()) * MM_TO_FEET
-            except Exception:
-                pass
-            try:
-                l3_feet = float(self.txt_l3.Text.strip()) * MM_TO_FEET
-            except Exception:
-                pass
-        else:
-            base = 1000.0 * MM_TO_FEET
-            try:
-                base = float(self.txt_offset.Text.strip()) * MM_TO_FEET
-            except Exception:
-                pass
-            l1_feet = base * 0.5
-            l2_feet = base
-            l3_feet = base * 1.5
+        # ── Min-segment warning & facade switches ─────────────────────────
+        check_min = False
+        try:
+            check_min = self.chk_min_seg.IsChecked == True
+        except Exception:
+            pass
+        do_facade = False
+        try:
+            do_facade = self.chk_facade.IsChecked == True
+        except Exception:
+            pass
+
+        # ── Lengths typed by the user (project unit — LENGTH_FIELDS) ─────
+        # A box that is not a length stops the run with the reason; only
+        # boxes the run uses are read (hidden L1-L3 / facade boxes are not).
+        min_seg_feet = 300.0 * MM_TO_FEET   # used only when check_min
+        facade_off = 1200.0 * MM_TO_FEET    # used only when do_facade
+        facade_tol = 1800.0 * MM_TO_FEET
+        try:
+            if is_3level:
+                l1_feet = self._read_length('txt_l1')
+                l2_feet = self._read_length('txt_l2')
+                l3_feet = self._read_length('txt_l3')
+            else:
+                base = self._read_length('txt_offset')
+                l1_feet = base * 0.5
+                l2_feet = base
+                l3_feet = base * 1.5
+            if check_min:
+                min_seg_feet = self._read_length('txt_min_seg')
+            if do_facade:
+                facade_off = self._read_length('txt_facade_offset')
+                facade_tol = self._read_length('txt_facade_tol')
+        except ValueError as ex:
+            self._set_status(u"{}".format(ex))
+            TaskDialog.Show("Auto Dimension", u"{}".format(ex))
+            return
 
         # ── Direction & placement ─────────────────────────────────────────
         dir_idx = 0
@@ -1048,34 +1123,6 @@ class AutoDimensionWindow(T3WPFWindow):
                 both_sides = self.chk_both_sides.IsChecked == True
             except Exception:
                 pass
-
-        # ── Min-segment conflict warning ──────────────────────────────────
-        check_min = False
-        min_seg_feet = 300.0 * MM_TO_FEET
-        try:
-            check_min = self.chk_min_seg.IsChecked == True
-            min_seg_feet = float(self.txt_min_seg.Text.strip()) * MM_TO_FEET
-        except Exception:
-            pass
-
-        # ── Facade dimension options ───────────────────────────────────────
-        do_facade = False
-        try:
-            do_facade = self.chk_facade.IsChecked == True
-        except Exception:
-            pass
-
-        facade_off = 1200.0 * MM_TO_FEET
-        try:
-            facade_off = float(self.txt_facade_offset.Text.strip()) * MM_TO_FEET
-        except Exception:
-            pass
-
-        facade_tol = 1800.0 * MM_TO_FEET
-        try:
-            facade_tol = float(self.txt_facade_tol.Text.strip()) * MM_TO_FEET
-        except Exception:
-            pass
 
         # ── Collect views to process ───────────────────────────────────────
         views_to_dim = []
@@ -1176,17 +1223,17 @@ class AutoDimensionWindow(T3WPFWindow):
                     len(views_to_dim), elem_summary, failure_detail)
             )
         elif small_count > 0:
-            warn = "  {} segment(s) < {}mm — text may overlap.".format(
-                small_count, int(min_seg_feet / MM_TO_FEET + 0.5))
+            warn = u"  {} segment(s) < {} — text may overlap.".format(
+                small_count, self._unit.show(min_seg_feet))
             self._set_status("Done ({} dims). {}".format(dims_created, warn))
             TaskDialog.Show(
                 "Auto Dimension — Conflict Warning",
                 "Created {} dimension string(s) across {} view(s).\n\n"
-                "{} segment(s) are shorter than {}mm.\n"
+                "{} segment(s) are shorter than {}.\n"
                 "Consider increasing the offset or adjusting element positions "
                 "to prevent text overlap.".format(
                     dims_created, len(views_to_dim),
-                    small_count, int(min_seg_feet / MM_TO_FEET + 0.5))
+                    small_count, self._unit.show(min_seg_feet))
             )
         else:
             self._set_status("Done — {} dimension string(s) created.".format(dims_created))

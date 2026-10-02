@@ -71,6 +71,10 @@ from Autodesk.Revit.UI import ExternalEvent, IExternalEventHandler, TaskDialog
 
 from Utils.DWGFamilyHelpers import get_xy_bounds, _project_curve_to_z as _dwg_project_curve
 from GUI.ProgressPauseMixin import ProgressPauseMixin
+# Sizes on screen follow the active document's length unit (a family
+# document's own units when FamiGen runs inside one). The JSON contract and
+# the presets stay in mm. Read per window, never at import.
+from Snippets._units import project_length_unit, MILLIMETERS
 from FamilyGen import builder as family_builder
 from FamilyGen import guidance as family_guidance
 from FamilyGen import preview_mesh
@@ -471,7 +475,7 @@ def _graphicstyle_layer(geom_elem, doc):
 
 class BlockItem(object):
     def __init__(self, name, curve_count, instance_count, curves,
-                 layer_level="", placements=None, import_inst=None):
+                 layer_level="", placements=None, import_inst=None, unit=None):
         self.IsSelected    = True
         self.BlockName     = name
         self.CurveCount    = curve_count
@@ -484,16 +488,23 @@ class BlockItem(object):
         arc_count = sum(1 for c in curves if isinstance(c, Arc))
         self.ArcCount = arc_count
 
+        # Grid shows the size in the document's unit (column header carries
+        # it); the category hint and the .rfa name keep using whole mm.
+        unit = unit or MILLIMETERS
         try:
             min_x, max_x, min_y, max_y = get_xy_bounds(curves)
-            w = (max_x - min_x) * 304.8
-            d = (max_y - min_y) * 304.8
+            w = MILLIMETERS.from_feet(max_x - min_x)
+            d = MILLIMETERS.from_feet(max_y - min_y)
             self.WidthMM = "{:.0f}".format(w)
             self.DepthMM = "{:.0f}".format(d)
+            self.WidthText = unit.text(max_x - min_x)
+            self.DepthText = unit.text(max_y - min_y)
         except Exception:
             w, d = 0.0, 0.0
             self.WidthMM = "-"
             self.DepthMM = "-"
+            self.WidthText = "-"
+            self.DepthText = "-"
 
         self.SuggestedCat = _suggest_category(name, arc_count, w, d, layer=layer_level)
         self.Category     = self.SuggestedCat
@@ -576,6 +587,11 @@ class FamilyCreatorDialog(T3WPFWindow):
         T3WPFWindow.__init__(self, _XAML)
         self._doc = revit_doc
         self._app = revit_app
+        self._unit = project_length_unit(revit_doc)
+        for name, text in (('col_block_width', "WIDTH"), ('col_block_depth', "DEPTH")):
+            col = getattr(self, name, None)     # grid columns: guard the lookup
+            if col is not None:
+                col.Header = self._unit.label(text)
         # Modeless = opened by the MCP server (famigen_propose_family). It
         # runs outside Revit API context after Show(), so it offers the JSON
         # review workflow only and queues Create Family on an ExternalEvent.
@@ -969,7 +985,7 @@ class FamilyCreatorDialog(T3WPFWindow):
             placements = [(centroid, 0.0)]
             return BlockItem(name, len(curves), 1, curves,
                              layer_level=layer_name, placements=placements,
-                             import_inst=import_inst)
+                             import_inst=import_inst, unit=self._unit)
         return None
 
     def _scan_blocks(self, import_inst):
@@ -1102,7 +1118,7 @@ class FamilyCreatorDialog(T3WPFWindow):
                 data['name'], len(data['curves']), data['count'], data['curves'],
                 layer_level=data.get('layer', ""),
                 placements=data.get('placements', []),
-                import_inst=import_inst))
+                import_inst=import_inst, unit=self._unit))
         return items
 
     # ── CAD export UI ────────────────────────────────────────────────────────
@@ -2765,12 +2781,16 @@ class FamilyCreatorDialog(T3WPFWindow):
             return
         info = schema_summary(schema)
         size = model.size_mm() if model is not None else (0, 0, 0)
+        unit = getattr(self, '_unit', None) or MILLIMETERS
+        size_text = u"{} × {} × {}".format(
+            unit.default_text(size[0]), unit.default_text(size[1]),
+            unit.show(MILLIMETERS.to_feet(size[2])))
         lines = [
             "{} · {}".format(info.get('family_name') or "(no family_name)",
                              info.get('family_category') or "(no category)"),
             "{} solid(s), {} void(s), {} material(s), {} parameter(s)".format(
                 info['solids'], info['voids'], len(info['materials']), info['parameters']),
-            "Size {:.0f} × {:.0f} × {:.0f} mm (W × D × H)".format(size[0], size[1], size[2]),
+            "Size {} (W × D × H)".format(size_text),
             ("Ready to create." if not errors else
              "{} problem(s) must be fixed before Create Family.".format(len(errors))),
         ]

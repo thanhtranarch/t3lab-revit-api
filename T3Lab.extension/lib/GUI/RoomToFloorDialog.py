@@ -9,6 +9,7 @@ from pyrevit import revit, forms, script
 from GUI.WPF_Base import T3WPFWindow, to_items_source
 from Snippets._host import get_revit_version
 from Snippets._compat import make_eid, eid_value, net_list
+from Snippets._units import project_length_unit
 
 
 import clr
@@ -235,10 +236,19 @@ class RoomToFloorWindow(T3WPFWindow):
         self.generator = FloorGenerator(self._doc)
         self._all_rooms = []
         self._floor_type_map = {}
+        # Read per window: the module stays loaded while the user switches
+        # between a metric and an imperial project.
+        self._unit = project_length_unit(self._doc)
 
+        self._apply_units()
         self._load_rooms()
         self._load_floor_types()
         self._update_status()
+
+    def _apply_units(self):
+        """Offset label and default in the length unit the project displays."""
+        self.lbl_offset.Text = self._unit.label("Height Offset") + ":"
+        self.txt_offset.Text = self._unit.text(0.0)
 
     def _load_rooms(self):
         try:
@@ -341,10 +351,15 @@ class RoomToFloorWindow(T3WPFWindow):
 
         floor_type = self._floor_type_map[floor_type_name]
 
+        # Bare number = project unit; "150 mm", "6\"" or "0'-6\"" work anywhere.
+        # FloorGenerator (and run_headless for MCP) keep taking millimetres.
         try:
-            offset_mm = float(self.txt_offset.Text)
-        except (ValueError, TypeError):
-            offset_mm = 0
+            offset_mm = self._unit.parse_mm(self.txt_offset.Text)
+        except ValueError as ex:
+            msg = "Height Offset: {}".format(ex)
+            self.status_text.Text = msg
+            TaskDialog.Show("Room to Floor", msg)
+            return
 
         is_structural = self.chk_structural.IsChecked
         use_finish = self.chk_room_finish.IsChecked

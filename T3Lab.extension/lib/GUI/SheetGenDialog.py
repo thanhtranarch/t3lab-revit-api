@@ -75,6 +75,9 @@ from Autodesk.Revit.DB import (
 )
 from Autodesk.Revit.UI import TaskDialog
 from GUI.WPF_Base import T3WPFWindow, to_items_source
+# Crop offset = model length (project unit); header strip = paper size (mm
+# in a metric project, inches in an imperial one). Read per window.
+from Snippets._units import project_length_unit, paper_unit, MILLIMETERS
 
 # ╦  ╦╔═╗╦═╗╦╔═╗╔╗ ╦  ╔═╗╔═╗
 # ╚╗╔╝╠═╣╠╦╝║╠═╣╠╩╗║  ║╣ ╚═╗
@@ -116,6 +119,11 @@ if lib_dir not in sys.path:
 XAML_FILE  = os.path.join(os.path.dirname(__file__), 'Tools', 'SheetGen.xaml')
 
 from GUI.ProgressPauseMixin import ProgressPauseMixin
+
+# Defaults the tool has always used, in mm: 1 m of model space around the
+# room, a 70 mm title-block header strip on paper.
+DEFAULT_OFFSET_MM = 1000.0
+DEFAULT_STRIP_MM  = 70.0
 
 # Printable margin inside the title block (~20 mm), shared by the layout
 # preview and the real viewport placement so they can never drift apart.
@@ -227,8 +235,20 @@ class CreateRoomPlanWindow(T3WPFWindow):
         self._load_plan_type_options()
         self._load_title_blocks()
         self.cmb_strip_side.SelectedIndex = 0  # default: right (vertical) strip
+        self._unit = project_length_unit(doc)
+        self._paper = paper_unit(self._unit)
+        self._apply_units()
         self._update_status()
         self._update_mockup()
+
+    def _apply_units(self):
+        """Unit labels + defaults: crop offset in the project unit, header
+        strip in the paper unit. Runs after the data loads because setting
+        the text boxes fires their TextChanged (mockup redraw)."""
+        self.lbl_offset.Text = self._unit.label("OFFSET")
+        self.txt_offset.Text = self._unit.default_text(DEFAULT_OFFSET_MM)
+        self.lbl_strip_size.Text = self._paper.label("HEADER SIZE")
+        self.txt_strip_mm.Text = self._paper.default_text(DEFAULT_STRIP_MM)
 
 
     # ── Data loading ──────────────────────────────────
@@ -379,12 +399,13 @@ class CreateRoomPlanWindow(T3WPFWindow):
             self.status_text.Text = "Ready"
 
     def _get_offset(self):
-        """Parse offset value from text box (in meters) and convert to feet."""
+        """Crop offset typed in the project unit (or with a unit: 1 m,
+        3'-0\") → feet. Unreadable text falls back to the 1 m default
+        (Create validates it first and says what is wrong)."""
         try:
-            val_meters = float(self.txt_offset.Text)
-            return val_meters * 3.28084
-        except (ValueError, TypeError):
-            return 3.28084  # Default 1 meter in feet
+            return self._unit.parse(self.txt_offset.Text)
+        except (ValueError, TypeError, AttributeError):
+            return MILLIMETERS.to_feet(DEFAULT_OFFSET_MM)
 
     @staticmethod
     def _offset_bbox(bbox, offset=1):
@@ -814,12 +835,12 @@ class CreateRoomPlanWindow(T3WPFWindow):
         except Exception:
             pass
         try:
-            mm = float(self.txt_strip_mm.Text)
-        except (ValueError, TypeError):
-            mm = 70.0
-        if mm < 0:
-            mm = 0.0
-        return side, mm / 304.8
+            strip = self._paper.parse(self.txt_strip_mm.Text)
+        except (ValueError, TypeError, AttributeError):
+            strip = MILLIMETERS.to_feet(DEFAULT_STRIP_MM)
+        if strip < 0:
+            strip = 0.0
+        return side, strip
 
     @staticmethod
     def _usable_rect(x0, y0, w, h, margin, strip_side, strip):
@@ -891,16 +912,19 @@ class CreateRoomPlanWindow(T3WPFWindow):
         return plans, elevs
 
     @staticmethod
-    def _paper_label(w_ft, h_ft):
-        """Human label for a paper size, e.g. 'A1 (841 x 594 mm)'."""
-        w_mm = int(round(w_ft * 304.8))
-        h_mm = int(round(h_ft * 304.8))
+    def _paper_label(w_ft, h_ft, paper=None):
+        """Human label for a paper size, e.g. 'A1 (841 x 594 mm)'; the
+        size is written in the paper unit (inches in an imperial project)."""
+        paper = paper or MILLIMETERS
+        size = "{} x {}".format(paper.text(w_ft), paper.show(h_ft))
+        w_mm = int(round(MILLIMETERS.from_feet(w_ft)))   # ISO match, always mm
+        h_mm = int(round(MILLIMETERS.from_feet(h_ft)))
         iso = ((1189, 841, "A0"), (841, 594, "A1"), (594, 420, "A2"),
                (420, 297, "A3"), (297, 210, "A4"))
         for iw, ih, name in iso:
             if abs(w_mm - iw) <= 6 and abs(h_mm - ih) <= 6:
-                return "{}  ({} x {} mm)".format(name, w_mm, h_mm)
-        return "{} x {} mm".format(w_mm, h_mm)
+                return "{}  ({})".format(name, size)
+        return size
 
     def _draw_viewport(self, canvas, title, detail_num, w_px, h_px, x_px, y_px, bg_color, border_color):
         """Draw a viewport rectangle and Revit-style title mark on the WPF canvas."""
@@ -986,7 +1010,8 @@ class CreateRoomPlanWindow(T3WPFWindow):
             canvas.Children.Add(band)
 
         lbl = TextBlock()
-        lbl.Text = self._paper_label(w_sheet, h_sheet)
+        lbl.Text = self._paper_label(w_sheet, h_sheet,
+                                     getattr(self, '_paper', None))
         lbl.FontSize = 9
         lbl.FontWeight = FontWeights.Bold
         lbl.Foreground = SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8))
@@ -1232,9 +1257,12 @@ class CreateRoomPlanWindow(T3WPFWindow):
                             ", ".join(missing + (["Title Block"] if do_layout and tb_id is None else [])))
             return
         try:
-            offset_m = float(self.txt_offset.Text)
-            if not math.isfinite(offset_m) or offset_m < 0:
-                raise ValueError("Crop offset must be finite and non-negative.")
+            try:
+                offset_ft = self._unit.parse(self.txt_offset.Text)
+            except ValueError as ex:
+                raise ValueError("Crop offset: {}".format(ex))
+            if not math.isfinite(offset_ft) or offset_ft < 0:
+                raise ValueError("Crop offset must be zero or more.")
             if do_floor:
                 for item in selected_rooms:
                     qty = int(item.GenQty)
@@ -1621,7 +1649,8 @@ class CreateRoomPlanWindow(T3WPFWindow):
                                 "- reduce the view scale or use a larger "
                                 "title block.".format(
                                     view.Name if view else view_id,
-                                    w_p * 304.8, h_p * 304.8,
+                                    MILLIMETERS.from_feet(w_p),
+                                    MILLIMETERS.from_feet(h_p),
                                     sheet.SheetNumber))
                     except Exception as ex:
                         logger.debug("Viewport clamp skipped: {}".format(ex))

@@ -15,6 +15,7 @@ clr.AddReference('RevitAPIUI')
 
 from pyrevit import forms
 from GUI.WPF_Base import T3WPFWindow, to_items_source
+from Snippets._units import project_length_unit
 
 from Autodesk.Revit.DB import (
     FilteredElementCollector, BuiltInCategory, BuiltInParameter,
@@ -49,8 +50,6 @@ TARGET_CATEGORIES = [
     ("Casework", BuiltInCategory.OST_Casework),
     ("Detail Items", BuiltInCategory.OST_DetailComponents),
 ]
-
-MM_TO_FEET = 1.0 / 304.8
 
 
 # =============================================================================
@@ -104,6 +103,8 @@ class TextToElementDialog(T3WPFWindow):
         self._uidoc = revit_obj.ActiveUIDocument
         self._text_notes = []
         self._transfer_list = []  # list of (text_content, element, param_name)
+        # Read per window: the module stays loaded across projects.
+        self._unit = project_length_unit(self._doc)
 
         xaml_path = os.path.join(
             os.path.dirname(__file__), 'Tools', 'TextToElement.xaml'
@@ -125,6 +126,7 @@ class TextToElementDialog(T3WPFWindow):
         if hasattr(self, "btn_ai_detect_target"):
             self.btn_ai_detect_target.Click += self._on_ai_detect_target
 
+        self._apply_units()
         self._populate_categories()
         self._update_source_info()
         self._init_ai_mode()
@@ -148,6 +150,12 @@ class TextToElementDialog(T3WPFWindow):
     # -------------------------------------------------------------------------
     # Initialisation helpers
     # -------------------------------------------------------------------------
+
+    def _apply_units(self):
+        """Tolerance unit and default (150 mm) in the project's length unit.
+        It is a model distance: bounding boxes are compared in model space."""
+        self.lbl_tolerance_unit.Text = self._unit.tag
+        self.txt_tolerance.Text = self._unit.default_text(150)
 
     def _populate_categories(self):
         """Populate the category ComboBox from TARGET_CATEGORIES."""
@@ -316,8 +324,14 @@ class TextToElementDialog(T3WPFWindow):
             self._set_status("Select a target parameter first")
             return
 
-        # Get tolerance
-        tolerance_feet = self._get_tolerance_feet()
+        # Get tolerance — a bad value stops here, before any picking
+        try:
+            tolerance_feet = self._get_tolerance_feet()
+        except ValueError as ex:
+            msg = "Tolerance: {}".format(ex)
+            self._set_status(msg)
+            self.txt_content_status.Text = msg
+            return
 
         # Collect text notes
         if self.rb_pick_items.IsChecked:
@@ -569,12 +583,10 @@ class TextToElementDialog(T3WPFWindow):
         return False
 
     def _get_tolerance_feet(self):
-        """Parse tolerance from txt_tolerance (mm) and convert to feet."""
-        try:
-            val = float(self.txt_tolerance.Text.strip())
-        except Exception:
-            val = 150.0
-        return val * MM_TO_FEET
+        """Tolerance typed in txt_tolerance → internal feet. A bare number is
+        in the project unit; "150 mm" or "6\"" work in any project. Raises
+        ValueError with a message that says what is accepted."""
+        return self._unit.parse(self.txt_tolerance.Text)
 
     def _set_status(self, message):
         """Update the status bar label."""

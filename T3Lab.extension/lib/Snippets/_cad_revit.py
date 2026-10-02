@@ -813,7 +813,10 @@ ROUND_PARAMS = ("d", "Diameter", "D", "b")
 
 
 def create_columns(doc, footprints, level, top_level, height_ft, rect_symbol,
-                   round_symbol, structural, match_size, rotate, step_mm, progress=None):
+                   round_symbol, structural, match_size, rotate, step_ft, progress=None,
+                   size_unit=None):
+    """Sizes are rounded to `step_ft` (feet); per-size types are named in
+    `size_unit` (mm or inches, see `geo.footprint_type_name`)."""
     result = RunResult("columns")
     stype = DB.Structure.StructuralType.Column if structural \
         else DB.Structure.StructuralType.NonStructural
@@ -829,13 +832,12 @@ def create_columns(doc, footprints, level, top_level, height_ft, rect_symbol,
         key = eid_value(base.Family.Id)
         cache = caches.setdefault(key, {})
         fam_syms = cache.setdefault("__symbols__", _family_symbols(doc, base))
-        w = geo.mm(geo.round_to(geo.to_mm(fp["width"]), step_mm))
+        w, d = geo.footprint_size(fp, step_ft)
         if fp["shape"] == "round":
             sizes = [(ROUND_PARAMS, w)]
         else:
-            d = geo.mm(geo.round_to(geo.to_mm(fp["depth"]), step_mm))
             sizes = [(RECT_WIDTH_PARAMS, w), (RECT_DEPTH_PARAMS, d)]
-        sym, ok = _duplicate_sized(doc, base, geo.footprint_type_name(fp, step_mm),
+        sym, ok = _duplicate_sized(doc, base, geo.footprint_type_name(fp, step_ft, size_unit),
                                    sizes, cache, fam_syms)
         if not ok:
             size_failed[0] += 1

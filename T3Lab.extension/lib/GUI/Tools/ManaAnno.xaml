@@ -1871,7 +1871,7 @@
                                                      ToolTip="List every dimension; click a row to select it in the active view"/>
                                         <RadioButton x:Name="rb_dim_type" Content="Types" GroupName="dim_mode"
                                                      Style="{StaticResource T3.Chip}" Checked="dim_submode"
-                                                     ToolTip="List dimension types with their text settings; double-click a name to rename it"/>
+                                                     ToolTip="List dimension types with their text settings; double-click a name to edit it, then Apply Changes"/>
                                     </StackPanel>
                                     <TextBox x:Name="dim_kw" Grid.Column="1" Style="{StaticResource T3.Search}"
                                              Width="240" HorizontalAlignment="Left"
@@ -1938,11 +1938,35 @@
                                                     </DataGridTemplateColumn>
                                                     <!-- Columns are told apart by binding path (GridPendingEdits.column_key),
                                                          never by header text. Instances show VIEW; Types show the text settings. -->
+                                                    <!-- NAME edits are STAGED (T3 "ô vàng"): dirty_Name is "True" while an edit waits for
+                                                         Apply Changes, "Failed" when the last Apply was refused (red, tooltip = reason).
+                                                         The cell reads the flag through its own AutomationProperties.ItemStatus (cell string
+                                                         bridge, same as every staged grid) - ManaAnnoDialog "STAGED INLINE EDITS". -->
                                                     <DataGridTextColumn Header="TYPE NAME" Binding="{Binding Name}" Width="*" IsReadOnly="False"
-                                                                        ElementStyle="{StaticResource T3.Body}"/>
+                                                                        ElementStyle="{StaticResource T3.Body}">
+                                                        <DataGridTextColumn.CellStyle>
+                                                            <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                                <Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_Name}"/>
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="AutomationProperties.ItemStatus" Value="True">
+                                                                        <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                        <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                                        <Setter Property="ToolTip" Value="{Binding tip_Name}"/>
+                                                                    </Trigger>
+                                                                    <Trigger Property="AutomationProperties.ItemStatus" Value="Failed">
+                                                                        <Setter Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource T3.Danger.Accent}"/>
+                                                                        <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                                        <Setter Property="ToolTip" Value="{Binding tip_Name}"/>
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </DataGridTextColumn.CellStyle>
+                                                    </DataGridTextColumn>
                                                     <DataGridTextColumn Header="VIEW" Binding="{Binding View}" Width="200" IsReadOnly="True"
                                                                         ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                                    <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="72" IsReadOnly="True" Visibility="Collapsed"
+                                                    <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="88" IsReadOnly="True" Visibility="Collapsed"
                                                                         HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"
                                                                         ElementStyle="{StaticResource T3.Cell.Center}"/>
                                                     <DataGridTextColumn Header="FONT" Binding="{Binding Font}" Width="100" IsReadOnly="True" Visibility="Collapsed"
@@ -1990,9 +2014,9 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
                                             <TextBlock Text="AUTO-RENAME TYPES" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                            <Button Style="{StaticResource T3.Button.Secondary}" HorizontalAlignment="Left"
+                                            <Button x:Name="btn_dim_rename_all" Style="{StaticResource T3.Button.Secondary}" HorizontalAlignment="Left"
                                                     Click="dim_rename_all"
-                                                    ToolTip="Rename every dimension type from its settings: [discipline]_DIM_[size]_[font]_[width]_[background]_[color]_[center]_[prefix]_[elevation]_[rounding]. Empty parts are left out.">
+                                                    ToolTip="Rename every dimension type from its settings: [discipline]_DIM_[size]_[font]_[width]_[background]_[color]_[center]_[prefix]_[elevation]_[rounding]. [size] is the text size in mm, e.g. 2.50mm. Empty parts are left out.">
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="&#xE8AC;" Style="{StaticResource T3.Icon.Lead}"/>
                                                     <TextBlock Text="Rename All" VerticalAlignment="Center"/>
@@ -2007,9 +2031,12 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
+                                                <!-- Label carries the pending count ("Apply Changes (3)") and the button is
+                                                     disabled with nothing staged: ManaAnnoDialog._sync_apply. -->
                                                 <Button x:Name="btn_dim_apply" Grid.Column="0" Content="Apply Changes"
                                                         Style="{StaticResource T3.Button.Secondary}" Visibility="Collapsed"
-                                                        Click="dim_apply" ToolTip="Write the type names in the table to the model"/>
+                                                        IsEnabled="False" ToolTipService.ShowOnDisabled="True"
+                                                        Click="dim_apply" ToolTip="Write the yellow cells to the model in one step (one Undo)"/>
                                                 <Button Grid.Column="2" Style="{StaticResource T3.Button.Danger}" Click="dim_delete"
                                                         ToolTip="Delete the checked rows (or the highlighted ones). Types still in use are skipped.">
                                                     <StackPanel Orientation="Horizontal">
@@ -2065,10 +2092,10 @@
                                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
                                         <RadioButton x:Name="rb_notes" Content="Text Notes" GroupName="txt_mode"
                                                      Style="{StaticResource T3.Chip}" IsChecked="True" Checked="txt_submode"
-                                                     ToolTip="List every text note; double-click the text to edit it"/>
+                                                     ToolTip="List every text note; double-click the text to edit it, then Apply Changes"/>
                                         <RadioButton x:Name="rb_types" Content="Types" GroupName="txt_mode"
                                                      Style="{StaticResource T3.Chip}" Checked="txt_submode"
-                                                     ToolTip="List text note types with their text settings; double-click a name to rename it"/>
+                                                     ToolTip="List text note types with their text settings; double-click a name to edit it, then Apply Changes"/>
                                     </StackPanel>
                                     <TextBox x:Name="txt_kw" Grid.Column="1" Style="{StaticResource T3.Search}"
                                              Width="240" HorizontalAlignment="Left"
@@ -2135,13 +2162,37 @@
                                                     </DataGridTemplateColumn>
                                                     <!-- Columns are told apart by binding path (GridPendingEdits.column_key),
                                                          never by header text. Notes show TYPE + VIEW; Types show the text settings. -->
+                                                    <!-- NAME edits are STAGED (T3 "ô vàng"): dirty_Name is "True" while an edit waits for
+                                                         Apply Changes, "Failed" when the last Apply was refused (red, tooltip = reason).
+                                                         The cell reads the flag through its own AutomationProperties.ItemStatus (cell string
+                                                         bridge, same as every staged grid) - ManaAnnoDialog "STAGED INLINE EDITS". -->
                                                     <DataGridTextColumn Header="TEXT" Binding="{Binding Name}" Width="*" IsReadOnly="False"
-                                                                        ElementStyle="{StaticResource T3.Body}"/>
+                                                                        ElementStyle="{StaticResource T3.Body}">
+                                                        <DataGridTextColumn.CellStyle>
+                                                            <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                                <Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_Name}"/>
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="AutomationProperties.ItemStatus" Value="True">
+                                                                        <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                        <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                                        <Setter Property="ToolTip" Value="{Binding tip_Name}"/>
+                                                                    </Trigger>
+                                                                    <Trigger Property="AutomationProperties.ItemStatus" Value="Failed">
+                                                                        <Setter Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource T3.Danger.Accent}"/>
+                                                                        <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                                        <Setter Property="ToolTip" Value="{Binding tip_Name}"/>
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </DataGridTextColumn.CellStyle>
+                                                    </DataGridTextColumn>
                                                     <DataGridTextColumn Header="TYPE" Binding="{Binding Details}" Width="160" IsReadOnly="True"
                                                                         ElementStyle="{StaticResource T3.Body.Secondary}"/>
                                                     <DataGridTextColumn Header="VIEW" Binding="{Binding View}" Width="160" IsReadOnly="True"
                                                                         ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                                    <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="72" IsReadOnly="True" Visibility="Collapsed"
+                                                    <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="88" IsReadOnly="True" Visibility="Collapsed"
                                                                         HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"
                                                                         ElementStyle="{StaticResource T3.Cell.Center}"/>
                                                     <DataGridTextColumn Header="FONT" Binding="{Binding Font}" Width="100" IsReadOnly="True" Visibility="Collapsed"
@@ -2172,7 +2223,7 @@
                                                 <TextBlock x:Name="txt_checked_count" Grid.Column="0" Text="0 checked"
                                                            Style="{StaticResource T3.Caption}" Margin="0,0,16,0"/>
                                                 <TextBlock x:Name="txt_hint" Grid.Column="1" HorizontalAlignment="Right"
-                                                           Text="Click a row to select the note in the active view; double-click the text to edit it."
+                                                           Text="Click a row to select the note; double-click the text to edit it, then Apply Changes."
                                                            Style="{StaticResource T3.Caption}" TextTrimming="CharacterEllipsis"/>
                                             </Grid>
                                         </Border>
@@ -2189,9 +2240,9 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
                                             <TextBlock Text="AUTO-RENAME TYPES" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                            <Button Style="{StaticResource T3.Button.Secondary}" HorizontalAlignment="Left"
+                                            <Button x:Name="btn_txt_rename_all" Style="{StaticResource T3.Button.Secondary}" HorizontalAlignment="Left"
                                                     Click="txt_rename_all"
-                                                    ToolTip="Rename every text note type from its settings: [discipline]_TXT_[size]_[font]_[width]_[background]_[color]_[border]_[B/U/I]. Empty parts are left out.">
+                                                    ToolTip="Rename every text note type from its settings: [discipline]_TXT_[size]_[font]_[width]_[background]_[color]_[border]_[B/U/I]. [size] is the text size in mm, e.g. 2.50mm. Empty parts are left out.">
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="&#xE8AC;" Style="{StaticResource T3.Icon.Lead}"/>
                                                     <TextBlock Text="Rename All" VerticalAlignment="Center"/>
@@ -2216,8 +2267,8 @@
                                                         </StackPanel>
                                                     </Button>
                                                     <Button x:Name="btn_txt_apply" Content="Apply Changes" Style="{StaticResource T3.Button.Secondary}"
-                                                            Visibility="Collapsed" Click="txt_apply"
-                                                            ToolTip="Write the text and type names in the table to the model"/>
+                                                            IsEnabled="False" ToolTipService.ShowOnDisabled="True" Click="txt_apply"
+                                                            ToolTip="Write the yellow cells to the model in one step (one Undo)"/>
                                                 </StackPanel>
                                                 <Button Grid.Column="2" Style="{StaticResource T3.Button.Danger}" Click="txt_delete"
                                                         ToolTip="Delete the checked rows (or the highlighted ones). Types still in use are skipped.">
@@ -2413,7 +2464,7 @@
 
                                                 <Separator Style="{StaticResource T3.Rule}" Margin="0,16"/>
 
-                                                <TextBlock Text="FILTER BY SEGMENT LENGTH" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                                                <TextBlock x:Name="lbl_dimtext_filter" Text="FILTER BY SEGMENT LENGTH" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                                                 <CheckBox x:Name="chk_filter_enable" Content="Only change segments whose length matches the rules"
                                                           Style="{StaticResource T3.CheckBox}"
                                                           Checked="dimtext_filter_toggle" Unchecked="dimtext_filter_toggle"/>

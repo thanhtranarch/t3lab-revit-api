@@ -141,6 +141,61 @@ from Services.point_cloud_analysis import (
 
 import uuid
 from Snippets._compat import disposing
+from Snippets._units import project_length_unit, LengthUnit
+
+
+# ── Display in the project's length unit ──────────────────────────────────────
+# The analysis service writes each element's DIMENSIONS text in mm (the MCP
+# point cloud tools hand that text to the model); the window rewrites it in
+# the unit the project displays. Only lengths switch — slope stays in degrees.
+
+_METERS = LengthUnit("meters")
+
+
+def _sizes_text(unit, sizes):
+    """[('W', ft), ('H', ft)] → 'W=900 H=2100 mm' / 'W=3' - 0" H=7' - 0"'."""
+    parts = u" ".join(u"{}={}".format(key, unit.text(ft)) for key, ft in sizes)
+    return u"{} {}".format(parts, unit.tag) if unit.style == "decimal" else parts
+
+
+def _area_text(unit, w_ft, d_ft):
+    """Plan area: m² in a metric project, ft² in an imperial one."""
+    if unit.is_metric:
+        return u"~{:.1f} m²".format(_METERS.from_feet(w_ft) * _METERS.from_feet(d_ft))
+    return u"~{:.0f} ft²".format(w_ft * d_ft)
+
+
+def _dimensions_text(elem, unit):
+    """The DIMENSIONS column for one detected element, written in `unit`.
+    Falls back to the service's mm text when the element's data is missing."""
+    d = getattr(elem, '_data', None) or {}
+    kind = getattr(elem, 'Type', None)
+    try:
+        if kind == 'Wall':
+            return u"L={}  T={}".format(unit.show(d['length_ft']),
+                                       unit.show(d['thickness_ft']))
+        if kind in ('Floor', 'Ceiling'):
+            c = d['corners_xy']
+            w, depth = abs(c[1][0] - c[0][0]), abs(c[2][1] - c[0][1])
+            return u"{}  @Z={}".format(_area_text(unit, w, depth),
+                                       unit.show(d['z_ft']))
+        if kind == 'Column':
+            return _sizes_text(unit, [('W', d['width_ft']), ('D', d['depth_ft']),
+                                      ('H', d['z_top_ft'] - d['z_bot_ft'])])
+        if kind in ('Door', 'Window'):
+            return _sizes_text(unit, [('W', d['width_ft']), ('H', d['height_ft'])])
+        if kind == 'Stair':
+            lo, hi = unit.text(d['z_bot_ft']), unit.text(d['z_top_ft'])
+            rise = (u"{}–{} {}".format(lo, hi, unit.tag) if unit.style == "decimal"
+                    else u"{} to {}".format(lo, hi))
+            return u"{} treads  Rise={}".format(d['tread_count'], rise)
+        if kind == 'Roof':
+            return u"Slope={:.1f}°  @Z={}".format(d['slope_deg'],
+                                                 unit.show(d['z_ft']))
+    except (KeyError, IndexError, TypeError, ValueError):
+        pass
+    return getattr(elem, 'Dimensions', u"")
+
 
 # The pushbutton script importlib.reload()s this module on every click; a
 # fixed __namespace__ would define the same .NET type twice and raise
@@ -615,6 +670,8 @@ class PointCloudModelWindow(T3WPFWindow):
         self._detected_elements = state.get('elements') or []
         self._wall_height_ft    = state.get('wall_height')
         self._builder           = ElementBuilder(doc)
+        # Read per window: the module stays loaded across projects.
+        self._unit              = project_length_unit(doc)
         self.result             = None
         # 'cloud' / 'region' — set by pick buttons. The window CLOSES for
         # every pick: hiding a ShowDialog window ends its modal loop, the
@@ -721,10 +778,10 @@ class PointCloudModelWindow(T3WPFWindow):
                 self.lbl_region_info.Text       = error_msg
                 self.lbl_region_info.Foreground = self._brush('#D23B3B')
             elif self._custom_min_pt is not None:
-                w_m = ft_to_mm(self._custom_max_pt.X - self._custom_min_pt.X) / 1000.0
-                d_m = ft_to_mm(self._custom_max_pt.Y - self._custom_min_pt.Y) / 1000.0
-                self.lbl_region_info.Text = (
-                    u"Region set: {:.1f} × {:.1f} m".format(w_m, d_m))
+                w_ft = self._custom_max_pt.X - self._custom_min_pt.X
+                d_ft = self._custom_max_pt.Y - self._custom_min_pt.Y
+                self.lbl_region_info.Text = u"Region set: {} × {}".format(
+                    self._unit.show(w_ft), self._unit.show(d_ft))
                 self.lbl_region_info.Foreground = self._brush('#0B8A5A')
                 self.btn_pick_region.Content    = u"Re-pick Region"
             else:
@@ -949,6 +1006,9 @@ class PointCloudModelWindow(T3WPFWindow):
         for t, badge in badge_map.items():
             cnt = type_counts.get(t, 0)
             badge.Text = u"{} {}".format(cnt, labels[t])
+
+        for e in elems:
+            e.Dimensions = _dimensions_text(e, self._unit)
 
         total = len(elems)
         self.pnl_empty_state.Visibility = Visibility.Collapsed

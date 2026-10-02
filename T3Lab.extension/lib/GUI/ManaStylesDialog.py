@@ -36,6 +36,9 @@ from Autodesk.Revit.DB import (
 from pyrevit import forms, revit
 from GUI.WPF_Base import T3WPFWindow
 from GUI.inline_rename import InlineRenameController
+# Line-pattern dashes are printed sizes: shown in the paper unit (mm in a
+# metric project, inches in an imperial one). Read per window.
+from Snippets._units import project_paper_unit, MILLIMETERS
 from Services.style_naming import (
     LINE_STYLE, LINE_PATTERN, FILL_PATTERN,
     check_renamable, validate_style_rename, rename_tooltip, renamed_status,
@@ -434,10 +437,21 @@ class LineStyleItem(_Reactive):
         for h in self._handlers: h(self, PropertyChangedEventArgs(prop))
 
 
+def segment_text(length_ft, paper=None):
+    """A dash / space / dot length on paper: '3.00 mm' (2 decimals, as the
+    grid always showed) or '0.125\"' (3 decimals — 1/8\" text would round a
+    1.5 mm dash to nothing)."""
+    paper = paper or MILLIMETERS
+    value = paper.from_feet(length_ft)
+    if paper.is_metric:
+        return "{:.2f} {}".format(value, paper.tag)
+    return "{:.3f}\"".format(value)
+
+
 class LinePatternItem(_Reactive):
     SYSTEM_PATTERNS = ["Solid", "Dash", "Dot", "Dash dot", "Dash dot dot"]
     
-    def __init__(self, element):
+    def __init__(self, element, paper=None):
         self._handlers = []
         self._element = element
         self._is_selected = False
@@ -457,7 +471,7 @@ class LinePatternItem(_Reactive):
                 values = []
                 for seg in segments:
                     types.append(seg.Type.ToString())
-                    values.append("{:.2f}mm".format(seg.Length * 304.8))
+                    values.append(segment_text(seg.Length, paper))
                 self._segments_type = ", ".join(types) if types else "Solid"
                 self._segments_value = ", ".join(values) if values else "-"
             else:
@@ -1353,7 +1367,8 @@ class ManaStylesWindow(T3WPFWindow):
     def _load_line_patterns(self):
         try:
             col = FilteredElementCollector(doc).OfClass(LinePatternElement)
-            self.line_patterns = [LinePatternItem(e) for e in col]
+            paper = project_paper_unit(doc)
+            self.line_patterns = [LinePatternItem(e, paper) for e in col]
             self.line_patterns.sort(key=lambda x: x.name)
             self._filter_line_patterns()
         except Exception as ex:

@@ -1833,7 +1833,7 @@
                     <TextBlock Text="INTERSECTION TOLERANCE" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <TextBox x:Name="txt_tolerance" Style="{StaticResource T3.TextBox}" Width="100" Text="150" Height="28"/>
-                        <TextBlock Text="mm" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="8,0,16,0"/>
+                        <TextBlock x:Name="lbl_tolerance_unit" Text="mm" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="8,0,16,0"/>
                         <TextBlock Text="(larger values catch text notes near element edges)" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
                     </StackPanel>
 

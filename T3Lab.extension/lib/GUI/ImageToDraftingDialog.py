@@ -88,6 +88,11 @@ if _lib_dir not in sys.path:
     sys.path.insert(0, _lib_dir)
 
 from GUI.ProgressPauseMixin import ProgressPauseMixin
+# Output width = model coordinates of the detail lines (the drafting view's
+# scale is not applied), so it is a project-unit length.
+from Snippets._units import project_length_unit
+
+DEFAULT_WIDTH_MM = 300.0
 
 # `revit.doc` / `revit.uidoc` RAISE AttributeError (not return None) when no
 # UIDocument is active. At module scope that kills the import outright, so the
@@ -1149,10 +1154,14 @@ class ImageToDraftingWindow(T3WPFWindow):
     PP_STATUS     = "status_text"
     PP_STOP_MSG   = u"Stopping… finishing current line"
 
-    def __init__(self, xaml_file=None):
+    def __init__(self, xaml_file=None, doc_param=None):
         if xaml_file is None:
             xaml_file = os.path.join(os.path.dirname(__file__), 'Tools', 'ImageToDrafting.xaml')
         T3WPFWindow.__init__(self, xaml_file)
+        # Project length unit, read for the document this window works on.
+        self._unit = project_length_unit(doc_param or doc)
+        self.lbl_output_width.Text = self._unit.label("OUTPUT WIDTH")
+        self.WidthInput.Text = self._unit.default_text(DEFAULT_WIDTH_MM)
         self.image_path   = None   # path to BMP ready for potrace
         self.pdf_path     = None   # original PDF path (None for images)
         self.gs_path      = None   # cached Ghostscript path
@@ -1313,11 +1322,14 @@ class ImageToDraftingWindow(T3WPFWindow):
         if not view_name:
             forms.alert("Enter a Drafting View name."); return
 
+        width_text = (self.WidthInput.Text or "").strip() or \
+            self._unit.default_text(DEFAULT_WIDTH_MM)
         try:
-            width_mm = float(self.WidthInput.Text.strip() or '300')
-            if width_mm <= 0: raise ValueError
-        except ValueError:
-            forms.alert("Output Width must be a positive number."); return
+            width_mm = self._unit.parse_mm(width_text)
+        except ValueError as ex:
+            forms.alert("Output Width: {}".format(ex)); return
+        if width_mm <= 0:
+            forms.alert("Output Width must be greater than zero."); return
 
         try:
             thickness = max(1, int(float(self.ThicknessInput.Text.strip() or '2')))
@@ -1557,7 +1569,7 @@ def show_image_to_drafting_dialog(doc=None):
         forms.alert("No active Revit document.", title="Image to Drafting")
         return
     xaml_file = os.path.join(os.path.dirname(__file__), 'Tools', 'ImageToDrafting.xaml')
-    win = ImageToDraftingWindow(xaml_file)
+    win = ImageToDraftingWindow(xaml_file, doc_param=d)
     try:
         win.ShowDialog()
     finally:

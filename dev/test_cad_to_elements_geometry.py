@@ -16,8 +16,10 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "T3Lab.extension", "lib"))
 
 from Snippets import _cad_geometry as g  # noqa: E402
+from Snippets import _units as U  # noqa: E402
 
 MM = g.FT_PER_MM
+IN = 1.0 / 12.0
 
 
 def seg(x0, y0, x1, y1, layer="A"):
@@ -179,7 +181,7 @@ class Footprints(unittest.TestCase):
         fp = g.rectangle_footprint(rect(0, 0, 400 * MM, 600 * MM))
         self.assertEqual(fp["shape"], "rect")
         self.assertAlmostEqual(fp["angle"], 0.0)
-        self.assertEqual(g.footprint_type_name(fp, 10), "400x600mm")
+        self.assertEqual(g.footprint_type_name(fp, 10 * MM), "400x600mm")
         self.assertAlmostEqual(fp["cx"], 200 * MM)
 
     def test_rotated_rectangle_and_collinear_vertex(self):
@@ -212,7 +214,25 @@ class Footprints(unittest.TestCase):
         kept = g.filter_footprints(fps)
         self.assertEqual(len(kept), 2)
         self.assertAlmostEqual(g.to_mm(kept[0]["width"]), 500.0)   # the circle
-        self.assertEqual(g.footprint_type_name(kept[0], 10), "D500mm")
+        self.assertEqual(g.footprint_type_name(kept[0], 10 * MM), "D500mm")
+
+    def test_size_step_is_in_feet_and_never_truncates_to_whole_mm(self):
+        # A 1/2" step keeps a 16" x 24" column exact (round_to would give 406 mm).
+        fp = g.rectangle_footprint(rect(0, 0, 16.1 * IN, 23.9 * IN))
+        w, d = g.footprint_size(fp, 0.5 * IN)
+        self.assertAlmostEqual(w, 16 * IN, places=9)
+        self.assertAlmostEqual(d, 24 * IN, places=9)
+        self.assertAlmostEqual(g.snap(1.23, 0), 1.23)          # no step: unchanged
+
+    def test_type_names_follow_the_size_unit(self):
+        inches = U.paper_unit(U.LengthUnit("feetFractionalInches"))
+        fp = g.rectangle_footprint(rect(0, 0, 16.1 * IN, 23.9 * IN))
+        self.assertEqual(g.footprint_type_name(fp, 0.5 * IN, inches), '16"x24"')
+        self.assertEqual(g.footprint_type_name(g.circle_footprint(0, 0, 9 * IN), 0.5 * IN, inches),
+                         'D18"')
+        metric = U.paper_unit(U.LengthUnit("meters"))           # sizes stay in mm, never m
+        self.assertEqual(g.footprint_type_name(fp, 10 * MM, metric), "410x610mm")
+        self.assertEqual(g.footprint_type_name(fp, 10 * MM), "410x610mm")
 
 
 class Grids(unittest.TestCase):
@@ -268,6 +288,10 @@ class Helpers(unittest.TestCase):
             self.assertTrue(m["verb"].startswith("Create "))
         self.assertEqual([c["key"] for c in g.MEP_CATEGORIES],
                          ["duct", "pipe", "tray", "conduit"])
+        # The dialog adds the project unit to the label ("WIDTH (FT-IN)").
+        for c in g.MEP_CATEGORIES:
+            self.assertNotIn("(", c["width_label"], c["key"])
+            self.assertEqual(c["width_label"], c["width_label"].upper(), c["key"])
 
 
 if __name__ == "__main__":

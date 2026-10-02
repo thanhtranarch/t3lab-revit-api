@@ -1870,7 +1870,7 @@
                             <ComboBox x:Name="cmb_floor_type" Style="{StaticResource T3.ComboBox}" Height="28" Margin="0,0,0,12"/>
 
                             <!-- Height Offset -->
-                            <TextBlock Text="Height Offset (mm):" Style="{StaticResource T3.Body.Secondary}" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="lbl_offset" Text="Height Offset (mm):" Style="{StaticResource T3.Body.Secondary}" Margin="0,0,0,4"/>
                             <TextBox x:Name="txt_offset" Text="0" Style="{StaticResource T3.TextBox}" Height="28" Margin="0,0,0,16"/>
 
                             <!-- Options -->

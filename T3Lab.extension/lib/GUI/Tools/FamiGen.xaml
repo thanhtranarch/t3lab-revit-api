@@ -1971,9 +1971,9 @@
                                                             ElementStyle="{StaticResource T3.Cell.Number}"/>
                                         <DataGridTextColumn Header="INSTANCES" Binding="{Binding InstanceCount}" Width="80" IsReadOnly="True"
                                                             ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                        <DataGridTextColumn Header="WIDTH (MM)" Binding="{Binding WidthMM}" Width="90" IsReadOnly="True"
+                                        <DataGridTextColumn x:Name="col_block_width" Header="WIDTH (MM)" Binding="{Binding WidthText}" Width="110" IsReadOnly="True"
                                                             ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                        <DataGridTextColumn Header="DEPTH (MM)" Binding="{Binding DepthMM}" Width="90" IsReadOnly="True"
+                                        <DataGridTextColumn x:Name="col_block_depth" Header="DEPTH (MM)" Binding="{Binding DepthText}" Width="110" IsReadOnly="True"
                                                             ElementStyle="{StaticResource T3.Cell.Number}"/>
                                         <DataGridTextColumn Header="ARCS" Binding="{Binding ArcCount}" Width="60" IsReadOnly="True"
                                                             ElementStyle="{StaticResource T3.Cell.Number}"/>

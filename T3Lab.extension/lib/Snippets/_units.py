@@ -78,8 +78,9 @@ def _number(token):
     return sign * value
 
 
-def _fraction_text(inches, denominator=8):
-    """6.53 → '6 1/2', 0.125 → '1/8', 7.0 → '7' (nearest 1/denominator)."""
+def _fraction_text(inches, denominator=8, lead_zero=False):
+    """6.53 → '6 1/2', 0.125 → '1/8' ('0 1/8' with lead_zero, the way Revit
+    writes feet-inches), 7.0 → '7' (nearest 1/denominator)."""
     sign = "-" if inches < 0 else ""
     eighths = int(round(abs(inches) * denominator))
     whole, rest = divmod(eighths, denominator)
@@ -89,18 +90,23 @@ def _fraction_text(inches, denominator=8):
             num //= 2
             den //= 2
         frac = "{}/{}".format(num, den)
-        return sign + ("{} {}".format(whole, frac) if whole else frac)
+        return sign + ("{} {}".format(whole, frac) if (whole or lead_zero) else frac)
     return sign + str(whole)
 
 
 class LengthUnit(object):
     """One project length unit: label tag, conversion, display and parsing."""
 
-    def __init__(self, key="millimeters"):
+    def __init__(self, key="millimeters", decimals=None, denominator=None):
         if key not in _UNITS:
             key = "millimeters"
         self.key = key
         self.tag, self.ft_per_unit, self.decimals, self.style = _UNITS[key]
+        if decimals is not None:
+            self.decimals = decimals
+        # Fractions: model feet-inches to 1/16" (Revit's usual accuracy);
+        # paper inches pass 1/64" so text heights like 3/32" survive.
+        self.denominator = denominator or 16
 
     # ── labels ───────────────────────────────────────────────────────────
     @property
@@ -131,16 +137,26 @@ class LengthUnit(object):
         feet = float(feet)
         if self.style == "ftin":
             sign = "-" if feet < 0 else ""
-            total_in = round(abs(feet) * 12.0 * 8) / 8.0
+            den = self.denominator
+            total_in = round(abs(feet) * 12.0 * den) / float(den)
             ft, inch = divmod(total_in, 12.0)
-            return "{}{}' - {}\"".format(sign, int(ft), _fraction_text(inch))
+            return "{}{}' - {}\"".format(sign, int(ft),
+                                         _fraction_text(inch, den, lead_zero=True))
         if self.style == "fraction":
-            return _fraction_text(feet * 12.0) + '"'
+            return _fraction_text(feet * 12.0, self.denominator) + '"'
         value = self.from_feet(feet)
         if self.decimals == 0:
             return str(int(round(value)))
         text = "{:.{}f}".format(value, self.decimals)
         return text.rstrip("0").rstrip(".") if "." in text else text
+
+    def show(self, feet):
+        """Text for a sentence, with the unit: '2800 mm', '1.25 m',
+        '9\' - 2 1/4"' (feet-inches and inches already carry ' and ")."""
+        text = self.text(feet)
+        if self.style == "decimal":
+            return "{} {}".format(text, self.tag)
+        return text
 
     def default_text(self, mm):
         """A default the code keeps in mm, shown in this unit."""
@@ -161,10 +177,13 @@ class LengthUnit(object):
         m = re.match(r"^({n})\s*(?:'|ft|feet|foot)\s*-?\s*({n})\s*(?:\"|in|inch|inches)?$"
                      .format(n=_NUM), s)
         if m:
-            ft = _number(m.group(1))
-            inch = _number(m.group(2))
-            sign = -1.0 if ft < 0 else 1.0
-            return ft + sign * inch / 12.0
+            # The sign comes from the TEXT: "-0' - 2\"" has ft == -0.0, which is
+            # not < 0, and used to come back as +2" (a beam offset 2" above the
+            # level instead of below it).
+            sign = -1.0 if m.group(1).strip().startswith("-") else 1.0
+            ft = abs(_number(m.group(1)))
+            inch = abs(_number(m.group(2)))
+            return sign * (ft + inch / 12.0)
 
         # one number with an explicit unit
         m = re.match(r"^({n})\s*(mm|cm|dm|m|ft|feet|foot|'|in|inch|inches|\")$"
@@ -218,15 +237,18 @@ def project_length_unit(doc):
 
 
 FRACTIONAL_INCHES = LengthUnit("fractionalInches")
+# Paper sizes are small: 2.5 mm text and 3/32" text must not round to 2 / 1/8.
+PAPER_MILLIMETERS = LengthUnit("millimeters", decimals=2)
+PAPER_INCHES = LengthUnit("fractionalInches", denominator=64)
 
 
 def paper_unit(model_unit):
     """Unit for sizes measured ON PAPER (sheet text and headers, print
     margins, drafting fill-pattern spacing): they never switch to m or ft —
-    mm in a metric project, inches in an imperial one."""
+    mm (to 0.01) in a metric project, inches (to 1/64") in an imperial one."""
     if model_unit is None or model_unit.is_metric:
-        return MILLIMETERS
-    return FRACTIONAL_INCHES
+        return PAPER_MILLIMETERS
+    return PAPER_INCHES
 
 
 def project_paper_unit(doc):

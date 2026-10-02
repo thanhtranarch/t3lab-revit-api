@@ -100,11 +100,15 @@ except Exception:
         pass
 
 from GUI.TileLayoutCore import (
-    MM_TO_FT, FT_TO_MM, FT2_TO_M2, MIN_CUT_WIDTH_MM,
+    MM_TO_FT, FT2_TO_M2, MIN_CUT_WIDTH_FT,
     PATTERNS, PATTERN_LABELS,
     V2, poly_area, poly_bbox, ensure_ccw,
     OptionGenerator,
+    length_text, shift_text, size_text, signed,
 )
+# Lengths are shown and typed in the project's unit (Manage › Project Units);
+# read per window, never at import — this module outlives the project.
+from Snippets._units import project_length_unit, MILLIMETERS
 
 XAML_FILE  = os.path.join(os.path.dirname(__file__), 'Tools', 'TileLayout.xaml')
 
@@ -614,19 +618,29 @@ def render_option_preview(option, floor_pts, canvas_w=190, canvas_h=130):
 # SECTION 10 — REPORTING
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _dims_text(fi, unit):
+    """Floor bounding size 'W × H mm' in the project unit."""
+    return size_text(fi.width_ft, fi.height_ft, unit)
+
+
 class ReportGenerator(object):
 
-    def __init__(self, chosen_per_floor, params, all_floors=None):
+    def __init__(self, chosen_per_floor, params, all_floors=None, unit=None):
         """chosen_per_floor: list of (FloorInfo, LayoutOption, pattern).
+        params: tile_w_ft / tile_h_ft / joint_ft / optimize_nesting.
         all_floors: full list of FloorInfo (for PDF report showing every
-        option, not just the chosen one)."""
+        option, not just the chosen one). unit: project length unit the
+        report is written in (None = mm)."""
         self.chosen = chosen_per_floor
         self.params = params
+        self.unit = unit or MILLIMETERS
         self.all_floors = all_floors or [fi for fi, _o, _p in chosen_per_floor]
 
 
     def export_csv(self, filepath):
-        with open(filepath, 'wb') as fh:
+        # Text mode for csv under Python 3 ('wb' raises "a bytes-like object
+        # is required"); utf-8-sig so Excel reads the file as UTF-8.
+        with open(filepath, 'w', newline='', encoding='utf-8-sig') as fh:
             w = csv.writer(fh)
             w.writerow(['Floor_Id', 'Pattern', 'Option',
                         'Label', 'Type', 'Parent_ID',
@@ -674,14 +688,16 @@ class ReportGenerator(object):
         title.Margin = Thickness(0, 0, 0, 4)
         fdoc.Blocks.Add(title)
 
-        tw_mm = self.params.get('tile_w_mm', 0)
-        th_mm = self.params.get('tile_h_mm', 0)
-        jw_mm = self.params.get('joint_mm', 0)
+        unit = self.unit
+        tw = self.params.get('tile_w_ft', 0.0)
+        th = self.params.get('tile_h_ft', 0.0)
+        jw = self.params.get('joint_ft', 0.0)
         nest  = "ON" if self.params.get('optimize_nesting') else "OFF"
         meta  = Paragraph(Run(
-            u"Tile {:.0f} × {:.0f} mm  \u00b7  Joint {:.1f} mm  \u00b7  "
+            u"Tile {}  \u00b7  Joint {}  \u00b7  "
             u"Nesting {}  \u00b7  {} floor(s)".format(
-                tw_mm, th_mm, jw_mm, nest, len(self.all_floors))))
+                size_text(tw, th, unit), length_text(jw, unit, extra=1),
+                nest, len(self.all_floors))))
         meta.FontSize = 11; meta.Foreground = sub
         meta.Margin = Thickness(0, 0, 0, 16)
         fdoc.Blocks.Add(meta)
@@ -695,10 +711,10 @@ class ReportGenerator(object):
             hdr = Paragraph()
             hdr.Inlines.Add(Run(u"Floor #{}  ".format(fi_idx + 1)))
             hdr.Inlines.Add(Run(u"(id {})  \u2014  {:.1f} m\u00b2  \u00b7  "
-                                u"{:.0f} \u00d7 {:.0f} mm  \u00b7  {}".format(
+                                u"{}  \u00b7  {}".format(
                 eid_value(fi.floor.Id),
                 fi.area_ft2 * FT2_TO_M2,
-                fi.width_ft * FT_TO_MM, fi.height_ft * FT_TO_MM,
+                _dims_text(fi, unit),
                 PATTERN_LABELS.get(chosen_pat, chosen_pat))))
             hdr.FontSize = 15; hdr.FontWeight = FontWeights.SemiBold
             hdr.Foreground = dark
@@ -722,7 +738,7 @@ class ReportGenerator(object):
             for opt in fi.options:
                 is_chosen = (opt.option_id == chosen_id)
                 grid.Children.Add(
-                    self._build_report_card(opt, fi, is_chosen))
+                    self._build_report_card(opt, fi, is_chosen, unit))
 
             container = BlockUIContainer(grid)
             container.Margin = Thickness(0, 0, 0, 10)
@@ -752,7 +768,7 @@ class ReportGenerator(object):
         return fdoc
 
     @staticmethod
-    def _build_report_card(opt, fi, is_chosen):
+    def _build_report_card(opt, fi, is_chosen, unit=MILLIMETERS):
         import System.Windows.Controls as WC
         import System.Windows as SW
         from System.Windows.Media import SolidColorBrush, Color as WColor
@@ -824,7 +840,7 @@ class ReportGenerator(object):
                                 waste_col))
         thin_col = warn_col if opt.n_thin_cuts else ok_col
         stack.Children.Add(_row(
-            u"Cuts < {:.0f}mm:".format(MIN_CUT_WIDTH_MM),
+            u"Cuts < {}:".format(unit.show(MIN_CUT_WIDTH_FT)),
             "{}".format(opt.n_thin_cuts), thin_col))
 
         outer.Child = stack
@@ -879,14 +895,18 @@ class _FloorFilter(ISelectionFilter):
 class FloorRowVM(object):
     """Row data for the Step 1 ListView (read-only display)."""
 
-    def __init__(self, floor_info, display_index):
+    def __init__(self, floor_info, display_index, unit=None):
         self._fi = floor_info
         self.Name        = "Floor #{}  (id {})".format(
             display_index, eid_value(floor_info.floor.Id))
         self.LevelName   = get_floor_level_name(floor_info.floor)
-        w_mm = floor_info.width_ft  * FT_TO_MM
-        h_mm = floor_info.height_ft * FT_TO_MM
-        self.Dimensions  = "{:.0f} × {:.0f}".format(w_mm, h_mm)
+        # Column header carries the unit (DIMENSIONS (MM)); sub-titles
+        # elsewhere use DimensionsText, which carries it after the numbers.
+        unit = unit or MILLIMETERS
+        self.Dimensions  = u"{} × {}".format(
+            unit.text(floor_info.width_ft), unit.text(floor_info.height_ft))
+        self.DimensionsText = size_text(floor_info.width_ft,
+                                        floor_info.height_ft, unit)
         self.AreaM2      = "{:.1f}".format(floor_info.area_ft2 * FT2_TO_M2)
         self.VertexCount = str(len(floor_info.pts))
 
@@ -914,6 +934,9 @@ class TileLayoutWindow(T3WPFWindow):
 
     def __init__(self, preselected_floors=None):
         T3WPFWindow.__init__(self, XAML_FILE)
+        # Project length unit — every length on screen and in the boxes.
+        self._unit = project_length_unit(doc)
+        self._apply_units()
 
         # ── wizard state ──
         self._floors = []        # [FloorInfo]
@@ -931,6 +954,20 @@ class TileLayoutWindow(T3WPFWindow):
             self._extract_boundaries(preselected_floors)
 
         self._refresh_step_ui()
+
+    def _apply_units(self):
+        """Labels + default tile size in the project unit (defaults are
+        600 × 600 mm tiles with a 3 mm joint, shown in that unit)."""
+        u = self._unit
+        self.lbl_tile_w.Text = u.label("Width") + ":"
+        self.lbl_tile_h.Text = u.label("Height") + ":"
+        self.lbl_joint.Text = u.label("Joint / Grout") + ":"
+        col = getattr(self, 'col_dimensions', None)   # GridViewColumn
+        if col is not None:
+            col.Header = u.label("DIMENSIONS")
+        self.txt_tile_w.Text = u.default_text(600)
+        self.txt_tile_h.Text = u.default_text(600)
+        self.txt_joint.Text = u.default_text(3)
 
     # ── logo ──────────────────────────────────────────────────────────────────
     # ── chrome ────────────────────────────────────────────────────────────────
@@ -1007,7 +1044,7 @@ class TileLayoutWindow(T3WPFWindow):
                 continue
             fi = FloorInfo(f, ensure_ccw(pts), z)
             self._floors.append(fi)
-            self._rows.append(FloorRowVM(fi, len(self._rows) + 1))
+            self._rows.append(FloorRowVM(fi, len(self._rows) + 1, self._unit))
             total_area += fi.area_ft2
 
         from System.Collections.ObjectModel import ObservableCollection
@@ -1058,8 +1095,8 @@ class TileLayoutWindow(T3WPFWindow):
             name_tb.FontWeight = SW.FontWeights.SemiBold
             name_tb.Foreground = SolidColorBrush(WColor.FromRgb(44, 62, 80))
             sub_tb = WC.TextBlock()
-            sub_tb.Text = "{}  ·  {} m²  ·  {} mm".format(
-                row.LevelName, row.AreaM2, row.Dimensions)
+            sub_tb.Text = u"{}  ·  {} m²  ·  {}".format(
+                row.LevelName, row.AreaM2, row.DimensionsText)
             sub_tb.FontSize = 11
             sub_tb.Foreground = SolidColorBrush(WColor.FromRgb(127, 140, 141))
             sub_tb.Margin = SW.Thickness(0, 2, 0, 0)
@@ -1122,7 +1159,7 @@ class TileLayoutWindow(T3WPFWindow):
 
         gen = OptionGenerator(params['tile_w_ft'], params['tile_h_ft'],
                               params['joint_ft'], params['optimize_nesting'],
-                              top_n=4)
+                              top_n=4, unit=self._unit)
 
         n_kept = 0
         bw_gap = False
@@ -1223,10 +1260,10 @@ class TileLayoutWindow(T3WPFWindow):
         for fi_idx, fi in enumerate(self._floors):
             # Section header
             hdr = WC.TextBlock()
-            hdr.Text = "{}  —  {} · {} mm".format(
+            hdr.Text = u"{}  —  {} · {}".format(
                 self._rows[fi_idx].Name,
-                self._rows[fi_idx].AreaM2 + " m²",
-                self._rows[fi_idx].Dimensions)
+                self._rows[fi_idx].AreaM2 + u" m²",
+                self._rows[fi_idx].DimensionsText)
             hdr.FontSize = 14
             hdr.FontWeight = SW.FontWeights.SemiBold
             hdr.Foreground = SolidColorBrush(WColor.FromRgb(44, 62, 80))
@@ -1346,7 +1383,7 @@ class TileLayoutWindow(T3WPFWindow):
 
         thin_col = warn_col if opt.n_thin_cuts else ok_col
         stack.Children.Add(_stat_row(
-            u"Cuts < {:.0f}mm:".format(MIN_CUT_WIDTH_MM),
+            u"Cuts < {}:".format(self._unit.show(MIN_CUT_WIDTH_FT)),
             "{}".format(opt.n_thin_cuts),
             thin_col))
 
@@ -1437,11 +1474,11 @@ class TileLayoutWindow(T3WPFWindow):
         stack.Children.Add(shift_row)
 
         # Shift readout
-        cur_dx_mm = (opt.gen_params.get('dx', 0.0) or 0.0) * FT_TO_MM
-        cur_dy_mm = (opt.gen_params.get('dy', 0.0) or 0.0) * FT_TO_MM
+        cur_dx = opt.gen_params.get('dx', 0.0) or 0.0
+        cur_dy = opt.gen_params.get('dy', 0.0) or 0.0
         shift_readout = WC.TextBlock()
-        shift_readout.Text = "dx {:+.0f} · dy {:+.0f} mm".format(
-            cur_dx_mm, cur_dy_mm)
+        shift_readout.Text = u"dx {} · dy {}".format(
+            signed(self._unit.text(cur_dx)), signed(self._unit.show(cur_dy)))
         shift_readout.FontSize = 10; shift_readout.Foreground = brush_sub
         shift_readout.HorizontalAlignment = SW.HorizontalAlignment.Center
         shift_readout.Margin = SW.Thickness(0, 2, 0, 0)
@@ -1578,9 +1615,8 @@ class TileLayoutWindow(T3WPFWindow):
         panel.Children.Add(title)
 
         floor_info = WC.TextBlock()
-        floor_info.Text = u"Floor #{}  \u00b7  {:.1f} m\u00b2  \u00b7  {:.0f} \u00d7 {:.0f} mm".format(
-            fi_idx + 1, fi.area_ft2 * FT2_TO_M2,
-            fi.width_ft * FT_TO_MM, fi.height_ft * FT_TO_MM)
+        floor_info.Text = u"Floor #{}  \u00b7  {:.1f} m\u00b2  \u00b7  {}".format(
+            fi_idx + 1, fi.area_ft2 * FT2_TO_M2, _dims_text(fi, self._unit))
         floor_info.FontSize = self.FindResource("T3.Size.Caption"); floor_info.Foreground = brush_sub
         floor_info.Margin = SW.Thickness(0, 0, 0, 12)
         panel.Children.Add(floor_info)
@@ -1693,14 +1729,14 @@ class TileLayoutWindow(T3WPFWindow):
                   brush_ok if opt.n_reuse else brush_dark)
             _stat("Tiles to buy:",   "{}".format(opt.tiles_to_buy))
             _stat("Waste:",          "{:.1f} %".format(opt.waste_pct), waste_col)
-            _stat(u"Cuts < {:.0f}mm:".format(MIN_CUT_WIDTH_MM),
+            _stat(u"Cuts < {}:".format(self._unit.show(MIN_CUT_WIDTH_FT)),
                   "{}".format(opt.n_thin_cuts), thin_col)
 
             gp = opt.gen_params or {}
             txt_a.Text = "{:.1f}".format(gp.get('angle', 0.0) or 0.0)
-            shift_readout.Text = u"dx {:+.0f} mm  \u00b7  dy {:+.0f} mm".format(
-                (gp.get('dx', 0.0) or 0.0) * FT_TO_MM,
-                (gp.get('dy', 0.0) or 0.0) * FT_TO_MM)
+            shift_readout.Text = u"dx {}  \u00b7  dy {}".format(
+                signed(self._unit.show(gp.get('dx', 0.0) or 0.0)),
+                signed(self._unit.show(gp.get('dy', 0.0) or 0.0)))
 
         # ── Handlers ──
         step_x = (opt.gen_params.get('tile_w', 0.0) or 0.0) * 0.1
@@ -1772,11 +1808,10 @@ class TileLayoutWindow(T3WPFWindow):
         gp = opt.gen_params or {}
         self.status_text.Text = (
             u"Option {}  \u00b7  angle {:+.1f}\u00b0  \u00b7  "
-            u"shift {:+.0f}/{:+.0f} mm  \u00b7  waste {:.1f}%".format(
+            u"shift {}  \u00b7  waste {:.1f}%".format(
                 opt.option_id,
                 gp.get('angle', 0.0),
-                gp.get('dx', 0.0) * FT_TO_MM,
-                gp.get('dy', 0.0) * FT_TO_MM,
+                shift_text(gp.get('dx', 0.0), gp.get('dy', 0.0), self._unit),
                 opt.waste_pct))
 
     def _refresh_selection_highlights(self, fi_idx):
@@ -1895,12 +1930,8 @@ class TileLayoutWindow(T3WPFWindow):
         if not chosen:
             TaskDialog.Show("Export", "No selections to export.")
             return None
-        params_mm = dict(
-            tile_w_mm=self._params['tile_w_ft'] * FT_TO_MM,
-            tile_h_mm=self._params['tile_h_ft'] * FT_TO_MM,
-            joint_mm =self._params['joint_ft']  * FT_TO_MM,
-            optimize_nesting=self._params['optimize_nesting'])
-        return ReportGenerator(chosen, params_mm, self._floors)
+        return ReportGenerator(chosen, dict(self._params), self._floors,
+                               unit=self._unit)
 
     def export_csv_clicked(self, sender, args):
         rpt = self._build_report()
@@ -1948,17 +1979,21 @@ class TileLayoutWindow(T3WPFWindow):
     # ═════════════════════════════════════════════════════════════════════════
 
     def _read_params(self):
-        def _mm(ctrl, name):
-            try: v = float(ctrl.Text.strip())
-            except (ValueError, AttributeError):
-                raise ValueError("'{}' is not a valid number.".format(name))
+        """Tile size and joint, typed in the project unit (or with an
+        explicit unit: 600 mm, 2', 1/8\") → internal feet."""
+        unit = self._unit
+        def _length(ctrl, name):
+            try:
+                v = unit.parse(ctrl.Text)
+            except (ValueError, AttributeError) as exc:
+                raise ValueError("{}: {}".format(name, exc))
             if v <= 0:
-                raise ValueError("'{}' must be greater than zero.".format(name))
-            return v * MM_TO_FT
+                raise ValueError("{} must be greater than zero.".format(name))
+            return v
         return dict(
-            tile_w_ft = _mm(self.txt_tile_w, "Tile Width"),
-            tile_h_ft = _mm(self.txt_tile_h, "Tile Height"),
-            joint_ft  = _mm(self.txt_joint,  "Joint Width"),
+            tile_w_ft = _length(self.txt_tile_w, "Tile Width"),
+            tile_h_ft = _length(self.txt_tile_h, "Tile Height"),
+            joint_ft  = _length(self.txt_joint,  "Joint Width"),
             optimize_nesting = bool(self.chk_nesting.IsChecked),
         )
 

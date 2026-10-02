@@ -11,6 +11,7 @@ import System
 
 from GUI.WPF_Base import T3WPFWindow, set_items_source
 from Snippets._compat import eid_value
+from Snippets._units import project_length_unit
 
 _XAML = os.path.join(os.path.dirname(__file__), 'Tools', 'WallCutProfile.xaml')
 
@@ -107,10 +108,18 @@ class WallCutProfileWindow(T3WPFWindow):
         self._selected_link = None
         self._picked_walls = []
         self._opening_families = []
+        # Read per window: the module stays loaded across projects.
+        self._unit = project_length_unit(doc)
 
+        self._apply_units()
         self._init_controls()
         self._load_links()
         self._load_opening_families()
+
+    def _apply_units(self):
+        """Clearance label and default (25 mm) in the project's length unit."""
+        self.lbl_offset.Text = self._unit.label("CLEARANCE")
+        self.txt_offset.Text = self._unit.default_text(25)
 
     def _init_controls(self):
         if hasattr(self, 'cmb_method') and self.cmb_method:
@@ -291,11 +300,14 @@ class WallCutProfileWindow(T3WPFWindow):
             forms.alert("Please select at least one intersecting category!", title="Wall Cut Profile")
             return
 
+        # Bare number = project unit; "25 mm" or "1\"" work in any project.
         try:
-            offset_mm = float(self.txt_offset.Text or "25")
-        except Exception:
-            offset_mm = 25.0
-        offset_ft = offset_mm / 304.8
+            offset_ft = self._unit.parse(self.txt_offset.Text)
+        except ValueError as ex:
+            msg = "Clearance: {}".format(ex)
+            self.txt_status.Text = msg
+            forms.alert(msg, title="Wall Cut Profile")
+            return
 
         method = str(self.cmb_method.SelectedItem or "Place Opening Family")
         sel_symbol = None

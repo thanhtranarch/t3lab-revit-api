@@ -11,6 +11,7 @@ import System
 
 from GUI.WPF_Base import T3WPFWindow, set_items_source
 from Snippets._compat import eid_value
+from Snippets._units import project_length_unit, MILLIMETERS
 
 _XAML = os.path.join(os.path.dirname(__file__), 'Tools', 'WallAdjustBase.xaml')
 
@@ -71,11 +72,13 @@ class ElementSelectionFilter(ISelectionFilter if DB else object):
 
 
 class LevelItem(object):
-    def __init__(self, level):
+    def __init__(self, level, unit=None):
         self.level = level
         self.name = level.Name
-        self.elevation_mm = round(level.Elevation * 304.8, 1)
-        self.display = "{} ({} mm)".format(self.name, self.elevation_mm)
+        # Elevation in the length unit the project displays.
+        self.elevation = level.Elevation
+        self.display = "{} ({})".format(
+            self.name, (unit or MILLIMETERS).show(self.elevation))
 
     def __str__(self):
         return self.display
@@ -88,6 +91,8 @@ class WallAdjustBaseWindow(T3WPFWindow):
         self._uidoc = uidoc
         self._elements = []
         self._levels = []
+        # Read per window: the module stays loaded across projects.
+        self._unit = project_length_unit(doc)
 
         self._load_levels()
         self._check_initial_selection()
@@ -98,7 +103,7 @@ class WallAdjustBaseWindow(T3WPFWindow):
         collector = FilteredElementCollector(self._doc).OfClass(Level)
         levels = list(collector)
         levels.sort(key=lambda x: x.Elevation)
-        self._levels = [LevelItem(lvl) for lvl in levels]
+        self._levels = [LevelItem(lvl, self._unit) for lvl in levels]
 
         if hasattr(self, 'cmb_levels') and self.cmb_levels:
             set_items_source(self.cmb_levels, [item.display for item in self._levels])

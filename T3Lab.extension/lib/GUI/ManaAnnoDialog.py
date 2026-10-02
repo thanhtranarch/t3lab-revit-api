@@ -5,7 +5,8 @@ Annotation Manager
 Unified tool combining Dimension and Text Note management:
   - Find elements by keyword → jump to view
   - Delete selected instances / types
-  - Double-click Name cell to rename inline (types and text note content)
+  - Double-click a Name cell to edit a type name or a note's text inline:
+    the edit is STAGED (yellow cell) and only Apply Changes writes it
   - Auto-rename all types based on their properties
   - T3Lab tool.
 
@@ -20,6 +21,7 @@ __version__ = "1.1.0"
 
 # IMPORT LIBRARIES
 # ==================================================
+import math
 import os
 import re
 import sys
@@ -36,12 +38,12 @@ clr.AddReference('PresentationFramework')
 clr.AddReference('System')
 clr.AddReference('System.Data')
 
-from System import TimeSpan
+from System import Action, TimeSpan
 from System.Collections.Generic import List
 from System.Data import DataTable
 from System.Windows import Visibility, WindowState, RoutedEventHandler
-from System.Windows.Controls import CheckBox
-from System.Windows.Threading import DispatcherTimer
+from System.Windows.Controls import CheckBox, DataGridEditingUnit
+from System.Windows.Threading import DispatcherPriority, DispatcherTimer
 import Autodesk.Revit.DB as DB
 from Autodesk.Revit.DB import (
     FilteredElementCollector,
@@ -53,8 +55,10 @@ from Autodesk.Revit.DB import (
 from pyrevit import revit, script
 from GUI import T3Dialog
 from GUI import DimTextDialog
-from GUI.GridPendingEdits import column_key
+from GUI.GridPendingEdits import column_key, editor_text, revert_editor
 from GUI.WPF_Base import T3WPFWindow
+from Snippets._compat import disposing
+from Snippets._units import MM_PER_FT, paper_unit, project_length_unit
 
 # DEFINE VARIABLES
 # ==================================================
@@ -89,6 +93,11 @@ try:
     uidoc = resolve_uidoc(getattr(revit, 'uidoc', None))
 except Exception:
     uidoc = None
+# Length unit of the project (Project Units › Length). Re-read with the
+# document on every launch (_refresh_active_document). Segment lengths on the
+# Dim Text page are in it; text sizes are measured on paper, so they use
+# paper_unit(unit): mm in a metric project, inches in an imperial one.
+unit = project_length_unit(doc)
 
 # ============================================================
 # NAMING STRUCTURE CONFIGURATION — ISO 19650 COMPLIANT
@@ -102,7 +111,7 @@ NAMING_TEMPLATES = {
         "Fields": [
             "Discipline",      # "ARC" or "STR"
             "TypeIndicator",   # Always "DIM"
-            "Size",            # E.g. "2.50mm"
+            "Size",            # Text size on paper: "2.50mm" (metric) / '3/32"' (imperial)
             "Font",            # E.g. "Arial"
             "WidthScale",      # E.g. "0.7"
             "Background",      # "Transparent" or "Opaque"
@@ -118,7 +127,7 @@ NAMING_TEMPLATES = {
         "Fields": [
             "Discipline",      # "ARC" or "STR"
             "TypeIndicator",   # Always "TXT"
-            "Size",            # E.g. "2.50mm"
+            "Size",            # Text size on paper: "2.50mm" (metric) / '3/32"' (imperial)
             "Font",            # E.g. "Arial"
             "WidthScale",      # E.g. "0.7"
             "Background",      # "Transparent" or "Opaque"
@@ -156,8 +165,83 @@ def _sanitize(v):
     value = re.sub(r'[\\/:{}\[\]|;<>?`~=\r\n\t"]', '', str(v)).strip()
     return value[:240] or "N/A"
 
-def _mm(param):
-    return "{:.2f}mm".format(round(param.AsDouble() * 304.8, 2))
+# ============================================================
+# TEXT SIZE IN THE PROJECT'S PAPER UNIT
+# ============================================================
+# A text size is measured on the sheet, so it never switches to m or ft: mm in
+# a metric project, inches in an imperial one (Snippets._units.paper_unit).
+# paper_unit().text() rounds to 1 mm / 1/8", too coarse for 2.5 mm or 3/32"
+# text, so the number is written here from the helper's conversion.
+_INCH_GRID = 64             # imperial sizes are named in fractions down to 1/64"
+
+
+def _paper_size(feet, paper=None):
+    """A size measured on paper (internal feet) → (number, unit mark).
+
+    Metric:   ("2.50", "mm") — exactly the text Rename All always wrote, so a
+              metric project keeps its names.
+    Imperial: ("3/32", '"') — the way imperial text types are named
+              ('3/32" Arial'). A size off the 1/64" grid (a metric type in an
+              imperial project) stays exact in decimal inches: ("0.098", '"').
+    `paper` may be the paper unit or the model unit (None = mm).
+    """
+    paper = paper_unit(paper)
+    if paper.is_metric:
+        # feet × MM_PER_FT is the exact float the names were always written
+        # from. from_feet() divides by 1/304.8 and lands one bit off at x.xx5 mm
+        # (1.875, 2.495 ...), which would rename types that already match.
+        return "{:.2f}".format(round(feet * MM_PER_FT, 2)), "mm"
+    value = paper.from_feet(feet)
+    steps = int(round(abs(value) * _INCH_GRID))
+    if abs(steps / float(_INCH_GRID) - abs(value)) > 1e-4:
+        return "{:.3f}".format(value).rstrip("0").rstrip("."), '"'
+    whole, rest = divmod(steps, _INCH_GRID)
+    if not rest:
+        return str(whole), '"'
+    common = math.gcd(rest, _INCH_GRID)
+    fraction = "{}/{}".format(rest // common, _INCH_GRID // common)
+    return ("{} {}".format(whole, fraction) if whole else fraction), '"'
+
+
+def _size_name(param, paper=None):
+    """TEXT_SIZE as the Size token of a type name: '2.50mm' / '3/32"'."""
+    number, mark = _paper_size(param.AsDouble(), paper)
+    return number + mark
+
+
+def _size_cell(param, paper=None):
+    """TEXT_SIZE for the SIZE column; the unit rides on the column header."""
+    return _paper_size(param.AsDouble(), paper)[0]
+
+
+# Rename All tooltip, written from NAMING_TEMPLATES so it never drifts from it.
+_FIELD_TOKENS = {
+    "Discipline": "[discipline]", "Size": "[size]", "Font": "[font]",
+    "WidthScale": "[width]", "Background": "[background]", "Color": "[color]",
+    "CenterSymbol": "[center]", "PrefixText": "[prefix]",
+    "ElevationText": "[elevation]", "Rounding": "[rounding]",
+    "Border": "[border]", "TextStyles": "[B/U/I]",
+}
+_TYPE_INDICATORS = {"Dimension": "DIM", "TextNote": "TXT"}
+_RENAME_NOUNS = {"Dimension": "dimension type", "TextNote": "text note type"}
+# Example text size per unit system, in the paper unit (mm / inches).
+_EXAMPLE_TEXT_SIZE = {True: 2.5, False: 3.0 / 32}
+
+
+def _rename_tooltip(kind, paper=None):
+    """Tooltip of a Rename All button: the naming pattern, and the unit the
+    [size] part is written in for this project."""
+    paper = paper_unit(paper)
+    template = NAMING_TEMPLATES[kind]
+    pattern = template["Separator"].join(
+        _TYPE_INDICATORS[kind] if field == "TypeIndicator"
+        else _FIELD_TOKENS.get(field, "[{}]".format(field.lower()))
+        for field in template["Fields"])
+    example = _paper_size(paper.to_feet(_EXAMPLE_TEXT_SIZE[paper.is_metric]), paper)
+    return (u"Rename every {} from its settings: {}. [size] is the text size in {}, "
+            u"e.g. {}. Empty parts are left out.").format(
+                _RENAME_NOUNS[kind], pattern, "mm" if paper.is_metric else "inches",
+                "".join(example))
 
 
 def _param_text(param, default=""):
@@ -215,14 +299,16 @@ def _run_transaction(label, action):
 # ============================================================
 # DIMENSION RENAME HELPERS
 # ============================================================
-def _dim_name(dt, origin):
+def _dim_name(dt, origin, paper=None):
+    """Standard name of a DimensionType; `paper` = the project's paper unit
+    (the Size part: "2.50mm" metric, '3/32"' imperial)."""
     def gp(bip):
         try: return dt.get_Parameter(bip)
         except: return None
 
     discipline = "STR" if "STR" in origin.upper() else "ARC"
     p = gp(BuiltInParameter.TEXT_SIZE)
-    size  = _mm(p) if p else "N/A"
+    size  = _size_name(p, paper) if p else "N/A"
     p = gp(BuiltInParameter.TEXT_FONT)
     font  = _sanitize(_param_text(p, "N/A"))
     p = gp(BuiltInParameter.TEXT_WIDTH_SCALE)
@@ -282,14 +368,15 @@ def _dim_name(dt, origin):
 # ============================================================
 # TEXTNOTE RENAME HELPERS
 # ============================================================
-def _txt_name(tt, origin):
+def _txt_name(tt, origin, paper=None):
+    """Standard name of a TextNoteType; `paper` as in _dim_name."""
     def gp(bip):
         try: return tt.get_Parameter(bip)
         except: return None
 
     discipline = "STR" if "STR" in origin.upper() else "ARC"
     p = gp(BuiltInParameter.TEXT_SIZE)
-    size   = _mm(p) if p else "N/A"
+    size   = _size_name(p, paper) if p else "N/A"
     p = gp(BuiltInParameter.TEXT_FONT)
     font   = _sanitize(_param_text(p, "N/A").replace(" ", ""))
     p = gp(BuiltInParameter.TEXT_BACKGROUND)
@@ -346,6 +433,8 @@ PAGE_DIM, PAGE_TXT, PAGE_DIMTEXT = 0, 1, 2
 # text: instance rows show where they sit, type rows show their text settings.
 _TYPE_ONLY_COLUMNS = ("Size", "Font", "Background", "Color", "Count")
 _INSTANCE_ONLY_COLUMNS = ("Details", "View")
+# Columns that hold a size measured on paper: the header carries the unit.
+_PAPER_SIZE_COLUMNS = {"Size": "SIZE"}
 
 # Footer status dot: the colour always sits next to the sentence, never alone.
 _DOT_KEYS = {
@@ -357,12 +446,133 @@ _DOT_KEYS = {
 
 _DIM_HINTS = {
     "instances": "Click a row to select that dimension in the active view.",
-    "types": "Double-click a type name to rename it.",
+    "types": "Double-click a type name to edit it. Yellow cells are written by Apply Changes.",
 }
 _TXT_HINTS = {
-    "notes": "Click a row to select the note in the active view; double-click the text to edit it.",
-    "types": "Double-click a type name to rename it.",
+    "notes": "Click a row to select the note; double-click the text to edit it, then Apply Changes.",
+    "types": "Double-click a type name to edit it. Yellow cells are written by Apply Changes.",
 }
+
+_PAGE_NAMES = {PAGE_DIM: "Dimensions", PAGE_TXT: "Text Notes", PAGE_DIMTEXT: "Dim Text"}
+
+# ============================================================
+# STAGED INLINE EDITS  (T3 standard: yellow cell, written on Apply)
+# ============================================================
+# Editing a NAME / TEXT cell never writes to Revit. The edit is staged: the
+# cell turns yellow, and only the page's Apply Changes writes every staged edit
+# in ONE transaction (one Undo). Typed back to the model value = unstaged.
+#
+# Staged edits live in a per-page store {element id: entry}, NOT in the
+# DataTable: the table is rebuilt on every filter keystroke, the store is not,
+# so filtering or sorting never loses an edit. Each rebuilt row reads its entry
+# back (_dt_add). Entry: {"kind": cat code, "original": model value,
+# "value": staged value, "error": reason of the last refused write ("" = none),
+# "status": optional STATUS text, e.g. "AI Fix"}.
+#
+# The cell reads its state from string columns of the DataTable:
+#   orig_Name   model value       dirty_Name  STAGE_* flag     tip_Name  tooltip
+# The NAME column's CellStyle copies dirty_Name into AutomationProperties.ItemStatus
+# and a property Trigger paints it (the standard's cell string bridge). Rows are
+# DataRowView, so a direct DataTrigger would also work; the bridge keeps every
+# tool on one pattern.
+ANNO_EDIT_FIELDS = ("Name",)           # dev/test_grid_pending_edits.py reads this
+EDIT_FIELD = ANNO_EDIT_FIELDS[0]       # by binding path (column_key), never header
+ORIG_PREFIX, DIRTY_PREFIX, TIP_PREFIX = "orig_", "dirty_", "tip_"
+STAGE_CLEAN, STAGE_PENDING, STAGE_FAILED = "False", "True", "Failed"
+_TYPE_KINDS = ("DimType", "TxtType")
+_EDITABLE_KINDS = ("DimType", "TxtType", "TxtInst")
+
+
+def _one_line(value, limit=40):
+    """`value` as one short line for a status or tooltip (notes hold line breaks)."""
+    text = u" ".join(u"{}".format(value if value is not None else u"").split())
+    return text if len(text) <= limit else text[:limit - 1] + u"…"
+
+
+def _stage_edit(store, key, kind, original, value, status=None):
+    """Stage `value` as element `key`'s new name / text.
+
+    Typed back to `original` → the entry is dropped and the cell is clean again.
+    A new value also clears the reason of an earlier refused Apply.
+    Returns True when the element has a pending edit afterwards.
+    """
+    if value == original:
+        store.pop(key, None)
+        return False
+    entry = {"kind": kind, "original": original, "value": value, "error": u""}
+    if status:
+        entry["status"] = status
+    store[key] = entry
+    return True
+
+
+def _cell_flags(entry):
+    """(dirty flag, tooltip) of the NAME cell for a store entry (None = clean)."""
+    if not entry:
+        return STAGE_CLEAN, u""
+    was = _one_line(entry.get("original"), 60)
+    if entry.get("error"):
+        return STAGE_FAILED, (u"Not applied: {}. Change the value and click Apply Changes "
+                              u"again, or type '{}' back to drop it.").format(entry["error"], was)
+    return STAGE_PENDING, (u"Not applied yet (was '{}'). "
+                           u"Apply Changes writes it to the model.").format(was)
+
+
+def _apply_label(count):
+    """Apply button text: the pending count rides on the label."""
+    return u"Apply Changes ({})".format(count) if count else u"Apply Changes"
+
+
+def _failure_reason(error):
+    """One short line of why Revit refused a write (e.g. a duplicate name)."""
+    text = u"{}".format(error).strip()
+    first = text.splitlines()[0].strip() if text else u""
+    return (first or type(error).__name__)[:160]
+
+
+def _write_staged(items, write):
+    """Write each staged (key, entry) with `write(key, entry)` inside the
+    caller's transaction. A refused write (duplicate name, illegal character,
+    element gone) fails that row only. Returns (done keys, [(key, reason)])."""
+    done, failed = [], []
+    for key, entry in items:
+        try:
+            write(key, entry)
+        except Exception as error:
+            failed.append((key, _failure_reason(error)))
+        else:
+            done.append(key)
+    return done, failed
+
+
+def _settle_staged(store, done, failed):
+    """After a COMMITTED Apply: written edits leave the store (yellow clears),
+    refused ones stay staged with their reason (the cell turns red)."""
+    for key in done:
+        store.pop(key, None)
+    for key, reason in failed:
+        if key in store:
+            store[key]["error"] = reason
+
+
+def _apply_summary(done_count, failures, notes=False):
+    """(status line, dot kind) after Apply. `failures` = [(staged value, reason)]."""
+    msg = (u"Updated {} text note(s)." if notes else u"Renamed {} type(s).").format(done_count)
+    if not failures:
+        return msg, "ok"
+    value, reason = failures[0]
+    msg += u" {} could not be {}: '{}' - {}".format(
+        len(failures), "updated" if notes else "renamed", _one_line(value), reason)
+    if len(failures) > 1:
+        msg += u" (+{} more)".format(len(failures) - 1)
+    msg += u". Hover a red cell for the reason."
+    return msg, ("warning" if done_count else "error")
+
+
+def _discard_prompt(count, action):
+    """(question, OK label) of the P5 confirm before staged edits are dropped."""
+    return (u"Discard {} unapplied change(s) and {}?".format(count, action),
+            u"Discard {} change(s)".format(count))
 
 # ============================================================
 # XAML PATH
@@ -380,6 +590,11 @@ class AnnotationManagerWindow(T3WPFWindow):
     def __init__(self):
         try:
             T3WPFWindow.__init__(self, _XAML_PATH)
+            # Units of the project this window opened on (re-read per launch by
+            # _refresh_active_document): segment lengths in `unit`, text sizes
+            # on paper (mm metric / inches imperial).
+            self._unit = unit
+            self._paper = paper_unit(unit)
             self._dim_submode = "instances"  # "instances" | "types"
             self._txt_submode = "notes"      # "notes"     | "types"
 
@@ -393,9 +608,15 @@ class AnnotationManagerWindow(T3WPFWindow):
                                "then click Apply Overrides.", "idle"),
             }
 
+            # Staged NAME / TEXT edits per table page (see "STAGED INLINE EDITS").
+            # Before the first fill: every rebuilt row reads its entry back.
+            self._staged = {PAGE_DIM: {}, PAGE_TXT: {}}
+
             import System
             columns = ["_id", "_cat", "Name", "Size", "Font", "Background", "Color",
-                       "Details", "View", "Type", "Count", "Status"]
+                       "Details", "View", "Type", "Count", "Status",
+                       ORIG_PREFIX + EDIT_FIELD, DIRTY_PREFIX + EDIT_FIELD,
+                       TIP_PREFIX + EDIT_FIELD]
             # ── Dimension DataTable ──────────────────────────────────────────
             self._dim_dt = DataTable()
             self._dim_dt.Columns.Add("Selected", System.Boolean)
@@ -413,6 +634,9 @@ class AnnotationManagerWindow(T3WPFWindow):
             self.dg_txt.ItemsSource = self._txt_dt.DefaultView
             self._txt_map = {}   # id-str → Revit element
             self.dg_txt.CellEditEnding += self.txt_cell_edit_ending
+
+            # Headers, tooltips and labels that name a unit, before any fill.
+            self._apply_units()
 
             # Every checkbox click inside a grid (row boxes and the header box)
             # bubbles here, after the row has been written: keep the "N checked"
@@ -459,6 +683,10 @@ class AnnotationManagerWindow(T3WPFWindow):
             # DimText state
             self._dimtext_rules = []
             self.txt_below.TextChanged += self._dimtext_below_changed
+
+            # X, Esc (IsCancel) and Alt+F4 all pass here: staged edits are never
+            # dropped without asking.
+            self.Closing += self._on_closing
 
             # Force initial tab content to render: nav_dim.IsChecked was already
             # True when the XAML was parsed, so no explicit SelectedIndex was ever
@@ -532,19 +760,27 @@ class AnnotationManagerWindow(T3WPFWindow):
                         and suggestion.strip()
                         and (original is None or str(original) == requested_text[elem_id])):
                     fixes[elem_id] = suggestion
+            # A fix is staged like a typed edit (yellow cell, Apply writes it),
+            # so a mode switch or Close asks before dropping it too.
+            self._flush_edit(self.dg_txt)
+            store = self._staged[PAGE_TXT]
             updated = 0
             for row in self._txt_dt.Rows:
                 rid = str(row["_id"])
                 current_text = str(row["Name"])
                 if (rid in fixes
+                        and str(row["_cat"]) == "TxtInst"
                         and current_text == requested_text.get(rid)
                         and fixes[rid] != current_text):
+                    if _stage_edit(store, rid, "TxtInst", str(row[ORIG_PREFIX + EDIT_FIELD]),
+                                   fixes[rid], status="AI Fix"):
+                        row["Status"] = "AI Fix"
                     row["Name"] = fixes[rid]
-                    row["Status"] = "AI Fix"
+                    self._paint_staged(row, store.get(rid))
                     row["Selected"] = True
                     updated += 1
             if updated:
-                self.btn_txt_apply.Visibility = Visibility.Visible
+                self._sync_apply(PAGE_TXT)
                 self._sync_checks(self.dg_txt)
                 self._status("AI staged {} fix(es) (Status 'AI Fix') - review, then Apply Changes.".format(updated),
                              PAGE_TXT, "warning")
@@ -586,17 +822,25 @@ class AnnotationManagerWindow(T3WPFWindow):
 
     def _sync_primary(self):
         """Footer primary: Jump to View on the two table pages (types have no
-        view, so it is disabled there), Apply Overrides on Dim Text."""
+        view, so it is disabled there), Apply Overrides on Dim Text.
+
+        IsDefault follows the label (owner decision 2026-10-02): the XAML keeps
+        IsDefault="True" (rule 9), but on Dim Text the button writes to the
+        model and the page is five TextBoxes, so Enter in any of them would
+        apply the overrides. There Enter does nothing; Jump to View only moves
+        the view, so it keeps Enter on the table pages."""
         btn = getattr(self, "btn_primary", None)
         if btn is None:
             return
         if self._page == PAGE_DIMTEXT:
             btn.Content = "Apply Overrides"
+            btn.IsDefault = False
             btn.IsEnabled = True
             btn.ToolTip = ("Write the text fields to the dimensions in scope "
                            "(one Undo step)")
             return
         btn.Content = "Jump to View"
+        btn.IsDefault = True
         on_instances = (self._dim_submode == "instances" if self._page == PAGE_DIM
                         else self._txt_submode == "notes")
         btn.IsEnabled = on_instances
@@ -614,9 +858,33 @@ class AnnotationManagerWindow(T3WPFWindow):
         else:
             self.dimtext_apply(sender, args)
 
-    def _set_mode_columns(self, grid, is_type, name_header=None):
+    def _apply_units(self):
+        """Every label that names a unit shows the project's units: the SIZE
+        column (paper unit: "SIZE (MM)" / "SIZE (IN)"), the Rename All naming
+        tooltips, and the Dim Text segment-length filter (model unit)."""
+        paper = getattr(self, "_paper", None) or paper_unit(None)
+        length = getattr(self, "_unit", None) or project_length_unit(None)
+        for grid in (getattr(self, "dg_dim", None), getattr(self, "dg_txt", None)):
+            if grid is None:
+                continue
+            for col in grid.Columns:
+                header = _PAPER_SIZE_COLUMNS.get(column_key(col))
+                if header:
+                    col.Header = paper.label(header)
+        for name, kind in (("btn_dim_rename_all", "Dimension"),
+                           ("btn_txt_rename_all", "TextNote")):
+            button = getattr(self, name, None)
+            if button is not None:
+                button.ToolTip = _rename_tooltip(kind, paper)
+        label = getattr(self, "lbl_dimtext_filter", None)
+        if label is not None:
+            label.Text = length.label("FILTER BY SEGMENT LENGTH")
+
+    def _set_mode_columns(self, grid, is_type, name_header=None, name_editable=True):
         """Show the columns of the current mode: instance rows show where they
-        sit (TYPE / VIEW), type rows show their text settings and COUNT."""
+        sit (TYPE / VIEW), type rows show their text settings and COUNT.
+        The NAME column is read-only where its rows cannot be edited
+        (dimension instances show their type name)."""
         shown, hidden = Visibility.Visible, Visibility.Collapsed
         for col in grid.Columns:
             key = column_key(col)
@@ -624,8 +892,283 @@ class AnnotationManagerWindow(T3WPFWindow):
                 col.Visibility = shown if is_type else hidden
             elif key in _INSTANCE_ONLY_COLUMNS:
                 col.Visibility = hidden if is_type else shown
-            elif key == "Name" and name_header:
-                col.Header = name_header
+            elif key == EDIT_FIELD:
+                if name_header:
+                    col.Header = name_header
+                col.IsReadOnly = not name_editable
+
+    # ── Staged NAME / TEXT edits (yellow cells, written by Apply Changes) ──
+
+    def _grid(self, page):
+        return self.dg_dim if page == PAGE_DIM else self.dg_txt
+
+    def _nav_button(self, page):
+        return {PAGE_DIM: self.nav_dim, PAGE_TXT: self.nav_txt,
+                PAGE_DIMTEXT: self.nav_dimtext}[page]
+
+    @staticmethod
+    def _flush_edit(grid):
+        """Commit a cell that is still being typed in, so it is staged before
+        Apply, a page / mode switch, a rebuild or Close counts what is pending."""
+        try:
+            grid.CommitEdit(DataGridEditingUnit.Cell, True)
+            grid.CommitEdit(DataGridEditingUnit.Row, True)
+        except Exception:
+            pass
+
+    def _commit_row_later(self, grid):
+        """Commit the row once the cell edit has been written back. A later
+        row-level Esc can then no longer roll back a cell the store already
+        holds as staged, and the committed DataRowView repaints the cell."""
+        def commit():
+            try:
+                grid.CommitEdit(DataGridEditingUnit.Row, True)
+            except Exception:
+                pass
+        try:
+            self.Dispatcher.BeginInvoke(DispatcherPriority.Background, Action(commit))
+        except Exception:
+            pass
+
+    @staticmethod
+    def _paint_staged(row, entry):
+        """Write a store entry's flag and tooltip into the row's bridge columns."""
+        flag, tip = _cell_flags(entry)
+        row[DIRTY_PREFIX + EDIT_FIELD] = flag
+        row[TIP_PREFIX + EDIT_FIELD] = tip
+
+    def _sync_apply(self, page):
+        """Apply Changes carries the pending count and is disabled with nothing to write."""
+        btn = getattr(self, "btn_dim_apply" if page == PAGE_DIM else "btn_txt_apply", None)
+        if btn is None:
+            return
+        count = len(self._staged[page])
+        btn.Content = _apply_label(count)
+        btn.IsEnabled = bool(count)
+        if count:
+            btn.ToolTip = ("Write the {} yellow cell(s) to the model in one step "
+                           "(one Undo)".format(count))
+        else:
+            btn.ToolTip = ("Nothing to apply. Double-click a name to edit it; the edit "
+                           "stays yellow until you apply it.")
+
+    def _stage_cell_edit(self, page, grid, args):
+        """CellEditEnding of the NAME / TEXT column: STAGE the edit, never write it.
+
+        Runs before the binding writes the typed text into the row, so
+        row[EDIT_FIELD] still holds the old value and rewriting the editor
+        changes what the cell commits. Apply Changes writes the store."""
+        if column_key(args.Column) != EDIT_FIELD:
+            return
+        if str(args.EditAction) != "Commit":
+            return
+        row = args.Row.Item
+        editor = args.EditingElement
+        cat_code = str(row["_cat"])
+        shown = str(row[EDIT_FIELD])
+        if cat_code not in _EDITABLE_KINDS:
+            revert_editor(editor, shown)
+            self._status("Dimension instances cannot be renamed. Show Types to rename a "
+                         "dimension type.", page, "warning")
+            return
+        is_type = cat_code in _TYPE_KINDS
+        typed = editor_text(editor) or u""
+        value = typed.strip() if is_type else typed
+        if not value.strip():
+            revert_editor(editor, shown)
+            self._status(u"A {} cannot be empty. The cell keeps '{}'.".format(
+                "type name" if is_type else "text note", _one_line(shown)), page, "warning")
+            return
+        if value != typed:
+            revert_editor(editor, value)            # the cell commits the trimmed name
+        store = self._staged[page]
+        elem_id = str(row["_id"])
+        original = str(row[ORIG_PREFIX + EDIT_FIELD])
+        pending = _stage_edit(store, elem_id, cat_code, original, value)
+        self._paint_staged(row, store.get(elem_id))
+        self._commit_row_later(grid)
+        self._sync_apply(page)
+        if pending:
+            self._status(u"Staged '{}' → '{}'. {} change(s) pending: Apply Changes writes "
+                         u"them.".format(_one_line(original), _one_line(value), len(store)),
+                         page, "warning")
+        else:
+            self._status(u"'{}' is back to its model value. {} change(s) pending.".format(
+                _one_line(value), len(store)), page)
+
+    def _discard_staged(self, page, rebuild=True):
+        """Drop every staged edit of a page; the rebuilt table shows the model again."""
+        self._staged[page].clear()
+        if rebuild:
+            if page == PAGE_DIM:
+                self._fill_dims(announce=False)
+            else:
+                self._fill_txts(announce=False)
+        self._sync_apply(page)
+
+    def _confirm_discard(self, count, action):
+        """P5 confirm before staged edits are thrown away. True = discard."""
+        message, ok_text = _discard_prompt(count, action)
+        return bool(T3Dialog.confirm(
+            message,
+            title="Unapplied changes",
+            ok_text=ok_text,
+            cancel_text="Keep editing",
+            danger=True,
+            details="The yellow cells have not been written to the model yet. "
+                    "Click Apply Changes to keep them.",
+            owner=self))
+
+    def _discard_or_keep(self, page, action, rebuild=True):
+        """Before an action that would drop a page's staged edits: True when
+        nothing is pending or the user chose Discard (the edits are gone),
+        False on Keep editing (nothing changed, the caller stops)."""
+        self._flush_edit(self._grid(page))
+        count = len(self._staged[page])
+        if not count:
+            return True
+        if not self._confirm_discard(count, action):
+            self._status(u"{} change(s) still pending. Apply Changes writes them.".format(count),
+                         page, "warning")
+            return False
+        self._discard_staged(page, rebuild)
+        self._status(u"Discarded {} unapplied change(s). Nothing was written.".format(count),
+                     page)
+        return True
+
+    def _leave_page(self, target):
+        """Rail click: leaving a table page with staged edits asks first.
+        Keep editing → the rail and the page stay where they were."""
+        page = getattr(self, "_page", target)
+        if target == page or page not in self._staged:
+            return True
+        if self._discard_or_keep(page, "leave {}".format(_PAGE_NAMES[page])):
+            return True
+        self._update_nav_states(self._nav_button(page))
+        return False
+
+    def _on_closing(self, sender, args):
+        """Close (X, Esc, Alt+F4) never drops staged edits silently."""
+        for page in self._staged:
+            self._flush_edit(self._grid(page))
+        count = sum(len(store) for store in self._staged.values())
+        if count and not self._confirm_discard(count, "close Annotation Manager"):
+            args.Cancel = True
+            return
+        self._dim_search_timer.Stop()
+        self._txt_search_timer.Stop()
+
+    def _prune_staged(self, page):
+        """After a cache refresh: drop staged edits of elements that are gone."""
+        store = self._staged.get(page)
+        if not store:
+            return
+        gone = [key for key in store if self._staged_element(key, store[key]["kind"]) is None]
+        for key in gone:
+            store.pop(key, None)
+        if gone:
+            self._sync_apply(page)
+
+    def _staged_element(self, key, kind):
+        """The Revit element a staged edit targets, from the caches (the table
+        may be filtered, so the row maps do not hold every staged element)."""
+        if kind == "DimType":
+            return self._dim_type_by_id.get(key)
+        if kind == "TxtType":
+            return self._txt_type_by_id.get(key)
+        if kind == "TxtInst":
+            record = self._txt_record_by_id.get(key)
+            return record["element"] if record else None
+        return None
+
+    def _apply_staged(self, page):
+        """Apply Changes: write every staged edit of the page in ONE transaction
+        (one Undo). A refused row (duplicate name, illegal character) stays
+        staged and turns red with its reason; the others are written.
+        Returns True when nothing is left pending."""
+        self._flush_edit(self._grid(page))
+        store = self._staged[page]
+        if not store:
+            self._sync_apply(page)
+            self._status("Nothing to apply. Double-click a name to edit it first.", page)
+            return True
+        items = list(store.items())
+        notes = all(entry["kind"] == "TxtInst" for _, entry in items)
+        if page == PAGE_DIM:
+            label = "Rename Dimension Types"
+        else:
+            label = "Edit Text Notes" if notes else "Rename Text Note Types"
+
+        def write(key, entry):
+            element = self._staged_element(key, entry["kind"])
+            if element is None:
+                raise LookupError("it is no longer in the model")
+            if entry["kind"] == "TxtInst":
+                element.Text = entry["value"]
+            else:
+                element.Name = entry["value"]
+
+        try:
+            with disposing(Transaction(doc, "T3Lab: " + label)) as transaction:
+                if transaction.Start() != DB.TransactionStatus.Started:
+                    raise RuntimeError("Revit did not start the transaction")
+                options = transaction.GetFailureHandlingOptions()
+                options.SetForcedModalHandling(True)
+                transaction.SetFailureHandlingOptions(options)
+                done, failed = _write_staged(items, write)
+                if done:
+                    if transaction.Commit() != DB.TransactionStatus.Committed:
+                        raise RuntimeError("Revit did not commit the transaction")
+                else:
+                    transaction.RollBack()
+        except Exception as error:
+            self._status(u"Apply failed; nothing was written: {}. The {} change(s) stay "
+                         u"staged.".format(_failure_reason(error), len(store)), page, "error")
+            return False
+
+        _settle_staged(store, done, failed)
+        if page == PAGE_DIM:
+            self._refresh_dim_cache()
+            self._fill_dims(announce=False)
+        else:
+            self._refresh_txt_cache()
+            self._fill_txts(announce=False)
+        self._load_sidebar_lists()
+        self._sync_apply(page)
+
+        staged = dict(items)
+        msg, kind = _apply_summary(
+            len(done), [(staged[key]["value"], reason) for key, reason in failed], notes)
+        self._status(msg, page, kind)
+        if failed:
+            T3Dialog.show_warning(
+                msg,
+                title="Some changes were not applied",
+                details="\n".join(
+                    u"'{}' → '{}': {}".format(_one_line(staged[key]["original"]),
+                                               _one_line(staged[key]["value"]), reason)
+                    for key, reason in failed),
+                owner=self)
+        return not failed
+
+    def _settle_before_rename_all(self, page):
+        """Rename All names every type from its settings, so pending type
+        renames are applied or discarded first. True = go on."""
+        self._flush_edit(self._grid(page))
+        count = sum(1 for entry in self._staged[page].values()
+                    if entry["kind"] in _TYPE_KINDS)
+        if not count:
+            return True
+        if T3Dialog.confirm(
+                u"{} type rename(s) are not applied yet. Apply them before Rename All?".format(count),
+                title="Unapplied changes",
+                ok_text=u"Apply {} change(s)".format(count),
+                cancel_text="Don't apply",
+                details="Rename All names every type from its settings, so it can replace "
+                        "the names typed in the yellow cells.",
+                owner=self):
+            return self._apply_staged(page)
+        return self._discard_or_keep(page, "run Rename All")
 
     # ── Checked rows (header select-all, "N checked" strip) ──────────────
     # Rows are DataRowView: T3WPFWindow.toggle_all_rows / sync_header_checkbox
@@ -729,6 +1272,7 @@ class AnnotationManagerWindow(T3WPFWindow):
             }
             self._dim_records.append(record)
             self._dim_record_by_id[elem_id] = record
+        self._prune_staged(PAGE_DIM)
 
     def _refresh_txt_cache(self):
         self._txt_types = list(
@@ -764,6 +1308,7 @@ class AnnotationManagerWindow(T3WPFWindow):
             }
             self._txt_records.append(record)
             self._txt_record_by_id[elem_id] = record
+        self._prune_staged(PAGE_TXT)
 
     def _record_is_visible(self, record):
         return self._include_grouped() or not record["grouped"]
@@ -776,6 +1321,9 @@ class AnnotationManagerWindow(T3WPFWindow):
 
     def _replace_table(self, table, grid, populate):
         """Bulk replace rows without a WPF notification/layout pass per row."""
+        # A cell still in edit mode is committed (and so staged) first: the
+        # rows are about to be replaced, the store of staged edits is not.
+        self._flush_edit(grid)
         was_updating = getattr(self, '_updating_grids', False)
         self._updating_grids = True
         grid.ItemsSource = None
@@ -882,7 +1430,12 @@ class AnnotationManagerWindow(T3WPFWindow):
 
     def _dt_add(self, dt, elem_id, cat_code, name, details,
                 size="", font="", bg="", color="", selected=False, count="1", status="Active",
-                view=""):
+                view="", page=None):
+        """Add one row; `name` is the model value. A staged edit of the
+        element (store of `page`) comes back as the shown value + yellow flag."""
+        entry = self._staged.get(page, {}).get(elem_id) if page is not None else None
+        if entry is not None and entry.get("kind") != cat_code:
+            entry = None
         row = dt.NewRow()
         row["Selected"]   = selected
         row["_id"]        = elem_id
@@ -897,16 +1450,22 @@ class AnnotationManagerWindow(T3WPFWindow):
         row["Type"]       = "Dimension Style" if "Dim" in cat_code else "Text Note Style"
         row["Count"]      = count
         row["Status"]     = status
+        row[ORIG_PREFIX + EDIT_FIELD] = name
+        if entry is not None:
+            row[EDIT_FIELD] = entry["value"]
+            if entry.get("status"):
+                row["Status"] = entry["status"]
+        self._paint_staged(row, entry)
         dt.Rows.Add(row)
 
     @staticmethod
-    def _get_dim_params(dt):
-        """Extract common params from a DimensionType element."""
+    def _get_dim_params(dt, paper=None):
+        """Extract common params from a DimensionType element (size in `paper`)."""
         def gp(bip):
             try: return dt.get_Parameter(bip)
             except: return None
         p = gp(BuiltInParameter.TEXT_SIZE)
-        size = _mm(p) if p else ""
+        size = _size_cell(p, paper) if p else ""
         p = gp(BuiltInParameter.TEXT_FONT)
         font = _param_text(p)
         p = gp(BuiltInParameter.DIM_TEXT_BACKGROUND)
@@ -916,13 +1475,13 @@ class AnnotationManagerWindow(T3WPFWindow):
         return size, font, bg, color
 
     @staticmethod
-    def _get_txt_params(tt):
-        """Extract common params from a TextNoteType element."""
+    def _get_txt_params(tt, paper=None):
+        """Extract common params from a TextNoteType element (size in `paper`)."""
         def gp(bip):
             try: return tt.get_Parameter(bip)
             except: return None
         p = gp(BuiltInParameter.TEXT_SIZE)
-        size = _mm(p) if p else ""
+        size = _size_cell(p, paper) if p else ""
         p = gp(BuiltInParameter.TEXT_FONT)
         font = _param_text(p)
         p = gp(BuiltInParameter.TEXT_BACKGROUND)
@@ -951,7 +1510,7 @@ class AnnotationManagerWindow(T3WPFWindow):
                     self._dt_add(self._dim_dt, record["id"], "DimInst",
                                  record["type_name"], "",
                                  selected=False, count="1", status="Active",
-                                 view=record["view_name"])
+                                 view=record["view_name"], page=PAGE_DIM)
                     self._dim_map[record["id"]] = record["element"]
             else:
                 for item in self._dim_types:
@@ -960,7 +1519,7 @@ class AnnotationManagerWindow(T3WPFWindow):
                     if kw and kw not in name.lower():
                         continue
                     try:
-                        size, font, bg, color = self._get_dim_params(item)
+                        size, font, bg, color = self._get_dim_params(item, self._paper)
                     except Exception:
                         size, font, bg, color = "", "", "", ""
                     count = counts.get(elem_id, 0)
@@ -968,7 +1527,8 @@ class AnnotationManagerWindow(T3WPFWindow):
                     status = "Active" if count else ("Grouped only" if all_count else "Unused")
                     self._dt_add(self._dim_dt, elem_id, "DimType", name,
                                  "Dimension Type", size, font, bg, color,
-                                 selected=False, count=str(count), status=status)
+                                 selected=False, count=str(count), status=status,
+                                 page=PAGE_DIM)
                     self._dim_map[elem_id] = item
 
         self._replace_table(self._dim_dt, self.dg_dim, populate)
@@ -1006,7 +1566,7 @@ class AnnotationManagerWindow(T3WPFWindow):
                     self._dt_add(self._txt_dt, record["id"], "TxtInst",
                                  record["text"], record["type_name"],
                                  selected=False, count="1", status="Active",
-                                 view=record["view_name"])
+                                 view=record["view_name"], page=PAGE_TXT)
                     self._txt_map[record["id"]] = record["element"]
             else:
                 for item in self._txt_types:
@@ -1015,7 +1575,7 @@ class AnnotationManagerWindow(T3WPFWindow):
                     if kw and kw not in name.lower():
                         continue
                     try:
-                        size, font, bg, color = self._get_txt_params(item)
+                        size, font, bg, color = self._get_txt_params(item, self._paper)
                     except Exception:
                         size, font, bg, color = "", "", "", ""
                     count = counts.get(elem_id, 0)
@@ -1023,7 +1583,8 @@ class AnnotationManagerWindow(T3WPFWindow):
                     status = "Active" if count else ("Grouped only" if all_count else "Unused")
                     self._dt_add(self._txt_dt, elem_id, "TxtType", name,
                                  "Text Note Type", size, font, bg, color,
-                                 selected=False, count=str(count), status=status)
+                                 selected=False, count=str(count), status=status,
+                                 page=PAGE_TXT)
                     self._txt_map[elem_id] = item
 
         self._replace_table(self._txt_dt, self.dg_txt, populate)
@@ -1068,15 +1629,24 @@ class AnnotationManagerWindow(T3WPFWindow):
     def dim_submode(self, sender, args):
         if not hasattr(self, '_dim_dt'):
             return
+        mode = "instances" if self.rb_dim_inst.IsChecked else "types"
+        if mode == self._dim_submode:
+            return              # also the chip being put back after Keep editing
+        if not self._discard_or_keep(
+                PAGE_DIM, "show {}".format("Dimensions" if mode == "instances" else "Types"),
+                rebuild=False):
+            (self.rb_dim_type if self._dim_submode == "types" else self.rb_dim_inst).IsChecked = True
+            return
         self._dim_search_timer.Stop()
-        self._dim_submode = "instances" if self.rb_dim_inst.IsChecked else "types"
+        self._dim_submode = mode
         self._apply_dim_mode()
         self._fill_dims()
 
     def _apply_dim_mode(self):
         is_type = self._dim_submode == "types"
-        self._set_mode_columns(self.dg_dim, is_type)
+        self._set_mode_columns(self.dg_dim, is_type, name_editable=is_type)
         self.btn_dim_apply.Visibility = Visibility.Visible if is_type else Visibility.Collapsed
+        self._sync_apply(PAGE_DIM)
         self.dim_hint.Text = _DIM_HINTS[self._dim_submode]
         self._sync_primary()
 
@@ -1086,46 +1656,8 @@ class AnnotationManagerWindow(T3WPFWindow):
         self._fill_dims()
 
     def dim_cell_edit_ending(self, sender, args):
-        if column_key(args.Column) != "Name":
-            return
-        if str(args.EditAction) != "Commit":
-            return
-
-        tb       = args.EditingElement
-        new_name = tb.Text.strip()
-        if not new_name:
-            args.Cancel = True
-            return
-
-        row      = args.Row.Item
-        elem_id  = str(row["_id"])
-        cat_code = str(row["_cat"])
-        old_name = str(row["Name"])
-
-        if new_name == old_name:
-            return
-
-        if cat_code != "DimType":
-            args.Cancel = True
-            self._status("Dimension instances cannot be renamed. Show Types to rename a "
-                         "dimension type.", PAGE_DIM, "warning")
-            return
-
-        elem = self._dim_map.get(elem_id)
-        if not elem:
-            return
-
-        try:
-            _run_transaction("Rename Dimension Type", lambda: setattr(elem, "Name", new_name))
-            self._status(u"Renamed dimension type '{}' → '{}'.".format(
-                old_name[:40], new_name[:40]), PAGE_DIM, "ok")
-        except Exception as e:
-            args.Cancel = True
-            self._status("Rename failed: {}. The type keeps its name.".format(e),
-                         PAGE_DIM, "error")
-            return
-        self._refresh_dim_cache()
-        self._load_sidebar_lists()
+        """Typing a dimension type name stages it (yellow); Apply Changes writes it."""
+        self._stage_cell_edit(PAGE_DIM, sender, args)
 
     def dim_jump(self, sender, args):
         selected_rows = []
@@ -1209,46 +1741,12 @@ class AnnotationManagerWindow(T3WPFWindow):
         self._status(msg, PAGE_DIM, "warning" if result["errors"] else "ok")
 
     def dim_apply(self, sender, args):
-        """Apply edited Name back to DimensionType elements."""
-        changes = []
-        for row in self._dim_dt.Rows:
-            elem_id = str(row["_id"])
-            elem = self._dim_map.get(elem_id)
-            if not elem or str(row["_cat"]) != "DimType":
-                continue
-            new_name = str(row["Name"]).strip()
-            if not new_name:
-                continue
-            if _type_name(elem) != new_name:
-                changes.append((elem, new_name))
-        if not changes:
-            self._status("No dimension type names needed changes.", PAGE_DIM)
-            return
-        result = {"count": 0, "errors": 0}
-
-        def apply_changes():
-            for elem, new_name in changes:
-                try:
-                    elem.Name = new_name
-                    result["count"] += 1
-                except Exception:
-                    result["errors"] += 1
-
-        try:
-            _run_transaction("Apply Dimension Type Changes", apply_changes)
-        except Exception as ex:
-            self._status("Apply failed; no dimension types were renamed: {}".format(ex),
-                         PAGE_DIM, "error")
-            return
-        self._refresh_dim_cache()
-        self._fill_dims(announce=False)
-        self._load_sidebar_lists()
-        msg = "Renamed {} dimension type(s).".format(result["count"])
-        if result["errors"]:
-            msg += "  ({} failed.)".format(result["errors"])
-        self._status(msg, PAGE_DIM, "warning" if result["errors"] else "ok")
+        """Apply Changes: write the staged dimension type names (one transaction)."""
+        self._apply_staged(PAGE_DIM)
 
     def dim_rename_all(self, sender, args):
+        if not self._settle_before_rename_all(PAGE_DIM):
+            return
         used_names = {name.lower() for name in self._dim_type_names.values()}
         plans = []
         for item in self._dim_types:
@@ -1256,7 +1754,7 @@ class AnnotationManagerWindow(T3WPFWindow):
             if not origin:
                 continue
             used_names.discard(origin.lower())
-            base_name = _dim_name(item, origin)
+            base_name = _dim_name(item, origin, self._paper)
             new_name = base_name
             suffix = 2
             while new_name.lower() in used_names:
@@ -1309,15 +1807,25 @@ class AnnotationManagerWindow(T3WPFWindow):
     def txt_submode(self, sender, args):
         if not hasattr(self, '_txt_dt'):
             return
+        mode = "notes" if self.rb_notes.IsChecked else "types"
+        if mode == self._txt_submode:
+            return              # also the chip being put back after Keep editing
+        if not self._discard_or_keep(
+                PAGE_TXT, "show {}".format("Text Notes" if mode == "notes" else "Types"),
+                rebuild=False):
+            (self.rb_types if self._txt_submode == "types" else self.rb_notes).IsChecked = True
+            return
         self._txt_search_timer.Stop()
-        self._txt_submode = "notes" if self.rb_notes.IsChecked else "types"
+        self._txt_submode = mode
         self._apply_txt_mode()
         self._fill_txts()
 
     def _apply_txt_mode(self):
         is_type = self._txt_submode == "types"
         self._set_mode_columns(self.dg_txt, is_type, "TYPE NAME" if is_type else "TEXT")
-        self.btn_txt_apply.Visibility = Visibility.Visible if is_type else Visibility.Collapsed
+        # Both modes edit the NAME / TEXT column, so both stage and apply.
+        self.btn_txt_apply.Visibility = Visibility.Visible
+        self._sync_apply(PAGE_TXT)
         self.txt_kw.Tag = "Filter by type name…" if is_type else "Filter by text or type…"
         self.txt_hint.Text = _TXT_HINTS[self._txt_submode]
         self._sync_primary()
@@ -1328,44 +1836,8 @@ class AnnotationManagerWindow(T3WPFWindow):
         self._fill_txts()
 
     def txt_cell_edit_ending(self, sender, args):
-        if column_key(args.Column) != "Name":
-            return
-        if str(args.EditAction) != "Commit":
-            return
-
-        tb       = args.EditingElement
-        row      = args.Row.Item
-        elem_id  = str(row["_id"])
-        cat_code = str(row["_cat"])
-        old_name = str(row["Name"])
-        raw_name = tb.Text or ""
-        new_name = raw_name.strip() if cat_code == "TxtType" else raw_name
-        if not new_name.strip():
-            args.Cancel = True
-            return
-
-        if new_name == old_name:
-            return
-
-        elem = self._txt_map.get(elem_id)
-        if not elem:
-            return
-
-        try:
-            attr_name = "Name" if cat_code == "TxtType" else "Text"
-            _run_transaction(
-                "Rename Text Note Type" if cat_code == "TxtType" else "Edit Text Note",
-                lambda: setattr(elem, attr_name, new_name),
-            )
-            what = "text note type" if cat_code == "TxtType" else "text note"
-            self._status(u"Changed {} '{}' → '{}'.".format(
-                what, old_name[:40], new_name[:40]), PAGE_TXT, "ok")
-        except Exception as e:
-            args.Cancel = True
-            self._status("Edit failed: {}. Nothing was changed.".format(e), PAGE_TXT, "error")
-            return
-        self._refresh_txt_cache()
-        self._load_sidebar_lists()
+        """Typing a type name or a note's text stages it (yellow); Apply Changes writes it."""
+        self._stage_cell_edit(PAGE_TXT, sender, args)
 
     def txt_jump(self, sender, args):
         if self._txt_submode != "notes":
@@ -1451,55 +1923,12 @@ class AnnotationManagerWindow(T3WPFWindow):
         self._status(msg, PAGE_TXT, "warning" if result["errors"] else "ok")
 
     def txt_apply(self, sender, args):
-        """Apply edited Name/Text back to TextNoteType or TextNote instances."""
-        changes = []
-        for row in self._txt_dt.Rows:
-            elem_id = str(row["_id"])
-            elem = self._txt_map.get(elem_id)
-            if not elem:
-                continue
-            cat_code = str(row["_cat"])
-            raw_name = str(row["Name"])
-            new_name = raw_name.strip() if cat_code == "TxtType" else raw_name
-            if not new_name.strip():
-                continue
-            current = _type_name(elem) if cat_code == "TxtType" else (elem.Text or "")
-            if current != new_name:
-                changes.append((elem, cat_code, new_name))
-        if not changes:
-            self._status("No text note changes needed to be applied.", PAGE_TXT)
-            return
-        result = {"count": 0, "errors": 0}
-
-        def apply_changes():
-            for elem, cat_code, new_name in changes:
-                try:
-                    if cat_code == "TxtType":
-                        elem.Name = new_name
-                    else:
-                        elem.Text = new_name
-                    result["count"] += 1
-                except Exception:
-                    result["errors"] += 1
-
-        try:
-            _run_transaction("Apply Text Note Changes", apply_changes)
-        except Exception as ex:
-            self._status("Apply failed; no text notes were changed: {}".format(ex),
-                         PAGE_TXT, "error")
-            return
-        self._refresh_txt_cache()
-        self._fill_txts(announce=False)
-        self._load_sidebar_lists()
-        self.btn_txt_apply.Visibility = (
-            Visibility.Visible if self._txt_submode == "types" else Visibility.Collapsed
-        )
-        msg = "Applied {} text change(s).".format(result["count"])
-        if result["errors"]:
-            msg += "  ({} failed.)".format(result["errors"])
-        self._status(msg, PAGE_TXT, "warning" if result["errors"] else "ok")
+        """Apply Changes: write the staged type names / note texts (one transaction)."""
+        self._apply_staged(PAGE_TXT)
 
     def txt_rename_all(self, sender, args):
+        if not self._settle_before_rename_all(PAGE_TXT):
+            return
         used_names = {name.lower() for name in self._txt_type_names.values()}
         plans = []
         for item in self._txt_types:
@@ -1507,7 +1936,7 @@ class AnnotationManagerWindow(T3WPFWindow):
             if not origin:
                 continue
             used_names.discard(origin.lower())
-            base_name = _txt_name(item, origin)
+            base_name = _txt_name(item, origin, self._paper)
             new_name = base_name
             suffix = 2
             while new_name.lower() in used_names:
@@ -1565,18 +1994,24 @@ class AnnotationManagerWindow(T3WPFWindow):
                 pass
 
     def nav_dimensions_checked(self, sender, args):
+        if not self._leave_page(PAGE_DIM):
+            return
         self._update_nav_states(self.nav_dim)
         if hasattr(self, 'main_tabs'):
             self.main_tabs.SelectedIndex = 0
         self._on_page_shown(PAGE_DIM)
 
     def nav_textnotes_checked(self, sender, args):
+        if not self._leave_page(PAGE_TXT):
+            return
         self._update_nav_states(self.nav_txt)
         if hasattr(self, 'main_tabs'):
             self.main_tabs.SelectedIndex = 1
         self._on_page_shown(PAGE_TXT)
 
     def nav_dimtext_checked(self, sender, args):
+        if not self._leave_page(PAGE_DIMTEXT):
+            return
         self._update_nav_states(self.nav_dimtext)
         if hasattr(self, 'main_tabs'):
             self.main_tabs.SelectedIndex = 2
@@ -1632,7 +2067,8 @@ class AnnotationManagerWindow(T3WPFWindow):
             label.Text = "Dimensions in scope: unknown"
 
     def dimtext_add_rule(self, sender, args):
-        rd = DimTextDialog.create_rule_row(self, self._dimtext_remove_rule)
+        # Rule values are segment lengths: typed and labelled in the project unit.
+        rd = DimTextDialog.create_rule_row(self, self._dimtext_remove_rule, self._unit)
         self._dimtext_rules.append(rd)
         self.sp_rules.Children.Add(rd["panel"])
 
@@ -1642,10 +2078,13 @@ class AnnotationManagerWindow(T3WPFWindow):
             self._dimtext_rules.remove(rd)
 
     def _dimtext_build_filter_fn(self):
+        """Length filter from the rule rows, values parsed in the project unit.
+        Raises ValueError (naming the rule) when a value is not a length."""
         if not self.chk_filter_enable.IsChecked or not self._dimtext_rules:
             return None
         return DimTextDialog.build_filter_fn(self._dimtext_rules,
-                                             self.combo_combine.SelectedIndex == 0)
+                                             self.combo_combine.SelectedIndex == 0,
+                                             self._unit)
 
     def dimtext_apply(self, sender, args):
         prefix   = self.txt_prefix.Text.strip()
@@ -1654,7 +2093,11 @@ class AnnotationManagerWindow(T3WPFWindow):
         below    = self.txt_below.Text.strip()
         override = self.txt_override.Text.strip()
         leader_off = bool(self.chk_leader.IsChecked)
-        filter_fn  = self._dimtext_build_filter_fn()
+        try:
+            filter_fn = self._dimtext_build_filter_fn()
+        except ValueError as ex:
+            self._status(u"{} Nothing was changed.".format(ex), PAGE_DIMTEXT, "error")
+            return
 
         try:
             dims, where = self._dimtext_scope()
@@ -1774,8 +2217,9 @@ def _refresh_active_document():
     project was active the FIRST time the tool opened — after switching
     projects the window read and wrote that first project. The Dim Text page
     uses DimTextDialog's module globals, so they are refreshed too.
+    The project's length unit belongs to the document: it is re-read with it.
     """
-    global doc, uidoc
+    global doc, uidoc, unit
     try:
         doc = resolve_doc(getattr(revit, 'doc', None)).doc
     except Exception:
@@ -1784,8 +2228,10 @@ def _refresh_active_document():
         uidoc = resolve_uidoc(getattr(revit, 'uidoc', None))
     except Exception:
         uidoc = None
+    unit = project_length_unit(doc)
     DimTextDialog.doc = doc
     DimTextDialog.uidoc = uidoc
+    DimTextDialog.unit = unit
 
 
 def show_dialog():

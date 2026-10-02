@@ -1953,7 +1953,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="Offset:" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                     <TextBox x:Name="txt_offset" Grid.Column="1" Text="1000" Style="{StaticResource T3.TextBox}" Height="28" Margin="0,0,8,0"/>
-                                    <TextBlock Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="lbl_offset_unit" Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                 </Grid>
 
                                 <!-- 3-Level offsets panel -->
@@ -1967,7 +1967,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="L1 · Openings:" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                         <TextBox x:Name="txt_l1" Grid.Column="1" Text="500" Style="{StaticResource T3.TextBox}" Height="28" Margin="0,0,8,0"/>
-                                        <TextBlock Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="lbl_l1_unit" Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                     </Grid>
                                     <!-- L2 -->
                                     <Grid Margin="0,0,0,4">
@@ -1978,7 +1978,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="L2 · Cols/Walls:" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                         <TextBox x:Name="txt_l2" Grid.Column="1" Text="1000" Style="{StaticResource T3.TextBox}" Height="28" Margin="0,0,8,0"/>
-                                        <TextBlock Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="lbl_l2_unit" Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                     </Grid>
                                     <!-- L3 -->
                                     <Grid>
@@ -1989,7 +1989,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="L3 · Grid overall:" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                         <TextBox x:Name="txt_l3" Grid.Column="1" Text="1500" Style="{StaticResource T3.TextBox}" Height="28" Margin="0,0,8,0"/>
-                                        <TextBlock Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="lbl_l3_unit" Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                     </Grid>
                                 </StackPanel>
 
@@ -2016,8 +2016,8 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                     <CheckBox x:Name="chk_min_seg" Content="Warn if segment &lt;" IsChecked="True"
                                               Style="{StaticResource T3.CheckBox}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBox x:Name="txt_min_seg" Text="300" Width="64" Style="{StaticResource T3.TextBox}" Height="28" Margin="0,0,8,0"/>
-                                    <TextBlock Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
+                                    <TextBox x:Name="txt_min_seg" Text="300" Width="96" Style="{StaticResource T3.TextBox}" Height="28" Margin="0,0,8,0"/>
+                                    <TextBlock x:Name="lbl_min_seg_unit" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                 </StackPanel>
 
                                 <!-- Facade sub-section -->
@@ -2045,7 +2045,7 @@
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="Facade offset:" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                                 <TextBox x:Name="txt_facade_offset" Grid.Column="1" Text="1200" Style="{StaticResource T3.TextBox}" Height="28" Margin="0,0,8,0"/>
-                                                <TextBlock Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="lbl_facade_offset_unit" Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                             </Grid>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
@@ -2056,7 +2056,7 @@
                                                 <TextBlock Grid.Column="0" Text="Perimeter tol.:" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"
                                                            ToolTip="How far from outermost extent a wall counts as facade"/>
                                                 <TextBox x:Name="txt_facade_tol" Grid.Column="1" Text="1800" Style="{StaticResource T3.TextBox}" Height="28" Margin="0,0,8,0"/>
-                                                <TextBlock Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="lbl_facade_tol_unit" Grid.Column="2" Text="mm" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                                             </Grid>
                                         </StackPanel>
                                     </StackPanel>
