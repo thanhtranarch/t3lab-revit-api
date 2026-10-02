@@ -1200,6 +1200,40 @@ _ICON_GREEN = _trgb('Success')   # success
 _ICON_RED   = _trgb('Danger')    # "no / not available" markers
 _ICON_SLATE = _trgb('Muted')     # neutral / muted
 
+# Plan / task-progress card glyphs (Segoe MDL2 Assets, verified against
+# dev/icons/mdl2_codepoints.tsv). Every state ALSO carries a word next to the
+# glyph — status is never told by colour alone.
+_ICON_PENDING = u""   # CircleRing — step not started
+_ICON_FAILED  = u""   # Cancel — step failed
+_ICON_EDIT    = u""   # Edit — "changes the model" tag
+
+
+# ─── Plan → approve → run (multi-step plans that change the model) ─────────────
+# What the plan card hands back to the worker waiting on it. STOPPED / EXPIRED
+# come from agent_loop.PendingDecision itself.
+_PLAN_RUN        = 'run'
+_PLAN_EDIT       = 'edit'
+_PLAN_CANCEL     = 'cancel'
+_PLAN_SUPERSEDED = 'superseded'    # the user sent a new message instead
+
+#: How long a plan card waits for an answer. Long on purpose: the user is
+#: READING a plan, not dismissing a dialog. Stop or a new message end it early.
+_PLAN_APPROVAL_TIMEOUT = 600
+
+#: Per-call confirmation card (destructive tools, or any edit under
+#: "Ask before edits").
+_CONFIRM_TIMEOUT = 120
+
+# Step states on the progress card: (glyph, word, theme token).
+_STEP_LOOK = {
+    'pending':   (_ICON_PENDING, u"Pending",  'Muted'),
+    'running':   (_ICON_SYNC,    u"Running",  'Accent'),
+    'done':      (_ICON_SUCCESS, u"Done",     'Success'),
+    'failed':    (_ICON_FAILED,  u"Failed",   'Danger'),
+    'skipped':   (_ICON_STOP,    u"Skipped",  'Muted'),
+    'cancelled': (_ICON_STOP,    u"Stopped",  'Muted'),
+}
+
 
 # ─── Persistent memory: explicit "remember ..." save trigger ───────────────────
 # Only unambiguous save phrasings ("remember that X", "nhớ là X", "ghi nhớ X",
@@ -2066,6 +2100,28 @@ class T3LabAssistantWindow(T3WPFWindow):
                     pass
         else:
             self._ctx_failures = 0
+            self._warm_live_context()
+
+    def _warm_live_context(self):
+        """Keep ContextScout's levels/grids digest warm. UI THREAD (tick).
+
+        The digest is cached per document, so on almost every tick this is a
+        dict lookup. When the user switches models (or the cache went stale
+        after an edit) the two read-only collectors run HERE, on Revit's own
+        thread while it is idle, instead of on the routing worker in the
+        middle of a turn — the turn then finds it cached and pays nothing.
+        """
+        if not HAS_SCOUT:
+            return
+        try:
+            from Selection import scout as _scout
+            uiapp = _get_uiapp()
+            uidoc = getattr(uiapp, 'ActiveUIDocument', None) if uiapp else None
+            doc = getattr(uidoc, 'Document', None) if uidoc else None
+            if doc is not None:
+                _scout.get_levels_and_grids(doc)
+        except Exception:
+            pass
 
     def _read_revit_context(self):
         """(view_name, selection_count) for the active document, or None."""
@@ -2512,12 +2568,26 @@ class T3LabAssistantWindow(T3WPFWindow):
             logger.debug(u"new_chat_clicked error: {}".format(_exc_text(ex)))
 
     def _archive_current_session(self):
-        """Archive current conversation to a historical session file."""
+        """Archive current conversation to a historical session file.
+
+        Written to the ACTIVE PROJECT's own sessions folder
+        (config.chat_sessions.sessions_dir) and tagged with "pid", so History
+        lists a project's conversations with the project and deleting the
+        project takes them along. No project → the global archive, as before.
+        """
         try:
             if not getattr(self, '_persisted_msgs', None):
                 return None
             from core import jsonsafe
-            sessions_dir = _chat_history_dir('sessions')
+            pid = self._active_pid()
+            try:
+                from config import chat_sessions
+                # The global folder still goes through _chat_history_dir so
+                # its one-time legacy import keeps running.
+                sessions_dir = (chat_sessions.sessions_dir(pid) if pid
+                                else _chat_history_dir('sessions'))
+            except Exception:
+                sessions_dir = _chat_history_dir('sessions')
 
             title = u"Conversation"
             for m in self._persisted_msgs:
@@ -2540,6 +2610,8 @@ class T3LabAssistantWindow(T3WPFWindow):
                 "messages": list(self._persisted_msgs),
                 "summary": getattr(self, '_history_summary', u'')
             }
+            if pid:
+                session_data["pid"] = pid
 
             fname = "{}_{}.json".format(self._doc_key, session_id)
             fpath = os.path.join(sessions_dir, fname)
@@ -2612,27 +2684,126 @@ class T3LabAssistantWindow(T3WPFWindow):
         except Exception as ex:
             logger.debug(u"suggestion_card_clicked error: {}".format(_exc_text(ex)))
 
-    def _get_history_sessions(self):
-        """Retrieve list of saved session metadata for this document."""
-        sessions = []
+    # ─── History view: per-project list, search, scope, rename ───────────────
+
+    #: Search-box debounce: the list re-renders once typing pauses, not per
+    #: keystroke (each render re-reads the archive metadata).
+    _HISTORY_SEARCH_DELAY_MS = 300
+
+    def _history_query(self):
         try:
-            sessions_dir = _chat_history_dir('sessions')
-            prefix = "{}_".format(self._doc_key)
-            files = [f for f in os.listdir(sessions_dir) if f.endswith('.json')]
-            files.sort(reverse=True)
-            for f in files:
-                fpath = os.path.join(sessions_dir, f)
-                try:
-                    with io.open(fpath, 'r', encoding='utf-8') as sf:
-                        data = json.load(sf)
-                    data['fpath'] = fpath
-                    if data.get('doc_key') == self._doc_key or f.startswith(prefix):
-                        sessions.append(data)
-                except Exception:
-                    pass
+            return (self.history_search_box.Text or u"").strip()
+        except Exception:
+            return u""
+
+    def _history_scope_all(self):
+        """True when the "All projects" chip is on."""
+        try:
+            return bool(self.history_scope_all.IsChecked)
+        except Exception:
+            return False
+
+    def _get_history_sessions(self, query=None, all_projects=None):
+        """Archived sessions for the History view, newest first.
+
+        "This project": the active project's conversations for THIS document
+        (no project → the "No project" archive). "All projects": everything,
+        every document. Items come from config.chat_sessions.list_sessions:
+        {'path', 'title', 'created', 'message_count', 'pid', ...}.
+        """
+        try:
+            from config import chat_sessions
+            # Keeps the global folder's one-time legacy import running.
+            _chat_history_dir('sessions')
+            if query is None:
+                query = self._history_query()
+            if all_projects is None:
+                all_projects = self._history_scope_all()
+            if all_projects:
+                return chat_sessions.list_sessions(all_projects=True,
+                                                   query=query or None)
+            return chat_sessions.list_sessions(pid=self._active_pid(),
+                                               doc_key=self._doc_key,
+                                               query=query or None)
         except Exception as ex:
             logger.debug(u"_get_history_sessions error: {}".format(_exc_text(ex)))
-        return sessions
+            return []
+
+    def history_search_changed(self, sender=None, e=None):
+        """Search box typed in — re-render after a short pause. UI THREAD."""
+        try:
+            from System.Windows.Threading import DispatcherTimer
+            from System import TimeSpan
+            timer = getattr(self, '_history_search_timer', None)
+            if timer is None:
+                timer = DispatcherTimer()
+                timer.Interval = TimeSpan.FromMilliseconds(
+                    self._HISTORY_SEARCH_DELAY_MS)
+
+                def _tick(s, ev):
+                    try:
+                        timer.Stop()
+                        self._render_history_sessions()
+                    except Exception:
+                        pass
+                timer.Tick += _tick
+                self._history_search_timer = timer
+            timer.Stop()
+            timer.Start()
+        except Exception as ex:
+            logger.debug(u"history_search_changed error: {}".format(_exc_text(ex)))
+            self._render_history_sessions()
+
+    def history_scope_changed(self, sender=None, e=None):
+        """"This project" / "All projects" chip. UI THREAD."""
+        try:
+            if self.history_view_grid.Visibility == Visibility.Visible:
+                self._render_history_sessions()
+        except Exception:
+            pass
+
+    def _history_project_names(self):
+        """{pid: name} for the "All projects" card labels. Never raises."""
+        try:
+            from config.project_store import ProjectStore
+            return dict((p.get('id'), p.get('name') or p.get('id'))
+                        for p in (ProjectStore().list_projects() or []))
+        except Exception:
+            return {}
+
+    def _sync_history_header(self, all_projects, count, query):
+        """Subtitle, scope-chip label and empty-state text. UI THREAD."""
+        pid = self._active_pid()
+        try:
+            self.history_scope_project.Content = (u"This project" if pid
+                                                  else u"No project")
+        except Exception:
+            pass
+        try:
+            if all_projects:
+                sub = u"Conversations from every project and document"
+            elif pid:
+                sub = u"Conversations of the active project, for this document"
+            else:
+                sub = u"Conversations outside any project, for this document"
+            if query:
+                sub = u"{} result{} for \u201c{}\u201d — {}".format(
+                    count, u"" if count == 1 else u"s", query, sub[0].lower()
+                    + sub[1:])
+            self.history_subtitle.Text = sub
+        except Exception:
+            pass
+        try:
+            if query:
+                self.history_empty_title.Text = u"No matching conversations"
+                self.history_empty_hint.Text = (
+                    u"Try fewer words, or switch to All projects.")
+            else:
+                self.history_empty_title.Text = u"No chat history yet"
+                self.history_empty_hint.Text = (
+                    u"Click + above to start a conversation.")
+        except Exception:
+            pass
 
     def _render_history_sessions(self):
         """Populate the history view with saved conversation cards."""
@@ -2640,9 +2811,14 @@ class T3LabAssistantWindow(T3WPFWindow):
             from System.Windows import Visibility, Thickness, CornerRadius, GridUnitType, GridLength
             from System.Windows.Controls import Border, Grid, StackPanel, TextBlock, Button, ColumnDefinition, Orientation
             from System.Windows.Media import Brushes, FontFamily
+            from config import chat_sessions
 
             self.history_sessions_panel.Children.Clear()
-            sessions = self._get_history_sessions()
+            query = self._history_query()
+            all_projects = self._history_scope_all()
+            sessions = self._get_history_sessions(query=query,
+                                                  all_projects=all_projects)
+            self._sync_history_header(all_projects, len(sessions), query)
 
             if not sessions:
                 self.history_empty_state.Visibility = Visibility.Visible
@@ -2651,14 +2827,20 @@ class T3LabAssistantWindow(T3WPFWindow):
 
             self.history_empty_state.Visibility = Visibility.Collapsed
             self.history_sessions_panel.Visibility = Visibility.Visible
+            names = self._history_project_names() if all_projects else {}
 
             for sess in sessions:
-                fpath = sess.get('fpath')
+                fpath = sess.get('path')
                 title_text = sess.get('title') or u"Conversation"
-                meta_text = u"{}  •  {} messages".format(
-                    sess.get('timestamp') or u"",
-                    sess.get('message_count') or len(sess.get('messages', []))
-                )
+                meta_bits = []
+                if all_projects:
+                    _spid = sess.get('pid')
+                    meta_bits.append(names.get(_spid, _spid) if _spid
+                                     else chat_sessions.NO_PROJECT_LABEL)
+                meta_bits.append(sess.get('created') or u"")
+                meta_bits.append(u"{} messages".format(
+                    sess.get('message_count') or 0))
+                meta_text = u"  •  ".join(b for b in meta_bits if b)
 
                 card = Border()
                 card.Background = self.FindResource("T3.Surface")
@@ -2684,6 +2866,7 @@ class T3LabAssistantWindow(T3WPFWindow):
                 tb_title.Text = title_text
                 tb_title.Style = self.FindResource("T3.BodyStrong")
                 tb_title.TextTrimming = System.Windows.TextTrimming.CharacterEllipsis
+                tb_title.ToolTip = title_text
 
                 tb_meta = TextBlock()
                 tb_meta.Text = meta_text
@@ -2717,27 +2900,42 @@ class T3LabAssistantWindow(T3WPFWindow):
                 btn_open.Click += _make_resume_handler(fpath)
                 act_stack.Children.Add(btn_open)
 
-                # Delete button
-                btn_del = Button()
-                btn_del.Style = self.FindResource("T3.Button.Ghost")
-                btn_del.Height = 28
-                btn_del.Width = 28
-                btn_del.Padding = Thickness(0)
-                btn_del.Margin = Thickness(4, 0, 0, 0)
-                btn_del.ToolTip = u"Delete this session"
+                def _icon_btn(glyph, tip, fg_key):
+                    b = Button()
+                    b.Style = self.FindResource("T3.Button.Ghost")
+                    b.Height = 28
+                    b.Width = 28
+                    b.MinWidth = 0
+                    b.Padding = Thickness(0)
+                    b.Margin = Thickness(4, 0, 0, 0)
+                    b.ToolTip = tip
+                    ic = TextBlock()
+                    ic.Text = glyph
+                    ic.FontFamily = FontFamily("Segoe MDL2 Assets")
+                    ic.FontSize = 11.5
+                    ic.Foreground = self.FindResource(fg_key)
+                    b.Content = ic
+                    return b
 
-                tb_del_icon = TextBlock()
-                tb_del_icon.Text = u"\uE74D"
-                tb_del_icon.FontFamily = FontFamily("Segoe MDL2 Assets")
-                tb_del_icon.FontSize = 11.5
-                tb_del_icon.Foreground = self.FindResource("T3.Danger.Text")
-                btn_del.Content = tb_del_icon
+                # Rename (inline, in place of the title)
+                btn_ren = _icon_btn(_ICON_EDIT, u"Rename this conversation",
+                                    "T3.TextSecondary")
+
+                def _make_ren_handler(path, title_tb, stack):
+                    def _handler(s, ev):
+                        self._begin_history_rename(path, title_tb, stack)
+                    return _handler
+                btn_ren.Click += _make_ren_handler(fpath, tb_title, info_stack)
+                act_stack.Children.Add(btn_ren)
+
+                # Delete button
+                btn_del = _icon_btn(u"\uE74D", u"Delete this session",
+                                    "T3.Danger.Text")
 
                 def _make_del_handler(path):
                     def _handler(s, ev):
                         try:
-                            if path and os.path.exists(path):
-                                os.remove(path)
+                            chat_sessions.delete_session(path)
                             self._render_history_sessions()
                         except Exception:
                             pass
@@ -2750,6 +2948,62 @@ class T3LabAssistantWindow(T3WPFWindow):
                 self.history_sessions_panel.Children.Add(card)
         except Exception as ex:
             logger.debug(u"_render_history_sessions error: {}".format(_exc_text(ex)))
+
+    def _begin_history_rename(self, path, title_tb, stack):
+        """Swap a card's title for an edit box. Enter or leaving the box
+        saves (config.chat_sessions.rename_session); Esc cancels. UI THREAD."""
+        try:
+            from System.Windows.Controls import TextBox
+            from System.Windows.Input import Key
+            old = title_tb.Text or u""
+            box = TextBox()
+            try:
+                box.Style = self.FindResource("T3.TextBox")
+            except Exception:
+                pass
+            box.Text = old
+            box.ToolTip = u"Enter to save · Esc to cancel"
+            state = {"done": False}
+
+            def _finish(save):
+                if state["done"]:
+                    return
+                state["done"] = True
+                new = (box.Text or u"").strip()
+                try:
+                    stack.Children.Remove(box)
+                    title_tb.Visibility = Visibility.Visible
+                except Exception:
+                    pass
+                if save and new and new != old:
+                    try:
+                        from config import chat_sessions
+                        if chat_sessions.rename_session(path, new):
+                            title_tb.Text = chat_sessions.clean_title(new)
+                            title_tb.ToolTip = title_tb.Text
+                    except Exception as rx:
+                        logger.debug(u"rename session error: {}".format(
+                            _exc_text(rx)))
+
+            def _keydown(s, ev):
+                if ev.Key in (Key.Return, Key.Enter):
+                    _finish(True)
+                    ev.Handled = True
+                elif ev.Key == Key.Escape:
+                    _finish(False)
+                    ev.Handled = True
+
+            def _lost(s, ev):
+                _finish(True)
+
+            box.KeyDown += _keydown
+            box.LostKeyboardFocus += _lost
+            title_tb.Visibility = Visibility.Collapsed
+            stack.Children.Insert(0, box)
+            box.Focus()
+            box.SelectAll()
+        except Exception as ex:
+            logger.debug(u"_begin_history_rename error: {}".format(_exc_text(ex)))
 
     def _resume_history_session(self, path):
         """Load and resume an archived session into the current chat."""
@@ -2789,16 +3043,32 @@ class T3LabAssistantWindow(T3WPFWindow):
             logger.debug(u"_resume_history_session error: {}".format(_exc_text(ex)))
 
     def clear_all_history_clicked(self, sender=None, e=None):
-        """Delete all saved sessions for this document."""
+        """Delete every conversation the History list currently shows.
+
+        The list can now span every project ("All projects") or a search, so
+        the button asks first and says how many go — it used to delete one
+        document's sessions silently.
+        """
         try:
             sessions = self._get_history_sessions()
-            for s in sessions:
-                fp = s.get('fpath')
-                if fp and os.path.exists(fp):
-                    try:
-                        os.remove(fp)
-                    except Exception:
-                        pass
+            if not sessions:
+                return
+            from System.Windows import (MessageBox, MessageBoxButton,
+                                        MessageBoxImage, MessageBoxResult)
+            n = len(sessions)
+            answer = MessageBox.Show(
+                u"Delete the {} conversation{} shown in this list? This cannot "
+                u"be undone.".format(n, u"" if n == 1 else u"s"),
+                u"Clear chat history", MessageBoxButton.YesNo,
+                MessageBoxImage.Warning, MessageBoxResult.No)
+            if answer != MessageBoxResult.Yes:
+                return
+            from config import chat_sessions
+            for sess in sessions:
+                try:
+                    chat_sessions.delete_session(sess.get('path'))
+                except Exception:
+                    pass
             self._render_history_sessions()
         except Exception as ex:
             logger.debug(u"clear_all_history_clicked error: {}".format(_exc_text(ex)))
@@ -3388,7 +3658,7 @@ class T3LabAssistantWindow(T3WPFWindow):
 
     # ─── Projects (workspaces) ────────────────────────────────────────────────
 
-    def _project_prompt_blocks(self):
+    def _project_prompt_blocks(self, memory_tool=True):
         """(project_instructions, memory_block) for the active project.
 
         The single source of project grounding for a turn. It exists because
@@ -3400,30 +3670,69 @@ class T3LabAssistantWindow(T3WPFWindow):
         instructions and remembered conventions silently vanished at the moment
         they mattered most.
 
+        memory_tool=False for every prompt whose turn has NO remember_fact
+        tool (legacy JSON path, knowledge / comment agents, background read
+        tasks): the facts are still listed, but the block no longer tells the
+        model to call a tool it cannot reach — a JSON-intent model answers
+        that instruction with {"intent": "remember_fact"} and "Tool does not
+        exist".
+
+        The first value is READY TO APPEND, headers included: the user's
+        personal instructions ("## Personal instructions", from LLMs Setting)
+        FIRST, then "## Project instructions" — project instructions refine
+        the personal ones, so they come after them on every path. Callers add
+        no header of their own. Both change only when the user edits them, so
+        the system prompt stays fixed for the session (prompt caching).
+
         Never raises; a failure just means an unscoped prompt.
         """
-        instructions = u""
+        personal = u""
+        project = u""
         memory = u""
+        try:
+            from config.settings import get_settings
+            personal = get_settings().build_user_instructions_block() or u""
+        except Exception:
+            personal = u""
         try:
             from config.project_store import ProjectStore
             ps = ProjectStore()
-            instructions = ps.get_active_prompt_addendum() or u""
+            project = ps.get_active_prompt_addendum() or u""
             try:
                 from Intelligence import assistant_memory
                 memory = assistant_memory.build_memory_block(
-                    ps.get_active_project_id()) or u""
+                    ps.get_active_project_id(),
+                    include_tool_hint=bool(memory_tool)) or u""
             except Exception:
                 memory = u""
         except Exception:
             pass
-        return instructions, memory
+        sections = []
+        if personal:
+            sections.append(personal)
+        if project:
+            sections.append(u"## Project instructions\n" + project)
+        return u"\n\n".join(sections), memory
+
+    #: First line of assistant_memory.build_memory_block — how a prompt that
+    #: already carries the memory block is recognised.
+    _MEMORY_BLOCK_HEAD = u"## Persistent memory"
 
     def _apply_project_blocks(self, system_prompt):
-        """Append project instructions + memory to a plain system prompt."""
-        instructions, memory = self._project_prompt_blocks()
+        """Append personal + project instructions and memory to a LEGACY
+        (JSON-intent) system prompt.
+
+        The legacy prompt builder (t3lab_assistant._build_system_prompt)
+        already appends the memory block itself, without the tool hint, so
+        appending it again here sent every remembered fact twice — the second
+        copy telling the model to call `remember_fact`, a tool that path does
+        not have. Memory is added here only when the base prompt lacks it
+        (e.g. the degraded builder), and then without the tool hint.
+        """
+        instructions, memory = self._project_prompt_blocks(memory_tool=False)
         if instructions:
-            system_prompt += u"\n\n## Project instructions\n" + instructions
-        if memory:
+            system_prompt += u"\n\n" + instructions
+        if memory and self._MEMORY_BLOCK_HEAD not in (system_prompt or u""):
             system_prompt += u"\n\n" + memory
         return system_prompt
 
@@ -4099,6 +4408,8 @@ class T3LabAssistantWindow(T3WPFWindow):
             self._request_id = getattr(self, '_request_id', 0) + 1
             self._replied    = False
             self._tool_runs  = 0
+            # Plan approval covers ONE plan's edits, never the next request.
+            self._plan_preapproved = False
             self._begin_turn_timer()
             # Tell the app-level self-study loop the assistant is active, so it
             # backs off while the user is working (see Intelligence/learning).
@@ -5287,6 +5598,19 @@ class T3LabAssistantWindow(T3WPFWindow):
         # alone while the dialog always rewrote name/instructions/provider/model
         # together) or race each other's whole-file rewrites.
 
+        # ── 0. Description (what the project is for) ───────────────────────
+        # Read-only like everything here; it is written in LLMs Setting →
+        # Projects. Shown straight under the title, Claude-Projects style.
+        desc = u" ".join((meta.get('description') or u'').split())
+        if desc:
+            host.Children.Add(_txt(desc, size=11.5, fg='Muted',
+                                   margin=Thickness(0, 0, 0, 12)))
+        else:
+            host.Children.Add(_txt(
+                u"No description yet — say what this project is for in "
+                u"LLMs Setting → Projects.",
+                size=11.5, fg='Faint', margin=Thickness(0, 0, 0, 12)))
+
         # ── 1. Instructions ────────────────────────────────────────────────
         instr = (meta.get('instructions') or u'').strip()
         _section(u"Instructions",
@@ -5633,12 +5957,35 @@ class T3LabAssistantWindow(T3WPFWindow):
 
     # ─── Harness: action mode (auto / confirm-first) + activity log ──────────
 
+    @staticmethod
+    def _action_mode():
+        """'auto' | 'confirm' (settings agents.action_mode). Never raises."""
+        try:
+            from config.settings import get_settings
+            mode = get_settings().get_action_mode()
+        except Exception:
+            mode = 'auto'
+        return mode if mode in ('auto', 'confirm') else 'auto'
+
+    # What each mode does, in the words the chip's tooltip uses. The mode is
+    # enforced in code (ToolGate in Intelligence/agent_loop.py), so this text
+    # is a promise the pane keeps — not a hint to the model.
+    _MODE_TIP_AUTO = (
+        u"Auto — the assistant applies model edits right away. Destructive "
+        u"actions (delete, purge, ungroup, sync) still ask first, and a "
+        u"multi-step plan that edits the model is shown for approval before "
+        u"it runs.\nClick to switch to Ask before edits.")
+    _MODE_TIP_CONFIRM = (
+        u"Ask before edits — every call that would change the model or write "
+        u"a file waits for your Confirm on a card in the chat. Reading the "
+        u"model never asks.\nClick to switch to Auto.")
+
     def action_mode_clicked(self, sender, e):
-        """Toggle between 'auto' (act immediately) and 'confirm' (plan first)."""
+        """Toggle between 'auto' (act immediately) and 'confirm' (ask first)."""
         try:
             from config.settings import get_settings
             settings = get_settings()
-            new_mode = ('confirm' if settings.get_action_mode() == 'auto'
+            new_mode = ('confirm' if self._action_mode() == 'auto'
                         else 'auto')
             settings.set_agent_option('action_mode', new_mode)
             # The chip itself renders the new state — no chat bubble, it just
@@ -5651,9 +5998,8 @@ class T3LabAssistantWindow(T3WPFWindow):
         """Render the action-mode chip state (Claude-style stroke icons:
         shield = ask-before-edits, zap = auto). UI THREAD."""
         try:
-            from System.Windows.Media import SolidColorBrush, Color, Geometry
-            from config.settings import get_settings
-            confirm = (get_settings().get_action_mode() == 'confirm')
+            from System.Windows.Media import Geometry
+            confirm = (self._action_mode() == 'confirm')
             _SHIELD = (u"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01"
                        u"C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 "
                        u"6.24-2.72a1 1 0 0 1 1.52 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z")
@@ -5661,27 +6007,24 @@ class T3LabAssistantWindow(T3WPFWindow):
                     u"l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63"
                     u"l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z")
             # The label collapses on a narrow pane (_apply_narrow_layout);
-            # the tooltip still names the mode.
+            # the tooltip still names the mode AND says what it does.
             try:
                 self.action_mode_btn.ToolTip = (
-                    u"Model edits: {} — click to toggle".format(
-                        u"Ask before edits" if confirm else u"Auto"))
+                    self._MODE_TIP_CONFIRM if confirm else self._MODE_TIP_AUTO)
             except Exception:
                 pass
+            # Bound, not copied: the chip follows a Revit Light/Dark switch
+            # like the rest of the pane instead of keeping its birth colour.
             if confirm:
                 self.action_mode_text.Text = u"Ask before edits"
-                self.action_mode_text.Foreground = SolidColorBrush(
-                    _theme_color('Accent'))
+                _bind_fg(self.action_mode_text, 'Accent')
                 self.action_mode_icon.Data = Geometry.Parse(_SHIELD)
-                self.action_mode_icon.Stroke = SolidColorBrush(
-                    _theme_color('Blue'))
+                _bind_stroke(self.action_mode_icon, 'Blue')
             else:
                 self.action_mode_text.Text = u"Auto"
-                self.action_mode_text.Foreground = SolidColorBrush(
-                    _theme_color('Muted'))
+                _bind_fg(self.action_mode_text, 'Muted')
                 self.action_mode_icon.Data = Geometry.Parse(_ZAP)
-                self.action_mode_icon.Stroke = SolidColorBrush(
-                    _theme_color('Muted'))
+                _bind_stroke(self.action_mode_icon, 'Muted')
         except Exception as ex:
             logger.debug(u"_update_action_mode_chip error: {}".format(_exc_text(ex)))
 
@@ -5798,16 +6141,17 @@ class T3LabAssistantWindow(T3WPFWindow):
                                u'numbered list.')
                         icon, color = _ICON_WARNING, _ICON_AMBER
                 elif sub.startswith(u'clear'):
-                    n = assistant_memory.clear_facts(pid, everything=True)
-                    msg = (u'Đã xóa toàn bộ {} ghi nhớ.'.format(n) if viet
-                           else u'Cleared all {} remembered facts.'.format(n))
-                    icon, color = _ICON_REFRESH, _ICON_SLATE
+                    msg, icon, color = self._memory_clear_reply(
+                        sub[len(u'clear'):].strip(), pid, viet)
                 else:
                     msg = (u'Lệnh memory: `/memory` · '
-                           u'`/memory forget <số|nội dung>` · `/memory clear`'
+                           u'`/memory forget <số|nội dung>` · '
+                           u'`/memory clear` · `/memory clear global`'
                            if viet else
                            u'Memory commands: `/memory` · '
-                           u'`/memory forget <number|text>` · `/memory clear`')
+                           u'`/memory forget <number|text>` · '
+                           u'`/memory clear` (this project) · '
+                           u'`/memory clear global`')
                     icon, color = _ICON_INFO, _ICON_SLATE
 
             # ── "what do you remember?" ───────────────────────────────────
@@ -5863,6 +6207,68 @@ class T3LabAssistantWindow(T3WPFWindow):
         except Exception as ex:
             logger.debug('_try_memory_command error: {}'.format(ex))
             return False
+
+    @staticmethod
+    def _memory_clear_reply(arg, pid, viet=False):
+        """`/memory clear [global]` — clear ONE scope. Returns (msg, icon, color).
+
+        It used to call clear_facts(pid, everything=True), which wiped the
+        GLOBAL memory (preferences for every project) along with the
+        project's. Now:
+          /memory clear          → this project's facts only; global kept
+          /memory clear global   → global facts only; projects kept
+          /memory clear, no project active → nothing is cleared; the reply
+                                   says how to clear global explicitly
+        The reply names the scope and how many facts went.
+        """
+        from Intelligence import assistant_memory as _am
+        arg = (arg or u'').strip().lower()
+        wants_global = arg in (u'global', u'all projects', u'all-projects',
+                               u'toan cuc', u'toàn cục', u'chung')
+        if wants_global:
+            n = _am.clear_scope(_am.GLOBAL_SCOPE)
+            kept = _am.count_scope(_am.PROJECT_SCOPE, pid) if pid else 0
+            if viet:
+                msg = (u'Đã xóa {} ghi nhớ chung (áp dụng cho mọi dự án).'
+                       .format(n))
+                if pid:
+                    msg += u' Giữ nguyên {} ghi nhớ của dự án này.'.format(kept)
+            else:
+                msg = (u'Cleared {} global fact{} (the ones that apply to '
+                       u'every project).'.format(n, u'' if n == 1 else u's'))
+                if pid:
+                    msg += (u" This project's {} fact{} {} kept.".format(
+                        kept, u'' if kept == 1 else u's',
+                        u'was' if kept == 1 else u'were'))
+            return msg, _ICON_REFRESH, _ICON_SLATE
+        n_global = _am.count_scope(_am.GLOBAL_SCOPE)
+        if not pid:
+            # No project = no project memory. Clearing global here would be
+            # the old surprise in a new place — ask for it by name instead.
+            if viet:
+                msg = (u'Chưa chọn dự án nào nên không có ghi nhớ dự án để '
+                       u'xóa. Gõ `/memory clear global` để xóa {} ghi nhớ '
+                       u'chung (áp dụng cho mọi dự án).'.format(n_global))
+            else:
+                msg = (u'No project is active, so there is no project memory '
+                       u'to clear. Send `/memory clear global` to clear the {} '
+                       u'global fact{} that apply to every project.'.format(
+                           n_global, u'' if n_global == 1 else u's'))
+            return msg, _ICON_INFO, _ICON_SLATE
+        n = _am.clear_scope(_am.PROJECT_SCOPE, pid)
+        if viet:
+            msg = (u'Đã xóa {} ghi nhớ của dự án này. Giữ nguyên {} ghi nhớ '
+                   u'chung — gõ `/memory clear global` nếu muốn xóa cả '
+                   u'chúng.'.format(n, n_global))
+        else:
+            msg = (u"Cleared {} fact{} from this project's memory. The {} "
+                   u"global fact{} (every project) {} kept — send "
+                   u"`/memory clear global` to clear {} too.".format(
+                       n, u'' if n == 1 else u's', n_global,
+                       u'' if n_global == 1 else u's',
+                       u'was' if n_global == 1 else u'were',
+                       u'it' if n_global == 1 else u'them'))
+        return msg, _ICON_REFRESH, _ICON_SLATE
 
     # ─── Self-study: /train command ───────────────────────────────────────────
 
@@ -6095,6 +6501,13 @@ class T3LabAssistantWindow(T3WPFWindow):
             # must not overwrite _forced_skill_id while the current request
             # is still routing on the worker thread.
             if self._busy:
+                # A plan card waiting for Run/Edit/Cancel is not work in
+                # progress — nothing has run yet. A new message means "not
+                # that, this": the card is set aside and the message goes
+                # through as soon as the waiting worker lets go of the turn.
+                _plan_wait = getattr(self, '_pending_plan', None)
+                if _plan_wait is not None and (raw or attached):
+                    _plan_wait.decide(_PLAN_SUPERSEDED)
                 if attached:
                     self._append_bot_message(
                         u"Still working on the previous request — attachments "
@@ -6525,7 +6938,7 @@ class T3LabAssistantWindow(T3WPFWindow):
             # Same grounding as every other path. Remembered facts are project
             # conventions ("sheet prefix is WH-"), so a knowledge answer must
             # respect them too — this path only ever got the instructions half.
-            _p_instr, _p_mem = self._project_prompt_blocks()
+            _p_instr, _p_mem = self._project_prompt_blocks(memory_tool=False)
             proj_instructions = u"\n\n".join(
                 [b for b in (_p_instr, _p_mem) if b])
 
@@ -6643,7 +7056,7 @@ class T3LabAssistantWindow(T3WPFWindow):
             # naming/annotation conventions, so the comment agent needs the
             # same project grounding every other path gets. extra_context is
             # already appended to its BỐI CẢNH block.
-            _p_instr, _p_mem = self._project_prompt_blocks()
+            _p_instr, _p_mem = self._project_prompt_blocks(memory_tool=False)
             _extra = u"\n\n".join([b for b in (_p_instr, _p_mem) if b])
 
             report = agent.analyze(
@@ -7314,6 +7727,14 @@ class T3LabAssistantWindow(T3WPFWindow):
                     _prev_calls = self._earlier_turn_calls()
                     _blocked_repeats = 0
                     _announce_nudges = 0         # "I'm about to…" with no call
+                    # ONE approval gate for the whole request — the same
+                    # ToolGate the native path uses, so the destructive
+                    # confirm, "Ask before edits" and the first-purge dry run
+                    # hold here too. This loop used to hand every call
+                    # straight to srv._execute_tool. Built on the first tool
+                    # call (it needs the server), then reused: it remembers
+                    # whether this request already made its dry-run purge.
+                    _legacy_gate = {"g": None}
 
                     # Initial user prompt. _rag_query == rag_context except
                     # when a text-only provider was handed images (see above).
@@ -7588,7 +8009,11 @@ class T3LabAssistantWindow(T3WPFWindow):
                                 try:
                                     from core.server import get_t3labai_server
                                     srv = get_t3labai_server()
-                                    tool_result = srv._execute_tool(intent, params)
+                                    if _legacy_gate["g"] is None:
+                                        _legacy_gate["g"] = self._new_tool_gate(srv)
+                                    tool_result = self._run_gated_tool(
+                                        srv, _legacy_gate["g"], intent,
+                                        params, _is_viet_text(captured))
                                 except Exception as execute_err:
                                     # _exc_text, never str(): a Revit error
                                     # carrying a non-ASCII message made str()
@@ -7613,11 +8038,17 @@ class T3LabAssistantWindow(T3WPFWindow):
 
                                 # Register the successful call (errors stay
                                 # unregistered — rule 4 allows ONE retry with
-                                # corrected/same args after a failure).
+                                # corrected/same args after a failure). A call
+                                # the user DECLINED is registered too — the
+                                # repeat guard then stops the model asking
+                                # again — but it ran nothing, so it is not a
+                                # step that "had already run" on Stop.
                                 if not (isinstance(tool_result, dict)
                                         and tool_result.get('error')):
                                     _turn_calls.add(_call_key)
-                                    self._tool_runs += 1
+                                    if not (isinstance(tool_result, dict)
+                                            and tool_result.get('cancelled')):
+                                        self._tool_runs += 1
 
                                 # Tool execution is where the seconds go, so
                                 # this is the checkpoint that makes Stop feel
@@ -8408,13 +8839,18 @@ class T3LabAssistantWindow(T3WPFWindow):
         except Exception:
             return True
 
-    def _build_orchestrator(self, provider, history, viet):
+    def _build_orchestrator(self, provider, history, viet, progress=None):
         """A GraphOrchestrator whose runner is one `_run_native_agent` turn.
 
         max_parallel is pinned to 1: the runner streams into the chat
         transcript, and two agent turns writing into one transcript interleave
         into nonsense. The executor's parallel path is real and tested, but it
         belongs to headless callers — see Intelligence/graph/executor.py.
+
+        progress: optional {"card": handle} for the task-progress card of an
+        APPROVED plan. The orchestrator is built before the plan exists, so
+        the caller fills "card" in after Run; until then (and for plans that
+        need no approval) the runner's step marks are no-ops.
         """
         base_history = list(history)
 
@@ -8425,15 +8861,26 @@ class T3LabAssistantWindow(T3WPFWindow):
                 # remaining node one at a time.
                 state.cancel()
                 return None
+            step = self._plan_step_of(node)
+            self._mark_plan_step(progress, step, 'running')
             spec = get_spec(node.specialist) if node.specialist else None
             skill_ids = [node.skill] if node.skill else None
             # `context` carries what earlier nodes produced. It rides in front
             # of this node's own goal exactly like attachment RAG excerpts do.
-            self._run_native_agent(
-                provider, list(base_history), node.goal,
-                spec=spec, skill_ids=skill_ids,
-                rag_context=(context or None), hold_busy=True)
-            return getattr(self, '_last_agent_text', u'') or None
+            try:
+                self._run_native_agent(
+                    provider, list(base_history), node.goal,
+                    spec=spec, skill_ids=skill_ids,
+                    rag_context=(context or None), hold_busy=True)
+            except Exception:
+                self._mark_plan_step(progress, step, 'failed')
+                raise
+            text = getattr(self, '_last_agent_text', u'') or None
+            # Provisional: the verifier and the fallback route can still
+            # change a step's outcome — _finalize_plan_progress settles it
+            # from the graph state once the whole plan is over.
+            self._mark_plan_step(progress, step, 'done' if text else 'failed')
+            return text
 
         def _on_step(index, total, node):
             header = (u"**Bước {}/{}** — {}" if viet
@@ -8482,13 +8929,17 @@ class T3LabAssistantWindow(T3WPFWindow):
         never touches the shared streaming bubble or self._last_agent_text
         (which concurrent tasks would clobber), returning the answer as a value
         instead. Read-only by construction — the parallel path is gated on a
-        writer-free plan — so it needs neither the action-group wrapper nor the
-        destructive-confirm card, and it withholds the launcher and memory tools
-        (a background task must not open a window or race a fact write).
+        writer-free plan AND the catalog handed to the loop is filtered down
+        to read tools — so it needs neither the action-group wrapper nor an
+        approval card (several background tasks cannot share one blocking
+        card), and it withholds the launcher and memory tools (a background
+        task must not open a window or race a fact write).
         Runs on a task worker thread. Never raises.
         """
         try:
-            from Intelligence.agent_loop import AgentLoop, build_agent_system_prompt
+            from Intelligence.agent_loop import (AgentLoop,
+                                                 build_agent_system_prompt,
+                                                 read_only_tools)
             from Intelligence import tool_schema
             from core.server import get_t3labai_server
             srv = get_t3labai_server()
@@ -8508,25 +8959,42 @@ class T3LabAssistantWindow(T3WPFWindow):
         else:
             tools = tool_schema.get_tools_for_provider(
                 provider.NAME, [], essential_only=_is_local)
+        # A 'general' sub-goal gets the FULL catalog above, write tools
+        # included — and a background task has no approval card to stop at,
+        # in either action mode. The plan was judged read-only, so hold it
+        # to that: a tool it cannot see is a tool it cannot call.
+        tools = read_only_tools(tools)
         if not tools:
             return None
 
         _lang = _reply_language()
         if _lang == 'auto':
             _lang = 'vi' if _is_viet_text(node.goal) else 'en'
-        _proj_instructions, _mem_block = self._project_prompt_blocks()
+        _proj_instructions, _mem_block = self._project_prompt_blocks(
+            memory_tool=False)
         if spec is not None and HAS_SPECIALISTS:
+            # Grounding appended here, not passed as project_instructions:
+            # the specialist builder would put its own "## Project
+            # instructions" header in front of the personal block.
             system_prompt = build_specialist_prompt(
-                spec, project_instructions=_proj_instructions,
+                spec, project_instructions=u"",
                 skills_block=u"", local=_is_local, lang=_lang)
         else:
             system_prompt = build_agent_system_prompt(local=_is_local, lang=_lang)
-            if _proj_instructions:
-                system_prompt += u"\n\n## Project instructions\n" + _proj_instructions
+        if _proj_instructions:
+            system_prompt += u"\n\n" + _proj_instructions
         if _mem_block:
             system_prompt += u"\n\n" + _mem_block
 
         def _exec(name, args):
+            # Belt and braces for the filtered catalog: a text-rescued call
+            # can still name any tool, and this task has no approval card.
+            if (tool_schema.is_model_modifying(name)
+                    or srv.is_destructive(name, args or {})):
+                return {"error": u"`{}` needs the user's approval; this "
+                                 u"background step is read-only. Report what "
+                                 u"you found and say the action needs a "
+                                 u"separate request.".format(name)}
             # srv._execute_tool marshals anything main-thread-bound onto Revit's
             # thread via ExternalEvent — that queue is the real serializer, so
             # several read tasks contend there and nowhere else.
@@ -8714,6 +9182,13 @@ class T3LabAssistantWindow(T3WPFWindow):
         message was not multi-goal (or the layer is off / unavailable) and the
         caller must fall through to its normal single-specialist path —
         nothing has been shown to the user in that case.
+
+        Plan → approve → run: a plan with at least one step that changes the
+        model is shown on a plan card FIRST and nothing runs until Run is
+        clicked (Edit puts the steps in the composer, Cancel drops it, Stop or
+        a new message end the wait). An approved plan runs with a task
+        progress card whose steps tick pending → running → done/failed. A
+        read-only plan has nothing to lose and runs immediately, as before.
         """
         if not self._graph_enabled():
             return False
@@ -8730,11 +9205,13 @@ class T3LabAssistantWindow(T3WPFWindow):
 
         viet = _is_viet_text(raw)
         rid = getattr(self, '_request_id', 0)
+        progress = {"card": None}
 
         # Decide BEFORE anything is shown: a plan the layer declines must leave
         # the turn exactly as it found it, so the caller can fall through.
         try:
-            orchestrator = self._build_orchestrator(provider, history, viet)
+            orchestrator = self._build_orchestrator(provider, history, viet,
+                                                    progress=progress)
             plan = orchestrator.plan_for(raw, utterance=utterance)
         except Exception as ex:
             logger.debug("graph plan error: {}".format(ex))
@@ -8743,20 +9220,42 @@ class T3LabAssistantWindow(T3WPFWindow):
             return False
         logger.debug("graph plan:\n{}".format(plan.describe()))
 
-        # Parallel task cards: an all-READ multi-goal plan can run its goals at
-        # once as cancellable cards instead of one-at-a-time. Gated hard (opt-in
-        # switch + writer-free) — see task_manager.eligible_for_parallel. Any
-        # writer present, or the switch off, falls straight through to the
-        # sequential orchestrator below, exactly as before.
-        try:
-            from Intelligence.agents.task_manager import eligible_for_parallel
-            if eligible_for_parallel(plan.is_multi, len(plan.agent_nodes()),
-                                     plan.has_writer(),
-                                     self._parallel_tasks_enabled()):
-                self._run_parallel_tasks(plan, provider, history, viet)
+        approved = False
+        if self._plan_needs_approval(plan):
+            # ── Plan → approve → run ───────────────────────────────────────
+            decision = self._await_plan_approval(plan, viet)
+            if decision != _PLAN_RUN:
+                self._end_unapproved_plan(plan, decision, rid)
                 return True
-        except Exception as ex:
-            logger.debug(u"parallel tasks skipped: {}".format(_exc_text(ex)))
+            approved = True
+        else:
+            # Parallel task cards: an all-READ multi-goal plan can run its
+            # goals at once as cancellable cards instead of one-at-a-time.
+            # Gated hard (opt-in switch + writer-free) — see
+            # task_manager.eligible_for_parallel. Any writer present, or the
+            # switch off, falls straight through to the sequential
+            # orchestrator below, exactly as before.
+            try:
+                from Intelligence.agents.task_manager import eligible_for_parallel
+                if eligible_for_parallel(plan.is_multi, len(plan.agent_nodes()),
+                                         plan.has_writer(),
+                                         self._parallel_tasks_enabled()):
+                    self._run_parallel_tasks(plan, provider, history, viet)
+                    return True
+            except Exception as ex:
+                logger.debug(u"parallel tasks skipped: {}".format(_exc_text(ex)))
+
+        if approved:
+            # The user approved THESE edits on the plan card: "Ask before
+            # edits" does not ask again per call while this plan runs
+            # (destructive calls still confirm one by one). Reset in the
+            # finally below, and by the next _set_busy(True) regardless.
+            self._plan_preapproved = True
+
+            def _show_progress():
+                self._show_loading_bar(True)
+                progress["card"] = self._append_plan_progress_card(plan, viet)
+            self._ui_invoke(_show_progress)
 
         # Past this point the plan owns the turn: its nodes stream into the
         # transcript, so falling through afterwards would answer twice.
@@ -8765,8 +9264,15 @@ class T3LabAssistantWindow(T3WPFWindow):
                 raw, utterance=utterance, plan=plan,
                 lang=('vi' if viet else 'en'))
         except Exception as ex:
+            self._finalize_plan_progress(progress, None,
+                                         cancelled=self._cancelled())
             self._report_error(u"graph plan", ex, rid)
             return True
+        finally:
+            self._plan_preapproved = False
+
+        self._finalize_plan_progress(progress, getattr(result, 'state', None),
+                                     cancelled=self._cancelled())
 
         if self._cancelled():
             self._finish_cancelled(rid)
@@ -8784,6 +9290,483 @@ class T3LabAssistantWindow(T3WPFWindow):
         if self._claim_turn(rid):
             self._ui_invoke(_finish)
         return True
+
+    # ─── Plan approval card ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _plan_needs_approval(plan):
+        """True when `plan` must be approved before any step runs. Never
+        raises; an unreadable plan errs on the side of asking."""
+        try:
+            check = getattr(plan, 'needs_approval', None)
+            if check is not None:
+                return bool(check())
+            return bool(plan.is_multi and plan.has_writer())
+        except Exception:
+            return True
+
+    def _await_plan_approval(self, plan, viet):
+        """WORKER THREAD: show the plan card and block until it is answered.
+
+        Returns _PLAN_RUN / _PLAN_EDIT / _PLAN_CANCEL / _PLAN_SUPERSEDED, or
+        PendingDecision.STOPPED (Stop) / EXPIRED (no answer) / 'error' (the
+        card could not be shown — nothing may run unapproved).
+
+        While the card waits the turn stays busy, so the composer keeps its
+        usual busy behaviour: typing works, the send button is Stop, and a
+        message sent now supersedes the plan (_process_input) instead of
+        waiting behind it.
+        """
+        from Intelligence.agent_loop import PendingDecision
+        pending = PendingDecision()
+        handle = {"seal": None}
+        self._pending_plan = pending
+
+        def _ui():
+            try:
+                self._hide_typing_indicator()
+                # Waiting on the USER, not working: no busy bar while the
+                # card is read (Run brings it back; any other answer ends
+                # the turn, which hides it anyway).
+                self._show_loading_bar(False)
+                handle["seal"] = self._append_plan_card(plan, pending, viet)
+            except Exception as ex:
+                logger.debug(u"plan card error: {}".format(_exc_text(ex)))
+
+        try:
+            self._ui_invoke(_ui)
+            if handle["seal"] is None:
+                pending.decide('error')
+            decision = pending.wait(_PLAN_APPROVAL_TIMEOUT,
+                                    should_abort=self._cancelled)
+        finally:
+            self._pending_plan = None
+
+        _seal_text = {
+            PendingDecision.STOPPED: u"Stopped — nothing was run",
+            PendingDecision.EXPIRED: u"Expired — nothing was run",
+            _PLAN_SUPERSEDED: u"Set aside for your new message — nothing "
+                              u"was run",
+        }.get(decision)
+        if _seal_text and handle["seal"] is not None:
+            def _seal():
+                try:
+                    handle["seal"](_seal_text)
+                except Exception:
+                    pass
+            self._ui_invoke(_seal)
+        return decision
+
+    def _end_unapproved_plan(self, plan, decision, rid):
+        """Close a turn whose plan was not run. WORKER THREAD.
+
+        The card already says what happened; what is added here is the
+        transcript line (so a follow-up like "skip step 2" has the plan to
+        refer to) and a bubble only where the card alone would leave the user
+        guessing (expired / could not be shown).
+        """
+        from Intelligence.agent_loop import PendingDecision
+        if decision == PendingDecision.STOPPED:
+            self._finish_cancelled(rid, note=u"The plan was not run.")
+            return
+        reason = {
+            _PLAN_EDIT:       u"the user chose to edit it",
+            _PLAN_CANCEL:     u"the user cancelled it",
+            _PLAN_SUPERSEDED: u"the user sent a new message instead",
+            PendingDecision.EXPIRED: u"it got no answer",
+        }.get(decision, u"it could not be shown for approval")
+        notice = None
+        if decision == PendingDecision.EXPIRED:
+            notice = (u"The plan waited {} minutes without an answer, so "
+                      u"nothing was run. Send the request again to see it "
+                      u"again.".format(_PLAN_APPROVAL_TIMEOUT // 60))
+        elif decision not in (_PLAN_EDIT, _PLAN_CANCEL, _PLAN_SUPERSEDED):
+            notice = (u"The plan could not be shown for approval, so nothing "
+                      u"was run. Please send the request again.")
+        try:
+            steps = len(plan.agent_nodes())
+            plan_text = plan.review_text()
+        except Exception:
+            steps, plan_text = 0, u""
+        record = u"Proposed a {}-step plan; it was not run ({}).".format(
+            steps, reason)
+        if plan_text:
+            record += u"\n" + plan_text
+
+        def _ui():
+            try:
+                self._hide_typing_indicator()
+                if notice:
+                    self._append_bot_message(notice, icon=_ICON_WARNING,
+                                             icon_color=_ICON_AMBER)
+                self._add_to_history("assistant", record)
+            except Exception:
+                pass
+            finally:
+                self._set_busy(False)
+
+        if self._claim_turn(rid):
+            self._ui_invoke(_ui)
+
+    def _show_loading_bar(self, visible):
+        """The thin busy bar under the top bar. UI THREAD. Never raises."""
+        try:
+            self.top_loading_bar.Visibility = (Visibility.Visible if visible
+                                               else Visibility.Collapsed)
+        except Exception:
+            pass
+
+    def _load_plan_into_composer(self, text):
+        """Edit: put the numbered plan in the message box. UI THREAD."""
+        try:
+            self.chat_input.Text = text
+            self.chat_input.Focus()
+            self.chat_input.CaretIndex = len(text or u"")
+        except Exception as ex:
+            logger.debug(u"plan edit error: {}".format(_exc_text(ex)))
+
+    def _append_plan_card(self, plan, pending, viet):
+        """The plan card: numbered steps, which ones change the model, and
+        Run / Edit / Cancel. UI THREAD. Returns seal(text).
+
+        Layout is a vertical stack of star-width grids and a WrapPanel of
+        buttons, so it reflows down to the 240 DIP pane instead of clipping.
+        """
+        from System.Windows.Controls import (Border, TextBlock, StackPanel,
+                                              Grid, ColumnDefinition,
+                                              WrapPanel)
+        from System.Windows.Documents import Run
+        from System.Windows import (Thickness, CornerRadius, TextWrapping,
+                                    GridLength, GridUnitType)
+
+        steps = plan.review_steps()
+        n_mod = sum(1 for st in steps if st['modifies'])
+        plan_text = plan.review_text()
+
+        card = Border()
+        _bind_bg(card, 'CardBg')
+        _bind_border(card, 'Accent')
+        card.BorderThickness = Thickness(1)
+        card.CornerRadius    = CornerRadius(8)
+        card.Padding         = Thickness(12, 10, 12, 10)
+        card.Margin          = Thickness(0, 0, 8, 10)
+        panel = StackPanel()
+
+        head = TextBlock()
+        head.FontSize     = 12
+        head.FontWeight   = System.Windows.FontWeights.SemiBold
+        head.TextWrapping = TextWrapping.Wrap
+        _bind_fg(head, 'Ink')
+        self._add_icon_run(head, _ICON_LIST, _trgb('Accent'), size=12)
+        head.Inlines.Add(Run(u"Review the plan before it runs"))
+        panel.Children.Add(head)
+
+        sub = TextBlock()
+        sub.Text = (u"{} steps · {} change{} the model. Nothing runs until "
+                    u"you click Run.".format(
+                        len(steps), n_mod, u"s" if n_mod == 1 else u""))
+        sub.FontSize     = 11.5
+        sub.TextWrapping = TextWrapping.Wrap
+        sub.Margin       = Thickness(0, 4, 0, 4)
+        _bind_fg(sub, 'Muted')
+        panel.Children.Add(sub)
+
+        for st in steps:
+            row = Grid()
+            row.Margin = Thickness(0, 4, 0, 0)
+            c0 = ColumnDefinition()
+            c0.Width = GridLength.Auto
+            c1 = ColumnDefinition()
+            c1.Width = GridLength(1, GridUnitType.Star)
+            row.ColumnDefinitions.Add(c0)
+            row.ColumnDefinitions.Add(c1)
+
+            num = TextBlock()
+            num.Text     = u"{}.".format(st['index'])
+            num.FontSize = 12
+            num.Margin   = Thickness(0, 0, 8, 0)
+            _bind_fg(num, 'Muted')
+            Grid.SetColumn(num, 0)
+            row.Children.Add(num)
+
+            col = StackPanel()
+            goal = TextBlock()
+            goal.Text         = st['goal']
+            goal.FontSize     = 12
+            goal.TextWrapping = TextWrapping.Wrap
+            _bind_fg(goal, 'Ink')
+            col.Children.Add(goal)
+
+            tag = TextBlock()
+            tag.FontSize     = 11
+            tag.TextWrapping = TextWrapping.Wrap
+            if st['modifies']:
+                # Glyph AND words: "changes the model" is never told by
+                # colour alone.
+                self._add_icon_run(tag, _ICON_EDIT, _trgb('Warning'), size=11)
+                tag.Inlines.Add(Run(u"Changes the model · {}".format(
+                    st['role'])))
+                _bind_fg(tag, 'Warning')
+            else:
+                tag.Inlines.Add(Run(u"Read-only · {}".format(st['role'])))
+                _bind_fg(tag, 'Muted')
+            col.Children.Add(tag)
+            Grid.SetColumn(col, 1)
+            row.Children.Add(col)
+            panel.Children.Add(row)
+
+        btn_row = WrapPanel()
+        btn_row.Margin = Thickness(0, 12, 0, 0)
+        if self._action_mode() == 'confirm':
+            _run_tip = (u"Run all {} steps in order. This click approves the "
+                        u"plan's edits; destructive actions still ask one by "
+                        u"one.".format(len(steps)))
+        else:
+            _run_tip = (u"Run all {} steps in order. Destructive actions "
+                        u"still ask before they run.".format(len(steps)))
+        run_btn = self._make_card_button(u"Run", primary=True, tooltip=_run_tip)
+        edit_btn = self._make_card_button(
+            u"Edit", tooltip=u"Put the steps in the message box so you can "
+                             u"change them, then send")
+        cancel_btn = self._make_card_button(
+            u"Cancel", tooltip=u"Drop this plan — nothing runs")
+        btn_row.Children.Add(run_btn)
+        btn_row.Children.Add(edit_btn)
+        btn_row.Children.Add(cancel_btn)
+        panel.Children.Add(btn_row)
+
+        status_tb = TextBlock()
+        status_tb.FontSize     = 11.5
+        status_tb.TextWrapping = TextWrapping.Wrap
+        status_tb.Margin       = Thickness(0, 8, 0, 0)
+        status_tb.Visibility   = Visibility.Collapsed
+        _bind_fg(status_tb, 'Muted')
+        panel.Children.Add(status_tb)
+
+        def _seal(msg):
+            try:
+                btn_row.Visibility   = Visibility.Collapsed
+                for b in (run_btn, edit_btn, cancel_btn):
+                    b.IsEnabled = False
+                status_tb.Text       = msg
+                status_tb.Visibility = Visibility.Visible
+            except Exception:
+                pass
+
+        def _on_run(s, e):
+            if pending.decide(_PLAN_RUN):
+                _seal(u"Approved — running {} steps".format(len(steps)))
+
+        def _on_edit(s, e):
+            if pending.decide(_PLAN_EDIT):
+                self._load_plan_into_composer(plan_text)
+                _seal(u"Moved to the message box — change the steps and "
+                      u"send")
+
+        def _on_cancel(s, e):
+            if pending.decide(_PLAN_CANCEL):
+                _seal(u"Cancelled — nothing was run")
+
+        run_btn.Click += _on_run
+        edit_btn.Click += _on_edit
+        cancel_btn.Click += _on_cancel
+
+        card.Child = panel
+        self.chat_history_panel.Children.Add(card)
+        self._scroll_to_bottom()
+        return _seal
+
+    # ─── Task progress card (approved plans) ──────────────────────────────────
+
+    @staticmethod
+    def _plan_step_of(node):
+        """The plan step a graph node reports on: a fallback copy (n1_alt)
+        ticks its original step, not a row of its own."""
+        try:
+            return (node.meta or {}).get('fallback_for') or node.id
+        except Exception:
+            return getattr(node, 'id', None)
+
+    def _mark_plan_step(self, progress, step_id, state):
+        """Any thread: tick one step on the progress card (no-op without one)."""
+        handle = (progress or {}).get("card")
+        if not handle or step_id is None:
+            return
+        self._ui_invoke(lambda: self._set_plan_step(handle, step_id, state))
+
+    def _append_plan_progress_card(self, plan, viet):
+        """One card listing the approved plan's steps, each with a state
+        glyph AND word that tick pending → running → done/failed, plus Stop.
+        UI THREAD. Returns the handle _set_plan_step updates (or None)."""
+        try:
+            from System.Windows.Controls import (Border, TextBlock, StackPanel,
+                                                  Grid, ColumnDefinition)
+            from System.Windows import (Thickness, CornerRadius, TextWrapping,
+                                        GridLength, GridUnitType,
+                                        VerticalAlignment)
+            from System.Windows.Media import FontFamily
+
+            steps = plan.review_steps()
+            outer = Border()
+            _bind_bg(outer, 'SelectedBg')
+            _bind_border(outer, 'CardBorder')
+            outer.BorderThickness = Thickness(1)
+            outer.CornerRadius    = CornerRadius(8)
+            outer.Padding         = Thickness(12, 8, 12, 8)
+            outer.Margin          = Thickness(0, 0, 8, 10)
+            col = StackPanel()
+
+            top = Grid()
+            t0 = ColumnDefinition()
+            t0.Width = GridLength(1, GridUnitType.Star)
+            t1 = ColumnDefinition()
+            t1.Width = GridLength.Auto
+            top.ColumnDefinitions.Add(t0)
+            top.ColumnDefinitions.Add(t1)
+            head = TextBlock()
+            head.FontSize          = 12
+            head.FontWeight        = System.Windows.FontWeights.SemiBold
+            head.TextWrapping      = TextWrapping.Wrap
+            head.VerticalAlignment = VerticalAlignment.Center
+            _bind_fg(head, 'Ink')
+            Grid.SetColumn(head, 0)
+            top.Children.Add(head)
+            stop_btn = self._make_card_button(
+                u"Stop", tooltip=u"Stop after the current step — steps that "
+                                 u"already ran are not undone")
+            stop_btn.Margin = Thickness(8, 0, 0, 0)
+
+            def _stop(s, e):
+                try:
+                    self._request_stop()
+                except Exception:
+                    pass
+            stop_btn.Click += _stop
+            Grid.SetColumn(stop_btn, 1)
+            top.Children.Add(stop_btn)
+            col.Children.Add(top)
+
+            rows = {}
+            for st in steps:
+                row = Grid()
+                row.Margin = Thickness(0, 6, 0, 0)
+                c0 = ColumnDefinition()
+                c0.Width = GridLength.Auto
+                c1 = ColumnDefinition()
+                c1.Width = GridLength(1, GridUnitType.Star)
+                row.ColumnDefinitions.Add(c0)
+                row.ColumnDefinitions.Add(c1)
+
+                glyph = TextBlock()
+                glyph.FontFamily = FontFamily(u"Segoe MDL2 Assets")
+                glyph.FontSize   = 12
+                glyph.Margin     = Thickness(0, 2, 8, 0)
+                Grid.SetColumn(glyph, 0)
+                row.Children.Add(glyph)
+
+                body = StackPanel()
+                goal = TextBlock()
+                goal.Text         = st['goal']
+                goal.FontSize     = 12
+                goal.TextWrapping = TextWrapping.Wrap
+                _bind_fg(goal, 'Ink')
+                body.Children.Add(goal)
+                line = TextBlock()
+                line.FontSize     = 11
+                line.TextWrapping = TextWrapping.Wrap
+                body.Children.Add(line)
+                Grid.SetColumn(body, 1)
+                row.Children.Add(body)
+                col.Children.Add(row)
+                rows[st['id']] = {"glyph": glyph, "line": line,
+                                  "index": st['index'],
+                                  "modifies": st['modifies']}
+
+            outer.Child = col
+            handle = {"rows": rows, "head": head, "stop": stop_btn,
+                      "total": len(steps), "states": {}, "phase": u"running"}
+            for sid in rows:
+                self._set_plan_step(handle, sid, 'pending')
+            self.chat_history_panel.Children.Add(outer)
+            self._scroll_to_bottom()
+            return handle
+        except Exception as ex:
+            logger.debug(u"_append_plan_progress_card error: {}".format(
+                _exc_text(ex)))
+            return None
+
+    @staticmethod
+    def _plan_progress_title(phase, done, total):
+        """Header of the progress card."""
+        lead = {u"running": u"Running plan", u"finished": u"Plan finished",
+                u"stopped": u"Plan stopped"}.get(phase, u"Plan")
+        return u"{} — {} of {} steps done".format(lead, done, total)
+
+    def _set_plan_step(self, handle, step_id, state):
+        """Paint one step row. UI THREAD."""
+        try:
+            row = handle["rows"].get(step_id)
+            if row is None:
+                return
+            glyph, word, token = _STEP_LOOK.get(state, _STEP_LOOK['pending'])
+            row["glyph"].Text = glyph
+            _bind_fg(row["glyph"], token)
+            line = u"Step {} · {}".format(row["index"], word)
+            if row["modifies"]:
+                line += u" · changes the model"
+            row["line"].Text = line
+            if state == 'failed':
+                _bind_fg(row["line"], 'Danger')
+            else:
+                _bind_fg(row["line"], 'Muted')
+            handle["states"][step_id] = state
+            done = sum(1 for v in handle["states"].values() if v == 'done')
+            handle["head"].Text = self._plan_progress_title(
+                handle.get("phase"), done, handle["total"])
+        except Exception as ex:
+            logger.debug(u"_set_plan_step error: {}".format(_exc_text(ex)))
+
+    @staticmethod
+    def _final_step_state(graph_status, current, cancelled):
+        """Where a step ends up once the plan is over.
+
+        graph_status: the GraphState status of the step (None when the run
+        crashed and there is no state). current: what the card shows now.
+        The graph is the authority — the verifier can fail a step whose
+        runner returned text, and a fallback route can rescue one that failed.
+        """
+        if graph_status in ('done', 'failed', 'skipped', 'cancelled'):
+            return graph_status
+        if graph_status is None and current in ('done', 'failed'):
+            return current
+        if cancelled:
+            return 'cancelled'
+        return 'failed' if current == 'running' else 'skipped'
+
+    def _finalize_plan_progress(self, progress, state, cancelled=False):
+        """Any thread: settle every row from the graph state, retire Stop."""
+        handle = (progress or {}).get("card")
+        if not handle:
+            return
+
+        def _ui():
+            try:
+                handle["phase"] = u"stopped" if cancelled else u"finished"
+                for sid in list(handle["rows"].keys()):
+                    status = None
+                    if state is not None:
+                        try:
+                            status = state.status_of(sid)
+                        except Exception:
+                            status = None
+                    self._set_plan_step(handle, sid, self._final_step_state(
+                        status, handle["states"].get(sid), cancelled))
+                handle["stop"].Visibility = Visibility.Collapsed
+                handle["stop"].IsEnabled = False
+            except Exception as ex:
+                logger.debug(u"_finalize_plan_progress error: {}".format(
+                    _exc_text(ex)))
+        self._ui_invoke(_ui)
 
     @staticmethod
     def _graph_summary(result, viet):
@@ -8968,16 +9951,22 @@ class T3LabAssistantWindow(T3WPFWindow):
         # _volatile below and rides along with the user turn instead — putting
         # it here made the system block never repeat, so the cache never hit.
         if spec is not None and HAS_SPECIALISTS:
+            # Personal + project instructions and the skill block are
+            # appended below in the same order build_specialist_prompt uses
+            # (instructions, then skills), so a turn without personal
+            # instructions produces the exact prompt it always did — but the
+            # specialist builder would otherwise put its own "## Project
+            # instructions" header in front of the personal block.
             system_prompt = build_specialist_prompt(
-                spec, project_instructions=_proj_instructions,
-                skills_block=_skills_block, local=_is_local, lang=_lang)
+                spec, project_instructions=u"",
+                skills_block=u"", local=_is_local, lang=_lang)
         else:
             system_prompt = build_agent_system_prompt(local=_is_local,
                                                       lang=_lang)
-            if _proj_instructions:
-                system_prompt += u"\n\n## Project instructions\n" + _proj_instructions
-            if _skills_block:
-                system_prompt += u"\n\n" + _skills_block
+        if _proj_instructions:
+            system_prompt += u"\n\n" + _proj_instructions
+        if _skills_block:
+            system_prompt += u"\n\n" + _skills_block
 
         # Persistent memory — facts saved in previous chats steer BOTH the
         # specialist and the default prompt path.
@@ -9013,23 +10002,23 @@ class T3LabAssistantWindow(T3WPFWindow):
         except Exception:
             _kref = u""
 
-        # Harness action mode: 'confirm' = propose-then-wait before ANY
-        # model-modifying tool call (chip next to the project picker).
-        try:
-            from config.settings import get_settings as _gs_mode
-            if _gs_mode().get_action_mode() == 'confirm':
-                system_prompt += (
-                    u"\n\n## ACTION MODE: CONFIRM FIRST\n"
-                    u"Before calling ANY tool that modifies the model "
-                    u"(create/set/bulk/move/rotate/rename/delete/join/split/"
-                    u"purge/load/place/tag/color...), REPLY first with a "
-                    u"short plan: which tools, which elements and how many "
-                    u"are affected — then STOP and wait for the user's "
-                    u"confirmation in the next message. Read-only tools "
-                    u"(get/list/query/analyze/export) may be called "
-                    u"immediately without asking.")
-        except Exception:
-            pass
+        # Harness action mode: 'confirm' = "Ask before edits" (chip next to
+        # the project picker). ENFORCED in code — every model-modifying call
+        # goes through _run_gated_tool's approval card — so the model is told
+        # NOT to ask in text as well. The old wording ("reply with a plan, then
+        # STOP and wait") made every edit a double confirmation once the card
+        # existed: a typed "yes", then a click. Fixed per mode, so the system
+        # block still caches.
+        if self._action_mode() == 'confirm':
+            system_prompt += (
+                u"\n\n## ACTION MODE: ASK BEFORE EDITS\n"
+                u"The user approves every tool call that modifies the model "
+                u"on a card in the chat before it runs; the pane holds the "
+                u"call for you. So call tools exactly as you otherwise would "
+                u"— do NOT ask for confirmation in text first. If a call "
+                u"comes back cancelled (the user declined it), do not retry "
+                u"it: say what was skipped and ask what to change. Read-only "
+                u"tools are never held.")
 
         viet = _is_viet_text(captured)
 
@@ -9084,7 +10073,10 @@ class T3LabAssistantWindow(T3WPFWindow):
             logger.debug(u"context block build error: {}".format(_exc_text(_ctx_ex)))
 
         # ── B5: tool-execution wrapper ────────────────────────────────────────
-        # Destructive tools block on an in-chat Confirm/Cancel card; the first
+        # Every call goes through _run_gated_tool with ONE ToolGate per
+        # request — the same seam the legacy JSON-intent loop uses: destructive
+        # tools block on an in-chat Confirm/Cancel card, "Ask before edits"
+        # holds every model-modifying call on one too, and the first
         # purge_unused of a request is always forced to dry_run.
         #
         # B4 (one request = one TransactionGroup = one Undo entry) USED to live
@@ -9098,7 +10090,7 @@ class T3LabAssistantWindow(T3WPFWindow):
         # __begin_action_group in lib/core/server.py before reinstating any of
         # this: each tool now commits its own transaction, so a multi-step
         # request is N undo entries.
-        purge = {"first_done": False}
+        gate = self._new_tool_gate(srv)
         # Belt and braces: an AppDomain-anchored server from before a pyRevit
         # reload may still be carrying a group handle from the old code.
         try:
@@ -9160,18 +10152,11 @@ class T3LabAssistantWindow(T3WPFWindow):
                     return {"error": _note}
                 except Exception as _mem_ex:
                     return {"error": u"{}".format(_mem_ex)}
-            if name == 'purge_unused' and not purge["first_done"]:
-                purge["first_done"] = True
-                if not bool(args.get('dry_run', True)):
-                    args['dry_run'] = True   # first pass is ALWAYS a report
             # What counts as destructive is declared with the tools themselves
             # (server._DESTRUCTIVE_TOOLS / _DESTRUCTIVE_OPS) so a new tool can
-            # opt in at the point of definition instead of needing an edit here.
-            destructive = srv.is_destructive(name, args)
-            if destructive and not self._confirm_tool_blocking(name, args, viet):
-                return {"cancelled": True,
-                        "note": "User declined the '{}' action.".format(name)}
-            res = srv._execute_tool(name, args)
+            # opt in at the point of definition instead of needing an edit
+            # here; the gate reads it through srv.is_destructive.
+            res = self._run_gated_tool(srv, gate, name, args, viet)
             # Multi-doc workflow: the model changed the active document ON
             # PURPOSE — the doc-changed guard must not abort the request.
             # Activation can complete asynchronously, so retargeting the key
@@ -9190,10 +10175,11 @@ class T3LabAssistantWindow(T3WPFWindow):
             """Run a run of read-only calls in ONE crossing to Revit.
 
             Only reachable for plain reads (agent_loop.leading_read_run stops
-            at the first write, launcher or memory call), so none of the
-            _exec_tool preamble above — the action group, the destructive
-            confirm card, the purge dry-run forcing, the doc-guard disarm —
-            can apply to anything in here.
+            at the first write, launcher or memory call). One read CAN still
+            need a card: check_bad_geometry with deep_probe is destructive
+            (it can hard-crash Revit). A batch holding any call the gate would
+            stop returns None — AgentLoop then discards the prefetch and runs
+            every call through _exec_tool, card included.
 
             This used to call srv.execute_tools_batch, which the server has
             never defined. AgentLoop wraps the call in `except Exception:
@@ -9203,6 +10189,10 @@ class T3LabAssistantWindow(T3WPFWindow):
             `batch` is [(name, args), ...]; the return must be a list of the
             same length or AgentLoop discards it.
             """
+            from Intelligence.agent_loop import GATE_RUN
+            if any(gate.verdict(_name, _args) != GATE_RUN
+                   for _name, _args in batch):
+                return None
             out = []
             for _name, _args in batch:
                 out.append(srv._execute_tool(_name, _args))
@@ -9739,14 +10729,21 @@ class T3LabAssistantWindow(T3WPFWindow):
             from System.Windows.Media import SolidColorBrush, Color
 
             status = handle["status"]
-            if ok:
+            # A call the user declined on its approval card ran nothing: it
+            # is neither a success (green check) nor a failure (red cross).
+            declined = isinstance(result, dict) and bool(result.get("cancelled"))
+            if declined:
+                status.Text       = _ICON_STOP
+                _bind_fg(status, 'Muted')
+            elif ok:
                 status.Text       = u""   # MDL2 CheckMark
                 _bind_fg(status, 'Success')
             else:
                 status.Text       = u""   # MDL2 Cancel
                 _bind_fg(status, 'Danger')
 
-            handle["dur"].Text = u"{0:.1f}s".format(seconds)
+            handle["dur"].Text = (u"skipped" if declined
+                                  else u"{0:.1f}s".format(seconds))
 
             group = handle.get("group")
             if group is not None:
@@ -9826,6 +10823,8 @@ class T3LabAssistantWindow(T3WPFWindow):
             return fallback
         if result.get("error"):
             return u"Error: {}".format(result.get("error"))
+        if result.get("cancelled"):
+            return u"Not run — declined on the approval card"
         parts = []
         # Explicit human message from the tool, if any.
         msg = result.get("message") or result.get("summary")
@@ -10173,83 +11172,166 @@ class T3LabAssistantWindow(T3WPFWindow):
             logger.debug(u"_append_spellcheck_findings error: {}".format(_exc_text(ex)))
             return False
 
-    # ─── Destructive-tool confirmation (B5) ────────────────────────────────────
+    # ─── Tool approval gate (shared by the native and legacy paths) ───────────
+    # WHAT needs approval is decided by Intelligence.agent_loop.ToolGate (pure,
+    # tested); this block only shows the card and blocks on it. Both prompt
+    # paths execute through _run_gated_tool, so the destructive confirm, the
+    # first-purge dry run and "Ask before edits" can no longer differ between
+    # them — the legacy JSON-intent loop used to run every call unchecked.
 
-    def _confirm_tool_blocking(self, name, args, viet, timeout_sec=120):
+    def _new_tool_gate(self, srv):
+        """A fresh ToolGate for ONE request (it remembers the first purge)."""
+        from Intelligence.agent_loop import ToolGate
+        return ToolGate(
+            action_mode=self._action_mode(),
+            is_destructive=srv.is_destructive,
+            preapproved_edits=bool(getattr(self, '_plan_preapproved', False)))
+
+    def _run_gated_tool(self, srv, gate, name, args, viet):
+        """Gate, then execute, one tool call. WORKER THREAD.
+
+        Returns the tool's result, or agent_loop.declined_result(name) when
+        the user said no (or Stop / the timeout answered for them) — the model
+        reads that as "skipped, do not retry", never as a failure to work
+        around.
+        """
+        from Intelligence.agent_loop import GATE_RUN, declined_result
+        args, verdict = gate.prepare(name, args)
+        if verdict != GATE_RUN:
+            if not self._confirm_tool_blocking(name, args, viet, kind=verdict):
+                return declined_result(name)
+        res = srv._execute_tool(name, args)
+        if gate.modifies(name, args):
+            self._note_model_changed()
+        return res
+
+    @staticmethod
+    def _note_model_changed():
+        """The assistant just changed the model: the cached levels/grids
+        digest in the live context may be stale (it may have made a level)."""
+        try:
+            _inv = getattr(ContextScout, 'invalidate_datums', None)
+            if _inv is not None:
+                _inv()
+        except Exception:
+            pass
+
+    def _confirm_tool_blocking(self, name, args, viet,
+                               timeout_sec=_CONFIRM_TIMEOUT,
+                               kind='destructive'):
         """WORKER thread: render a Confirm/Cancel card and block until the
         user decides. Returns True only on an explicit Confirm click —
         timeout, Stop, or any error all count as declined.
+
+        kind: 'destructive' (red card, every action mode) or 'edit' (an
+        ordinary model change held by "Ask before edits").
         """
-        import threading
-        state = {"decision": None, "seal": None}
-        evt = threading.Event()
+        from Intelligence.agent_loop import PendingDecision
+        pending = PendingDecision()
+        handle = {"seal": None}
 
         def _ui():
             try:
                 self._hide_typing_indicator()
-                self._append_confirm_card(name, args, state, evt, viet)
-            except Exception:
-                state["decision"] = False
-                evt.set()
+                handle["seal"] = self._append_confirm_card(
+                    name, args, pending, viet, kind=kind)
+            except Exception as _cx:
+                logger.debug(u"confirm card error: {}".format(_exc_text(_cx)))
+                pending.decide(False)
 
         try:
             self.Dispatcher.Invoke(Action(_ui))
         except Exception:
             return False
 
-        waited = 0.0
-        while waited < timeout_sec and not evt.is_set():
-            evt.wait(0.25)
-            waited += 0.25
-            loop = self._agent_loop
+        def _abort():
+            # Stop on EITHER path: the native loop's own flag, and the
+            # window-wide one the legacy loop checks.
+            loop = getattr(self, '_agent_loop', None)
             if loop is not None and loop.is_cancelled():
-                break
+                return True
+            return self._cancelled()
 
-        if state["decision"] is None:
+        decision = pending.wait(timeout_sec, should_abort=_abort)
+        if decision is not True and decision is not False:
             # Timeout / Stop — seal the card so stale buttons can't approve
             # a request that is already over.
+            _msg = (u"Stopped — skipped" if decision == PendingDecision.STOPPED
+                    else u"Expired — skipped")
+
             def _expire():
                 try:
-                    if state.get("seal"):
-                        state["seal"](u"⏱ Expired — skipped" if viet
-                                      else u"⏱ Expired — skipped")
+                    if handle.get("seal"):
+                        handle["seal"](_msg)
                 except Exception:
                     pass
             try:
                 self.Dispatcher.BeginInvoke(Action(_expire))
             except Exception:
                 pass
-        return state["decision"] is True
+        return decision is True
 
-    def _append_confirm_card(self, name, args, state, evt, viet):
-        """Confirm/Cancel card for a destructive tool call. UI thread only."""
-        from System.Windows.Controls import Border, TextBlock, StackPanel, Orientation, Button
+    def _make_card_button(self, label, primary=False, tooltip=None):
+        """A button for an in-chat card that follows the Revit theme. UI THREAD.
+
+        T3.Button.Base supplies only the SHAPE (flat template, control radius,
+        30px, hand cursor, focus ring) and no colour of its own; the colours
+        are bound to the theme tokens like every other transcript element, so
+        the button survives a Light/Dark switch while it sits on screen.
+        """
+        from System.Windows.Controls import Button
+        from System.Windows import Thickness
+        btn = Button()
+        try:
+            btn.Style = self.FindResource("T3.Button.Base")
+        except Exception:
+            pass
+        btn.Content = label
+        btn.Margin  = Thickness(0, 0, 8, 8)
+        if tooltip:
+            btn.ToolTip = tooltip
+        if primary:
+            _bind_bg(btn, 'Accent')
+            _bind_border(btn, 'Accent')
+            _bind_fg(btn, 'OnAccent')
+
+            def _enter(s, e, _b=btn):
+                _bind_bg(_b, 'AccentHover')
+                _bind_border(_b, 'AccentHover')
+
+            def _leave(s, e, _b=btn):
+                _bind_bg(_b, 'Accent')
+                _bind_border(_b, 'Accent')
+        else:
+            _bind_bg(btn, 'ControlBg')
+            _bind_border(btn, 'ControlBorder')
+            _bind_fg(btn, 'Ink')
+
+            def _enter(s, e, _b=btn):
+                _bind_bg(_b, 'ControlHoverBg')
+                _bind_border(_b, 'ControlHoverBorder')
+
+            def _leave(s, e, _b=btn):
+                _bind_bg(_b, 'ControlBg')
+                _bind_border(_b, 'ControlBorder')
+        btn.MouseEnter += _enter
+        btn.MouseLeave += _leave
+        return btn
+
+    def _append_confirm_card(self, name, args, pending, viet,
+                             kind='destructive'):
+        """Confirm/Cancel card for one held tool call. UI thread only.
+
+        Returns seal(text): disables the card and shows `text`. A click
+        decides `pending` (agent_loop.PendingDecision) — first answer wins, so
+        a click that lands after Stop or the timeout changes nothing.
+        """
+        from System.Windows.Controls import (Border, TextBlock, StackPanel,
+                                              WrapPanel)
         from System.Windows.Documents import Run
         from System.Windows import Thickness, CornerRadius, TextWrapping
-        from System.Windows.Media import SolidColorBrush, Color
+        from System.Windows.Media import SolidColorBrush, Color, FontFamily
         from System.Windows.Input import Cursors
-
-        card = Border()
-        card.Background      = SolidColorBrush(Color.FromRgb(254, 242, 242))  # #FEF2F2
-        card.BorderBrush     = SolidColorBrush(Color.FromRgb(252, 165, 165))  # #FCA5A5
-        card.BorderThickness = Thickness(1)
-        card.CornerRadius    = CornerRadius(8)
-        card.Padding         = Thickness(12, 10, 12, 10)
-        card.Margin          = Thickness(0, 0, 8, 10)
-
-        panel = StackPanel()
-
-        head = TextBlock()
-        head.FontSize   = 12
-        head.FontWeight = System.Windows.FontWeights.SemiBold
-        head.Foreground = SolidColorBrush(Color.FromRgb(185, 28, 28))          # #B91C1C
-        # Minimal MDL2 warning glyph — needs its own FontFamily run; the plain
-        # "⚠" character rendered in the body font would show as a colored
-        # emoji glyph (or tofu) instead of a flat monochrome icon.
-        self._add_icon_run(head, _ICON_WARNING, (185, 28, 28), size=12)
-        head.Inlines.Add(Run(u"Confirm destructive action" if viet
-                             else u"Confirm destructive action"))
-        panel.Children.Add(head)
 
         try:
             args_s = json.dumps(args, ensure_ascii=False)
@@ -10257,83 +11339,135 @@ class T3LabAssistantWindow(T3WPFWindow):
             args_s = u"{}".format(args)
         if len(args_s) > 200:
             args_s = args_s[:200] + u"…"
+
+        destructive = (kind == 'destructive')
+        card = Border()
+        card.BorderThickness = Thickness(1)
+        card.CornerRadius    = CornerRadius(8)
+        card.Padding         = Thickness(12, 10, 12, 10)
+        card.Margin          = Thickness(0, 0, 8, 10)
+        panel = StackPanel()
+
+        head = TextBlock()
+        head.FontSize     = 12
+        head.FontWeight   = System.Windows.FontWeights.SemiBold
+        head.TextWrapping = TextWrapping.Wrap
         body = TextBlock()
-        body.Text         = u"`{}` — {}".format(name, args_s)
         body.FontSize     = 11.5
         body.TextWrapping = TextWrapping.Wrap
-        # Fixed ink, not a theme token. This card stays light red in BOTH
-        # themes on purpose (a destructive prompt has to shout), so token text
-        # inverts with the host and disappears on it: BotText is #E4E4E4 in
-        # Revit's dark theme — near-white on #FEF2F2.
-        body.Foreground   = SolidColorBrush(Color.FromRgb(63, 63, 63))   # #3F3F3F
         body.Margin       = Thickness(0, 4, 0, 8)
-        panel.Children.Add(body)
-
-        btn_row = StackPanel()
-        btn_row.Orientation = Orientation.Horizontal
-
         status_tb = TextBlock()
-        status_tb.FontSize   = 11.5
-        # Same reason as `body` above — fixed card, fixed ink.
-        status_tb.Foreground = SolidColorBrush(Color.FromRgb(140, 106, 106))  # #8C6A6A
-        status_tb.Margin     = Thickness(10, 5, 0, 0)
-        status_tb.Visibility = Visibility.Collapsed
+        status_tb.FontSize     = 11.5
+        status_tb.TextWrapping = TextWrapping.Wrap
+        status_tb.Visibility   = Visibility.Collapsed
 
-        def _mk_btn(label, bg, fg):
-            b = Button()
-            b.Content         = label
-            b.FontSize        = 12
-            b.FontWeight      = System.Windows.FontWeights.SemiBold
-            b.Padding         = Thickness(14, 5, 14, 5)
-            b.Margin          = Thickness(0, 0, 8, 0)
-            b.Cursor          = Cursors.Hand
-            b.Background      = SolidColorBrush(bg)
-            b.Foreground      = SolidColorBrush(fg)
-            b.BorderThickness = Thickness(0)
-            return b
+        btn_row = WrapPanel()
+        if destructive:
+            card.Background  = SolidColorBrush(Color.FromRgb(254, 242, 242))  # #FEF2F2
+            card.BorderBrush = SolidColorBrush(Color.FromRgb(252, 165, 165))  # #FCA5A5
+            head.Foreground  = SolidColorBrush(Color.FromRgb(185, 28, 28))    # #B91C1C
+            # Minimal MDL2 warning glyph — needs its own FontFamily run; the
+            # plain "⚠" character rendered in the body font would show as a
+            # colored emoji glyph (or tofu) instead of a flat monochrome icon.
+            self._add_icon_run(head, _ICON_WARNING, (185, 28, 28), size=12)
+            head.Inlines.Add(Run(u"Confirm destructive action"))
+            body.Text = u"`{}` — {}".format(name, args_s)
+            # Fixed ink, not a theme token. This card stays light red in BOTH
+            # themes on purpose (a destructive prompt has to shout), so token
+            # text inverts with the host and disappears on it: BotText is
+            # #E4E4E4 in Revit's dark theme — near-white on #FEF2F2.
+            body.Foreground      = SolidColorBrush(Color.FromRgb(63, 63, 63))     # #3F3F3F
+            status_tb.Foreground = SolidColorBrush(Color.FromRgb(140, 106, 106))  # #8C6A6A
+            status_tb.Margin     = Thickness(0, 4, 0, 0)
 
-        # Fixed colours, like the card itself — the two buttons live on a
-        # surface that does not follow the host, so theme tokens read wrong on
-        # it in dark mode (CardBg is a mid grey there: grey label on a red
-        # button, 2.1:1; Ink is white: white label on a light grey button).
-        ok_btn = _mk_btn(u"Confirm" if viet else u"Confirm",
-                         Color.FromRgb(196, 43, 28),      # #C42B1C
-                         Color.FromRgb(255, 255, 255))
-        no_btn = _mk_btn(u"Cancel" if viet else u"Cancel",
-                         Color.FromRgb(230, 230, 230),    # #E6E6E6
-                         Color.FromRgb(63, 63, 63))       # #3F3F3F
+            def _mk_btn(label, bg, fg):
+                from System.Windows.Controls import Button
+                b = Button()
+                b.Content         = label
+                b.FontSize        = 12
+                b.FontWeight      = System.Windows.FontWeights.SemiBold
+                b.Padding         = Thickness(14, 5, 14, 5)
+                b.Margin          = Thickness(0, 0, 8, 4)
+                b.Cursor          = Cursors.Hand
+                b.Background      = SolidColorBrush(bg)
+                b.Foreground      = SolidColorBrush(fg)
+                b.BorderThickness = Thickness(0)
+                return b
+
+            # Fixed colours, like the card itself — the two buttons live on a
+            # surface that does not follow the host, so theme tokens read wrong
+            # on it in dark mode (CardBg is a mid grey there: grey label on a
+            # red button, 2.1:1; Ink is white: white label on a light grey
+            # button).
+            ok_btn = _mk_btn(u"Confirm",
+                             Color.FromRgb(196, 43, 28),      # #C42B1C
+                             Color.FromRgb(255, 255, 255))
+            no_btn = _mk_btn(u"Cancel",
+                             Color.FromRgb(230, 230, 230),    # #E6E6E6
+                             Color.FromRgb(63, 63, 63))       # #3F3F3F
+        else:
+            # An ordinary edit held by "Ask before edits": a question, not an
+            # alarm — the theme card with an accent edge, not the red one.
+            _bind_bg(card, 'CardBg')
+            _bind_border(card, 'Accent')
+            _bind_fg(head, 'Ink')
+            self._add_icon_run(head, _ICON_EDIT, _trgb('Accent'), size=12)
+            head.Inlines.Add(Run(u"Approve this model change"))
+            _tool = Run(name)
+            _tool.FontFamily = FontFamily(u"Consolas")
+            body.Inlines.Add(_tool)
+            body.Inlines.Add(Run(u" — {}".format(args_s)))
+            _bind_fg(body, 'Ink')
+            note = TextBlock()
+            note.Text = (u"Ask before edits is on — nothing changes until you "
+                         u"confirm.")
+            note.FontSize     = 11
+            note.TextWrapping = TextWrapping.Wrap
+            note.Margin       = Thickness(0, 0, 0, 8)
+            _bind_fg(note, 'Muted')
+            _bind_fg(status_tb, 'Muted')
+            ok_btn = self._make_card_button(
+                u"Confirm", primary=True,
+                tooltip=u"Run this one call now")
+            no_btn = self._make_card_button(
+                u"Cancel", tooltip=u"Skip this call — the assistant is told "
+                                   u"you declined")
+
+        panel.Children.Add(head)
+        panel.Children.Add(body)
+        if not destructive:
+            panel.Children.Add(note)
 
         def _seal(msg):
             try:
+                btn_row.Visibility   = Visibility.Collapsed
                 ok_btn.IsEnabled     = False
                 no_btn.IsEnabled     = False
                 status_tb.Text       = msg
                 status_tb.Visibility = Visibility.Visible
             except Exception:
                 pass
-        state["seal"] = _seal
 
         def _on_ok(s, e):
-            state["decision"] = True
-            _seal(u"✓ Confirmed" if viet else u"✓ Confirmed")
-            evt.set()
+            if pending.decide(True):
+                _seal(u"Confirmed")
 
         def _on_cancel(s, e):
-            state["decision"] = False
-            _seal(u"✗ Cancelled" if viet else u"✗ Cancelled")
-            evt.set()
+            if pending.decide(False):
+                _seal(u"Cancelled — skipped")
 
         ok_btn.Click += _on_ok
         no_btn.Click += _on_cancel
 
         btn_row.Children.Add(ok_btn)
         btn_row.Children.Add(no_btn)
-        btn_row.Children.Add(status_tb)
         panel.Children.Add(btn_row)
+        panel.Children.Add(status_tb)
 
         card.Child = panel
         self.chat_history_panel.Children.Add(card)
         self._scroll_to_bottom()
+        return _seal
 
     # ─── Vision view capture (C2) ──────────────────────────────────────────────
 

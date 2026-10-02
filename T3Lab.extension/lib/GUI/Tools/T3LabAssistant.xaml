@@ -1907,44 +1907,67 @@
 
                     <Border Grid.Row="0" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
                             Padding="16,12" Background="{StaticResource T3.SurfaceSunken}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Chat History" Style="{StaticResource T3.Title}"
-                                           TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="Past sessions saved for this document"
-                                           Style="{StaticResource T3.Caption}" Margin="0,4,0,0"
-                                           TextWrapping="Wrap"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
-                                        Margin="8,0,0,0">
-                                <Button x:Name="btn_activity_log"
-                                        Style="{StaticResource T3.Button.Ghost}"
-                                        Height="26" MinWidth="0" Padding="8,0"
-                                        Margin="0,0,8,0"
-                                        Click="activity_log_clicked"
-                                        ToolTip="Today's activity log (daily log in the project folder)">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="11"
-                                                   Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="activity_log_label" Text="Activity log"
-                                                   Style="{StaticResource T3.Caption}" VerticalAlignment="Center"
-                                                   Margin="4,0,0,0"/>
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="btn_clear_all_history"
-                                        Style="{StaticResource T3.Button.Ghost}"
-                                        Height="26" MinWidth="0" Padding="8,0"
-                                        Click="clear_all_history_clicked"
-                                        ToolTip="Delete all saved sessions">
-                                    <TextBlock Text="Clear all" Style="{StaticResource T3.Caption}"
-                                               Foreground="{StaticResource T3.Danger.Text}"/>
-                                </Button>
-                            </StackPanel>
-                        </Grid>
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Chat History" Style="{StaticResource T3.Title}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock x:Name="history_subtitle"
+                                               Text="Past sessions saved for this document"
+                                               Style="{StaticResource T3.Caption}" Margin="0,4,0,0"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                            Margin="8,0,0,0">
+                                    <Button x:Name="btn_activity_log"
+                                            Style="{StaticResource T3.Button.Ghost}"
+                                            Height="26" MinWidth="0" Padding="8,0"
+                                            Margin="0,0,8,0"
+                                            Click="activity_log_clicked"
+                                            ToolTip="Today's activity log (daily log in the project folder)">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                       Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="activity_log_label" Text="Activity log"
+                                                       Style="{StaticResource T3.Caption}" VerticalAlignment="Center"
+                                                       Margin="4,0,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="btn_clear_all_history"
+                                            Style="{StaticResource T3.Button.Ghost}"
+                                            Height="26" MinWidth="0" Padding="8,0"
+                                            Click="clear_all_history_clicked"
+                                            ToolTip="Delete every conversation in this list">
+                                        <TextBlock Text="Clear all" Style="{StaticResource T3.Caption}"
+                                                   Foreground="{StaticResource T3.Danger.Text}"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Search + scope. Stacked, not side by side: the pane works
+                                 from 240 DIP, where a row of box + two chips leaves the
+                                 box no room to type in. -->
+                            <TextBox x:Name="history_search_box" Style="{StaticResource T3.Search}"
+                                     Tag="Search conversations" Margin="0,12,0,0"
+                                     TextChanged="history_search_changed"
+                                     ToolTip="Search titles and messages — every word must match"/>
+                            <WrapPanel Margin="0,8,0,0">
+                                <RadioButton x:Name="history_scope_project" GroupName="history_scope"
+                                             Style="{StaticResource T3.Chip}" IsChecked="True"
+                                             Content="This project"
+                                             Checked="history_scope_changed"
+                                             ToolTip="Conversations of the active project, for this document"/>
+                                <RadioButton x:Name="history_scope_all" GroupName="history_scope"
+                                             Style="{StaticResource T3.Chip}"
+                                             Content="All projects"
+                                             Checked="history_scope_changed"
+                                             ToolTip="Conversations from every project and document"/>
+                            </WrapPanel>
+                        </StackPanel>
                     </Border>
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
@@ -1958,10 +1981,12 @@
                                 <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="19"
                                            Foreground="{StaticResource T3.TextDisabled}"
                                            HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                                <TextBlock Text="No chat history yet" Style="{StaticResource T3.BodyStrong}"
+                                <TextBlock x:Name="history_empty_title"
+                                           Text="No chat history yet" Style="{StaticResource T3.BodyStrong}"
                                            HorizontalAlignment="Center" Margin="0,0,0,4"
                                            TextWrapping="Wrap" TextAlignment="Center"/>
-                                <TextBlock Text="Click + above to start a conversation."
+                                <TextBlock x:Name="history_empty_hint"
+                                           Text="Click + above to start a conversation."
                                            Style="{StaticResource T3.Caption}"
                                            HorizontalAlignment="Center"
                                            TextWrapping="Wrap" TextAlignment="Center"/>

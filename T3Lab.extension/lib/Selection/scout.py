@@ -7,6 +7,10 @@ Collects current Revit context for the AI Agent to avoid redundant questions.
 Author: Tran Tien Thanh
 """
 
+import re
+import threading
+import time
+
 from pyrevit import revit, DB
 
 
@@ -22,8 +26,153 @@ def _eid_value(element_id):
         return element_id.IntegerValue   # Revit 2023 and earlier
 
 
+# ─── Levels + grids (cached per document) ─────────────────────────────────────
+# The datums every placement / filter / dimension request leans on. Without
+# them in the live context the agent spent its first round-trip of almost any
+# "on Level 2" / "between grids A and C" request calling list_levels. They
+# change rarely, so they are read ONCE per document and kept: the cache is
+# keyed by document (switching models re-reads), dropped when the assistant
+# itself changes the model (invalidate_datums), and re-read after a TTL so an
+# edit the user makes by hand in Revit still shows up. A turn inside the TTL
+# costs nothing at all.
+
+_FT_TO_M = 0.3048
+
+#: Most levels / grids listed by name in the summary (the count is always
+#: exact). Thirty grid names cover an ordinary building; a campus model with
+#: hundreds would otherwise put a wall of names in front of every turn.
+MAX_LEVELS_IN_SUMMARY = 40
+MAX_GRIDS_IN_SUMMARY = 30
+
+#: Seconds a document's digest stays fresh without an explicit invalidation.
+DATUM_TTL_SEC = 300.0
+
+#: Documents remembered at once (one entry per open model the user visits).
+_MAX_CACHED_DOCS = 8
+
+_datum_cache = {}          # doc key -> {"at", "levels", "grids", "dirty"}
+_datum_lock = threading.Lock()
+
+
+def _doc_identity(doc):
+    """A key for one open document: its path, else its title (unsaved)."""
+    try:
+        path = doc.PathName or u""
+    except Exception:
+        path = u""
+    try:
+        title = doc.Title or u""
+    except Exception:
+        title = u""
+    return u"{}|{}".format(path, title)
+
+
+def _natural_key(text):
+    """Sort "2" before "10" and "A" before "B" — grid names are both."""
+    parts = re.split(r'(\d+)', u"{}".format(text or u""))
+    return [(0, int(p), u"") if p.isdigit() else (1, 0, p.lower())
+            for p in parts if p != u""]
+
+
+def collect_levels_and_grids(doc):
+    """([(level name, elevation in m)], [grid name]) for `doc`.
+
+    Read-only: two collectors, no transaction. Elevations are converted from
+    Revit's internal feet to METRES — the unit every assistant tool speaks —
+    the same way the list_levels tool reports them.
+    """
+    levels = []
+    for lv in DB.FilteredElementCollector(doc).OfClass(DB.Level):
+        try:
+            levels.append((lv.Name, round(float(lv.Elevation) * _FT_TO_M, 3)))
+        except Exception:
+            pass
+    levels.sort(key=lambda item: (item[1], _natural_key(item[0])))
+    grids = []
+    for g in DB.FilteredElementCollector(doc).OfClass(DB.Grid):
+        try:
+            grids.append(g.Name)
+        except Exception:
+            pass
+    grids.sort(key=_natural_key)
+    return levels, grids
+
+
+def _fmt_elevation(metres):
+    text = u"{:.3f}".format(metres).rstrip(u"0").rstrip(u".")
+    if text in (u"-0", u""):
+        text = u"0"
+    return text
+
+
+def format_levels_and_grids(levels, grids, max_levels=None, max_grids=None):
+    """Compact summary lines (no trailing newline), or u"" when the model has
+    neither. The count is exact even when the name list is cut short."""
+    max_levels = MAX_LEVELS_IN_SUMMARY if max_levels is None else max_levels
+    max_grids = MAX_GRIDS_IN_SUMMARY if max_grids is None else max_grids
+    lines = []
+    if levels:
+        shown = [u"{} ({} m)".format(name, _fmt_elevation(elev))
+                 for name, elev in levels[:max_levels]]
+        more = len(levels) - len(shown)
+        lines.append(u"- Levels ({}, by elevation): {}{}".format(
+            len(levels), u", ".join(shown),
+            u", +{} more".format(more) if more > 0 else u""))
+    if grids:
+        shown = [u"{}".format(n) for n in grids[:max_grids]]
+        more = len(grids) - len(shown)
+        lines.append(u"- Grids ({}): {}{}".format(
+            len(grids), u", ".join(shown),
+            u", +{} more".format(more) if more > 0 else u""))
+    return u"\n".join(lines)
+
+
+def get_levels_and_grids(doc, now=None):
+    """Cached collect_levels_and_grids(doc). Never raises — ([], []) when the
+    document cannot be read."""
+    if doc is None:
+        return [], []
+    key = _doc_identity(doc)
+    now = time.time() if now is None else now
+    with _datum_lock:
+        entry = _datum_cache.get(key)
+        if (entry is not None and not entry["dirty"]
+                and (now - entry["at"]) < DATUM_TTL_SEC):
+            return list(entry["levels"]), list(entry["grids"])
+    try:
+        levels, grids = collect_levels_and_grids(doc)
+    except Exception:
+        return [], []
+    with _datum_lock:
+        if key not in _datum_cache and len(_datum_cache) >= _MAX_CACHED_DOCS:
+            oldest = min(_datum_cache, key=lambda k: _datum_cache[k]["at"])
+            _datum_cache.pop(oldest, None)
+        _datum_cache[key] = {"at": now, "levels": list(levels),
+                             "grids": list(grids), "dirty": False}
+    return list(levels), list(grids)
+
+
+def invalidate_datums(doc=None):
+    """Mark the cached digest stale — one document, or all of them. Called
+    after the assistant runs a model-modifying tool (it may have just created
+    a level or a grid)."""
+    with _datum_lock:
+        if doc is None:
+            for entry in _datum_cache.values():
+                entry["dirty"] = True
+            return
+        entry = _datum_cache.get(_doc_identity(doc))
+        if entry is not None:
+            entry["dirty"] = True
+
+
 class ContextScout:
     """Specialized module for rapid context gathering from the active Revit session."""
+
+    @staticmethod
+    def invalidate_datums(doc=None):
+        """See the module-level invalidate_datums()."""
+        invalidate_datums(doc)
 
     @staticmethod
     def get_active_context():
@@ -93,7 +242,11 @@ class ContextScout:
                 "language": str(doc.Application.Language)
             }
         }
-        
+
+        # Levels + grids: cached per document, so this costs nothing per turn.
+        levels, grids = get_levels_and_grids(doc)
+        context["datums"] = {"levels": levels, "grids": grids}
+
         return context
 
     @staticmethod
@@ -121,5 +274,11 @@ class ContextScout:
             summary += "Selected items details:\n"
             for d in ctx["selection"]["details"]:
                 summary += "  * {} ({}) [ID: {}]\n".format(d["name"], d["category"], d["id"])
-                
+
+        datums = ctx.get("datums") or {}
+        datum_lines = format_levels_and_grids(datums.get("levels") or [],
+                                              datums.get("grids") or [])
+        if datum_lines:
+            summary += datum_lines + "\n"
+
         return summary

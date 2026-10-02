@@ -32,10 +32,12 @@ __title__  = "Agent Loop"
 
 import json
 import re
+import threading
 import time
 
 from core import jsonsafe
-from Intelligence.tool_schema import LAUNCHER_TOOL_NAME, MEMORY_TOOL_NAME
+from Intelligence.tool_schema import (LAUNCHER_TOOL_NAME, MEMORY_TOOL_NAME,
+                                      is_model_modifying)
 
 
 # ─── Result truncation ─────────────────────────────────────────────────────────
@@ -385,6 +387,212 @@ def _sanitize_history(history, limit=None):
     while out and out[0]["role"] == "assistant":
         out.pop(0)
     return out
+
+
+# ─── Tool gate: who has to approve a call before it runs ──────────────────────
+# ONE policy for every path that executes a tool on the user's behalf — the
+# native AgentLoop callback and the legacy JSON-intent loop in the Assistant
+# pane both ask the same ToolGate. They used to disagree: the native path
+# confirmed destructive tools and forced the first purge to a dry run, while
+# the legacy path ran every call straight through srv._execute_tool, and the
+# "Ask before edits" switch was only a sentence in the system prompt that
+# nothing in code enforced.
+#
+# The gate only DECIDES. Showing the approval card and blocking on it is the
+# window's job (it needs WPF); this half is pure so it can be tested.
+
+GATE_RUN         = 'run'           # execute now, nobody is asked
+GATE_DESTRUCTIVE = 'destructive'   # always confirm, in every action mode
+GATE_EDIT        = 'edit'          # "Ask before edits" is on: confirm first
+
+ACTION_MODES = ('auto', 'confirm')
+
+# Calls that only REPORT although the tool itself can write. A purge dry run
+# lists what it would delete and touches nothing, so "Ask before edits" has
+# nothing to ask about — and the first purge of every request is forced into
+# exactly that dry run below.
+_REPORT_ONLY_CALLS = {
+    'purge_unused': ('dry_run', True),
+}
+
+
+def _is_report_only(name, args):
+    rule = _REPORT_ONLY_CALLS.get(name)
+    if not rule:
+        return False
+    key, default = rule
+    try:
+        return bool((args or {}).get(key, default))
+    except Exception:
+        return False
+
+
+class ToolGate(object):
+    """Pre-execution policy for ONE user request.
+
+    action_mode:       'auto' | 'confirm' (settings agents.action_mode).
+    is_destructive:    callable(name, args) -> bool — core.server's
+                       T3LabAIServer.is_destructive, where the dangerous
+                       tools are declared next to their definitions.
+    is_modifying:      callable(name) -> bool. Defaults to
+                       tool_schema.is_model_modifying (unknown names count as
+                       modifying: the unclassified tool is the surprising one).
+    preapproved_edits: True while an approved multi-step plan runs — the user
+                       already said yes to its edits on the plan card, so
+                       "Ask before edits" does not ask again per call.
+                       Destructive calls still confirm one by one.
+
+    Fails CLOSED: a classifier that raises turns the call into a
+    confirmation, never into a silent run.
+    """
+
+    def __init__(self, action_mode='auto', is_destructive=None,
+                 is_modifying=None, preapproved_edits=False):
+        self.action_mode = (action_mode if action_mode in ACTION_MODES
+                            else 'auto')
+        self._is_destructive = is_destructive
+        self._is_modifying = is_modifying or is_model_modifying
+        self.preapproved_edits = bool(preapproved_edits)
+        self._purge_seen = False
+
+    def verdict(self, name, args=None):
+        """GATE_RUN | GATE_DESTRUCTIVE | GATE_EDIT for one call. No side
+        effects — safe to ask about a call that will never run."""
+        if not name or name in (LAUNCHER_TOOL_NAME, MEMORY_TOOL_NAME):
+            # Local pseudo-tools: the launcher opens a window AFTER the turn,
+            # the memory tool writes a fact file. Neither touches the model.
+            return GATE_RUN
+        args = args or {}
+        if self._is_destructive is not None:
+            try:
+                if self._is_destructive(name, args):
+                    return GATE_DESTRUCTIVE
+            except Exception:
+                return GATE_DESTRUCTIVE
+        if (self.action_mode == 'confirm' and not self.preapproved_edits
+                and self.modifies(name, args)):
+            return GATE_EDIT
+        return GATE_RUN
+
+    def modifies(self, name, args=None):
+        """True when this call can change the model or write a file
+        (whatever the action mode says about asking first)."""
+        if not name or name in (LAUNCHER_TOOL_NAME, MEMORY_TOOL_NAME):
+            return False
+        if _is_report_only(name, args or {}):
+            return False
+        try:
+            return bool(self._is_modifying(name))
+        except Exception:
+            return True
+
+    def prepare(self, name, args):
+        """(args, verdict) for a call that is ABOUT to run.
+
+        The first purge_unused of a request is always rewritten to a dry run
+        — the model reports what would go, the user decides, and only a
+        second, explicit call can delete (and that one is destructive, so it
+        confirms).
+        """
+        args = dict(args or {})
+        if name == 'purge_unused' and not self._purge_seen:
+            self._purge_seen = True
+            if not bool(args.get('dry_run', True)):
+                args['dry_run'] = True
+        return args, self.verdict(name, args)
+
+
+def tool_def_name(tool):
+    """Name of one provider-native tool definition (Anthropic `{"name"}`,
+    OpenAI-style `{"function": {"name"}}`), or u''."""
+    try:
+        return (tool.get("name")
+                or (tool.get("function") or {}).get("name") or u"")
+    except Exception:
+        return u""
+
+
+def read_only_tools(tools, is_modifying=None):
+    """`tools` minus every definition that can change the model or write a
+    file. For background read tasks, which have no approval card to stop at:
+    a tool they cannot see is a tool they cannot call."""
+    is_modifying = is_modifying or is_model_modifying
+    out = []
+    for t in tools or []:
+        name = tool_def_name(t)
+        try:
+            if name and not is_modifying(name):
+                out.append(t)
+        except Exception:
+            pass
+    return out
+
+
+def declined_result(name):
+    """The tool result handed back to the model when the user said no."""
+    return {"cancelled": True,
+            "note": u"User declined the '{}' action. Do not retry it; say "
+                    u"what was skipped and ask what to change.".format(name)}
+
+
+# ─── One answer from the UI thread to a waiting worker ────────────────────────
+
+class PendingDecision(object):
+    """A one-shot decision the UI thread hands to a blocked worker thread.
+
+    The approval cards (plan card, confirm card) block the routing worker
+    while the user reads them. FIRST decision wins: a Run click that lands a
+    moment after Stop must not resurrect a request the user already
+    cancelled, and a timeout must not be overturned by a late click.
+    """
+
+    STOPPED = 'stopped'
+    EXPIRED = 'expired'
+
+    def __init__(self):
+        self._evt   = threading.Event()
+        self._lock  = threading.Lock()
+        self._value = None
+
+    def decide(self, value):
+        """Record `value` unless something was decided already. Returns True
+        when THIS call made the decision."""
+        with self._lock:
+            if self._evt.is_set():
+                return False
+            self._value = value
+            self._evt.set()
+            return True
+
+    @property
+    def value(self):
+        return self._value
+
+    def is_decided(self):
+        return self._evt.is_set()
+
+    def wait(self, timeout_sec, should_abort=None, poll=0.25):
+        """Block until decided, aborted (STOPPED) or timed out (EXPIRED).
+
+        `should_abort` is polled between waits — the window passes its Stop
+        flag, so pressing Stop releases a card that is still on screen.
+        Returns the decided value.
+        """
+        deadline = time.time() + max(0.0, float(timeout_sec or 0))
+        while not self._evt.is_set():
+            if should_abort is not None:
+                try:
+                    if should_abort():
+                        self.decide(self.STOPPED)
+                        break
+                except Exception:
+                    pass
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                self.decide(self.EXPIRED)
+                break
+            self._evt.wait(min(poll, remaining))
+        return self._value
 
 
 class AgentLoop(object):
