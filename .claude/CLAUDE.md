@@ -55,7 +55,7 @@ The following XAML files are **UI-locked** — their visual design is finalized 
 
 | File | Reason |
 |------|--------|
-| `T3Lab.extension/lib/GUI/Tools/DWGManagement.xaml` | Finalized custom design — UI locked |
+| `T3Lab.extension/lib/GUI/Tools/DWGManagement.xaml` | Finalized custom design — UI locked (window chrome only follows rule 26 since 2026-10-02, owner request: transparent Window, 1px `T3.BorderStrong`, `T3.R.Window`, no grip) |
 | `T3Lab.extension/lib/GUI/Tools/T3LabAssistant.xaml` | Chat surface, not a tool dialog — Revit's own UI greys + Revit light/dark theme instead of Lumina. See `docs/assistant-revit-ui.md` |
 
 > **T3LabAssistant.xaml — do NOT re-apply the Lumina palette.** Its colours come

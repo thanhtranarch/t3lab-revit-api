@@ -5,10 +5,10 @@
         Width="1100" Height="720"
         MinWidth="900" MinHeight="560"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="None" AllowsTransparency="False"
-        ResizeMode="CanResizeWithGrip"
+        WindowStyle="None" AllowsTransparency="True"
+        ResizeMode="CanResize"
         ShowInTaskbar="True"
-        Background="{DynamicResource T3.Canvas}"
+        Background="Transparent"
         FontFamily="Segoe UI" FontSize="13"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
@@ -1707,8 +1707,8 @@
     <!-- Outer Window Container (Zero-Gap) -->
     <Border Background="{StaticResource T3.Surface}"
             BorderBrush="{StaticResource T3.BorderStrong}"
-            BorderThickness="1.5"
-            CornerRadius="12" ClipToBounds="True">
+            BorderThickness="1"
+            CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title Bar -->

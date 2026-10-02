@@ -70,9 +70,10 @@ CHROME_BORDER = {
     "CornerRadius": "{StaticResource T3.R.Window}",
     "ClipToBounds": "True",
 }
-# File UI-LOCKED theo CLAUDE.md — giữ nguyên chrome riêng của chúng.
+# Chỉ còn bề mặt chat được giữ chrome riêng. DWGManagement (UI-locked) đã theo
+# luật 26 từ 2026-10-02 theo yêu cầu của chủ repo — chỉ phần khung cửa sổ, thiết
+# kế bên trong vẫn khoá.
 CHROME_EXEMPT = {
-    "DWGManagement.xaml",   # thiết kế chốt, UI locked
     "T3LabAssistant.xaml",  # bề mặt chat theo theme Revit, đổi bo 12 ↔ 0 khi dock
 }
 
