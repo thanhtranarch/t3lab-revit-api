@@ -415,6 +415,34 @@ def setup_window_logo(win_or_elem):
     return None
 
 
+def rounded_window_inner_radius(root):
+    """Radius of the inner edge of the root's border, seen from its child.
+
+    WPF strokes a uniform Border along a centre line of radius
+    ``CornerRadius``, so the inner edge of a ``t``px line has radius
+    ``CornerRadius - t/2``; Padding moves the child further in again.
+    Returns 0 when the root is square (docked Assistant, CornerRadius 0).
+    """
+    corner = getattr(root, 'CornerRadius', None)
+    if corner is None:
+        return 0.0
+    radius = min(float(corner.TopLeft), float(corner.TopRight),
+                 float(corner.BottomRight), float(corner.BottomLeft))
+    if radius <= 0.0:
+        return 0.0
+
+    def _sides(name):
+        value = getattr(root, name, None)
+        if value is None:
+            return (0.0,)
+        return (float(value.Left), float(value.Top),
+                float(value.Right), float(value.Bottom))
+
+    stroke = max(_sides('BorderThickness'))
+    padding = min(_sides('Padding'))
+    return max(0.0, radius - stroke / 2.0 - padding)
+
+
 class T3WPFWindow(Window):
     """
     Universal WPF Window base class supporting both CPython 3 and IronPython.
@@ -497,9 +525,9 @@ class T3WPFWindow(Window):
 
         # A Border's ClipToBounds only clips to its rectangular bounds; it does
         # not honour CornerRadius.  Frameless windows therefore need an explicit
-        # rounded geometry or their title/footer backgrounds can still paint
-        # into the transparent HWND corners.  Install it centrally so every T3
-        # custom-chrome window behaves the same while resizing.
+        # rounded geometry or their title/footer backgrounds paint square
+        # corners over the rounded 1px outline.  Install it centrally so every
+        # T3 custom-chrome window behaves the same while resizing.
         self._install_rounded_window_clip()
 
         if set_owner:
@@ -509,13 +537,17 @@ class T3WPFWindow(Window):
         self._install_dispatcher_guard()
 
     def _install_rounded_window_clip(self):
-        """Clip a rounded root surface to its CornerRadius.
+        """Clip the content of a rounded root surface inside its outline.
 
         WPF ``Border.ClipToBounds`` clips children to a rectangle, not to the
         rounded outline painted by ``Border.CornerRadius``.  With a transparent
-        frameless Window this otherwise leaves square title/footer pixels visible
-        in the corners.  The geometry follows the root surface during resize and
-        is disabled while maximized so the window fills the monitor edge-to-edge.
+        frameless Window the square title/footer backgrounds of the child would
+        otherwise paint over the corner arcs of the 1px border line and poke out
+        past them.  The geometry goes on the root's CHILD, never on the root:
+        clipping the root itself also shaves the outer half of its own stroke,
+        which is exactly what made the corner line fade out.  It follows the
+        surface during resize and is disabled while maximized so the window
+        fills the monitor edge-to-edge.
         """
         try:
             from System.Windows import WindowStyle as _WindowStyle
@@ -562,31 +594,31 @@ class T3WPFWindow(Window):
     def _refresh_rounded_window_clip(self, sender=None, e=None):
         try:
             root = self._t3_rounded_window_root
+            # Bản cũ đặt Clip lên chính root: hình cắt trùng mép ngoài nên nó
+            # gọt mất nửa ngoài nét viền ở góc. Root không bao giờ bị cắt nữa.
+            root.Clip = None
+            child = getattr(root, 'Child', None)
+            if child is None:
+                return
             if getattr(self, 'WindowState', None) == WindowState.Maximized:
-                root.Clip = None
+                child.Clip = None
                 return
 
-            width = float(root.ActualWidth)
-            height = float(root.ActualHeight)
+            width = float(child.ActualWidth)
+            height = float(child.ActualHeight)
             if width <= 0.0 or height <= 0.0:
                 return
 
-            corner = getattr(root, 'CornerRadius', None)
-            if corner is None:
-                root.Clip = None
-                return
-            radii = (float(corner.TopLeft), float(corner.TopRight),
-                     float(corner.BottomRight), float(corner.BottomLeft))
-            radius = min(radii)
+            radius = rounded_window_inner_radius(root)
             if radius <= 0.0:
-                root.Clip = None
+                child.Clip = None
                 root.InvalidateVisual()
                 return
 
             from System.Windows import Rect
             from System.Windows.Media import RectangleGeometry
-            root.Clip = RectangleGeometry(Rect(0.0, 0.0, width, height),
-                                          radius, radius)
+            child.Clip = RectangleGeometry(Rect(0.0, 0.0, width, height),
+                                           radius, radius)
             root.InvalidateVisual()
         except BaseException:
             pass

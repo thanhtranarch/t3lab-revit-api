@@ -9,7 +9,7 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        ResizeMode="CanResizeWithGrip"
+        ResizeMode="CanResize"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
@@ -1707,9 +1707,9 @@
 
     <!-- Outer Window Container (Zero-Gap) -->
     <Border Background="{StaticResource T3.Surface}"
-            BorderBrush="{StaticResource T3.Border}"
+            BorderBrush="{StaticResource T3.BorderStrong}"
             BorderThickness="1"
-            CornerRadius="12" ClipToBounds="True">
+            CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title Bar -->

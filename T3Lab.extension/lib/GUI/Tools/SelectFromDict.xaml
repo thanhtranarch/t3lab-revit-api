@@ -1709,7 +1709,7 @@
 
     <!-- ═══ Outer Window Border (Zero-Gap Grid) ═══ -->
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
-            Background="{StaticResource T3.Surface}" CornerRadius="12" ClipToBounds="True">
+            Background="{StaticResource T3.Surface}" CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True">
         <Grid Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/> <!-- Row 0: Title Bar -->

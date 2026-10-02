@@ -80,9 +80,10 @@ nếu không, bốn góc vuông của HWND sẽ lộ ra sau outer Border đã bo
 
 `Background="Transparent"` là ngoại lệ kỹ thuật duy nhất ở root Window cho custom
 chrome; màu bề mặt thật vẫn do outer Border lấy từ token `T3.*`.
-`T3WPFWindow` tự cắt cây con theo đúng `CornerRadius` khi resize vì
+`T3WPFWindow` tự cắt cây con theo mép trong của nét viền khi resize vì
 `ClipToBounds="True"` của WPF chỉ cắt hình chữ nhật; không tự gọi
-`XamlReader.Load()` để mở cửa sổ này.
+`XamlReader.Load()` để mở cửa sổ này. Không dùng `ResizeMode="CanResizeWithGrip"`
+(grip đè góc bo) — `CanResize` + `ResizeBorderThickness` là đủ.
 
 ```xml
 <Border Style="{StaticResource T3.TitleBar}" Padding="12,0,8,0">
