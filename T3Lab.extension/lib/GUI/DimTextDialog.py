@@ -355,6 +355,17 @@ class DimTextWindow(T3WPFWindow):
 
 
 def show_dialog():
+    # Imported once per Revit session: re-read the active document so the
+    # window never works on the project that was open at first import.
+    global doc, uidoc
+    try:
+        uidoc = revit.uidoc
+    except Exception:
+        uidoc = None
+    try:
+        doc = revit.doc
+    except Exception:
+        doc = None
     DimTextWindow().ShowDialog()
 
 if __name__ == '__main__':

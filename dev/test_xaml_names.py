@@ -20,7 +20,9 @@ REQUIRED = {
                       'txt_override', 'chk_leader', 'rb_view', 'rb_selection',
                       'chk_filter_enable', 'sp_filter_config', 'combo_combine',
                       'sp_rules', 'nav_dim', 'nav_txt', 'nav_dimtext',
-                      'main_tabs'],
+                      'main_tabs', 'btn_primary', 'lb_dimtext_presets',
+                      'dimtext_scope_count', 'dim_hint', 'txt_hint',
+                      'dim_checked_count', 'txt_checked_count'],
     'DimText.xaml': ['chk_leader', 'rb_view', 'chk_filter_enable',
                      'sp_filter_config', 'combo_combine', 'sp_rules', 'lbl_status'],
     'ContainsDefineValue.xaml': ['avail_list', 'selected_list', 'txt_sep',
@@ -46,12 +48,19 @@ class XamlNames(unittest.TestCase):
             self.assertEqual(missing, [], '{} is missing {}'.format(fname, missing))
 
     def test_manaanno_presets_carry_tag(self):
-        """dimtext_preset_below writes sender.Tag into the Below field."""
+        """dimtext_preset_selected writes the picked item's Tag into the Below field.
+
+        Since 2026-10-02 the presets are the left pick list of the Dim Text page
+        (same panel as the type lists of the other two pages), not buttons."""
         with open(os.path.join(TOOLS, 'ManaAnno.xaml'), encoding='utf-8-sig') as f:
-            buttons = re.findall(r'<Button [^>]*Click="dimtext_preset_below"[^>]*>', f.read())
-        self.assertTrue(buttons)
-        for b in buttons:
-            self.assertIn('Tag="', b)
+            src = f.read()
+        start = src.index('x:Name="lb_dimtext_presets"')
+        block = src[start:src.index('</ListBox>', start)]
+        self.assertIn('SelectionChanged="dimtext_preset_selected"', block)
+        items = re.findall(r'<ListBoxItem [^>]*>', block)
+        self.assertTrue(items)
+        for item in items:
+            self.assertIn('Tag="', item)
 
 
 if __name__ == '__main__':
