@@ -9,7 +9,17 @@ Tool: ribbon **Modeling & Datum › Create › Create Elements › CAD to Elemen
 | Dialog (wiring, plans, confirm/report) | `T3Lab.extension/lib/GUI/CADToElementsDialog.py` |
 | Pure rules (what gets created) | `T3Lab.extension/lib/Snippets/_cad_geometry.py` |
 | Revit API (scan, types, creators) | `T3Lab.extension/lib/Snippets/_cad_revit.py` |
-| Tests | `dev/test_cad_to_elements_geometry.py`, `dev/test_cad_to_elements_layout.py` |
+| Tests | `dev/test_cad_to_elements_geometry.py`, `dev/test_cad_to_elements_layout.py`, `dev/test_cad_to_elements_units.py` |
+
+**Units (2026-10-02).** Every length in the options card follows the project's
+length unit (`Snippets/_units.py`, read when the window opens): labels read
+"HEIGHT (MM)" / "HEIGHT (FT-IN)", defaults (kept in mm in the dialog's
+`LENGTH_FIELDS` and `geo.MEP_CATEGORIES`) are shown in that unit, and typed text
+is parsed by it ("1200 mm", "1.2 m" and 3'-6" work in any project). The level
+combo shows elevations in the project unit. Column size rounding and the
+per-size column type names use mm (metric) or inches (imperial), never m or ft.
+Still metric by design: the beam rule (width rounded to 50 mm, depth table) and
+the per-thickness wall type names ("Generic - 200mm").
 
 ## 1 · Before (2026-10-01)
 

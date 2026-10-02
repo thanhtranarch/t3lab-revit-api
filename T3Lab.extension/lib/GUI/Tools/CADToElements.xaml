@@ -1916,16 +1916,16 @@
                                                   ToolTip="Basic wall type the new walls (and per-thickness copies) are based on"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="0">
-                                        <TextBlock Text="HEIGHT (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_wall_height" Style="{StaticResource T3.TextBox}" Text="3000"/>
+                                        <TextBlock x:Name="lbl_wall_height" Text="HEIGHT" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_wall_height" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="2">
-                                        <TextBlock Text="BASE OFFSET (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_wall_offset" Style="{StaticResource T3.TextBox}" Text="0"/>
+                                        <TextBlock x:Name="lbl_wall_offset" Text="BASE OFFSET" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_wall_offset" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="0">
-                                        <TextBlock Text="UNPAIRED THICKNESS (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_wall_thickness" Style="{StaticResource T3.TextBox}" Text="200"
+                                        <TextBlock x:Name="lbl_wall_thickness" Text="UNPAIRED THICKNESS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_wall_thickness" Style="{StaticResource T3.TextBox}"
                                                  ToolTip="Thickness used for single lines when Include unpaired lines is on"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="2">
@@ -1943,7 +1943,7 @@
                                         <CheckBox x:Name="chk_include_unpaired" Content="Include unpaired lines"
                                                   Style="{StaticResource T3.CheckBox}"/>
                                     </StackPanel>
-                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                    <TextBlock x:Name="txt_wall_hint" Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
                                                VerticalAlignment="Bottom"
                                                Text="Two parallel lines up to 610 mm apart make one wall on their centerline."/>
                                 </Grid>
@@ -1979,12 +1979,12 @@
                                         <ComboBox x:Name="cmb_floor_type" Style="{StaticResource T3.ComboBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="0">
-                                        <TextBlock Text="HEIGHT OFFSET (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_floor_offset" Style="{StaticResource T3.TextBox}" Text="0"/>
+                                        <TextBlock x:Name="lbl_floor_offset" Text="HEIGHT OFFSET" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_floor_offset" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="2">
-                                        <TextBlock Text="PART THICKNESS (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_part_thickness" Style="{StaticResource T3.TextBox}" Text="200"/>
+                                        <TextBlock x:Name="lbl_part_thickness" Text="PART THICKNESS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_part_thickness" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="0">
                                         <TextBlock Text="PART CATEGORY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
@@ -2031,12 +2031,12 @@
                                         <ComboBox x:Name="cmb_ceiling_type" Style="{StaticResource T3.ComboBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="0">
-                                        <TextBlock Text="HEIGHT OFFSET (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_ceiling_offset" Style="{StaticResource T3.TextBox}" Text="2700"/>
+                                        <TextBlock x:Name="lbl_ceiling_offset" Text="HEIGHT OFFSET" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_ceiling_offset" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="2">
-                                        <TextBlock Text="PART THICKNESS (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_ceiling_part_thickness" Style="{StaticResource T3.TextBox}" Text="25"/>
+                                        <TextBlock x:Name="lbl_ceiling_part_thickness" Text="PART THICKNESS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_ceiling_part_thickness" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="0">
                                         <TextBlock Text="PART CATEGORY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
@@ -2140,13 +2140,13 @@
                                                   SelectionChanged="column_top_level_changed"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="2">
-                                        <TextBlock Text="HEIGHT (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_column_height" Style="{StaticResource T3.TextBox}" Text="3000"
+                                        <TextBlock x:Name="lbl_column_height" Text="HEIGHT" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_column_height" Style="{StaticResource T3.TextBox}"
                                                  ToolTip="Used when the top level is Unconnected"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="4" Grid.Column="0">
-                                        <TextBlock Text="SIZE ROUNDING (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_column_rounding" Style="{StaticResource T3.TextBox}" Text="10"/>
+                                        <TextBlock x:Name="lbl_column_rounding" Text="SIZE ROUNDING" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_column_rounding" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
                                         <CheckBox x:Name="chk_column_match_size" Content="Type per detected size" IsChecked="True"
@@ -2154,7 +2154,7 @@
                                         <CheckBox x:Name="chk_column_rotate" Content="Rotate to match CAD" IsChecked="True"
                                                   Style="{StaticResource T3.CheckBox}"/>
                                     </StackPanel>
-                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                    <TextBlock x:Name="txt_column_hint" Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
                                                VerticalAlignment="Bottom"
                                                Text="Shapes 100–3000 mm are read; a column drawn twice is placed once."/>
                                 </Grid>
@@ -2191,8 +2191,8 @@
                                                   ToolTip="Structural framing type (copied per size when Type per detected size is on)"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="0">
-                                        <TextBlock Text="TOP OFFSET (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_beam_offset" Style="{StaticResource T3.TextBox}" Text="-50"
+                                        <TextBlock x:Name="lbl_beam_offset" Text="TOP OFFSET" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_beam_offset" Style="{StaticResource T3.TextBox}"
                                                  ToolTip="Height of the beam top relative to the level"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="2">
@@ -2200,12 +2200,12 @@
                                         <ComboBox x:Name="cmb_beam_part_category" Style="{StaticResource T3.ComboBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="0">
-                                        <TextBlock Text="MIN WIDTH (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_beam_min_width" Style="{StaticResource T3.TextBox}" Text="50"/>
+                                        <TextBlock x:Name="lbl_beam_min_width" Text="MIN WIDTH" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_beam_min_width" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="2">
-                                        <TextBlock Text="MAX WIDTH (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_beam_max_width" Style="{StaticResource T3.TextBox}" Text="1500"/>
+                                        <TextBlock x:Name="lbl_beam_max_width" Text="MAX WIDTH" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_beam_max_width" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
                                         <CheckBox x:Name="chk_beam_match_size" Content="Type per detected size" IsChecked="True"
@@ -2259,12 +2259,12 @@
                                                  ToolTip="Flat axes are lettered bottom to top from this letter (I and O are skipped)"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="0">
-                                        <TextBlock Text="EXTEND ENDS (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_grid_extend" Style="{StaticResource T3.TextBox}" Text="0"/>
+                                        <TextBlock x:Name="lbl_grid_extend" Text="EXTEND ENDS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_grid_extend" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="2">
-                                        <TextBlock Text="MIN LENGTH (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_grid_min_length" Style="{StaticResource T3.TextBox}" Text="1000"/>
+                                        <TextBlock x:Name="lbl_grid_min_length" Text="MIN LENGTH" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_grid_min_length" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
                                         <CheckBox x:Name="chk_grid_skip_existing" Content="Skip axes that already have a grid" IsChecked="True"
@@ -2306,8 +2306,8 @@
                                         <ComboBox x:Name="cmb_line_style" Style="{StaticResource T3.ComboBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="0">
-                                        <TextBlock Text="OFFSET FROM LEVEL (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_lines_offset" Style="{StaticResource T3.TextBox}" Text="0"/>
+                                        <TextBlock x:Name="lbl_lines_offset" Text="OFFSET FROM LEVEL" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_lines_offset" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
                                         <CheckBox x:Name="chk_lines_merge" Content="Merge collinear lines" IsChecked="True"
@@ -2365,16 +2365,16 @@
                                         </ComboBox>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="0">
-                                        <TextBlock x:Name="lbl_mep_width" Text="WIDTH / DIAMETER (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_mep_width" Style="{StaticResource T3.TextBox}" Text="300"/>
+                                        <TextBlock x:Name="lbl_mep_width" Text="WIDTH / DIAMETER" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_mep_width" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="3" Grid.Column="2">
-                                        <TextBlock Text="HEIGHT (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_mep_height" Style="{StaticResource T3.TextBox}" Text="250"/>
+                                        <TextBlock x:Name="lbl_mep_height" Text="HEIGHT" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_mep_height" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="4" Grid.Column="0">
-                                        <TextBlock Text="OFFSET FROM LEVEL (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_mep_offset" Style="{StaticResource T3.TextBox}" Text="2800"/>
+                                        <TextBlock x:Name="lbl_mep_offset" Text="OFFSET FROM LEVEL" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_mep_offset" Style="{StaticResource T3.TextBox}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
                                         <CheckBox x:Name="chk_mep_elbows" Content="Auto elbow fittings" IsChecked="True"

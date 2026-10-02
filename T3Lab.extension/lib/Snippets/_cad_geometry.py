@@ -9,7 +9,10 @@ reading a column footprint, naming grids) runs and is unit-tested outside Revit
 and turns the answers back into elements.
 
 Units: every coordinate and length is in Revit internal feet unless a name
-ends in `_mm`.
+ends in `_mm`. What the user types and reads is in the PROJECT's length unit
+(`Snippets/_units.py`); the dialog converts at the edge, so nothing here
+depends on the project unit except the type names of column sizes
+(`footprint_type_name`, mm or inches).
 
 Shapes
 ------
@@ -22,6 +25,8 @@ polygon  [(x, y), ...] (not repeated at the end)
 from __future__ import division
 
 import math
+
+from Snippets import _units
 
 MM_PER_FT = 304.8
 FT_PER_MM = 1.0 / 304.8
@@ -96,22 +101,25 @@ def mode(key):
     raise KeyError(key)
 
 
+# width_label has no unit: the dialog adds the project unit ("WIDTH (MM)",
+# "WIDTH (FT-IN)"). width / height_mm / offset are defaults kept in mm and shown
+# in the project unit.
 MEP_CATEGORIES = [
     dict(key="duct", label="Duct", noun="ducts", verb="Create Ducts",
          type_label="duct type", system=True, double=True, height=True,
-         width_label="WIDTH / DIAMETER (MM)", width=300.0, height_mm=250.0,
+         width_label="WIDTH / DIAMETER", width=300.0, height_mm=250.0,
          offset=2800.0, ai_label="HVAC duct lines"),
     dict(key="pipe", label="Pipe", noun="pipes", verb="Create Pipes",
          type_label="pipe type", system=True, double=False, height=False,
-         width_label="DIAMETER (MM)", width=100.0, height_mm=None,
+         width_label="DIAMETER", width=100.0, height_mm=None,
          offset=2600.0, ai_label="Plumbing / mechanical pipe lines"),
     dict(key="tray", label="Cable Tray", noun="cable trays", verb="Create Cable Trays",
          type_label="cable tray type", system=False, double=True, height=True,
-         width_label="WIDTH (MM)", width=300.0, height_mm=100.0,
+         width_label="WIDTH", width=300.0, height_mm=100.0,
          offset=2700.0, ai_label="Cable tray lines"),
     dict(key="conduit", label="Conduit", noun="conduits", verb="Create Conduits",
          type_label="conduit type", system=False, double=False, height=False,
-         width_label="DIAMETER (MM)", width=25.0, height_mm=None,
+         width_label="DIAMETER", width=25.0, height_mm=None,
          offset=2700.0, ai_label="Electrical conduit lines"),
 ]
 
@@ -807,7 +815,12 @@ def circle_footprint(cx, cy, r):
     return dict(shape="round", cx=cx, cy=cy, width=2 * r, depth=2 * r, angle=0.0)
 
 
-def filter_footprints(footprints, min_mm=100.0, max_mm=3000.0, center_tol=None):
+FOOTPRINT_MIN_MM = 100.0     # smallest column read from a closed shape
+FOOTPRINT_MAX_MM = 3000.0    # largest
+
+
+def filter_footprints(footprints, min_mm=FOOTPRINT_MIN_MM, max_mm=FOOTPRINT_MAX_MM,
+                      center_tol=None):
     """Drop shapes outside the size window and keep the LARGEST shape per centre.
 
     CAD columns are often drawn twice (finish outline + structure, or outline +
@@ -827,12 +840,30 @@ def filter_footprints(footprints, min_mm=100.0, max_mm=3000.0, center_tol=None):
     return kept
 
 
-def footprint_type_name(fp, step_mm):
-    """Type name for a footprint size: '400x600mm' or 'D500mm'."""
-    w = round_to(to_mm(fp["width"]), step_mm)
+def snap(value_ft, step_ft):
+    """`value_ft` rounded to the nearest multiple of `step_ft` (both in feet;
+    a step <= 0 leaves it as is). Unlike `round_to` it never truncates to a
+    whole mm, so a 1/2" step keeps a 16" column at exactly 16"."""
+    if not step_ft or step_ft <= 0:
+        return value_ft
+    return round(value_ft / step_ft) * step_ft
+
+
+def footprint_size(fp, step_ft):
+    """(width_ft, depth_ft) of a footprint rounded to the size step (feet)."""
+    return snap(fp["width"], step_ft), snap(fp["depth"], step_ft)
+
+
+def footprint_type_name(fp, step_ft, size_unit=None):
+    """Type name for a footprint size, written in `size_unit` (a
+    `_units.LengthUnit`; mm when None): '400x600mm' / 'D500mm' in mm,
+    '16"x24"' / 'D18"' in inches. `step_ft` is the size rounding in feet."""
+    unit = size_unit or _units.MILLIMETERS
+    tag = unit.tag if unit.style == "decimal" else ""
+    w, d = footprint_size(fp, step_ft)
     if fp["shape"] == "round":
-        return "D{}mm".format(w)
-    return "{}x{}mm".format(w, round_to(to_mm(fp["depth"]), step_mm))
+        return "D{}{}".format(unit.text(w), tag)
+    return "{}x{}{}".format(unit.text(w), unit.text(d), tag)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

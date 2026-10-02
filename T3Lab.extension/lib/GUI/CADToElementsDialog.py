@@ -19,6 +19,13 @@ Rules deciding WHAT gets created live in `Snippets/_cad_geometry.py` (pure,
 unit-tested); Revit calls in `Snippets/_cad_revit.py` (one transaction per
 run). Every run shows the count first (P5 confirm), then a result with counts.
 
+Units: every length the user types or reads is in the project's length unit
+(Manage > Project Units > Length), read each time the window opens through
+`Snippets/_units.py`. Labels get the unit ("HEIGHT (MM)", "HEIGHT (FT-IN)"),
+defaults are written in it, and typed text is parsed by it (a bare number is
+in the project unit; "1200 mm", "1.2 m" or 3'-6" always work). Column size
+rounding and the per-size column type names use mm / inches (`paper_unit`).
+
 Copyright (c) 2026 T3Lab
 """
 import os
@@ -36,12 +43,51 @@ from GUI.T3Dialog import show_info, show_warning, show_error, confirm
 from Snippets import _cad_geometry as geo
 from Snippets import _cad_revit as cr
 from Snippets._compat import eid_value
+from Snippets._units import project_length_unit, paper_unit
 
 _XAML_HUB = os.path.join(os.path.dirname(__file__), "Tools", "CADToElements.xaml")
 TITLE = "CAD to Elements"
 
 ROUND_SKIP = {"element": None, "name": "(Skip circles)"}
 UNCONNECTED = {"element": None, "name": "Unconnected (use height)"}
+
+# Every model length of the options card except the MEP ones (those follow
+# geo.MEP_CATEGORIES): TextBox, label without the unit, default kept in mm.
+# When the window opens the label `lbl_<same suffix>` gets the project unit and
+# the TextBox the default written in that unit.
+LENGTH_FIELDS = (
+    ("txt_wall_height", "HEIGHT", 3000),
+    ("txt_wall_offset", "BASE OFFSET", 0),
+    ("txt_wall_thickness", "UNPAIRED THICKNESS", 200),
+    ("txt_floor_offset", "HEIGHT OFFSET", 0),
+    ("txt_part_thickness", "PART THICKNESS", 200),
+    ("txt_ceiling_offset", "HEIGHT OFFSET", 2700),
+    ("txt_ceiling_part_thickness", "PART THICKNESS", 25),
+    ("txt_column_height", "HEIGHT", 3000),
+    ("txt_beam_offset", "TOP OFFSET", -50),
+    ("txt_beam_min_width", "MIN WIDTH", 50),
+    ("txt_beam_max_width", "MAX WIDTH", 1500),
+    ("txt_grid_extend", "EXTEND ENDS", 0),
+    ("txt_grid_min_length", "MIN LENGTH", 1000),
+    ("txt_lines_offset", "OFFSET FROM LEVEL", 0),
+)
+
+# Column SIZE ROUNDING is a step for type sizes, which are written in mm or
+# inches (`paper_unit`), never in m / ft: 10 mm in decimal feet reads "0.03"
+# (9.1 mm) and would turn a 400 mm column into 402 mm. Default per unit tag.
+COLUMN_ROUNDING_DEFAULT = {"mm": 10, "in": 0.5}
+
+
+def label_name(field):
+    """txt_wall_height -> lbl_wall_height (the label above the TextBox)."""
+    return "lbl_" + field[len("txt_"):]
+
+
+def with_unit(unit, feet):
+    """A length for a sentence: '2800 mm', '2.8 m', 9' - 2 1/4" (ft-in and
+    fractional inches already carry their ' and " marks)."""
+    text = unit.text(feet)
+    return text if unit.style != "decimal" else u"{} {}".format(text, unit.tag)
 
 
 class _InputError(Exception):
@@ -95,6 +141,9 @@ class CADToElementsWindow(T3WPFWindow):
         T3WPFWindow.__init__(self, _XAML_HUB)
         self._doc = revit.doc
         self._uidoc = revit.uidoc
+        # Read on every open, never at import: the module outlives the project.
+        self._unit = project_length_unit(self._doc)
+        self._size_unit = paper_unit(self._unit)     # column type sizes: mm / inches
         self._mode = "wall"
         self._mep_key = "duct"
         self._mep_values = {}
@@ -117,10 +166,36 @@ class CADToElementsWindow(T3WPFWindow):
         self.grid_layers.AddHandler(CheckBox.ClickEvent, self._row_click_handler, True)
         self.PreviewKeyDown += self._on_key_down
 
+        self._apply_units()
         self._load_all()
         self._busy = False
         self._apply_mode("wall")
         self.init_ai_badge()
+
+    # ------------------------------------------------------------------
+    # Units — labels, defaults and hints in the project's length unit
+    # ------------------------------------------------------------------
+
+    def _apply_units(self):
+        unit, size_unit = self._unit, self._size_unit
+        for field, label, default_mm in LENGTH_FIELDS:
+            getattr(self, label_name(field)).Text = unit.label(label)
+            getattr(self, field).Text = unit.default_text(default_mm)
+        self.lbl_column_rounding.Text = size_unit.label("SIZE ROUNDING")
+        self.txt_column_rounding.Text = size_unit.text(
+            size_unit.to_feet(COLUMN_ROUNDING_DEFAULT.get(size_unit.tag, 10)))
+        self.lbl_mep_height.Text = unit.label("HEIGHT")
+        self.lbl_mep_offset.Text = unit.label("OFFSET FROM LEVEL")
+        self.txt_wall_hint.Text = (u"Two parallel lines up to {} apart make one wall on their "
+                                   u"centerline.".format(self._len(geo.MAX_WALL_THICKNESS)))
+        self.txt_column_hint.Text = (u"Shapes from {} to {} across are read; a column drawn "
+                                     u"twice is placed once.".format(
+                                         self._len(geo.mm(geo.FOOTPRINT_MIN_MM)),
+                                         self._len(geo.mm(geo.FOOTPRINT_MAX_MM))))
+
+    def _len(self, feet, unit=None):
+        """A length (feet) as the user reads it: '2800 mm' / 9' - 2 1/4"."""
+        return with_unit(unit or self._unit, feet)
 
     # ------------------------------------------------------------------
     # Loading
@@ -134,7 +209,7 @@ class CADToElementsWindow(T3WPFWindow):
                    default=self._index_of(self._cad_list, keep_cad))
         self._levels = cr.get_levels(self._doc)
         for lv in self._levels:
-            lv["label"] = u"{} ({} mm)".format(lv["name"], int(round(geo.to_mm(lv["elevation"]))))
+            lv["label"] = u"{} ({})".format(lv["name"], self._len(lv["elevation"]))
         self._fill("cmb_levels", self._levels, "No level in this model", label="label",
                    default=self._default_level_index(keep_level))
         self._fill_types()
@@ -431,7 +506,7 @@ class CADToElementsWindow(T3WPFWindow):
         busy, self._busy = self._busy, True
         try:
             self.lbl_mep_type.Text = cat["type_label"].upper()
-            self.lbl_mep_width.Text = cat["width_label"]
+            self.lbl_mep_width.Text = self._unit.label(cat["width_label"])
             self._fill("cmb_mep_type", self._mep_types.get(key, []),
                        "No {} loaded — load an MEP template".format(cat["type_label"]))
             if cat["system"]:
@@ -451,9 +526,10 @@ class CADToElementsWindow(T3WPFWindow):
                 self.txt_mep_offset.Text = saved["offset"]
             else:
                 self.cmb_mep_line_mode.SelectedIndex = 0
-                self.txt_mep_width.Text = "{:g}".format(cat["width"])
-                self.txt_mep_height.Text = "{:g}".format(cat["height_mm"]) if cat["height_mm"] else ""
-                self.txt_mep_offset.Text = "{:g}".format(cat["offset"])
+                unit = self._unit
+                self.txt_mep_width.Text = unit.default_text(cat["width"])
+                self.txt_mep_height.Text = unit.default_text(cat["height_mm"]) if cat["height_mm"] else ""
+                self.txt_mep_offset.Text = unit.default_text(cat["offset"])
         finally:
             self._busy = busy
         self._update_enabling()
@@ -726,7 +802,37 @@ class CADToElementsWindow(T3WPFWindow):
             raise _InputError("The model has no level.\nCreate a level, then run again.")
         return dict(cad=cad, layers=layers, level=level["element"], level_name=level["name"])
 
+    def _length(self, box, label, positive=False, minimum=None, maximum=None, unit=None):
+        """A length typed in the options card -> feet.
+
+        A bare number is in the project unit (or `unit`); "1200 mm", "1.2 m"
+        or 3'-6" work in any project. `minimum` / `maximum` are in feet.
+        """
+        unit = unit or self._unit
+        text = box.Text or ""
+        try:
+            feet = unit.parse(text)
+        except ValueError as ex:
+            raise _InputError(u"{}: {}\nFix it in the options card, then run again."
+                              .format(label, ex))
+        # _units.parse drops the sign when the feet part is zero (-0' - 2"
+        # comes back as +2"); the sign the user typed wins.
+        if text.strip().startswith("-") and feet > 0:
+            feet = -feet
+        rule = None
+        if positive and feet <= 0:
+            rule = u"more than zero"
+        elif minimum is not None and feet < minimum - 1e-9:
+            rule = u"at least {}".format(self._len(minimum, unit))
+        elif maximum is not None and feet > maximum + 1e-9:
+            rule = u"at most {}".format(self._len(maximum, unit))
+        if rule:
+            raise _InputError(u"{} is {}, but it must be {}.\nChange it in the options card, "
+                              u"then run again.".format(label, self._len(feet, unit), rule))
+        return feet
+
     def _num(self, box, label, default, minimum=None, maximum=None):
+        """A plain number that is not a length (the first grid number)."""
         value, ok = geo.parse_number(box.Text, default, minimum, maximum)
         if not ok:
             rng = ""
@@ -774,22 +880,28 @@ class CADToElementsWindow(T3WPFWindow):
 
     def _plan_wall(self, ctx):
         doc, level = self._doc, ctx["level"]
-        height = self._num(self.txt_wall_height, "Height", 3000, 1)
-        offset = self._num(self.txt_wall_offset, "Base offset", 0)
-        default_thk = self._num(self.txt_wall_thickness, "Unpaired thickness", 200, 1, 3000)
+        height = self._length(self.txt_wall_height, "Height", positive=True)
+        offset = self._length(self.txt_wall_offset, "Base offset")
+        default_thk = self._length(self.txt_wall_thickness, "Unpaired thickness", positive=True,
+                                   maximum=geo.mm(3000))
         include = self._checked(self.chk_include_unpaired)
         segs = self._segments(ctx["layers"], self._checked(self.chk_merge_collinear))
         pairs, unpaired = geo.find_parallel_pairs(segs)
         items = [(c[0], c[1], c[2], c[3], c[4]) for c in pairs]
         if include:
-            items += [(s[0], s[1], s[2], s[3], geo.mm(default_thk)) for s in unpaired]
-        sizes = sorted(geo.group_by_size(items, lambda it: it[4]))
+            items += [(s[0], s[1], s[2], s[3], default_thk) for s in unpaired]
+        thicknesses = []                # one per wall type (1 mm apart), in the project unit
+        for size_mm in sorted(geo.group_by_size(items, lambda it: it[4])):
+            text = self._len(geo.mm(size_mm))
+            if text not in thicknesses:
+                thicknesses.append(text)
         details = [u"Wall pairs found: {}".format(len(pairs)),
                    u"Single lines: {} ({})".format(len(unpaired), "included" if include else "ignored"),
-                   u"Thicknesses (mm): {}".format(", ".join(str(s) for s in sizes[:12]) or "—"),
-                   u"Height {:g} mm · base offset {:g} mm".format(height, offset)]
-        empty = ("No two parallel lines lie within 610 mm of each other. Tick the layers that hold "
-                 "both faces of each wall, or turn on Include unpaired lines.")
+                   u"Thicknesses: {}".format(", ".join(thicknesses[:12]) or "—"),
+                   u"Height {} · base offset {}".format(self._len(height), self._len(offset))]
+        empty = (u"No two parallel lines lie within {} of each other. Tick the layers that hold "
+                 u"both faces of each wall, or turn on Include unpaired lines."
+                 .format(self._len(geo.MAX_WALL_THICKNESS)))
         n = len(items)
         if self._checked(self.rb_wall_part_mode):
             cat = self._category("cmb_wall_part_category")
@@ -798,7 +910,7 @@ class CADToElementsWindow(T3WPFWindow):
                 rect = geo.centerline_rect(x0, y0, x1, y1, t / 2.0)
                 lp = geo.loop_from_polygon(rect) if rect else None
                 if lp:
-                    profiles.append((lp, [], level.Elevation + geo.mm(offset), geo.mm(height)))
+                    profiles.append((lp, [], level.Elevation + offset, height))
             details.append(u"Category: {}".format(cat["name"]))
             return Plan(len(profiles), "wall parts",
                         u"Create {} wall parts on {}?".format(len(profiles), ctx["level_name"]),
@@ -811,26 +923,26 @@ class CADToElementsWindow(T3WPFWindow):
         structural = self._checked(self.chk_structural)
         return Plan(n, "walls", u"Create {} walls on {}?".format(n, ctx["level_name"]),
                     u"Create {} Walls".format(n), u"\n".join(details),
-                    lambda p: cr.create_walls(doc, items, level, wtype["element"], geo.mm(height),
-                                              geo.mm(offset), structural, match, p), empty)
+                    lambda p: cr.create_walls(doc, items, level, wtype["element"], height,
+                                              offset, structural, match, p), empty)
 
     # ── Floors / Ceilings ──
 
     def _plan_floor(self, ctx):
         doc, level = self._doc, ctx["level"]
-        offset = self._num(self.txt_floor_offset, "Height offset", 0)
+        offset = self._length(self.txt_floor_offset, "Height offset")
         groups, _p, _h = self._outline_groups(ctx["layers"], self._checked(self.chk_floor_holes))
         n = len(groups)
         holes = sum(len(h) for _o, h in groups)
         details = [u"Outlines: {} · openings: {}".format(n, holes),
-                   u"Height offset {:g} mm".format(offset)]
+                   u"Height offset {}".format(self._len(offset))]
         empty = ("The ticked layers hold no closed outline. Use closed polylines or lines whose "
                  "ends meet, or tick the layer that holds the slab edges.")
         if self._checked(self.rb_part_mode):
-            thk = self._num(self.txt_part_thickness, "Part thickness", 200, 1)
+            thk = self._length(self.txt_part_thickness, "Part thickness", positive=True)
             cat = self._category("cmb_part_category")
-            profiles = [(o, h, level.Elevation + geo.mm(offset), geo.mm(thk)) for o, h in groups]
-            details.append(u"Part thickness {:g} mm · category {}".format(thk, cat["name"]))
+            profiles = [(o, h, level.Elevation + offset, thk) for o, h in groups]
+            details.append(u"Part thickness {} · category {}".format(self._len(thk), cat["name"]))
             return Plan(n, "floor parts", u"Create {} floor parts on {}?".format(n, ctx["level_name"]),
                         u"Create {} Parts".format(n), u"\n".join(details),
                         lambda p: cr.create_parts(doc, profiles, cat["bic"],
@@ -840,23 +952,23 @@ class CADToElementsWindow(T3WPFWindow):
         details.append(u"Floor type: {}".format(ftype["name"]))
         return Plan(n, "floors", u"Create {} floors on {}?".format(n, ctx["level_name"]),
                     u"Create {} Floors".format(n), u"\n".join(details),
-                    lambda p: cr.create_floors(doc, groups, ftype["id"], level, geo.mm(offset),
+                    lambda p: cr.create_floors(doc, groups, ftype["id"], level, offset,
                                                structural, p), empty)
 
     def _plan_ceiling(self, ctx):
         doc, level = self._doc, ctx["level"]
-        offset = self._num(self.txt_ceiling_offset, "Height offset", 2700)
+        offset = self._length(self.txt_ceiling_offset, "Height offset")
         groups, _p, _h = self._outline_groups(ctx["layers"], self._checked(self.chk_ceiling_holes))
         n = len(groups)
         details = [u"Outlines: {} · openings: {}".format(n, sum(len(h) for _o, h in groups)),
-                   u"Height offset {:g} mm".format(offset)]
+                   u"Height offset {}".format(self._len(offset))]
         empty = ("The ticked layers hold no closed outline. Tick the layer that holds the ceiling "
                  "outlines (closed polylines or lines whose ends meet).")
         if self._checked(self.rb_ceiling_part_mode):
-            thk = self._num(self.txt_ceiling_part_thickness, "Part thickness", 25, 1)
+            thk = self._length(self.txt_ceiling_part_thickness, "Part thickness", positive=True)
             cat = self._category("cmb_ceiling_part_category")
-            profiles = [(o, h, level.Elevation + geo.mm(offset), geo.mm(thk)) for o, h in groups]
-            details.append(u"Part thickness {:g} mm · category {}".format(thk, cat["name"]))
+            profiles = [(o, h, level.Elevation + offset, thk) for o, h in groups]
+            details.append(u"Part thickness {} · category {}".format(self._len(thk), cat["name"]))
             return Plan(n, "ceiling parts", u"Create {} ceiling parts on {}?".format(n, ctx["level_name"]),
                         u"Create {} Parts".format(n), u"\n".join(details),
                         lambda p: cr.create_parts(doc, profiles, cat["bic"],
@@ -865,7 +977,7 @@ class CADToElementsWindow(T3WPFWindow):
         details.append(u"Ceiling type: {}".format(ctype["name"]))
         return Plan(n, "ceilings", u"Create {} ceilings on {}?".format(n, ctx["level_name"]),
                     u"Create {} Ceilings".format(n), u"\n".join(details),
-                    lambda p: cr.create_ceilings(doc, groups, ctype["id"], level, geo.mm(offset), p),
+                    lambda p: cr.create_ceilings(doc, groups, ctype["id"], level, offset, p),
                     empty)
 
     # ── Rooms ──
@@ -914,8 +1026,10 @@ class CADToElementsWindow(T3WPFWindow):
 
     def _plan_column(self, ctx):
         doc, level = self._doc, ctx["level"]
-        step = int(self._num(self.txt_column_rounding, "Size rounding", 10, 1, 500))
-        height = self._num(self.txt_column_height, "Height", 3000, 1)
+        size_unit = self._size_unit
+        step = self._length(self.txt_column_rounding, "Size rounding", positive=True,
+                            maximum=geo.mm(500), unit=size_unit)
+        height = self._length(self.txt_column_height, "Height", positive=True)
         rect_item = self._pick("cmb_column_type")
         round_item = self._pick("cmb_column_round_type")
         rect_sym = rect_item["element"] if rect_item else None
@@ -931,34 +1045,35 @@ class CADToElementsWindow(T3WPFWindow):
         top_level = top["element"] if top else None
         sizes = {}
         for f in items:
-            nm = geo.footprint_type_name(f, step)
+            nm = geo.footprint_type_name(f, step, size_unit)
             sizes[nm] = sizes.get(nm, 0) + 1
         details = [u"Rectangles: {} · circles: {}{}".format(
             len(rects), len(rounds), u" (skipped — no round type chosen)" if rounds and round_sym is None else u""),
             u"Sizes: {}".format(u", ".join(u"{} ×{}".format(k, v) for k, v in sorted(sizes.items())[:8]) or u"—"),
-            u"Top: {}".format(top["name"] if top_level is not None else u"unconnected, {:g} mm".format(height))]
+            u"Top: {}".format(top["name"] if top_level is not None else u"unconnected, {}".format(self._len(height)))]
         structural = self._checked(self.rb_column_structural)
         match = self._checked(self.chk_column_match_size)
         rotate = self._checked(self.chk_column_rotate)
         n = len(items)
-        empty = ("The ticked layers hold no closed rectangle or circle 100–3000 mm across. Tick the "
-                 "layer that holds the column outlines.")
+        empty = (u"The ticked layers hold no closed rectangle or circle {}–{} across. Tick the "
+                 u"layer that holds the column outlines.".format(
+                     self._len(geo.mm(geo.FOOTPRINT_MIN_MM)), self._len(geo.mm(geo.FOOTPRINT_MAX_MM))))
         return Plan(n, "columns", u"Place {} columns on {}?".format(n, ctx["level_name"]),
                     u"Place {} Columns".format(n), u"\n".join(details),
-                    lambda p: cr.create_columns(doc, items, level, top_level, geo.mm(height),
+                    lambda p: cr.create_columns(doc, items, level, top_level, height,
                                                 rect_sym, round_sym, structural, match, rotate,
-                                                step, p), empty)
+                                                step, p, size_unit=size_unit), empty)
 
     # ── Beams ──
 
     def _plan_beam(self, ctx):
         doc, level = self._doc, ctx["level"]
-        offset = self._num(self.txt_beam_offset, "Top offset", -50)
-        w_min = self._num(self.txt_beam_min_width, "Min width", 50, 1)
-        w_max = self._num(self.txt_beam_max_width, "Max width", 1500, w_min)
+        offset = self._length(self.txt_beam_offset, "Top offset")
+        w_min = self._length(self.txt_beam_min_width, "Min width", positive=True)
+        w_max = self._length(self.txt_beam_max_width, "Max width", minimum=w_min)
         segs = self._segments(ctx["layers"], self._checked(self.chk_beam_merge))
-        pairs, _unpaired = geo.find_parallel_pairs(segs, max_sep=geo.mm(w_max),
-                                                   min_sep=geo.mm(w_min), min_overlap=0.7)
+        pairs, _unpaired = geo.find_parallel_pairs(segs, max_sep=w_max,
+                                                   min_sep=w_min, min_overlap=0.7)
         items = []
         for (x0, y0, x1, y1, sep, _layer) in pairs:
             w = max(50, geo.round_to(geo.to_mm(sep), 50))
@@ -966,13 +1081,13 @@ class CADToElementsWindow(T3WPFWindow):
         sizes = sorted(set("{}x{}".format(w, h) for *_xy, w, h in items))
         details = [u"Beam pairs found: {}".format(len(items)),
                    u"Sizes (mm): {}".format(", ".join(sizes[:10]) or "—"),
-                   u"Top offset {:g} mm".format(offset)]
-        empty = ("No two parallel lines {:g}–{:g} mm apart overlap enough to be a beam. Tick the "
-                 "layer that holds both edges of each beam.".format(w_min, w_max))
+                   u"Top offset {}".format(self._len(offset))]
+        empty = (u"No two parallel lines {}–{} apart overlap enough to be a beam. Tick the "
+                 u"layer that holds both edges of each beam.".format(self._len(w_min), self._len(w_max)))
         n = len(items)
         if self._checked(self.rb_beam_part_mode):
             cat = self._category("cmb_beam_part_category")
-            top = level.Elevation + geo.mm(offset)
+            top = level.Elevation + offset
             profiles = []
             for (x0, y0, x1, y1, w, h) in items:
                 rect = geo.centerline_rect(x0, y0, x1, y1, geo.mm(w) / 2.0)
@@ -990,22 +1105,23 @@ class CADToElementsWindow(T3WPFWindow):
         details.append(u"Type: {}{}".format(sym["name"], " (copied per size)" if match else ""))
         return Plan(n, "beams", u"Create {} beams on {}?".format(n, ctx["level_name"]),
                     u"Create {} Beams".format(n), u"\n".join(details),
-                    lambda p: cr.create_beams(doc, items, level, sym["element"], geo.mm(offset),
+                    lambda p: cr.create_beams(doc, items, level, sym["element"], offset,
                                               match, p), empty)
 
     # ── Grids ──
 
     def _plan_grid(self, ctx):
         doc = self._doc
-        extend = self._num(self.txt_grid_extend, "Extend ends", 0, 0, 100000)
-        min_len = self._num(self.txt_grid_min_length, "Min length", 1000, 0)
+        extend = self._length(self.txt_grid_extend, "Extend ends", minimum=0.0,
+                              maximum=geo.mm(100000))
+        min_len = self._length(self.txt_grid_min_length, "Min length", minimum=0.0)
         auto = self._checked(self.rb_grid_autoname)
         start_number = int(self._num(self.txt_grid_start_number, "First number", 1, 0, 100000)) if auto else 1
         start_letter = (self.txt_grid_start_letter.Text or "A").strip() or "A"
         if auto and geo.letter_index(start_letter) == 0 and start_letter.upper() != "A":
             raise _InputError(u"First letter is \"{}\", which is not a grid letter.\nUse letters "
                               u"A–Z without I and O (for example A, C or AA).".format(start_letter))
-        axes = geo.collapse_axis_lines(self._segments(ctx["layers"], False), min_len=geo.mm(min_len))
+        axes = geo.collapse_axis_lines(self._segments(ctx["layers"], False), min_len=min_len)
         skipped = 0
         existing, taken = cr.existing_grid_lines(doc)
         if self._checked(self.chk_grid_skip_existing):
@@ -1013,7 +1129,7 @@ class CADToElementsWindow(T3WPFWindow):
             skipped = len(axes) - len(kept)
             axes = kept
         names = geo.name_grids(axes, start_number, start_letter) if auto else None
-        lines = [geo.extend_line(a[0], a[1], a[2], a[3], geo.mm(extend)) for a in axes]
+        lines = [geo.extend_line(a[0], a[1], a[2], a[3], extend) for a in axes]
         gtype = self._pick("cmb_grid_type")
         type_id = gtype["id"] if gtype else None
         numbers = [nm for nm in (names or []) if nm.isdigit()]
@@ -1026,8 +1142,8 @@ class CADToElementsWindow(T3WPFWindow):
                 details.append(u"Lettered {}–{}".format(geo.grid_letter(geo.letter_index(start_letter)),
                                                           geo.grid_letter(geo.letter_index(start_letter) + len(letters) - 1)))
         n = len(lines)
-        empty = ("The ticked layers hold no straight axis line of at least {:g} mm{}. Tick the axis "
-                 "layer.".format(min_len, ", or every axis already has a grid" if skipped else ""))
+        empty = (u"The ticked layers hold no straight axis line of at least {}{}. Tick the axis "
+                 u"layer.".format(self._len(min_len), ", or every axis already has a grid" if skipped else ""))
         return Plan(n, "grids", u"Create {} grids?".format(n), u"Create {} Grids".format(n),
                     u"\n".join(details),
                     lambda p: cr.create_grids(doc, lines, names, type_id, set(taken), p), empty)
@@ -1055,7 +1171,7 @@ class CADToElementsWindow(T3WPFWindow):
             except Exception:
                 pass
         else:
-            z = level.Elevation + geo.mm(self._num(self.txt_lines_offset, "Offset from level", 0))
+            z = level.Elevation + self._length(self.txt_lines_offset, "Offset from level")
         merge = self._checked(self.chk_lines_merge)
         edges = []
         for lg in ctx["layers"]:
@@ -1086,12 +1202,14 @@ class CADToElementsWindow(T3WPFWindow):
         system_id = None
         if cat["system"]:
             system_id = self._need("cmb_mep_system", "{} system type".format(cat["label"].lower()))["id"]
-        width = self._num(self.txt_mep_width, cat["width_label"].title(), cat["width"], 1)
+        double = cat["double"] and self.cmb_mep_line_mode.SelectedIndex == 1
+        width = None                    # double lines: the width comes from the pair spacing
+        if not double:
+            width = self._length(self.txt_mep_width, cat["width_label"].capitalize(), positive=True)
         height = None
         if cat["height"]:
-            height = self._num(self.txt_mep_height, "Height", cat["height_mm"], 1)
-        offset = self._num(self.txt_mep_offset, "Offset from level", cat["offset"])
-        double = cat["double"] and self.cmb_mep_line_mode.SelectedIndex == 1
+            height = self._length(self.txt_mep_height, "Height", positive=True)
+        offset = self._length(self.txt_mep_offset, "Offset from level")
         segs = self._segments(ctx["layers"], self._checked(self.chk_mep_merge))
         unpaired = []
         if double:
@@ -1102,18 +1220,17 @@ class CADToElementsWindow(T3WPFWindow):
         n = len(segments)
         details = [u"{}: {}".format("Line pairs" if double else "Lines", n),
                    u"Type: {}".format(tp["name"]),
-                   u"Size: {}".format("from the pair spacing" if double else u"{:g} mm".format(width)) +
-                   (u" × {:g} mm".format(height) if height else u""),
-                   u"Offset from level {:g} mm".format(offset)]
+                   u"Size: {}".format("from the pair spacing" if double else self._len(width)) +
+                   (u" × {}".format(self._len(height)) if height else u""),
+                   u"Offset from level {}".format(self._len(offset))]
         if double and unpaired:
             details.append(u"Single lines ignored: {}".format(len(unpaired)))
         auto_elbow = self._checked(self.chk_mep_elbows)
         noun = cat["noun"]
         return Plan(n, noun, u"Create {} {} on {}?".format(n, noun, ctx["level_name"]),
                     u"Create {} {}".format(n, cat["verb"][len("Create "):]), u"\n".join(details),
-                    lambda p: cr.create_mep_runs(doc, key, segments, level, geo.mm(offset), tp["id"],
-                                                 system_id, geo.mm(width),
-                                                 geo.mm(height) if height else None, auto_elbow,
+                    lambda p: cr.create_mep_runs(doc, key, segments, level, offset, tp["id"],
+                                                 system_id, width, height, auto_elbow,
                                                  noun, "T3Lab: CAD to {}".format(cat["label"] + "s"), p),
                     "The ticked layers hold no straight line." if not double else
                     "No parallel line pairs found. Switch to Single line or tick the layer with both edges.")
