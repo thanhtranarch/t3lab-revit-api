@@ -5,7 +5,7 @@ import os
 import sys
 
 from pyrevit import revit, script
-from Snippets._compat import eid_value
+from Snippets._compat import eid_value, disposing
 from Snippets._host import get_revit_version
 
 try:
@@ -256,6 +256,67 @@ def create_workset_views(doc):
         return None, None, str(e)
 
     return created, skipped, None
+
+
+def get_workset_by_id(doc, workset_id):
+    """Return the user Workset with this WorksetId, or None."""
+    target = eid_value(workset_id)
+    return next((w for w in get_user_worksets(doc) if eid_value(w.Id) == target), None)
+
+
+def workset_blocking_owner(doc, workset):
+    """Name of ANOTHER user who owns `workset`, or "" when we may edit it.
+
+    `Workset.Owner` / `IsEditable` exist on every Revit 2022-2027; a workset
+    owned by the current user, or by nobody (borrowable), is not blocked.
+    """
+    if workset is None:
+        return ""
+    owner = (getattr(workset, "Owner", "") or "").strip()
+    if not owner:
+        return ""
+    try:
+        me = (doc.Application.Username or "").strip()
+    except Exception:
+        me = ""
+    if me and owner.casefold() == me.casefold():
+        return ""
+    return owner
+
+
+def is_workset_name_unique(doc, name):
+    """`WorksetTable.IsWorksetNameUnique` (True when the API is unavailable)."""
+    try:
+        return bool(WorksetTable.IsWorksetNameUnique(doc, name))
+    except Exception:
+        return True
+
+
+def rename_workset(doc, workset_id, new_name):
+    """Rename a user workset in ONE transaction ("Rename Workset").
+
+    Returns (ok, error_message). Rolls back on any failure; an owned-by-other
+    workset is refused before the transaction starts.
+    """
+    ws = get_workset_by_id(doc, workset_id)
+    if ws is None:
+        return False, "The workset no longer exists. Click Refresh to reload the list."
+    owner = workset_blocking_owner(doc, ws)
+    if owner:
+        return False, ("'{}' is owned by {}. Ask {} to relinquish it, "
+                       "then click Refresh and try again.".format(ws.Name, owner, owner))
+    try:
+        with disposing(Transaction(doc, "Rename Workset")) as t:
+            t.Start()
+            try:
+                WorksetTable.RenameWorkset(doc, ws.Id, new_name)
+                _commit_transaction(t)
+            except Exception:
+                _rollback_started(t)
+                raise
+        return True, ""
+    except Exception as e:
+        return False, str(e) or e.__class__.__name__
 
 
 def delete_workset(doc, ws_to_delete, ws_to_reassign=None):

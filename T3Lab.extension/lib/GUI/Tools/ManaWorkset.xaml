@@ -1867,13 +1867,40 @@
                             <Grid Grid.Row="2" Background="{StaticResource T3.Surface}">
                                 <DataGrid x:Name="ws_grid" Style="{StaticResource T3.DataGrid}"
                                           CanUserAddRows="False" CanUserDeleteRows="False"
-                                          SelectionMode="Extended" IsReadOnly="True"
-                                          BorderThickness="0">
+                                          SelectionMode="Extended" IsReadOnly="False"
+                                          BorderThickness="0"
+                                          MouseDoubleClick="ws_grid_double_click"
+                                          PreviewKeyDown="ws_grid_preview_key_down"
+                                          BeginningEdit="ws_grid_beginning_edit"
+                                          CellEditEnding="ws_grid_cell_edit_ending">
+                                    <!-- Only WORKSET NAME is editable, and only through double-click / F2 / Enter
+                                         (ws_grid_beginning_edit cancels every other edit trigger). -->
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="#" Binding="{Binding Number}" Width="50" IsReadOnly="True"
+                                                            CanUserSort="False"
                                                             ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                        <DataGridTextColumn Header="WORKSET NAME" Binding="{Binding Name}" Width="*" IsReadOnly="True"/>
-                                        <DataGridTemplateColumn Header="ACTIVE" Width="70">
+                                        <DataGridTemplateColumn Width="*" SortMemberPath="Name">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="WORKSET NAME" ToolTip="Double-click or press F2 to rename"/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="Double-click or press F2 to rename"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                            <DataGridTemplateColumn.CellEditingTemplate>
+                                                <DataTemplate>
+                                                    <TextBox x:Name="row_name_edit" Text="{Binding Name, Mode=OneWay}"
+                                                             Style="{StaticResource T3.TextBox}"
+                                                             Height="{StaticResource T3.H.Row}"
+                                                             VerticalAlignment="Center"
+                                                             ToolTip="Enter to rename, Esc to cancel"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellEditingTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="ACTIVE" Width="70" IsReadOnly="True">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -1886,7 +1913,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="OPEN" Width="70">
+                                        <DataGridTemplateColumn Header="OPEN" Width="70" IsReadOnly="True">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -1899,7 +1926,7 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="EDITABLE" Width="80">
+                                        <DataGridTemplateColumn Header="EDITABLE" Width="80" IsReadOnly="True">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
