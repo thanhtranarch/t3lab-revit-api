@@ -3,8 +3,8 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="MCP Control"
-        Width="460" Height="740"
-        MinWidth="440" MinHeight="600"
+        Width="460" Height="620"
+        MinWidth="440" MinHeight="520"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="True"
         ResizeMode="CanResize"
@@ -1869,7 +1869,7 @@
                                                        ToolTip="The ChatGPT app's own Connectors need a public https URL — a local server is reached through Codex."/>
                                             <TextBlock x:Name="chatgpt_cfg_label" Text="Checking..."
                                                        Style="{StaticResource T3.Caption}" TextWrapping="Wrap"/>
-                                            <TextBlock Text="Works in the Codex app and CLI, not in ChatGPT chat."
+                                            <TextBlock Text="Codex app and CLI only, not ChatGPT chat."
                                                        Style="{StaticResource T3.Caption}" TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <Button Grid.Column="2" x:Name="configure_chatgpt_btn" Content="Connect"
@@ -1910,7 +1910,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="configure_all_label" Grid.Column="0"
-                                           Text="Restart the AI app after connecting so it loads T3Lab."
+                                           Text="Restart the AI app after connecting."
                                            Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
                                            Margin="0,0,12,0"/>
                                 <Button Grid.Column="1" x:Name="configure_all_btn" Content="Connect All"
@@ -1963,7 +1963,7 @@
                             <TextBlock Text="CONFIG ENTRY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
                             <TextBox x:Name="config_box" IsReadOnly="True"
                                      Style="{StaticResource T3.TextBox.Mono}"
-                                     Height="280" Padding="8" VerticalContentAlignment="Top"
+                                     Height="240" Padding="8" VerticalContentAlignment="Top"
                                      AcceptsReturn="True" TextWrapping="NoWrap"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
 
@@ -2016,7 +2016,7 @@
 
                             <!-- File task watcher -->
                             <TextBlock Text="FILE TASK WATCHER" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                            <TextBlock Text="Zero-network alternative to the server: runs task.json files dropped into the data folder."
+                            <TextBlock Text="Server-free option: runs task.json files from the data folder."
                                        Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -2083,7 +2083,7 @@
                                         Height="28" Padding="12,0"
                                         ToolTip="Use the active model as the teaching sandbox"/>
                             </Grid>
-                            <TextBlock Text="While recording, model-editing tools may only change the sandbox model."
+                            <TextBlock Text="While recording, AI edits may only change this model."
                                        Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
 
                         </StackPanel>
