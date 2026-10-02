@@ -638,7 +638,9 @@ class ReportGenerator(object):
 
 
     def export_csv(self, filepath):
-        with open(filepath, 'wb') as fh:
+        # Text mode for csv under Python 3 ('wb' raises "a bytes-like object
+        # is required"); utf-8-sig so Excel reads the file as UTF-8.
+        with open(filepath, 'w', newline='', encoding='utf-8-sig') as fh:
             w = csv.writer(fh)
             w.writerow(['Floor_Id', 'Pattern', 'Option',
                         'Label', 'Type', 'Parent_ID',
