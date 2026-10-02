@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tiet dien dam: be tong (surface + net), dai thep (detail), 4 thanh goc (amber) -->
+  <rect x="4.5" y="4.5" width="23" height="23" fill="#F3F3F3" stroke="#000000" stroke-width="1"/>
+  <rect x="8.5" y="8.5" width="15" height="15" fill="none" stroke="#858585" stroke-width="1"/>
+  <circle cx="11" cy="11" r="1.5" fill="#E07B00"/>
+  <circle cx="21" cy="11" r="1.5" fill="#E07B00"/>
+  <circle cx="11" cy="21" r="1.5" fill="#E07B00"/>
+  <circle cx="21" cy="21" r="1.5" fill="#E07B00"/>
+</svg>

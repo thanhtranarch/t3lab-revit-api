@@ -1,0 +1,10 @@
+title: "Rebar\nWizard"
+tooltip: "Reinforce rectangular beams, columns and pad footings from a preset — main bars, stirrups in three zones, footing mesh — added to the host's assembly (Tekla: system components 63 / 83 / 77)"
+description: |
+  Beam: bottom and top bars, stirrups dense at both ends and wider in the middle
+  Column: corner and side verticals, ties dense at top and bottom, optional cross ties
+  Pad footing: two-layer bottom mesh with optional 90° end hooks
+  Presets saved per user; anything that is not rectangular and straight is listed as out of scope
+  One Ctrl+Z undoes the whole run; new bars join the host's assembly
+author: "Tran Tien Thanh"
+version: "1.0.0"
