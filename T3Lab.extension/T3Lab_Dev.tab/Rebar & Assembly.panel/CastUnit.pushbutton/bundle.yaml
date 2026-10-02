@@ -1,0 +1,10 @@
+title: "Cast Unit\nManager"
+tooltip: "Create assemblies for many hosts at once with their rebar, sync rebar into assemblies, rename marks as a series and set rebar partitions by rule (Tekla: cast unit)"
+description: |
+  Batch create: one assembly per beam, column or footing (or all in one) from the selection or a filter, hosted rebar included
+  Skips hosts in a group, from a link or already in an assembly, and says why before anything runs
+  Manage: see members, rebar not yet in its assembly, views and sheets; sync rebar in one click
+  Rename series: prefix + start + step per assembly type, reporting any type Revit splits or merges
+  Partition by rule: set the rebar Partition from the assembly mark, level, host type or workset
+author: "Tran Tien Thanh"
+version: "1.0.0"
