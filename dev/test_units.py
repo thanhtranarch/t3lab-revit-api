@@ -160,5 +160,22 @@ class PaperUnits(unittest.TestCase):
         self.assertEqual(U.paper_unit(None).tag, 'mm')
         self.assertEqual(U.project_paper_unit(None).tag, 'mm')
 
+
+class Precision(unittest.TestCase):
+    def test_feet_inches_to_a_sixteenth_written_like_revit(self):
+        ftin = U.LengthUnit('feetFractionalInches')
+        self.assertEqual(ftin.text(0.5 * IN), '0\' - 0 1/2"')
+        self.assertEqual(ftin.text(1.0 / 16 * IN), '0\' - 0 1/16"')
+        self.assertEqual(ftin.text(3 * FT + 6.5 * IN), '3\' - 6 1/2"')
+        self.assertAlmostEqual(ftin.parse(ftin.text(1.0 / 16 * IN)), 1.0 / 16 * IN, places=9)
+
+    def test_paper_sizes_keep_small_text_heights(self):
+        mm = U.paper_unit(U.LengthUnit('meters'))
+        inch = U.paper_unit(U.LengthUnit('feetFractionalInches'))
+        self.assertEqual(mm.text(2.5 * MM), '2.5')
+        self.assertEqual(mm.text(70 * MM), '70')
+        self.assertEqual(inch.text(3.0 / 32 * IN), '3/32"')
+        self.assertEqual(inch.text(1.25 * IN), '1 1/4"')
+
 if __name__ == '__main__':
     unittest.main()

@@ -483,9 +483,10 @@ class AutoDimension(unittest.TestCase):
         self.assertAlmostEqual(l3, 1500 * MM)
         self.assertAlmostEqual(args[23], 4.0)          # facade offset
         self.assertAlmostEqual(args[24], 6.0)          # facade tolerance
-        # min segment: the default box (300 mm) reads 0' - 11 3/4" and is used as shown
-        self.assertEqual(win.txt_min_seg.Text, '0\' - 11 3/4"')
-        self.assertAlmostEqual(args[22], 11.75 * IN)
+        # min segment: the default box (300 mm) reads 0' - 11 13/16" (1/16"
+        # accuracy) and is used as shown
+        self.assertEqual(win.txt_min_seg.Text, '0\' - 11 13/16"')
+        self.assertAlmostEqual(args[22], (11 + 13.0 / 16) * IN)
 
     def test_single_offset_in_metres(self):
         _, win = self.open(METERS)
@@ -545,10 +546,10 @@ class PointCloud(unittest.TestCase):
         text = {el.Type: ns['_dimensions_text'](el, win._unit) for el in self.elements()}
         self.assertEqual(text['Wall'], 'L=9\' - 10 1/8"  T=0\' - 7 7/8"')
         self.assertEqual(text['Column'], 'W=1\' - 3 3/4" D=1\' - 11 5/8" H=10\' - 6"')
-        self.assertEqual(text['Door'], 'W=2\' - 11 3/8" H=6\' - 10 5/8"')
+        self.assertEqual(text['Door'], 'W=2\' - 11 7/16" H=6\' - 10 11/16"')
         self.assertEqual(text['Floor'], '~108 ft²  @Z=9\' - 10 1/8"')
         self.assertTrue(text['Stair'].startswith('18 treads  Rise=0\' - 0" to 9\' - 10 1/8"'))
-        self.assertEqual(text['Roof'], 'Slope=12.5°  @Z=29\' - 6 3/8"')   # angle stays
+        self.assertEqual(text['Roof'], 'Slope=12.5°  @Z=29\' - 6 5/16"')   # angle stays
 
     def test_results_grid_gets_the_project_unit(self):
         _, win = self.open(METERS)
