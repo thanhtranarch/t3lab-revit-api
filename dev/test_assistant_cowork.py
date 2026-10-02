@@ -234,6 +234,12 @@ def test_tool_gate_policy():
           conf.verdict('purge_unused', {'dry_run': True}) == GATE_RUN)
     check('confirm: destructive stays destructive',
           conf.verdict('delete_element', {}) == GATE_DESTRUCTIVE)
+    check('confirm: exports only write a file, so they never ask',
+          all(conf.verdict(n, {}) == GATE_RUN for n in
+              ('export_sheets_pdf', 'export_dwg', 'export_image',
+               'export_model', 'export_room_data')))
+    check('confirm: exports still count as modifying elsewhere (skills)',
+          conf.modifies('export_sheets_pdf', {}))
     check('confirm: launcher / memory pseudo-tools never ask',
           conf.verdict(LAUNCHER_TOOL_NAME, {}) == GATE_RUN
           and conf.verdict(MEMORY_TOOL_NAME, {}) == GATE_RUN)
@@ -739,8 +745,9 @@ def test_action_mode_chip_says_what_it_does():
     auto, conf = S._MODE_TIP_AUTO, S._MODE_TIP_CONFIRM
     check('Auto tooltip: edits apply right away, destructive still asks',
           'right away' in auto and 'Destructive' in auto)
-    check('Ask tooltip: every change waits for Confirm, reads never ask',
-          'Confirm' in conf and 'never asks' in conf)
+    check('Ask tooltip: every model change waits for Confirm; reads and '
+          'exports never ask',
+          'Confirm' in conf and 'never ask' in conf and 'exports' in conf)
     chip = _method_node('_update_action_mode_chip')
     seg = ast.get_source_segment(SRC, chip)
     check('the chip uses both tooltips',

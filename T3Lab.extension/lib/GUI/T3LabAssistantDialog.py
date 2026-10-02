@@ -5976,9 +5976,9 @@ class T3LabAssistantWindow(T3WPFWindow):
         u"multi-step plan that edits the model is shown for approval before "
         u"it runs.\nClick to switch to Ask before edits.")
     _MODE_TIP_CONFIRM = (
-        u"Ask before edits — every call that would change the model or write "
-        u"a file waits for your Confirm on a card in the chat. Reading the "
-        u"model never asks.\nClick to switch to Auto.")
+        u"Ask before edits — every call that would change the model waits "
+        u"for your Confirm on a card in the chat. Reading the model and "
+        u"exports (PDF, DWG, images) never ask.\nClick to switch to Auto.")
 
     def action_mode_clicked(self, sender, e):
         """Toggle between 'auto' (act immediately) and 'confirm' (ask first)."""

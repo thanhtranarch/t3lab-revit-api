@@ -37,7 +37,7 @@ import time
 
 from core import jsonsafe
 from Intelligence.tool_schema import (LAUNCHER_TOOL_NAME, MEMORY_TOOL_NAME,
-                                      is_model_modifying)
+                                      is_file_output_only, is_model_modifying)
 
 
 # ─── Result truncation ─────────────────────────────────────────────────────────
@@ -470,7 +470,10 @@ class ToolGate(object):
             except Exception:
                 return GATE_DESTRUCTIVE
         if (self.action_mode == 'confirm' and not self.preapproved_edits
-                and self.modifies(name, args)):
+                and self.modifies(name, args)
+                and not is_file_output_only(name)):
+            # Exports only write a new file — "Ask before edits" is about the
+            # model, so they run (tool_schema.FILE_OUTPUT_TOOL_NAMES).
             return GATE_EDIT
         return GATE_RUN
 

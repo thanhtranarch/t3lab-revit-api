@@ -395,6 +395,15 @@ def test_read_only_tools_are_real_tools():
     check('READ_ONLY_TOOL_NAMES names only real tools', not unknown, unknown)
 
 
+def test_file_output_tools_are_real_and_not_read_only():
+    files = _frozenset_literal(_read(TOOL_SCHEMA), 'FILE_OUTPUT_TOOL_NAMES')
+    reads = _frozenset_literal(_read(TOOL_SCHEMA), 'READ_ONLY_TOOL_NAMES')
+    unknown = sorted(n for n in files if n not in REGISTRY)
+    check('FILE_OUTPUT_TOOL_NAMES names only real tools', not unknown, unknown)
+    check('no file-output tool is filed as read-only', not (files & reads),
+          sorted(files & reads))
+
+
 def test_read_only_tools_open_no_transaction():
     """A tool that opens a Transaction changes the document, full stop.
 
@@ -588,6 +597,7 @@ TESTS = [
         test_write_tools_are_real_tools,
         test_docless_tools_are_real_tools,
         test_read_only_tools_are_real_tools,
+        test_file_output_tools_are_real_and_not_read_only,
         test_read_only_tools_open_no_transaction,
     ]),
     ('argument contract', [
