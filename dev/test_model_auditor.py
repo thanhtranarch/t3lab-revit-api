@@ -1118,6 +1118,62 @@ class NavigationTests(unittest.TestCase):
 
 
 # ───────────────────────── source / XAML contracts ──────────────────────────
+class HistoryLocationTests(unittest.TestCase):
+    """Score history is data about the user's projects: it must live under
+    %APPDATA%\\T3LabAI, never in the extension folder (the old in-extension
+    folder was committed to a public repo with client names, 2026-10-02)."""
+
+    def setUp(self):
+        import os, tempfile
+        self.tmp = tempfile.mkdtemp()
+        self.appdata = os.path.join(self.tmp, 'appdata')
+        self.legacy = os.path.join(self.tmp, 'legacy')
+        os.makedirs(self.legacy)
+        self._env = os.environ.get('APPDATA')
+        os.environ['APPDATA'] = self.appdata
+        # load_dialog() execs functions and classes only, so module constants
+        # are injected here the way the other suites inject their fakes.
+        globs = MOD._history_file_for_doc.__globals__
+        self._old_legacy = globs.get('_LEGACY_HISTORY_DIR')
+        globs['_LEGACY_HISTORY_DIR'] = self.legacy
+        globs.setdefault('re', __import__('re'))
+
+    def tearDown(self):
+        import os, shutil
+        globs = MOD._history_file_for_doc.__globals__
+        if self._old_legacy is None:
+            globs.pop('_LEGACY_HISTORY_DIR', None)
+        else:
+            globs['_LEGACY_HISTORY_DIR'] = self._old_legacy
+        if self._env is None:
+            os.environ.pop('APPDATA', None)
+        else:
+            os.environ['APPDATA'] = self._env
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_history_goes_to_appdata_not_the_extension(self):
+        import os
+        doc = types.SimpleNamespace(PathName=r'C:\\Jobs\\Client Tower.rvt', Title='Client Tower')
+        path = MOD._history_file_for_doc(doc)
+        self.assertTrue(path.startswith(os.path.join(self.appdata, 'T3LabAI', 'model_auditor', 'history')), path)
+        self.assertNotIn(os.path.join('GUI', 'Resources'), path)
+
+    def test_legacy_history_is_carried_over_once(self):
+        import os, json
+        name = 'Client_Tower.rvt.json'
+        with open(os.path.join(self.legacy, name), 'w') as f:
+            json.dump([{'score': 71.0}], f)
+        doc = types.SimpleNamespace(PathName='Client Tower.rvt', Title='Client Tower')
+        path = MOD._history_file_for_doc(doc)
+        with open(path) as f:
+            self.assertEqual(json.load(f), [{'score': 71.0}])
+        with open(path, 'w') as f:
+            json.dump([{'score': 80.0}], f)
+        MOD._history_file_for_doc(doc)
+        with open(path) as f:
+            self.assertEqual(json.load(f), [{'score': 80.0}], 'a newer file is never overwritten')
+
+
 class SourceContractTests(unittest.TestCase):
     """Guards that removed code and known traps do not creep back in."""
 

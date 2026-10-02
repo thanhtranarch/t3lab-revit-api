@@ -52,3 +52,8 @@ T3Lab.extension/lib/config/chat_history/
 
 # Local fine-tune build artifacts (finetune_local.py default --out)
 tools/train/out/
+
+# Model Auditor score history is per-user project data: it lives in
+# %APPDATA%\T3LabAI\model_auditor\history. The old in-extension folder must
+# never be committed again (it exposed client project names, 2026-10-02).
+T3Lab.extension/lib/GUI/Resources/ModelAuditorHistory/

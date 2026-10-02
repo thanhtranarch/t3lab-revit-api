@@ -249,7 +249,21 @@ METRIC_THRESHOLDS = OrderedDict([
 #  https://help.autodesk.com/view/MODALY/ENU/?guid=MODALY_Understanding_Data_ama_reports_html)
 # ============================================================================
 _CONFIG_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), 'Resources', 'model_auditor_thresholds.json'))
-_HISTORY_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), 'Resources', 'ModelAuditorHistory'))
+# Per-model score history is data about the user's projects, so it lives in
+# %APPDATA%\T3LabAI\model_auditor\history — never inside the extension. The
+# old Resources/ModelAuditorHistory/ sat in the clone and was committed to the
+# public repo with client project names in its file names (2026-10-02); it is
+# now only read once per model to carry the trend across (_history_file_for_doc).
+_LEGACY_HISTORY_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), 'Resources', 'ModelAuditorHistory'))
+
+
+def _history_dir():
+    try:
+        from core.paths import settings_dir
+        base = settings_dir()
+    except Exception:
+        base = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'T3LabAI')
+    return os.path.join(base, 'model_auditor', 'history')
 
 
 def _save_metric_config():
@@ -465,12 +479,23 @@ def _rag_status(score):
 def _history_file_for_doc(doc):
     name = os.path.basename(doc.PathName) if doc.PathName else doc.Title
     safe = re.sub(r'[^A-Za-z0-9_.-]', '_', name) or "UnsavedProject"
-    if not os.path.isdir(_HISTORY_DIR):
+    hist_dir = _history_dir()
+    if not os.path.isdir(hist_dir):
         try:
-            os.makedirs(_HISTORY_DIR)
+            os.makedirs(hist_dir)
         except Exception:
             pass
-    return os.path.join(_HISTORY_DIR, safe + '.json')
+    path = os.path.join(hist_dir, safe + '.json')
+    # One-time carry-over from the old in-extension folder, so "vs last run"
+    # keeps working after the move. The legacy file is left untouched.
+    legacy = os.path.join(_LEGACY_HISTORY_DIR, safe + '.json')
+    if not os.path.isfile(path) and os.path.isfile(legacy):
+        try:
+            import shutil
+            shutil.copyfile(legacy, path)
+        except Exception:
+            pass
+    return path
 
 
 def _load_history(doc):
