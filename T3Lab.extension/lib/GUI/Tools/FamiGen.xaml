@@ -1711,8 +1711,11 @@
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,16,0">
                         </StackPanel>
 
-                        <!-- Window Controls -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Window Controls — IsHitTestVisibleInChrome BẮT BUỘC: cả dải 48px
+                             là caption của WindowChrome, thiếu nó thì click bị chrome nuốt
+                             (để kéo cửa sổ) và 3 nút không bấm được. -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+                                    WindowChrome.IsHitTestVisibleInChrome="True">
                             <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize"
                                     Click="minimize_button_clicked">
                                 <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
@@ -2057,28 +2060,35 @@
                                  Text="Paste your JSON schema here..."/>
                         </Grid>
 
-                        <!-- JSON Action Bar -->
+                        <!-- JSON Action Bar — MỘT hàng, cùng nhịp với CAD Action Bar: trạng
+                             thái của bước JSON bên trái (cắt "…" + tooltip đủ câu), nút bên
+                             phải, hành động chính ngoài cùng. Bỏ "Cancel": nó chỉ Close()
+                             cửa sổ, trùng nút X (IsCancel) trên title bar. -->
                         <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                 Padding="16,8">
                             <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock x:Name="lbl_status" Text="Ready"
-                                           Style="{StaticResource T3.Body.Secondary}"
-                                           VerticalAlignment="Center" HorizontalAlignment="Left" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                                            Margin="0,0,16,0">
+                                    <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Field}"/>
+                                    <TextBlock x:Name="lbl_status" Text="Describe the family and press AI Generate, or paste JSON"
+                                               Style="{StaticResource T3.Body.Secondary}"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Button x:Name="copy_prompt_btn" Content="Copy Prompt"
                                             Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0"
-                                            Click="copy_prompt_clicked" Margin="0,0,8,0"/>
-                                    <Button x:Name="cancel_btn" Content="Cancel"
-                                            Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0"
-                                            Click="cancel_clicked" Margin="0,0,8,0"/>
+                                            Click="copy_prompt_clicked" Margin="0,0,8,0"
+                                            ToolTip="Copy an AI prompt for the chosen category, to use in any chat assistant"/>
                                     <Button x:Name="create_btn" Content="Create Family"
                                             Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="16,0"
-                                            Click="create_clicked"/>
+                                            Click="create_clicked"
+                                            ToolTip="Build the .rfa family from the JSON above"/>
                                 </StackPanel>
                             </Grid>
                         </Border>

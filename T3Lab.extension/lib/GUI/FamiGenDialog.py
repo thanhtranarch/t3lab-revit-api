@@ -2364,9 +2364,6 @@ class FamilyCreatorDialog(T3WPFWindow):
         except Exception as ex:
             logger.warning("Error reverting JSON: {}".format(ex))
 
-    def cancel_clicked(self, sender, e):
-        self.Close()
-
     def create_clicked(self, sender, e):
         if self._ai_generating:
             return
