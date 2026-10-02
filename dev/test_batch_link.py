@@ -460,15 +460,30 @@ class TestWorksetTabContract(unittest.TestCase):
                       'Mode=OneWay}"', self.grid)
 
     def test_locked_rows_show_text_not_combo(self):
-        self.assertIn('<DataTrigger Binding="{Binding WorksetEditable}" Value="no">',
-                      self.grid)
+        """WorksetEditable reaches WPF as a PyObject: the triggers must read it
+        through the hidden TextBlock, never {Binding WorksetEditable} itself."""
+        self.assertIn('x:Name="row_ws_editable_text" Text="{Binding WorksetEditable}" '
+                      'Visibility="Collapsed"', self.grid)
+        self.assertEqual(self.grid.count(
+            '<DataTrigger Binding="{Binding Text, ElementName=row_ws_editable_text}" '
+            'Value="no">'), 2)
+        self.assertNotIn('<DataTrigger Binding="{Binding WorksetEditable}"', self.grid)
 
     def test_states_painted_from_t3_tokens(self):
+        # Cell: row_state copied into the cell's own string property (no template
+        # to hold a TextBlock bridge). Combo inside the template: hidden TextBlock.
+        self.assertIn('<Setter Property="AutomationProperties.ItemStatus" '
+                      'Value="{Binding row_state}"/>', self.grid)
+        self.assertIn('x:Name="row_ws_state_text" Text="{Binding row_state}" '
+                      'Visibility="Collapsed"', self.grid)
         for state, token in (("pending", "Warning"), ("applied", "Success"),
                              ("failed", "Danger")):
-            self.assertIn('<DataTrigger Binding="{Binding row_state}" Value="%s">'
+            self.assertIn('<Trigger Property="AutomationProperties.ItemStatus" Value="%s">'
                           % state, self.grid)
+            self.assertIn('<DataTrigger Binding="{Binding Text, ElementName=row_ws_state_text}" '
+                          'Value="%s">' % state, self.grid)
             self.assertIn('{StaticResource T3.%s.Fill}' % token, self.grid)
+        self.assertNotIn('<DataTrigger Binding="{Binding row_state}"', self.grid)
         self.assertNotRegex(self.grid, r'"#[0-9A-Fa-f]{3,8}"')
 
     def test_no_templated_selection_changed(self):

@@ -773,7 +773,9 @@
 
           <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
                có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
-               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
+               <Column.CellStyle>. Dòng là object Python thì dùng cell bridge
+               (AutomationProperties.ItemStatus + Trigger, xem GUI/GridPendingEdits.py),
+               không DataTrigger bind thẳng field. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -981,7 +983,9 @@
           <Style TargetType="ListViewItem" BasedOn="{StaticResource T3.ListViewItem}"/>
 
           <!-- Status pill: nền tint + dot + CHỮ. Không bao giờ chỉ dùng màu.
-               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger"). -->
+               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger").
+               Severity đi qua TextBlock ẩn "sev" (string bridge): dòng là object Python thì
+               DataTrigger bind thẳng {Binding Severity} không bao giờ khớp. -->
           <DataTemplate x:Key="T3.StatusPill">
             <Border x:Name="pill" CornerRadius="{StaticResource T3.R.Pill}" Padding="7,2"
                     HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -990,20 +994,21 @@
                 <TextBlock x:Name="txt" Text="{Binding StatusText}"
                            FontFamily="Segoe UI" FontSize="12" FontWeight="SemiBold"
                            VerticalAlignment="Center"/>
+                <TextBlock x:Name="sev" Text="{Binding Severity}" Visibility="Collapsed"/>
               </StackPanel>
             </Border>
             <DataTemplate.Triggers>
-              <DataTrigger Binding="{Binding Severity}" Value="Success">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Success">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Success.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Warning">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Warning">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Warning.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Danger">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Danger">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Danger.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
@@ -1971,7 +1976,11 @@
                                                 ElementStyle="{StaticResource T3.Body.Secondary}"/>
 
                             <!-- Coordinates: Consolas, right-aligned so the decimal points line up.
-                                 Amber cell = edited, waiting for Apply. Red digits = not a whole mm. -->
+                                 Amber cell = edited, waiting for Apply. Red digits = not a whole mm.
+                                 Both flags are Python properties, so WPF receives a PyObject: a
+                                 DataTrigger on {Binding dirty_x_mm} never equals "True". Each style
+                                 copies its flag into the element's own AutomationProperties.ItemStatus
+                                 (a string property) and a property Trigger tests that string. -->
                             <DataGridTextColumn Header="X (MM)" Binding="{Binding x_mm, Mode=TwoWay}" Width="100">
                                 <DataGridTextColumn.HeaderStyle>
                                     <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
@@ -1981,21 +1990,23 @@
                                 </DataGridTextColumn.HeaderStyle>
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Number}">
+                                        <Setter Property="AutomationProperties.ItemStatus" Value="{Binding odd_x_mm}"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding odd_x_mm}" Value="True">
+                                            <Trigger Property="AutomationProperties.ItemStatus" Value="True">
                                                 <Setter Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
-                                            </DataTrigger>
+                                            </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                                 <DataGridTextColumn.CellStyle>
                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                        <Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_x_mm}"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding dirty_x_mm}" Value="True">
+                                            <Trigger Property="AutomationProperties.ItemStatus" Value="True">
                                                 <Setter Property="Background"      Value="{StaticResource T3.Warning.Fill}"/>
                                                 <Setter Property="BorderBrush"     Value="{StaticResource T3.Warning.Accent}"/>
                                                 <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                            </DataTrigger>
+                                            </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </DataGridTextColumn.CellStyle>
@@ -2009,21 +2020,23 @@
                                 </DataGridTextColumn.HeaderStyle>
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Number}">
+                                        <Setter Property="AutomationProperties.ItemStatus" Value="{Binding odd_y_mm}"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding odd_y_mm}" Value="True">
+                                            <Trigger Property="AutomationProperties.ItemStatus" Value="True">
                                                 <Setter Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
-                                            </DataTrigger>
+                                            </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                                 <DataGridTextColumn.CellStyle>
                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                        <Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_y_mm}"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding dirty_y_mm}" Value="True">
+                                            <Trigger Property="AutomationProperties.ItemStatus" Value="True">
                                                 <Setter Property="Background"      Value="{StaticResource T3.Warning.Fill}"/>
                                                 <Setter Property="BorderBrush"     Value="{StaticResource T3.Warning.Accent}"/>
                                                 <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                            </DataTrigger>
+                                            </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </DataGridTextColumn.CellStyle>
@@ -2037,21 +2050,23 @@
                                 </DataGridTextColumn.HeaderStyle>
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Number}">
+                                        <Setter Property="AutomationProperties.ItemStatus" Value="{Binding odd_z_mm}"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding odd_z_mm}" Value="True">
+                                            <Trigger Property="AutomationProperties.ItemStatus" Value="True">
                                                 <Setter Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
-                                            </DataTrigger>
+                                            </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                                 <DataGridTextColumn.CellStyle>
                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                        <Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_z_mm}"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding dirty_z_mm}" Value="True">
+                                            <Trigger Property="AutomationProperties.ItemStatus" Value="True">
                                                 <Setter Property="Background"      Value="{StaticResource T3.Warning.Fill}"/>
                                                 <Setter Property="BorderBrush"     Value="{StaticResource T3.Warning.Accent}"/>
                                                 <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                            </DataTrigger>
+                                            </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </DataGridTextColumn.CellStyle>

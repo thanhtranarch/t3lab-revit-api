@@ -54,6 +54,8 @@ T3Lab.extension/lib/Intelligence/config/learned_patterns.json
 T3Lab.extension/lib/Intelligence/config/assistant_feedback.json
 T3Lab.extension/lib/Intelligence/config/assistant_memory.json
 T3Lab.extension/lib/GUI/join_rules.json
+**/ManaLoca.pushbutton/session.json
+T3Lab.extension/lib/GUI/ManaLoca_session.json
 **/IFC-SG.pushbutton/reports/
 # Older builds saved imported configs here. To ship a config with the tool,
 # add it with `git add -f`.

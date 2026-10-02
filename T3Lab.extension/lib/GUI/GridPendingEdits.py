@@ -12,8 +12,8 @@ until Apply is pressed**. Three pieces, none of which touch the Revit API:
 * :func:`editor_text` / :func:`revert_editor` — read what was typed, and put the
   old value back when an edit has to be undone.
 * :func:`init_pending` and friends — per-row store of what is staged, plus the
-  ``dirty_<field>`` flags a column's ``CellStyle`` DataTrigger binds to in order
-  to paint the amber highlight.
+  ``dirty_<field>`` flags a column's ``CellStyle`` reads in order to paint the
+  amber highlight (through the cell bridge below).
 
 Why the binding path and not the header
 ---------------------------------------
@@ -29,6 +29,30 @@ the model never heard about it, and Sheet Manager's Apply button kept reporting
 retitles a column, logic keyed to it dies without a sound. The binding path is
 the column's actual contract with the row, so that is what is matched here.
 
+How the amber cell reads its flag (cell string bridge)
+------------------------------------------------------
+Rows are plain Python objects, so pythonnet hands WPF every attribute as a
+``PyObject``. WPF turns that into text for a string property (which is why every
+column shows its value), but a ``DataTrigger Binding="{Binding dirty_name}"
+Value="True"`` compares the PyObject itself with the string "True" and never
+matches: the highlight silently never appears. A ``DataGridCell`` has no
+template of its own to hold the hidden-TextBlock bridge, so the cell is its own
+bridge — the column's ``CellStyle`` copies the flag into a string property of
+the cell, :data:`CELL_BRIDGE_PROPERTY`, and a property ``Trigger`` tests that
+string::
+
+    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+      <Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_name}"/>
+      <Style.Triggers>
+        <Trigger Property="AutomationProperties.ItemStatus" Value="True"> ... </Trigger>
+      </Style.Triggers>
+    </Style>
+
+The columns stay ``DataGridTextColumn`` / ``DataGridComboBoxColumn``, so
+:func:`column_key`, :func:`editor_text` and ``CellEditEnding`` see exactly what
+they saw before. The flag is a plain attribute (no INotifyPropertyChanged), so
+the grid still needs ``Items.Refresh()`` after a stage/unstage to repaint.
+
 Part of T3Lab Extension.
 """
 
@@ -36,9 +60,14 @@ Part of T3Lab Extension.
 # tries to bind to it.
 PENDING_ATTR = "_t3_pending"
 
-# Prefix of the per-column flag a CellStyle DataTrigger binds to, e.g. a column
-# bound to `sheet_name` is highlighted through `dirty_sheet_name`.
+# Prefix of the per-column flag a CellStyle reads, e.g. a column bound to
+# `sheet_name` is highlighted through `dirty_sheet_name`.
 DIRTY_PREFIX = "dirty_"
+
+# String property of the DataGridCell the CellStyle copies `dirty_<field>` into
+# (see "cell string bridge" above). Accessibility-wise it is the right slot too:
+# "item status" of the cell. dev/test_grid_pending_edits.py holds the XAML to it.
+CELL_BRIDGE_PROPERTY = "AutomationProperties.ItemStatus"
 
 
 # ── COLUMN IDENTITY ──────────────────────────────────────────────────────────
@@ -136,8 +165,8 @@ def init_pending(row, fields):
     """Give `row` an empty staging store and one `dirty_<field>` flag each.
 
     The flags must exist as real attributes before the grid binds to them:
-    a DataTrigger bound to a missing path silently never fires, which would
-    leave every edit unhighlighted.
+    a binding to a missing path silently yields nothing, which would leave
+    every edit unhighlighted.
     """
     setattr(row, PENDING_ATTR, {})
     for field in fields:

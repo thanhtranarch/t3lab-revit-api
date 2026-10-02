@@ -260,21 +260,33 @@ Bảng cho sửa ô thì theo đúng ba luật này, không tự chế kiểu kh
 <DataGridTextColumn Header="SHEET NAME" Binding="{Binding sheet_name}" Width="*">
   <DataGridTextColumn.CellStyle>
     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+      <!-- string bridge của chính ô: cờ Python → thuộc tính string của ô -->
+      <Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_sheet_name}"/>
       <Style.Triggers>
-        <DataTrigger Binding="{Binding dirty_sheet_name}" Value="True">
+        <Trigger Property="AutomationProperties.ItemStatus" Value="True">
           <Setter Property="Background"      Value="{StaticResource T3.Warning.Fill}"/>
           <Setter Property="BorderBrush"     Value="{StaticResource T3.Warning.Accent}"/>
           <Setter Property="BorderThickness" Value="3,0,0,0"/>
-        </DataTrigger>
+        </Trigger>
       </Style.Triggers>
     </Style>
   </DataGridTextColumn.CellStyle>
 </DataGridTextColumn>
 ```
 
+**Không** viết `<DataTrigger Binding="{Binding dirty_sheet_name}" Value="True">`
+— mẫu cũ của mục này, và nó **không bao giờ nổ** (xem "Trigger trên dòng
+Python" ngay dưới). Ô `DataGridCell` không có template để đặt TextBlock bridge,
+nên ô tự làm bridge: Setter chép cờ vào `AutomationProperties.ItemStatus` (một
+thuộc tính **string** của ô — WPF đổi PyObject sang chuỗi `"True"`/`"False"`),
+rồi `Trigger` thường so chuỗi đó. Cột vẫn là `DataGridTextColumn` /
+`DataGridComboBoxColumn`, nên `CellEditEnding`, `column_key()` và
+`editor_text()` không đổi gì. Tên thuộc tính nằm ở
+`GridPendingEdits.CELL_BRIDGE_PROPERTY`.
+
 Python — `GUI/GridPendingEdits.py` lo phần treo, `init_pending` phải chạy trên
-mọi dòng lúc nạp, nếu không cờ `dirty_*` không tồn tại và DataTrigger **im lặng
-không bao giờ nổ**:
+mọi dòng lúc nạp, nếu không cờ `dirty_*` không tồn tại và ô **im lặng không bao
+giờ vàng**:
 
 ```python
 from GUI import GridPendingEdits as _pend
@@ -291,6 +303,27 @@ def _on_cell_edit(self, sender, args):              # grid.CellEditEnding
     else:
         _pend.stage(item, field, typed)
 ```
+
+### Trigger trên dòng Python — luôn qua string bridge (luật 28)
+
+Dòng của bảng là object Python thì pythonnet đưa **mọi** thuộc tính cho WPF dưới
+dạng `PyObject` — kể cả thuộc tính kiểu `str`. Thuộc tính WPF kiểu string
+(`Text`, ...) đổi được nó sang chuỗi, nên cột chữ hiện đúng. Nhưng
+`<DataTrigger Binding="{Binding severity}" Value="Danger">` so **chính PyObject**
+với `"Danger"` → không bao giờ khớp, trigger im lặng không nổ. Model Auditor
+từng tô mọi ô HEALTH cùng một màu xám vì đúng lỗi này (2026-10-02).
+
+| Trigger nằm ở đâu | Cách đọc đúng |
+|---|---|
+| Trong `DataTemplate` / `CellTemplate` | TextBlock ẩn làm bridge: `<TextBlock x:Name="sev_text" Text="{Binding severity}" Visibility="Collapsed"/>` rồi `<DataTrigger Binding="{Binding Text, ElementName=sev_text}" Value="Danger">` (mẫu: `ModelAuditor.xaml`) |
+| Phần tử đã hiện chính giá trị đó (`Text="{Binding DWGType}"`) | Trigger trên `Text` của chính nó: `<Trigger Property="Text" Value="Import">` |
+| `CellStyle` / `ElementStyle` (không có template) | Setter `AutomationProperties.ItemStatus` = `{Binding field}` + `<Trigger Property="AutomationProperties.ItemStatus" Value="True">` (mẫu ô vàng ở trên) |
+
+So bool Python bằng chuỗi `"True"` / `"False"` (`str(True)`). `audit_t3.py` (luật
+28, P1) bắt mọi `DataTrigger` / `Condition` bind thẳng vào DataContext — không có
+`ElementName` / `RelativeSource` / `Source`. Dòng là object .NET thật
+(`DataRowView`) thì bind thẳng vẫn đúng: khai file vào `PYROW_TRIGGER_EXEMPT`
+kèm lý do.
 
 ### Hai cái bẫy phải biết
 

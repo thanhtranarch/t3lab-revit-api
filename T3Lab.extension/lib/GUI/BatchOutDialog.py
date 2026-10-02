@@ -72,6 +72,7 @@ if lib_dir not in sys.path:
     sys.path.append(lib_dir)
 
 from Snippets._compat import eid_value, make_eid
+from core.paths import user_data_path
 
 try:
     from Intelligence.api_learner import SmartAPIAdapter, RevitAPILearner
@@ -106,6 +107,64 @@ try:
     output = safe_output()
 except Exception:
     output = script.get_output()
+
+
+# ── Machine state, not user files ─────────────────────────────────────────
+# Export profiles stay in Documents\T3Lab_BatchOut_Profiles: they are the
+# user's own, shareable files. The crash breadcrumbs do NOT belong there: the
+# in-flight marker is written + fsync'd before EVERY native export call and
+# removed after it, and in a OneDrive-synced Documents folder that is one sync
+# upload per sheet. They are per-machine state, so they live under
+# %APPDATA%\T3LabAI\batchout. The Bad Geometry check (checks/badgeometry_check.py)
+# writes its findings to %APPDATA%\T3LabAI\diagnostics for the same reason, and
+# safe mode reads them from there — dev/test_user_data_moves.py keeps both sides
+# on the same path.
+CRASH_MARKER_NAME = '_export_crash_marker.json'
+CRASH_HISTORY_NAME = '_export_crash_history.json'
+LEGACY_DIAG_FOLDER = os.path.join(os.path.expanduser('~'), 'Documents', 'T3Lab_Diagnostics')
+BAD_GEOMETRY_NAME = '_bad_geometry.json'
+
+
+def _adopt_legacy_file(old, new):
+    """Move a TRANSIENT state file an older build left behind to its new home.
+
+    Moved, not copied (unlike user_data_path's legacy copy): the file is
+    deleted as part of normal operation, and a copy would come back from the
+    old folder after every delete — reporting the same old crash each time
+    BatchOut opens. Never raises.
+    """
+    try:
+        if old and os.path.isfile(old) and not os.path.exists(new):
+            import shutil
+            shutil.move(old, new)
+    except Exception:
+        pass
+
+
+def crash_state_files(profiles_folder):
+    """(marker, history) paths of the native-crash breadcrumbs.
+
+    The history is durable (only ever rewritten), so an older one in the
+    profiles folder is copied over once. The marker is transient, so a leftover
+    one — a crash right before this build was installed — is moved.
+    """
+    history = user_data_path(
+        'batchout', CRASH_HISTORY_NAME,
+        legacy=[os.path.join(profiles_folder, CRASH_HISTORY_NAME)])
+    marker = user_data_path('batchout', CRASH_MARKER_NAME)
+    _adopt_legacy_file(os.path.join(profiles_folder, CRASH_MARKER_NAME), marker)
+    return marker, history
+
+
+def bad_geometry_file():
+    """Findings of the Bad Geometry check, read by safe mode.
+
+    Same path checks/badgeometry_check.py writes (FINDINGS_FILE). Findings are
+    durable (rewritten by each scan), so an older file is copied over once.
+    """
+    return user_data_path(
+        'diagnostics', BAD_GEOMETRY_NAME,
+        legacy=[os.path.join(LEGACY_DIAG_FOLDER, BAD_GEOMETRY_NAME)])
 
 
 def _build_view_type_labels():
@@ -733,8 +792,10 @@ class ExportManagerWindow(T3WPFWindow):
             # call and removed after it returns, so a surviving marker == that
             # exact combination killed the process. Confirmed kills are promoted
             # into a durable history so we can skip them instead of re-crashing.
-            self._crash_marker_file = os.path.join(self.profiles_folder, '_export_crash_marker.json')
-            self._crash_history_file = os.path.join(self.profiles_folder, '_export_crash_history.json')
+            # Both live in %APPDATA%\T3LabAI\batchout, not in the (often
+            # OneDrive-synced) profiles folder — see crash_state_files().
+            self._crash_marker_file, self._crash_history_file = \
+                crash_state_files(self.profiles_folder)
             self._crash_history = self._read_crash_history()
             self._pending_crash = self._promote_crash_marker()
             self._skipped_fatal = []
@@ -844,8 +905,9 @@ class ExportManagerWindow(T3WPFWindow):
             self.profiles = []
             if os.path.exists(self.profiles_folder):
                 for filename in os.listdir(self.profiles_folder):
-                    # Internal bookkeeping files (latest setup, crash marker,
-                    # crash history) share this folder but are not profiles.
+                    # Internal bookkeeping files (latest setup; the crash
+                    # marker/history of older builds) share this folder but
+                    # are not profiles.
                     if filename.startswith('_'):
                         continue
                     if filename.endswith('.json'):
@@ -1418,8 +1480,9 @@ class ExportManagerWindow(T3WPFWindow):
     def _write_crash_history(self):
         """Persist the confirmed-fatal list (last 50 entries)."""
         try:
-            if not os.path.exists(self.profiles_folder):
-                os.makedirs(self.profiles_folder)
+            folder = os.path.dirname(self._crash_history_file)
+            if not os.path.exists(folder):
+                os.makedirs(folder)
             with open(self._crash_history_file, 'w') as f:
                 json.dump(self._crash_history[-50:], f, indent=2)
         except Exception as ex:
@@ -1432,8 +1495,9 @@ class ExportManagerWindow(T3WPFWindow):
         `safe_level` is what lets the next session escalate instead of repeating
         a mitigation that has already been proven to still crash."""
         try:
-            if not os.path.exists(self.profiles_folder):
-                os.makedirs(self.profiles_folder)
+            folder = os.path.dirname(self._crash_marker_file)
+            if not os.path.exists(folder):
+                os.makedirs(folder)
             data = {
                 'sheet': sheet_number,
                 'format': fmt,
@@ -1493,17 +1557,15 @@ class ExportManagerWindow(T3WPFWindow):
     # exports, then rolls the change back so the model is byte-identical
     # afterwards. Preferred over skipping because it still produces the file.
 
-    BAD_GEOMETRY_FILE = os.path.join(
-        os.path.expanduser('~'), 'Documents', 'T3Lab_Diagnostics', '_bad_geometry.json')
-
     def _bad_geometry_ids(self):
         """ElementIds that the Bad Geometry check flagged for THIS model.
         Empty list if the check has not been run (safe mode then falls back to
         the blunt lever, Coarse detail level)."""
         try:
-            if not os.path.exists(self.BAD_GEOMETRY_FILE):
+            findings = bad_geometry_file()
+            if not os.path.exists(findings):
                 return []
-            with open(self.BAD_GEOMETRY_FILE, 'r') as f:
+            with open(findings, 'r') as f:
                 data = json.load(f)
             if data.get('doc') and data.get('doc') != self.doc.Title:
                 return []

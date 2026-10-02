@@ -9,6 +9,7 @@ from pyrevit import forms, revit, script
 from GUI.WPF_Base import T3WPFWindow, to_items_source
 from Snippets._compat import eid_value
 from core.extension_paths import tab_dir
+from core.paths import user_data_path
 
 import clr
 clr.AddReference('System')
@@ -48,11 +49,27 @@ from Snippets._compat import disposing
 XAML_FILE = os.path.join(os.path.dirname(__file__), 'Tools', 'ManaLoca.xaml')
 LIB_DIR = os.path.dirname(os.path.dirname(__file__))
 EXT_DIR = os.path.dirname(LIB_DIR)
-SETTINGS_FILE = os.path.join(
-    tab_dir(EXT_DIR), 'Standards & Settings.panel', 'ManaLoca.pushbutton', 'session.json'
-)
-if not os.path.exists(os.path.dirname(SETTINGS_FILE)):
-    SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'ManaLoca_session.json')
+
+
+def _legacy_settings_files():
+    """Where older builds kept the category state: next to the pushbutton
+    script, or next to this module when that folder was missing."""
+    legacy = []
+    try:
+        legacy.append(os.path.join(
+            tab_dir(EXT_DIR), 'Standards & Settings.panel', 'ManaLoca.pushbutton',
+            'session.json'))
+    except Exception:
+        pass
+    legacy.append(os.path.join(os.path.dirname(__file__), 'ManaLoca_session.json'))
+    return legacy
+
+
+# Which categories the user unticked. Per-user state lives in %APPDATA%\T3LabAI,
+# never in the extension folder: the clone is shared and updated by git, and the
+# file written next to the pushbutton was committed to the public repo. The old
+# file is copied over once (core.paths.user_data_path) and left untouched.
+SETTINGS_FILE = user_data_path('manaloca', 'session.json', legacy=_legacy_settings_files())
 
 logger = script.get_logger()
 
@@ -211,7 +228,9 @@ class ElementData(object):
     @z_mm.setter
     def z_mm(self, value): self.z = _parse_mm(value, self.z)
 
-    # Ô vàng = đã sửa, chờ Apply (DataTrigger trên CellStyle của từng cột).
+    # Ô vàng = đã sửa, chờ Apply. CellStyle của từng cột đọc cờ này qua string
+    # bridge (AutomationProperties.ItemStatus của chính ô) — DataTrigger bind
+    # thẳng vào thuộc tính Python nhận PyObject nên không bao giờ khớp "True".
     @property
     def dirty_x_mm(self): return abs(self.x - self._orig_mm[0]) > EDIT_TOL_MM
     @property
@@ -771,7 +790,7 @@ class LocationManagerWindow(T3WPFWindow):
     def _redraw_rows(self):
         """Vẽ lại ô vàng / chữ đỏ và dải đếm sau khi toạ độ đổi.
 
-        Dòng là object Python, không có INotifyPropertyChanged, nên DataTrigger
+        Dòng là object Python, không có INotifyPropertyChanged, nên style của ô
         chỉ đọc lại `dirty_*` / `odd_*` khi bảng Refresh.
         """
         grid = getattr(self, 'elem_datagrid', None)

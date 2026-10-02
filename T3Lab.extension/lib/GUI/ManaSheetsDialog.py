@@ -76,8 +76,9 @@ from GUI import GridPendingEdits as _pend
 from core import mana_sheets as _sheets
 
 # Row fields the grid lets the user edit. Each needs a matching `dirty_<field>`
-# flag on the row and a CellStyle DataTrigger in ManaSheets.xaml bound to it,
-# otherwise the amber "waiting for Apply" highlight never shows.
+# flag on the row and a CellStyle in ManaSheets.xaml that reads it through the
+# cell string bridge (GridPendingEdits.CELL_BRIDGE_PROPERTY), otherwise the amber
+# "waiting for Apply" highlight never shows.
 SHEET_EDIT_FIELDS = ("sheet_number", "sheet_name", "designed_by",
                      "checked_by", "approved_by", "drawn_by")
 
@@ -530,7 +531,7 @@ class SheetManagerWindow(T3WPFWindow):
     def _refresh_sheets_grid_later(self):
         """Redraw once the edit has finished committing.
 
-        SheetModel carries no INotifyPropertyChanged, so the amber DataTrigger
+        SheetModel carries no INotifyPropertyChanged, so the amber cell style
         only re-reads `dirty_<field>` on a refresh — and calling Refresh() while
         the cell is still committing throws "not allowed during an EditItem
         transaction". Hence the trip through the dispatcher.

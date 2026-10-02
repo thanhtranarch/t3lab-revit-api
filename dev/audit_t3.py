@@ -100,6 +100,14 @@ SELECTALL_EXEMPT = {
 #    giao diện vẫn khoá nguyên.)
 BRIDGE_EXEMPT = {"ManaAnno.xaml"}
 
+# ── Luật 28 · DataTrigger đọc thuộc tính dòng Python qua string bridge ────
+# DataTrigger Binding="{Binding field}" so PyObject với Value ("True",
+# "Danger", "pending") — không bao giờ khớp, dù thuộc tính Python là str hay
+# bool (Model Auditor 2026-10-02: mọi ô HEALTH cùng màu xám). Miễn trừ CHỈ cho
+# file mà dòng là object .NET thật (binding thẳng mang giá trị có kiểu), kèm lý do:
+#   ManaAnno — dòng là DataRowView (DataTable), như BRIDGE_EXEMPT.
+PYROW_TRIGGER_EXEMPT = {"ManaAnno.xaml"}
+
 # ── Luật 22 · ICON ───────────────────────────────────────────────────────
 # UI-frozen theo CLAUDE.md: icon của 2 file này không đi theo hệ T3.Icon.*
 #   DWGManagement — thiết kế riêng đã chốt
@@ -292,6 +300,39 @@ def spacing_bad(value):
         if f != int(f) or abs(int(f)) not in SPACING_OK:
             bad.append(n)
     return bad
+
+
+_SOURCE_RE = re.compile(r"(?:^|[\s,{])(?:ElementName|RelativeSource|Source)\s*=")
+
+
+def pyrow_trigger_bindings(root):
+    """Binding text of every DataTrigger / MultiDataTrigger Condition that reads
+    the DataContext directly (no ElementName / RelativeSource / Source) — luật 28.
+
+    Both the attribute form (Binding="{Binding f}") and the element form
+    (<DataTrigger.Binding><Binding Path="f"/></DataTrigger.Binding>) count.
+    """
+    found = []
+    for el in root.iter():
+        tag = local(el.tag)
+        if tag not in ("DataTrigger", "Condition"):
+            continue
+        b = " ".join(el.attrib.get("Binding", "").split())
+        if b:
+            if b.startswith("{Binding") and not _SOURCE_RE.search(b):
+                found.append(b)
+            continue
+        for prop in el:
+            if local(prop.tag) not in ("DataTrigger.Binding", "Condition.Binding"):
+                continue
+            for bind in prop:
+                if local(bind.tag) != "Binding":
+                    continue
+                attrs = {local(k) for k in bind.attrib}
+                attrs |= {local(c.tag).split(".")[-1] for c in bind}   # <Binding.Source>
+                if not attrs & {"ElementName", "RelativeSource", "Source"}:
+                    found.append("<Binding Path=\"%s\"/>" % bind.attrib.get("Path", ""))
+    return found
 
 
 def audit(src, base, keys):
@@ -577,6 +618,27 @@ def audit(src, base, keys):
                       for a in ancestors(el))):
             issues.append(("P1", "Visibility=\"%s\" trong template dòng — thuộc tính Python "
                                  "không đổi được sang Visibility; đọc qua string bridge" % flat))
+
+    # ── Luật 28 · DataTrigger không bind thẳng thuộc tính của dòng Python ───
+    # pythonnet đưa thuộc tính Python cho WPF dưới dạng PyObject. Thuộc tính
+    # kiểu string (Text, ...) đổi được — nên cột chữ hiện đúng — nhưng
+    # DataTrigger so CHÍNH PyObject với Value: "Danger" / "True" / "pending"
+    # không bao giờ khớp và trigger im lặng không nổ (Model Auditor: mọi ô
+    # HEALTH xám; ô vàng pending-edit của Sheet/View Manager không hiện).
+    # Đúng: đọc qua string bridge —
+    #   template dòng : <TextBlock x:Name="f_text" Text="{Binding f}" Visibility="Collapsed"/>
+    #                   + DataTrigger Binding="{Binding Text, ElementName=f_text}"
+    #   CellStyle/ElementStyle (không có template để đặt TextBlock):
+    #                   <Setter Property="AutomationProperties.ItemStatus" Value="{Binding f}"/>
+    #                   + <Trigger Property="AutomationProperties.ItemStatus" Value="True">
+    # Binding có ElementName / RelativeSource / Source đọc thuộc tính WPF → bỏ qua.
+    if base not in PYROW_TRIGGER_EXEMPT:
+        for b in pyrow_trigger_bindings(root):
+            issues.append(("P1", "DataTrigger Binding=\"%s\" so PyObject của dòng Python với "
+                                 "Value — không bao giờ khớp; đọc qua string bridge "
+                                 "(TextBlock ẩn + {Binding Text, ElementName=…}, hoặc Setter "
+                                 "AutomationProperties.ItemStatus + Trigger trong CellStyle)"
+                           % b))
 
     # ── Luật 27 · Nút đồng bộ: footer, nhãn, thứ tự (thêm 2026-10-02) ───────
     # (a) Nút trong T3.FooterBar giữ kích thước của style (cao T3.H.Action 30,

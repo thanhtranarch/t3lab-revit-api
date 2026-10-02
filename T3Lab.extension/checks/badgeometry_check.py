@@ -73,17 +73,56 @@ def probe_element(element, view):
     return _probe_element(element, view, deep_probe=DEEP_PROBE)
 
 
-DIAG_FOLDER = os.path.join(os.path.expanduser('~'), 'Documents', 'T3Lab_Diagnostics')
-MARKER_FILE = os.path.join(DIAG_FOLDER, '_geometry_scan_marker.json')
+# ── Where the scan keeps its state ───────────────────────────────────────
+# %APPDATA%\T3LabAI\diagnostics, never Documents: the marker is rewritten and
+# fsync'd before EVERY probed element (and the progress checkpoint as the scan
+# goes), which in a OneDrive-synced Documents folder meant one sync upload per
+# element. It is per-machine state, not a user file. Older builds wrote to
+# Documents\T3Lab_Diagnostics — see _diag_file for how those files are adopted.
+from core.paths import user_data_path
+
+LEGACY_DIAG_FOLDER = os.path.join(os.path.expanduser('~'), 'Documents', 'T3Lab_Diagnostics')
+
+
+def _adopt_legacy_file(old, new):
+    """Move a TRANSIENT file an older build left in Documents to its new home.
+
+    Moved, not copied: marker and progress are deleted when a scan completes,
+    and a copy would come back from the old folder after every delete. Never
+    raises."""
+    try:
+        if old and os.path.isfile(old) and not os.path.exists(new):
+            import shutil
+            shutil.move(old, new)
+    except Exception:
+        pass
+
+
+def _diag_file(name, transient):
+    """Path of one diagnostics file under %APPDATA%\\T3LabAI\\diagnostics."""
+    old = os.path.join(LEGACY_DIAG_FOLDER, name)
+    if transient:
+        path = user_data_path('diagnostics', name)
+        _adopt_legacy_file(old, path)
+        return path
+    # durable: copied over once, the old file is left untouched
+    return user_data_path('diagnostics', name, legacy=[old])
+
+
+MARKER_FILE = _diag_file('_geometry_scan_marker.json', transient=True)
 
 # Elements already probed in an earlier (possibly crashed) run, so a scan that
 # brings Revit down can be resumed instead of restarted. Cleared when a scan
 # completes normally.
-PROGRESS_FILE = os.path.join(DIAG_FOLDER, '_geometry_scan_progress.json')
+PROGRESS_FILE = _diag_file('_geometry_scan_progress.json', transient=True)
 
 # Findings are written here so BatchOut's safe-mode export can hide exactly
-# these elements while exporting the sheets they poison.
-FINDINGS_FILE = os.path.join(DIAG_FOLDER, '_bad_geometry.json')
+# these elements while exporting the sheets they poison. BatchOut reads the
+# SAME path (GUI/BatchOutDialog.py bad_geometry_file(); dev/test_user_data_moves.py
+# keeps the two in step).
+FINDINGS_FILE = _diag_file('_bad_geometry.json', transient=False)
+
+DIAG_FOLDER = os.path.dirname(FINDINGS_FILE)
 
 
 # ── ElementId compatibility (Revit 2024+ dropped IntegerValue) ────────────

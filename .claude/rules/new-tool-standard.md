@@ -54,7 +54,7 @@ không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy
 
 ---
 
-## 2 · XAML — 26 luật
+## 2 · XAML — 27 luật
 
 | # | Luật | Vi phạm |
 |---|------|---------|
@@ -84,6 +84,7 @@ không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy
 | 25 | **Visibility phải nhận giá trị Visibility thật**: không bind bool (`HasItems`, `IsChecked`...) thẳng vào `Visibility` — tool XAML không có converter nên binding lỗi và phần tử **luôn hiện** (empty state đè lên dòng của bảng). Dùng `DataTrigger` + `Setter Property="Visibility"`. Thuộc tính Python `"Visible"/"Collapsed"` trong template dòng cũng phải đọc qua string bridge | P1 |
 | 26 | **Custom chrome bo góc không được lòi HWND**: `<Window WindowStyle="None">` có outer Border bo góc phải đặt `AllowsTransparency="True" Background="Transparent"`; outer Border dùng `T3.BorderStrong`, `T3.R.Window`, `ClipToBounds="True"`, `BorderThickness="1"`. Nền `T3.Canvas`/`T3.Surface` đặt trên outer Border, không đặt trên Window. Không `ResizeMode="CanResizeWithGrip"` (grip đè góc bo). `audit_t3.py` bắt luật này | P1 |
 | 27 | **Nút đồng bộ**: (a) nút trong `T3.FooterBar` KHÔNG tự đặt `Height`/`Padding` — giữ 30px + padding của style; (b) nhãn chữ trong nút Primary/Secondary/Danger KHÔNG `Style="T3.Caption"`/`Foreground`/`FontSize` — icon `T3.Icon` `Margin="0,0,8,0"` + `<TextBlock Text="…" VerticalAlignment="Center"/>` kế thừa font/màu của nút; (c) Primary là nút ngoài cùng phải của footer. Thanh tiến trình: `T3.ProgressBar` không đặt `Height` (8px), panel Pause/Stop rộng 160 | P2 |
+| 28 | **Trigger trên dòng Python đọc qua string bridge**: dòng là object Python thì KHÔNG `<DataTrigger Binding="{Binding field}" Value="...">` — pythonnet đưa thuộc tính cho WPF dưới dạng `PyObject`, DataTrigger so PyObject với Value nên **không bao giờ nổ** (kể cả field là `str`). Trong template: `<TextBlock x:Name="field_text" Text="{Binding field}" Visibility="Collapsed"/>` + `<DataTrigger Binding="{Binding Text, ElementName=field_text}" Value="Danger">`; phần tử đã hiện chính giá trị thì `<Trigger Property="Text" ...>`; trong `CellStyle`/`ElementStyle`: `<Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_field}"/>` + `<Trigger Property="AutomationProperties.ItemStatus" Value="True">`. Bool so bằng `"True"`/`"False"`. Mẫu: `ModelAuditor.xaml`, ô vàng của `ManaSheets.xaml`. Miễn trừ (dòng .NET thật, DataTable) khai vào `PYROW_TRIGGER_EXEMPT` trong `dev/audit_t3.py` | P1 |
 
 Thêm hai thứ `audit_t3.py` cũng bắt: `<Grid.RowDefinition/>` dot-notation (**P0**,
 crash `EMPTYPROPERTYELEMENT` lúc mở tool) và mọi `Effect` (P2).

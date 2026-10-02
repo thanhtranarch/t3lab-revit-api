@@ -14,9 +14,13 @@ Pure Python on purpose -- no clr, no Revit API -- so ``dev/test_batch_link.py``
 exercises the very code the dialog runs. The Revit write itself is handed in as
 a callable (see :func:`apply_pending`).
 
-Every value the XAML reads is a STRING: PythonNet does not carry bools / ints
-through a binding reliably, strings it does (same as ``Severity``). The cell
-highlight is a DataTrigger on :attr:`LinkWorksetRow.row_state`.
+Every value the XAML reads is a STRING, and every trigger reads it through a
+string bridge: PythonNet hands WPF each attribute as a PyObject, which WPF turns
+into text for a string property but never matches against a DataTrigger value
+(not even a str attribute against "pending"). The cell highlight reads
+:attr:`LinkWorksetRow.row_state` through the cell's own
+AutomationProperties.ItemStatus; the WORKSET template reads ``row_state`` and
+``WorksetEditable`` through hidden TextBlocks (see BatchLink.xaml).
 
 Part of T3Lab Extension.
 """
@@ -127,7 +131,7 @@ class LinkWorksetRow(_Row):
 
     @property
     def WorksetEditable(self):
-        """"yes" shows the inline ComboBox, "no" the plain text (DataTrigger)."""
+        """"yes" shows the inline ComboBox, "no" the plain text (bridged trigger)."""
         return "yes" if self.IsEnabled else "no"
 
     @property
