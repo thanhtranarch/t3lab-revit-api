@@ -80,3 +80,31 @@
 | AutoDimension — Cải thiện | ✅ Đóng — GĐ A đã ship & hoạt động tốt; backlog cải tiến (~16 mục GĐ B/C/D: idempotent, dim mặt tường host, core-layer thật, stacking manager, EQ, trục xiên, section mở rộng, preset/preview…) **đóng không triển khai** theo quyết định user — nếu cần thì mở roadmap mới |
 | FamiGen — From JSON | ✅ Đóng — prompt v2 (7 file tự chứa + SOFT-FORM RECIPES + Object case library + ví dụ sofa 11 part) shipped, smoke test xác nhận chung 2026-07-05; backlog WS4 (cảnh báo part rời rạc) / WS5 (sketch plane tùy ý) **đóng không triển khai** |
 | MCP Tools — Expansion | ✅ Đóng — toàn bộ mục đã tick từ trước, smoke test xác nhận chung 2026-07-05 |
+
+---
+
+## Rebar & Assembly toolkit cho người dùng Tekla — Revit 2027 (mở 2026-10-02)
+
+- Roadmap (lý do, phạm vi, 3 lớp): `dev/plan/rebar-tekla-toolkit-roadmap.md`
+- Spec triển khai (nguồn chính cho code): `dev/plan/rebar-tekla-implementation-spec.md`
+- Hướng dẫn người dùng EN/VI: `docs/tekla-to-revit-2027.md`
+- Hàng đợi QA: `docs/ui-governance/PRIORITY_QUEUE.md` § "Rebar & Assembly panel"
+
+| Gói | Nội dung | Code + gate | QA trong Revit 2027 |
+|-----|----------|-------------|--------------------|
+| WP1 | Nền `_compat` / `_assembly` / `_rebar` + spike | ✅ 108 test | ⬜ chạy spike G1–G16 |
+| WP2 | Tekla Bridge + docs + mẫu phím tắt | ✅ 41 test | ⬜ |
+| WP3 | Cast Unit Manager | ✅ | ⬜ |
+| WP4 | Clone Drawing | ✅ 28 test | ⬜ |
+| WP5 | Rebar Check | ✅ 46 test | ⬜ |
+| WP6 | BVBS Export (BF2D) | ✅ 85 test | ⬜ đọc file bằng viewer BVBS |
+| WP7 | Rebar Wizard (dầm, cột, móng đơn) | ✅ 16 test | ⬜ |
+
+Cột QA chỉ được tick theo phản hồi của user sau khi chạy trong Revit — không tick từ gate tĩnh.
+
+### Kết quả spike (điền sau khi chạy `dev/debug/spike_rebar_assembly.py`)
+
+| Mã | Giả định | Kết quả |
+|----|----------|---------|
+| G1–G16 | xem spec §3.11 | ⬜ chưa chạy |
+

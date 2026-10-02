@@ -1,5 +1,19 @@
 # PRIORITY QUEUE — cập nhật 2026-09-15
 
+## Rebar & Assembly panel — Revit 2027 QA (2026-10-02)
+
+Six new T3 windows, all source gates green, **none verified in Revit**. Spec:
+`dev/plan/rebar-tekla-implementation-spec.md` (§5 per-tool QA lists, §3.11 spike).
+No DESIGN SYSTEM GAP was raised; no audit exemption was added.
+
+| Thứ tự | Mức | Hạng mục | Điều kiện hoàn thành |
+|---|---|---|---|
+| 1 | P1 | Run `dev/debug/spike_rebar_assembly.py` on Revit 2027 | G1–G16 PASS/FAIL copied into `dev/plan/README.md`; constants in `_drawing_clone.py` / `tekla_bridge.json` updated from the log |
+| 2 | P1 | Cast Unit Manager · Clone Drawing · Rebar Wizard | §5.2 / §5.3 / §5.6 QA lists + common checklist; Ctrl+Z one step; 100 % and 125 % DPI |
+| 3 | P1 | BVBS Export | Exported `.abs` opened in a BVBS viewer; legs match the bending schedule on a sample of each shape |
+| 4 | P2 | Tekla Bridge · Rebar Check | §5.1 / §5.4 QA lists; every Open button lands on the right Revit command |
+| 5 | P3 | `check_xaml_wpf.ps1` + `preview_t3_xaml.ps1` on the six XAMLs | 0 FAILED; screenshots at 100 % / 125 % |
+
 ## UI verification queue — 2026-10-01
 
 Current source consistency changes and precise runtime checklist: [review](REVIEW-2026-10-01-CONSISTENCY.md). Priorities: Windows/Revit smoke checks at 100%/125% DPI; dynamic modal/card layout and light/dark theme; legacy Renaming/resource consumers; direct-XamlReader compatibility. Source gates pass; none of these runtime items is marked verified. Older queue/history below is retained.
