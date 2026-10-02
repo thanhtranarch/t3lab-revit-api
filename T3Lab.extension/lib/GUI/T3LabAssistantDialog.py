@@ -234,6 +234,10 @@ except Exception:
     def _project_scope_lines(meta, doc_counts=None):
         return []
 
+# Welcome-headline phrases (time-of-day pools, no repeat in a row). Pure
+# Python, so a failure here can only be a broken install — let it surface.
+from GUI import AssistantGreetings as _greetings
+
 # ─── NLP module ───────────────────────────────────────────────────────────────
 try:
     from Intelligence.t3lab_assistant import (parse_command, has_api_key, keyword_parse,
@@ -880,33 +884,18 @@ def _relative_time(ts_text, viet=True):
 def _time_greeting(hour=None, viet=None):
     """Time-of-day greeting phrase (no name). Never raises.
 
-    Six buckets rather than the old three: Vietnamese distinguishes sáng sớm
-    / sáng / trưa / chiều / tối / khuya, and "Good afternoon" at 11am or
-    11pm reads as if nobody is home. English has no separate midday
-    greeting, so 11–13 and 13–18 legitimately share one phrase — the split
-    exists for the Vietnamese side.
+    Six buckets: Vietnamese distinguishes sáng sớm / sáng / trưa / chiều /
+    tối / khuya. The buckets and phrases live in GUI/AssistantGreetings.py;
+    this plain phrase is what the onboarding card shows ("Good morning!").
+    The welcome headline draws from the richer pool there instead — see
+    _render_greeting.
     """
     try:
-        if hour is None:
-            import datetime
-            hour = datetime.datetime.now().hour
-        hour = int(hour)
         if viet is None:
             viet = _ui_viet()
+        return _greetings.base_greeting(hour, bool(viet))
     except Exception:
         return u"Xin chào" if viet else u"Hello"
-
-    if hour < 5 or hour >= 22:
-        return u"Khuya rồi" if viet else u"Working late"
-    if hour < 7:
-        return u"Dậy sớm nhỉ" if viet else u"Early start"
-    if hour < 11:
-        return u"Chào buổi sáng" if viet else u"Good morning"
-    if hour < 13:
-        return u"Chào buổi trưa" if viet else u"Good afternoon"
-    if hour < 18:
-        return u"Chào buổi chiều" if viet else u"Good afternoon"
-    return u"Chào buổi tối" if viet else u"Good evening"
 
 
 def _ui_viet():
@@ -1642,9 +1631,11 @@ class T3LabAssistantWindow(T3WPFWindow):
         except Exception:
             pass
         self._compact = None
+        self._narrow_state = None
         try:
             _initial_w = self.root_chrome.ActualWidth if (hasattr(self, 'root_chrome') and self.root_chrome.ActualWidth > 0) else (self.ActualWidth or self.Width)
             self._apply_compact_layout(_initial_w)
+            self._apply_narrow_layout(_initial_w)
         except Exception:
             pass
 
@@ -1826,18 +1817,84 @@ class T3LabAssistantWindow(T3WPFWindow):
 
     # ─── Compact layout for narrow docks ─────────────────────────────────────
 
+    # Widths are WPF device-independent pixels, so display scaling is already
+    # folded in: a pane 400px wide on screen at 125% arrives here as 320.
+
     #: Below this width the pane is too narrow for the full composer furniture.
     COMPACT_WIDTH = 400
+
+    #: Below this width secondary labels give way to their icons and the
+    #: composer hint gets shorter (_apply_narrow_layout).
+    NARROW_WIDTH = 340
+
+    #: The floating window's min / max / close cluster (3 x 28 + 4) shares the
+    #: top bar; docked it is collapsed and costs nothing.
+    _FLOAT_CTRLS_WIDTH = 88
+
+    _PLACEHOLDER_FULL = u"Type a request — press / for skills"
+    _PLACEHOLDER_SHORT = u"Ask, or type / for skills"
 
     def _on_size_changed(self, sender, e):
         try:
             if e.WidthChanged:
                 self._apply_compact_layout(e.NewSize.Width)
+                self._apply_narrow_layout(e.NewSize.Width)
                 # Always, not just on the compact transition: dragging a
                 # docked pane from 250px to 350px never crosses the threshold,
                 # so _apply_compact_layout returns early and the popups would
                 # stay clamped to the narrowest width they ever saw.
                 self._fit_popups_to_width(e.NewSize.Width)
+        except Exception:
+            pass
+
+    def _apply_narrow_layout(self, width):
+        """Icon-only secondary buttons and a shorter composer hint. UI THREAD.
+
+        At 280–340 DIP three rows no longer fit their labels:
+
+          top bar     3 tabs + "Prompts & Skills" + New chat    ~300 (+88 floating)
+          below card  project chip + "Ask before edits" + Undo  ~300
+          history     "Activity log" + "Clear all" beside the title
+
+        Each label collapses on its own threshold; the icon and the tooltip
+        stay, so nothing becomes unreachable. Whatever still does not fit
+        trims (project / model names, view name, copyright) rather than being
+        pushed past the pane edge — that part is pure XAML.
+        """
+        try:
+            w = float(width or 0)
+        except Exception:
+            return
+        if w <= 0:
+            return
+        floating = False
+        try:
+            floating = self.float_ctrls_panel.Visibility == Visibility.Visible
+        except Exception:
+            pass
+        top_narrow = w < self.NARROW_WIDTH + (
+            self._FLOAT_CTRLS_WIDTH if floating else 0)
+        narrow = w < self.NARROW_WIDTH
+        state = (top_narrow, narrow)
+        if state == getattr(self, '_narrow_state', None):
+            return
+        self._narrow_state = state
+
+        def _show(name, visible):
+            try:
+                el = getattr(self, name, None)
+                if el is not None:
+                    el.Visibility = (Visibility.Visible if visible
+                                     else Visibility.Collapsed)
+            except Exception:
+                pass
+
+        _show('saved_prompts_label', not top_narrow)
+        for name in ('action_mode_text', 'undo_label', 'activity_log_label'):
+            _show(name, not narrow)
+        try:
+            self.composer_placeholder.Text = (
+                self._PLACEHOLDER_SHORT if narrow else self._PLACEHOLDER_FULL)
         except Exception:
             pass
 
@@ -1865,6 +1922,13 @@ class T3LabAssistantWindow(T3WPFWindow):
             else:
                 self.composer_bar.Padding = Thickness(16, 8, 16, 10)
                 self.chat_scroll.Padding  = Thickness(16, 12, 10, 8)
+        except Exception:
+            pass
+        # First-run card: 16 + 24 + 24 + 16 of chrome left "Skip for now" and
+        # "Get started" ~200 DIP on a 280 dock — not enough for both.
+        try:
+            self.onboarding_card.Margin  = Thickness(8 if compact else 16)
+            self.onboarding_card.Padding = Thickness(16 if compact else 24)
         except Exception:
             pass
 
@@ -1918,6 +1982,42 @@ class T3LabAssistantWindow(T3WPFWindow):
                     node.ClearValue(FrameworkElement.MaxWidthProperty)
             except Exception:
                 continue
+
+    #: Space kept between a popup and the pane's left / right edge.
+    _POPUP_EDGE = 8.0
+
+    def _keep_popup_in_pane(self, popup):
+        """Shift a popup left so it does not hang past the pane. UI THREAD.
+
+        Placement Top/Bottom lines the popup's LEFT edge up with its target.
+        The model chip and the Prompts & Skills button sit at the RIGHT of the
+        pane, so their 260–380px popups ran past the pane's right edge — over
+        the Properties palette when docked. Called right before opening: it
+        measures the popup content and sets HorizontalOffset to exactly the
+        overhang, never so far that the popup leaves the pane on the left.
+        Never raises.
+        """
+        try:
+            from System.Windows import Point, Size
+            root = getattr(self, 'root_chrome', None)
+            target = popup.PlacementTarget
+            child = popup.Child
+            if root is None or target is None or child is None:
+                return
+            pane_w = float(root.ActualWidth or 0)
+            if pane_w <= 0:
+                return
+            child.Measure(Size(float('inf'), float('inf')))
+            pop_w = float(child.DesiredSize.Width or 0)
+            left = float(target.TranslatePoint(Point(0, 0), root).X)
+            overhang = left + pop_w - (pane_w - self._POPUP_EDGE)
+            if overhang <= 0:
+                popup.HorizontalOffset = 0.0
+            else:
+                popup.HorizontalOffset = -min(
+                    overhang, max(0.0, left - self._POPUP_EDGE))
+        except Exception as ex:
+            logger.debug(u"_keep_popup_in_pane: {}".format(_exc_text(ex)))
 
     # ─── Live Revit context ──────────────────────────────────────────────────
 
@@ -2381,7 +2481,7 @@ class T3LabAssistantWindow(T3WPFWindow):
             clear_chat_history(self._doc_key)
             # No "Conversation refreshed" bubble — the welcome greeting panel
             # comes back on an empty transcript and already says the same thing.
-            self._update_welcome_greeting()
+            self._update_welcome_greeting(fresh=True)
         except Exception as ex:
             logger.debug(u"reset_chat error: {}".format(_exc_text(ex)))
 
@@ -2403,8 +2503,8 @@ class T3LabAssistantWindow(T3WPFWindow):
             self._reset_session_state(clear_transcript=True)
             clear_chat_history(self._doc_key)
 
-            # Update greeting & show suggestion prompt cards
-            self._update_welcome_greeting()
+            # Update greeting (a new phrase for a new conversation)
+            self._update_welcome_greeting(fresh=True)
 
             # Switch to chat tab
             self.tab_chat_clicked()
@@ -2589,6 +2689,9 @@ class T3LabAssistantWindow(T3WPFWindow):
                 tb_meta.Text = meta_text
                 tb_meta.Style = self.FindResource("T3.Caption")
                 tb_meta.Margin = Thickness(0, 4, 0, 0)
+                # Narrow pane: "date • N messages" breaks onto a second line
+                # beside Resume / Delete instead of running under them.
+                tb_meta.TextWrapping = System.Windows.TextWrapping.Wrap
 
                 info_stack.Children.Add(tb_title)
                 info_stack.Children.Add(tb_meta)
@@ -2710,6 +2813,7 @@ class T3LabAssistantWindow(T3WPFWindow):
                 self.saved_prompts_popup.IsOpen = False
             else:
                 self._populate_saved_prompts_list("")
+                self._keep_popup_in_pane(self.saved_prompts_popup)
                 self.saved_prompts_popup.IsOpen = True
                 try:
                     self.saved_prompts_search.Text = ""
@@ -2943,20 +3047,40 @@ class T3LabAssistantWindow(T3WPFWindow):
     _BADGE_COLORS = _SHARED_PROVIDER_COLORS
     _BADGE_GRAY = _SHARED_PROVIDER_GRAY   # #A1A1AA — no provider / offline
 
-    def _render_greeting(self, name):
-        """Set the welcome greeting text for a given name (no settings read)."""
+    def _render_greeting(self, name, fresh=False):
+        """Set the welcome greeting text for a given name (no settings read).
+
+        The phrase comes from the time-of-day pool in GUI/AssistantGreetings
+        (random, never the same one twice in a row). A new phrase is drawn
+        only when a conversation starts (fresh=True), on the first render, or
+        once the period / reply language has moved on. Everything else that
+        refreshes the headline — closing Settings, saving the profile name,
+        resuming a session — keeps the phrase and only re-renders the name,
+        so the headline does not reshuffle under the user's eyes.
+        """
         try:
-            self.welcome_greeting_text.Text = u"{}, {}".format(
-                _time_greeting(), name or u"Thạnh")
+            viet = bool(_ui_viet())
+            key = (_greetings.period_for_hour(), viet)
+            tpl = getattr(self, '_greeting_tpl', None)
+            if fresh or tpl is None or key != getattr(self, '_greeting_key', None):
+                tpl = _greetings.pick_template(viet=viet)
+                self._greeting_tpl = tpl
+                self._greeting_key = key
+            self.welcome_greeting_text.Text = _greetings.fill(
+                tpl, name or u"Thạnh")
         except Exception:
             pass
 
-    def _update_welcome_greeting(self):
-        """Refresh greeting text from saved settings and toggle panel visibility."""
+    def _update_welcome_greeting(self, fresh=False):
+        """Refresh greeting text from saved settings and toggle panel visibility.
+
+        fresh=True draws a new phrase — pass it only where a new conversation
+        starts (New chat, Reset).
+        """
         try:
             from config.user_profile import UserProfile
             name = UserProfile().get_name() or u"Thạnh"
-            self._render_greeting(name)
+            self._render_greeting(name, fresh=fresh)
 
             # The welcome banner only shows on a fresh chat (no history yet).
             if self._persisted_msgs:
@@ -4941,6 +5065,7 @@ class T3LabAssistantWindow(T3WPFWindow):
         """Open the Claude-style project picker popup."""
         try:
             self._build_project_popup()
+            self._keep_popup_in_pane(self.project_popup)
             self.project_popup.IsOpen = True
         except Exception as ex:
             logger.debug(u"project_chip_clicked error: {}".format(_exc_text(ex)))
@@ -5102,6 +5227,10 @@ class T3LabAssistantWindow(T3WPFWindow):
                 t.FontWeight = System.Windows.FontWeights.SemiBold
             if wrap:
                 t.TextWrapping = TextWrapping.Wrap
+            else:
+                # Section titles share a row with a button; on a narrow pane
+                # they trim instead of running under it.
+                t.TextTrimming = System.Windows.TextTrimming.CharacterEllipsis
             if margin is not None:
                 t.Margin = margin
             return t
@@ -5377,6 +5506,7 @@ class T3LabAssistantWindow(T3WPFWindow):
         """Open the Claude-style provider/model picker popup."""
         try:
             self._build_model_popup()
+            self._keep_popup_in_pane(self.model_popup)
             self.model_popup.IsOpen = True
         except Exception as ex:
             logger.debug(u"model_chip_clicked error: {}".format(_exc_text(ex)))
@@ -5530,6 +5660,14 @@ class T3LabAssistantWindow(T3WPFWindow):
             _ZAP = (u"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46"
                     u"l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63"
                     u"l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z")
+            # The label collapses on a narrow pane (_apply_narrow_layout);
+            # the tooltip still names the mode.
+            try:
+                self.action_mode_btn.ToolTip = (
+                    u"Model edits: {} — click to toggle".format(
+                        u"Ask before edits" if confirm else u"Auto"))
+            except Exception:
+                pass
             if confirm:
                 self.action_mode_text.Text = u"Ask before edits"
                 self.action_mode_text.Foreground = SolidColorBrush(
