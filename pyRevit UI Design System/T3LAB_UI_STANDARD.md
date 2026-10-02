@@ -346,7 +346,7 @@ tiêu đề trang / handler), không theo đối tượng chung của cả tool:
 | Glyph | Khái niệm | Đang dùng ở |
 |---|---|---|
 | `E8FD` BulletedList | Danh sách · inventory · chọn mục | ManaPara Browse · ManaSheets Inventory · ManaViews Inventory · ManaStyles Style Manager · ExportManager(+Test) Selection · UIStandardShowcase Element Inventory |
-| `E9D5` CheckList | Audit · soát theo luật | AutoWork QA/QC, IFCSG Compliance Checker |
+| `E9D5` CheckList | Audit · soát theo luật | AutoWork QA/QC, IFCSG Compliance Checker, ModelAuditor Health |
 | `E945` LightningBolt | Tự động hoá · macro | AutoWork Macro |
 | `E8B5` Import | Import · nạp vào model | FamiGen From CAD · ManaFami Family Loader · ManaPara Parameter Loader |
 | `E8AB` Switch | Hoán đổi · chuyển giữa hai phía | ManaPara Transfer · AutoJoin nút Switch |
@@ -361,7 +361,6 @@ tiêu đề trang / handler), không theo đối tượng chung của cả tool:
 | `E81E` MapLayers | Workset · layer | ManaWorkset Worksets |
 | `E90F` Repair | Công cụ · sửa hàng loạt | ManaWorkset Bulk Tools |
 | `F158` DialShape3 | 3D view | ManaWorkset 3D Views |
-| `E95E` Health | Sức khoẻ model | ModelAuditor Health |
 | `E8EF` Calculator | Tổng hợp · tính toán | ManaContains Elements to Rooms |
 | `E790` Color | Màu · ghi đè đồ hoạ | ManaStyles Color Splasher |
 | `E943` Code | Code · JSON | FamiGen AI / JSON |

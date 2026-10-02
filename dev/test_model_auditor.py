@@ -499,9 +499,10 @@ class HealthDashboardTests(unittest.TestCase):
         # a differently-named attribute shows up as a silently empty column,
         # which is exactly how CURRENT VALUE and HEALTH went blank in Revit.
         for row in rows:
-            for field in ('label', 'value_display', 'status', 'weight_stars',
+            for field in ('label', 'tooltip', 'value_display', 'status', 'weight_stars',
                           'band_index', 'band_tick_0', 'band_tick_4',
-                          'thresholds_tooltip', 'select_visibility'):
+                          'thresholds_tooltip', 'over_display', 'over_tooltip',
+                          'select_visibility'):
                 self.assertTrue(getattr(row, field, None) not in (None, ''),
                                 '{} is empty on {}'.format(field, row.label))
             self.assertIn(row.status, MOD._STATUS_ORDER)
@@ -520,12 +521,47 @@ class HealthDashboardTests(unittest.TestCase):
 
     def test_pills_never_bind_a_brush_from_python(self):
         """PythonNet không đưa được Brush qua binding: pill phải tô bằng
-        DataTrigger trên `severity`, nếu không nó hiện chữ mà không có nền."""
+        DataTrigger, nếu không nó hiện chữ mà không có nền."""
         self.assertNotIn('Binding bg_brush', XAML_SOURCE)
         self.assertNotIn('Binding fg_brush', XAML_SOURCE)
+
+    def test_severity_triggers_read_a_string_bridge(self):
+        """A DataTrigger bound straight to a Python field compares a PyObject
+        with "Danger" and never fires — Revit showed every HEALTH cell grey
+        (2026-10-02). Triggers must read a hidden TextBlock by ElementName."""
+        import re
+        body = XAML_SOURCE[XAML_SOURCE.index('HẾT T3 STYLES'):]
+        direct = re.findall(r'<DataTrigger Binding="\{Binding [a-z_]+\}"', body)
+        self.assertEqual(direct, [], 'DataTrigger on a Python field never fires')
+        for bridge in ('metric_sev_text', 'health_sev_text', 'value_sev_text',
+                       'over_sev_text', 'rec_sev_text'):
+            self.assertIn('x:Name="%s" Text="{Binding severity}"' % bridge, body)
         for fam in ('Success', 'Warning', 'Danger'):
-            self.assertIn('<DataTrigger Binding="{Binding severity}" Value="%s">' % fam,
-                          XAML_SOURCE)
+            self.assertIn('<DataTrigger Binding="{Binding Text, ElementName=health_sev_text}" '
+                          'Value="%s">' % fam, body)
+            self.assertIn('<DataTrigger Binding="{Binding Text, ElementName=rec_sev_text}" '
+                          'Value="%s">' % fam, body)
+
+    def test_action_is_the_last_column_and_metric_the_only_star(self):
+        import re
+        grid = XAML_SOURCE[XAML_SOURCE.index('x:Name="dg_health_metrics"'):]
+        grid = grid[:grid.index('</DataGrid.Columns>')]
+        columns = re.findall(r'<DataGrid(?:Template|Text)Column\s[^>]*>', grid)
+        self.assertIn('Header="METRIC"', columns[0])
+        self.assertIn('Header="ACTION"', columns[-1])
+        stars = [c for c in columns if 'Width="*"' in c]
+        self.assertEqual(stars, [columns[0]], 'only METRIC may take the spare width')
+
+    def test_problems_are_listed_first(self):
+        doc = FakeDoc(elements={
+            'ImportInstance': [SimpleNamespace(Id=FakeElementId(i), IsLinked=False,
+                                               Pinned=True) for i in range(40)],
+        }, warnings=[FakeWarning('Room not enclosed')] * 6000)
+        win = self._window(doc)
+        win.on_health_run(SimpleNamespace(IsEnabled=True), None)
+        ranks = [MOD._STATUS_ORDER.index(r.status) for r in win.dg_health_metrics.ItemsSource]
+        self.assertEqual(ranks, sorted(ranks, reverse=True))
+        self.assertGreater(ranks[0], 1, 'a problem metric must head the table')
 
     def test_every_row_carries_a_severity_the_xaml_knows(self):
         win = self._window(FakeDoc())
@@ -658,6 +694,17 @@ class ThresholdBandTests(unittest.TestCase):
         band = MOD._threshold_bands(3, [5, 5, 8, 15, 20])
         self.assertEqual(band['bands'][1][1], 'not used (same limit as Good)')
 
+    def test_over_limit_counts_from_the_acceptable_limit(self):
+        self.assertEqual(MOD._over_limit(40, self.CUTS)[0], '—')
+        self.assertEqual(MOD._over_limit(500, self.CUTS)[0], '—')
+        display, tip = MOD._over_limit(1227, self.CUTS)
+        self.assertEqual(display, '+727')
+        self.assertIn('Acceptable limit of 500', tip)
+        self.assertEqual(MOD._over_limit(312.5, [100, 250, 500, 750, 1000], 'MB')[0],
+                         '+62.5 MB')
+        self.assertEqual(MOD._over_limit(1184.3, [100, 1000, 5000, 9000, 10000])[0],
+                         '+184.3')
+
     def test_ticks_fit_the_slot(self):
         ticks = MOD._threshold_bands(0, [1000, 5000, 10000, 25000, 50000])['ticks']
         self.assertEqual(ticks, ['1000', '5000', '10k', '25k', '50k'])
@@ -668,11 +715,13 @@ class ThresholdBandTests(unittest.TestCase):
                 self.assertLessEqual(len(tick), 5, tick)
 
     def test_xaml_raises_the_band_from_a_string_index(self):
-        """band_index drives DataTriggers — it must be a string like severity."""
+        """band_index drives DataTriggers through the string bridge."""
         grid = XAML_SOURCE[XAML_SOURCE.index('x:Name="dg_health_metrics"'):]
         grid = grid[:grid.index('</DataGrid>')]
+        self.assertIn('x:Name="band_index_text" Text="{Binding band_index}"', grid)
         for i in range(6):
-            self.assertIn('<DataTrigger Binding="{Binding band_index}" Value="%d">' % i, grid)
+            self.assertIn('<DataTrigger Binding="{Binding Text, ElementName=band_index_text}" '
+                          'Value="%d">' % i, grid)
             self.assertIn('x:Name="band_seg_%d"' % i, grid)
         self.assertIn('ToolTip="{Binding thresholds_tooltip}"', grid)
 
