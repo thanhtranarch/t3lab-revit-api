@@ -6,7 +6,7 @@ Unified control panel for the T3Lab MCP server.
 Start / Stop the server and manage connection settings in one dialog.
 """
 __title__ = "MCP\nControl"
-__author__ = "T3Lab & Dang Quoc Truong"
+__author__ = "T3Lab"
 
 import os
 import sys

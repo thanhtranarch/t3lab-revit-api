@@ -1,7 +1,7 @@
 #! python3
 # -*- coding: utf-8 -*-
 __title__ = "Family\nManager"
-__author__ = "Tran Tien Thanh & Dang Quoc Truong"
+__author__ = "Tran Tien Thanh"
 __doc__ = "Family Manager — Batch rename families and types, and load new families, in one dialog."
 
 import os, sys

@@ -3,7 +3,7 @@
 Sheet Manager - Revit Service
 CLEANED - Sheet Methods Only
 
-Copyright © Dang Quoc Truong (DQT)
+Copyright © T3Lab
 """
 
 from Autodesk.Revit.DB import FilteredElementCollector, ViewSheet, BuiltInParameter

@@ -5,7 +5,7 @@ Scanners for system cleanup: imports, CAD, groups, design options, separators, o
 
 Compatible with Revit 2024, 2025, 2026, 2027
 
-Copyright (c) 2025 Dang Quoc Truong (DQT)
+Copyright (c) 2025 T3Lab
 
 FIXED in this version:
 - ImportSymbolsScanner now returns ALL import instances (not just unused)
@@ -13,7 +13,7 @@ FIXED in this version:
 - Added Revit 2026+ compatibility for ElementId.Value
 """
 
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 
 import os
 import sys

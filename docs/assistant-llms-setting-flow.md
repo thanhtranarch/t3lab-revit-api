@@ -68,7 +68,7 @@ sequenceDiagram
     U->>D: Chọn provider trong combo
     D->>R: switch_provider name
     R->>S: set_active_provider + set_provider_model
-    S-->>S: ghi settings.json + model_setup.log
+    S-->>S: ghi settings.json
     R-->>D: cập nhật cờ active
     D->>R: probe_provider chạy nền
     R->>P: check_health / get_active_model

@@ -26,7 +26,18 @@ _SERVICES_DIR = os.path.dirname(os.path.abspath(__file__))
 _LIB_DIR      = os.path.dirname(_SERVICES_DIR)
 _EXT_DIR      = os.path.dirname(_LIB_DIR)
 _TAB_DIR      = tab_dir(_EXT_DIR)
-REGISTRY_FILE = os.path.join(_LIB_DIR, 'config', 'tool_registry.json')
+# The registry is a machine-local cache rebuilt from the ribbon scan, so it
+# lives in %APPDATA%/T3LabAI/assistant, never in the extension folder (the
+# old lib/config/tool_registry.json leaked machine paths into the repo).
+# Tests point REGISTRY_FILE at a temp file; None = the per-user location.
+REGISTRY_FILE = None
+
+
+def _registry_file():
+    if REGISTRY_FILE:
+        return REGISTRY_FILE
+    from core.paths import user_data_path
+    return user_data_path('assistant', 'tool_registry.json')
 
 # Bump when the entry schema changes — a mismatched on-disk registry is
 # rebuilt from scratch so every entry carries the new fields (doc, xaml,
@@ -232,8 +243,9 @@ def _read_meta(script_path):
 def load_registry():
     """Return the on-disk registry dict, or a blank one if absent/corrupt."""
     try:
-        if os.path.exists(REGISTRY_FILE):
-            with io.open(REGISTRY_FILE, 'r', encoding='utf-8') as f:
+        path = _registry_file()
+        if os.path.exists(path):
+            with io.open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except Exception:
         pass
@@ -251,13 +263,14 @@ def save_registry(reg):
     empty registry: no auto-discovered tool could ever be opened by name.
     """
     try:
-        d = os.path.dirname(REGISTRY_FILE)
+        path = _registry_file()
+        d = os.path.dirname(path)
         if not os.path.exists(d):
             os.makedirs(d)
         data = json.dumps(reg, ensure_ascii=True, indent=2, sort_keys=True)
         if isinstance(data, bytes):                     # py2 str
             data = data.decode('ascii')
-        with io.open(REGISTRY_FILE, 'w', encoding='utf-8') as f:
+        with io.open(path, 'w', encoding='utf-8') as f:
             f.write(data)
     except Exception:
         pass

@@ -771,7 +771,9 @@
 
           <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
                có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
-               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
+               <Column.CellStyle>. Dòng là object Python thì dùng cell bridge
+               (AutomationProperties.ItemStatus + Trigger, xem GUI/GridPendingEdits.py),
+               không DataTrigger bind thẳng field. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -979,7 +981,9 @@
           <Style TargetType="ListViewItem" BasedOn="{StaticResource T3.ListViewItem}"/>
 
           <!-- Status pill: nền tint + dot + CHỮ. Không bao giờ chỉ dùng màu.
-               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger"). -->
+               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger").
+               Severity đi qua TextBlock ẩn "sev" (string bridge): dòng là object Python thì
+               DataTrigger bind thẳng {Binding Severity} không bao giờ khớp. -->
           <DataTemplate x:Key="T3.StatusPill">
             <Border x:Name="pill" CornerRadius="{StaticResource T3.R.Pill}" Padding="7,2"
                     HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -988,20 +992,21 @@
                 <TextBlock x:Name="txt" Text="{Binding StatusText}"
                            FontFamily="Segoe UI" FontSize="12" FontWeight="SemiBold"
                            VerticalAlignment="Center"/>
+                <TextBlock x:Name="sev" Text="{Binding Severity}" Visibility="Collapsed"/>
               </StackPanel>
             </Border>
             <DataTemplate.Triggers>
-              <DataTrigger Binding="{Binding Severity}" Value="Success">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Success">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Success.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Warning">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Warning">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Warning.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Danger">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Danger">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Danger.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
@@ -1780,7 +1785,7 @@
                                   Margin="0,0,0,8" IsChecked="True"
                                   Click="on_sidebar_clicked"
                                   ToolTip="Health Dashboard">
-                        <TextBlock Text="&#xE95E;" Style="{StaticResource T3.Icon.Rail}"/>
+                        <TextBlock Text="&#xE9D5;" Style="{StaticResource T3.Icon.Rail}"/>
                     </ToggleButton>
 
                     <!-- 2. Warning Manager -->
@@ -1957,7 +1962,11 @@
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
-                                                        <Border x:Name="rec_pill" Grid.Column="0" CornerRadius="4"
+                                                        <!-- String bridge: triggers read severity through this
+                                                             TextBlock (a DataTrigger on the Python field itself
+                                                             never matches — see the metrics table note). -->
+                                                        <TextBlock x:Name="rec_sev_text" Text="{Binding severity}" Visibility="Collapsed"/>
+                                                        <Border x:Name="rec_pill" Grid.Column="0" CornerRadius="{StaticResource T3.R.Pill}"
                                                                 Background="{StaticResource T3.SurfaceSunken}"
                                                                 Padding="8,4" VerticalAlignment="Top" MinWidth="72">
                                                             <TextBlock x:Name="rec_pill_text" Text="{Binding status}"
@@ -1986,15 +1995,15 @@
                                                         </Grid>
                                                     </Grid>
                                                     <DataTemplate.Triggers>
-                                                        <DataTrigger Binding="{Binding severity}" Value="Success">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=rec_sev_text}" Value="Success">
                                                             <Setter TargetName="rec_pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                                                             <Setter TargetName="rec_pill_text" Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding severity}" Value="Warning">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=rec_sev_text}" Value="Warning">
                                                             <Setter TargetName="rec_pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                                                             <Setter TargetName="rec_pill_text" Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding severity}" Value="Danger">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=rec_sev_text}" Value="Danger">
                                                             <Setter TargetName="rec_pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                                                             <Setter TargetName="rec_pill_text" Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
                                                         </DataTrigger>
@@ -2046,7 +2055,7 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="Raised band = current value  ·  Weight = effect on score"
+                                    <TextBlock Grid.Column="1" Text="Worst first  ·  Solid band = current value  ·  Weight = effect on score"
                                                TextTrimming="CharacterEllipsis"
                                                Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextDisabled}"
                                                HorizontalAlignment="Right" VerticalAlignment="Center"/>
@@ -2054,78 +2063,166 @@
                             </Border>
 
                             <!-- ── Row 3: METRICS TABLE ────────────────────────────────────
-                                 WEIGHT và THRESHOLDS tách thành hai cột một dòng: trước đây
-                                 chúng chồng lên nhau trong ô cao 26px nên dòng dưới bị cắt. -->
+                                 Problems come first: Python sorts rows worst → best, and every
+                                 row carries its severity in five places — a coloured flag bar,
+                                 a tinted HEALTH pill, a coloured VALUE, the OVER LIMIT amount and
+                                 the solid threshold band.
+
+                                 STRING BRIDGE: each colour reads the Python field through a hidden
+                                 TextBlock (x:Name="*_sev_text" / "band_index_text") and the
+                                 DataTriggers bind its Text by ElementName. A DataTrigger bound
+                                 straight to a Python attribute compares a PyObject with "Danger"
+                                 and never matches — Revit showed every HEALTH cell in the default
+                                 grey and no raised threshold band (2026-10-02).
+
+                                 METRIC is the only "*" column (layout rule 3), so the fixed
+                                 columns pack to the right and ACTION sits on the right edge. -->
                             <Grid Grid.Row="3">
                                 <DataGrid x:Name="dg_health_metrics"
                                           Style="{StaticResource T3.DataGrid}"
                                           BorderThickness="0">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="METRIC" Binding="{Binding label}" Width="200"/>
-                                        <DataGridTextColumn Header="CURRENT VALUE" Binding="{Binding value_display}" Width="120"
-                                                            ElementStyle="{StaticResource T3.Cell.Center}"
-                                                            HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"/>
-                                        <!-- Màu pill đến từ DataTrigger trên `severity`, KHÔNG bind Brush từ
-                                             Python: dưới PythonNet, Brush gán vào thuộc tính của một đối tượng
-                                             Python đi qua binding không tới được Background/Foreground (chuỗi
-                                             thì tới), nên pill trước đây hiện chữ mà không có nền. -->
-                                        <DataGridTemplateColumn Header="HEALTH" Width="120"
-                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
+                                        <!-- METRIC: 3px flag in the status colour on problem rows -->
+                                        <DataGridTemplateColumn Header="METRIC" Width="*" MinWidth="160">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock x:Name="health_pill_text" Text="{Binding status}"
-                                                               Foreground="{StaticResource T3.TextMuted}"
-                                                               FontWeight="Bold" FontSize="11"
-                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <Grid VerticalAlignment="Center">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock x:Name="metric_sev_text" Text="{Binding severity}" Visibility="Collapsed"/>
+                                                        <Border x:Name="metric_flag" Grid.Column="0" Width="3" Height="16"
+                                                                Margin="0,0,8,0" Background="Transparent" VerticalAlignment="Center"/>
+                                                        <TextBlock x:Name="metric_label" Grid.Column="1" Text="{Binding label}"
+                                                                   Style="{StaticResource T3.Body}" VerticalAlignment="Center"
+                                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding tooltip}"/>
+                                                    </Grid>
                                                     <DataTemplate.Triggers>
-                                                        <DataTrigger Binding="{Binding severity}" Value="Success">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=metric_sev_text}" Value="Warning">
+                                                            <Setter TargetName="metric_flag" Property="Background" Value="{StaticResource T3.Warning.Accent}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=metric_sev_text}" Value="Danger">
+                                                            <Setter TargetName="metric_flag" Property="Background" Value="{StaticResource T3.Danger.Accent}"/>
+                                                            <Setter TargetName="metric_label" Property="FontWeight" Value="SemiBold"/>
+                                                        </DataTrigger>
+                                                    </DataTemplate.Triggers>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+
+                                        <!-- HEALTH: status pill — tint + dot + word (never colour alone) -->
+                                        <DataGridTemplateColumn Header="HEALTH" Width="120">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Grid VerticalAlignment="Center">
+                                                        <TextBlock x:Name="health_sev_text" Text="{Binding severity}" Visibility="Collapsed"/>
+                                                        <Border x:Name="health_pill" CornerRadius="{StaticResource T3.R.Pill}" Padding="8,4"
+                                                                Background="{StaticResource T3.SurfaceSunken}" HorizontalAlignment="Left">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Ellipse x:Name="health_dot" Style="{StaticResource T3.Dot}"
+                                                                         Fill="{StaticResource T3.TextDisabled}"/>
+                                                                <TextBlock x:Name="health_pill_text" Text="{Binding status}"
+                                                                           Style="{StaticResource T3.Caption}" FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource T3.TextMuted}"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
+                                                    <DataTemplate.Triggers>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=health_sev_text}" Value="Success">
+                                                            <Setter TargetName="health_pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
+                                                            <Setter TargetName="health_dot" Property="Fill" Value="{StaticResource T3.Success.Accent}"/>
                                                             <Setter TargetName="health_pill_text" Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding severity}" Value="Warning">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=health_sev_text}" Value="Warning">
+                                                            <Setter TargetName="health_pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                            <Setter TargetName="health_dot" Property="Fill" Value="{StaticResource T3.Warning.Accent}"/>
                                                             <Setter TargetName="health_pill_text" Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding severity}" Value="Danger">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=health_sev_text}" Value="Danger">
+                                                            <Setter TargetName="health_pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
+                                                            <Setter TargetName="health_dot" Property="Fill" Value="{StaticResource T3.Danger.Accent}"/>
                                                             <Setter TargetName="health_pill_text" Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
                                                         </DataTrigger>
                                                     </DataTemplate.Triggers>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Header="WEIGHT" Width="120"
-                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
+
+                                        <!-- VALUE: number, right-aligned; coloured + bold when it is a problem -->
+                                        <DataGridTemplateColumn Header="VALUE" Width="96">
+                                            <DataGridTemplateColumn.HeaderStyle>
+                                                <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Right"/>
+                                                </Style>
+                                            </DataGridTemplateColumn.HeaderStyle>
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <!-- Cùng thang màu Success/Warning/Danger với cột HEALTH và dải
-                                                         legend phía trên — một dòng Critical thì cả HEALTH lẫn WEIGHT
-                                                         đều đỏ, đọc theo hàng ngang là ra ngay mức độ nghiêm trọng. -->
-                                                    <TextBlock x:Name="weight_text" Text="{Binding weight_stars}"
-                                                               Foreground="{StaticResource T3.TextMuted}"
-                                                               FontFamily="Consolas" FontWeight="Bold" FontSize="12.5"
-                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <Grid VerticalAlignment="Center">
+                                                        <TextBlock x:Name="value_sev_text" Text="{Binding severity}" Visibility="Collapsed"/>
+                                                        <TextBlock x:Name="value_text" Text="{Binding value_display}"
+                                                                   Style="{StaticResource T3.Cell.Number}" Margin="0"/>
+                                                    </Grid>
                                                     <DataTemplate.Triggers>
-                                                        <DataTrigger Binding="{Binding severity}" Value="Success">
-                                                            <Setter TargetName="weight_text" Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=value_sev_text}" Value="Warning">
+                                                            <Setter TargetName="value_text" Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
+                                                            <Setter TargetName="value_text" Property="FontWeight" Value="SemiBold"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding severity}" Value="Warning">
-                                                            <Setter TargetName="weight_text" Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding severity}" Value="Danger">
-                                                            <Setter TargetName="weight_text" Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=value_sev_text}" Value="Danger">
+                                                            <Setter TargetName="value_text" Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                                            <Setter TargetName="value_text" Property="FontWeight" Value="SemiBold"/>
                                                         </DataTrigger>
                                                     </DataTemplate.Triggers>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <!-- THRESHOLDS: thanh 6 dải Good → Severe, đọc như một trục số.
-                                             Ô màu = dải (họ màu giống cột HEALTH: 2 Success · 2 Warning · 2 Danger),
-                                             số nằm GIỮA hai ô = ngưỡng cắt giữa hai dải đó. Dải chứa giá trị hiện tại
-                                             được tô đậm Accent và cao hơn (dấu hình dạng, không chỉ dựa vào màu).
-                                             band_index là CHUỖI "0".."5" → DataTrigger, không bind Brush/int từ Python.
-                                             Slot cố định (ô 14px, số 36px) nên các dòng thẳng hàng; cột Width="Auto". -->
+
+                                        <!-- OVER LIMIT: how much to remove to get back to Acceptable -->
+                                        <DataGridTemplateColumn Width="96">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="OVER LIMIT"
+                                                           ToolTip="How far the value is above the Acceptable limit — the amount to remove to get back to Acceptable."/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.HeaderStyle>
+                                                <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource T3.DataGridColumnHeader}">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Right"/>
+                                                </Style>
+                                            </DataGridTemplateColumn.HeaderStyle>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Grid VerticalAlignment="Center" Background="Transparent" ToolTip="{Binding over_tooltip}">
+                                                        <TextBlock x:Name="over_sev_text" Text="{Binding severity}" Visibility="Collapsed"/>
+                                                        <TextBlock x:Name="over_text" Text="{Binding over_display}"
+                                                                   Style="{StaticResource T3.Cell.Number}" Margin="0"
+                                                                   Foreground="{StaticResource T3.TextDisabled}"/>
+                                                    </Grid>
+                                                    <DataTemplate.Triggers>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=over_sev_text}" Value="Warning">
+                                                            <Setter TargetName="over_text" Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
+                                                            <Setter TargetName="over_text" Property="FontWeight" Value="SemiBold"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=over_sev_text}" Value="Danger">
+                                                            <Setter TargetName="over_text" Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                                            <Setter TargetName="over_text" Property="FontWeight" Value="SemiBold"/>
+                                                        </DataTrigger>
+                                                    </DataTemplate.Triggers>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+
+                                        <!-- WEIGHT: neutral — it is how much the metric counts, not a status -->
+                                        <DataGridTextColumn Header="WEIGHT" Binding="{Binding weight_stars}" Width="64"
+                                                            ElementStyle="{StaticResource T3.Cell.Center}"
+                                                            HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"/>
+
+                                        <!-- THRESHOLDS: six bands, best (left) to worst (right), cut-offs between
+                                             them. Every band is a neutral grey track EXCEPT the one holding the
+                                             current value: solid status colour and raised (shape cue, not colour
+                                             alone). Fixed slots (band 14px, tick 36px) keep the rows aligned. -->
                                         <DataGridTemplateColumn Width="Auto">
                                             <DataGridTemplateColumn.Header>
                                                 <TextBlock Text="THRESHOLDS"
-                                                           ToolTip="Six health bands, best (left) to worst (right): Good, Acceptable, Warning, Concerning, Critical, Severe.&#x0a;The numbers are the cut-offs between neighbouring bands; each band includes its upper limit.&#x0a;The raised, solid segment is the band the current value falls in.&#x0a;Hover a row for its full ranges."/>
+                                                           ToolTip="Six health bands, best (left) to worst (right): Good, Acceptable, Warning, Concerning, Critical, Severe.&#x0a;The numbers are the cut-offs between neighbouring bands; each band includes its upper limit.&#x0a;The solid, raised segment is the band the current value falls in.&#x0a;Hover a row for its full ranges."/>
                                             </DataGridTemplateColumn.Header>
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
@@ -2143,54 +2240,53 @@
                                                             <ColumnDefinition Width="14"/>
                                                             <ColumnDefinition Width="36"/>
                                                             <ColumnDefinition Width="14"/>
-                                                            <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
+                                                        <TextBlock x:Name="band_index_text" Text="{Binding band_index}" Visibility="Collapsed"/>
                                                         <Border x:Name="band_seg_0" Grid.Column="0" Height="6" CornerRadius="2" VerticalAlignment="Center"
-                                                                Background="{StaticResource T3.Success.Fill}" BorderBrush="{StaticResource T3.Success.Accent}" BorderThickness="1"/>
+                                                                Background="{StaticResource T3.Border}"/>
                                                         <TextBlock Grid.Column="1" Text="{Binding band_tick_0}" Style="{StaticResource T3.Caption}"
                                                                    FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
                                                         <Border x:Name="band_seg_1" Grid.Column="2" Height="6" CornerRadius="2" VerticalAlignment="Center"
-                                                                Background="{StaticResource T3.Success.Fill}" BorderBrush="{StaticResource T3.Success.Accent}" BorderThickness="1"/>
+                                                                Background="{StaticResource T3.Border}"/>
                                                         <TextBlock Grid.Column="3" Text="{Binding band_tick_1}" Style="{StaticResource T3.Caption}"
                                                                    FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
                                                         <Border x:Name="band_seg_2" Grid.Column="4" Height="6" CornerRadius="2" VerticalAlignment="Center"
-                                                                Background="{StaticResource T3.Warning.Fill}" BorderBrush="{StaticResource T3.Warning.Accent}" BorderThickness="1"/>
+                                                                Background="{StaticResource T3.Border}"/>
                                                         <TextBlock Grid.Column="5" Text="{Binding band_tick_2}" Style="{StaticResource T3.Caption}"
                                                                    FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
                                                         <Border x:Name="band_seg_3" Grid.Column="6" Height="6" CornerRadius="2" VerticalAlignment="Center"
-                                                                Background="{StaticResource T3.Warning.Fill}" BorderBrush="{StaticResource T3.Warning.Accent}" BorderThickness="1"/>
+                                                                Background="{StaticResource T3.Border}"/>
                                                         <TextBlock Grid.Column="7" Text="{Binding band_tick_3}" Style="{StaticResource T3.Caption}"
                                                                    FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
                                                         <Border x:Name="band_seg_4" Grid.Column="8" Height="6" CornerRadius="2" VerticalAlignment="Center"
-                                                                Background="{StaticResource T3.Danger.Fill}" BorderBrush="{StaticResource T3.Danger.Accent}" BorderThickness="1"/>
+                                                                Background="{StaticResource T3.Border}"/>
                                                         <TextBlock Grid.Column="9" Text="{Binding band_tick_4}" Style="{StaticResource T3.Caption}"
                                                                    FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
                                                         <Border x:Name="band_seg_5" Grid.Column="10" Height="6" CornerRadius="2" VerticalAlignment="Center"
-                                                                Background="{StaticResource T3.Danger.Fill}" BorderBrush="{StaticResource T3.Danger.Accent}" BorderThickness="1"/>
-                                                        <TextBlock Grid.Column="11" Text="{Binding band_unit}" Style="{StaticResource T3.Caption}" Margin="8,0,0,0"/>
+                                                                Background="{StaticResource T3.Border}"/>
                                                     </Grid>
                                                     <DataTemplate.Triggers>
-                                                        <DataTrigger Binding="{Binding band_index}" Value="0">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=band_index_text}" Value="0">
                                                             <Setter TargetName="band_seg_0" Property="Background" Value="{StaticResource T3.Success.Accent}"/>
                                                             <Setter TargetName="band_seg_0" Property="Height" Value="16"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding band_index}" Value="1">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=band_index_text}" Value="1">
                                                             <Setter TargetName="band_seg_1" Property="Background" Value="{StaticResource T3.Success.Accent}"/>
                                                             <Setter TargetName="band_seg_1" Property="Height" Value="16"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding band_index}" Value="2">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=band_index_text}" Value="2">
                                                             <Setter TargetName="band_seg_2" Property="Background" Value="{StaticResource T3.Warning.Accent}"/>
                                                             <Setter TargetName="band_seg_2" Property="Height" Value="16"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding band_index}" Value="3">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=band_index_text}" Value="3">
                                                             <Setter TargetName="band_seg_3" Property="Background" Value="{StaticResource T3.Warning.Accent}"/>
                                                             <Setter TargetName="band_seg_3" Property="Height" Value="16"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding band_index}" Value="4">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=band_index_text}" Value="4">
                                                             <Setter TargetName="band_seg_4" Property="Background" Value="{StaticResource T3.Danger.Accent}"/>
                                                             <Setter TargetName="band_seg_4" Property="Height" Value="16"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding band_index}" Value="5">
+                                                        <DataTrigger Binding="{Binding Text, ElementName=band_index_text}" Value="5">
                                                             <Setter TargetName="band_seg_5" Property="Background" Value="{StaticResource T3.Danger.Accent}"/>
                                                             <Setter TargetName="band_seg_5" Property="Height" Value="16"/>
                                                         </DataTrigger>
@@ -2198,9 +2294,10 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <!-- ACTION là cột cuối và là cột "*": nó ăn phần rộng còn lại nên bảng kín mép
-                                             phải (luật 19), nút Detail canh trái ngay sau thanh ngưỡng. -->
-                                        <DataGridTemplateColumn Header="ACTION" Width="*" MinWidth="90">
+
+                                        <!-- ACTION: last, fixed width, on the right edge of the table -->
+                                        <DataGridTemplateColumn Header="ACTION" Width="80"
+                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -2208,9 +2305,9 @@
                                                         <Button Content="Detail" Visibility="{Binding Text, ElementName=metric_select_visibility_text}"
                                                                 Click="on_health_metric_detail"
                                                                 Style="{StaticResource T3.Button.Ghost}"
-                                                                Height="22" Padding="8,0" MinWidth="0" FontSize="11"
+                                                                Height="24" Padding="8,0" MinWidth="0"
                                                                 ToolTip="Select the elements behind this metric"
-                                                                VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                                                VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
@@ -2402,26 +2499,24 @@
                         <Grid x:Name="ma_progress_panel" Visibility="Collapsed"
                               HorizontalAlignment="Right" VerticalAlignment="Center" Margin="16,0,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="160"/>
                                 <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <ProgressBar x:Name="progress_bar" Grid.Column="0" Height="8" Minimum="0" Maximum="100" Value="0"
+                            <ProgressBar x:Name="progress_bar" Grid.Column="0" Minimum="0" Maximum="100" Value="0"
                                          Style="{StaticResource T3.ProgressBar}" VerticalAlignment="Center"/>
-                            <Button x:Name="ma_btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}"
-                                    Height="28" Padding="8,0">
+                            <Button x:Name="ma_btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock x:Name="ma_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                    <TextBlock x:Name="ma_btn_pause_label" Text="Pause" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="ma_btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                    <TextBlock x:Name="ma_btn_pause_label" Text="Pause" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="ma_btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}"
-                                    Height="28" Padding="8,0">
+                            <Button x:Name="ma_btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,4,0"/>
-                                    <TextBlock Text="Stop" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Surface}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon}" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Stop" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </Grid>

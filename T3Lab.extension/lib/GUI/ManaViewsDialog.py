@@ -104,8 +104,9 @@ from GUI.DataGridColumnFilter import ColumnFilterController
 from GUI import GridPendingEdits as _pend
 
 # Row fields the grids let the user edit. Each one also needs a `dirty_<field>`
-# flag on the row (init_pending creates them) and a CellStyle DataTrigger in the
-# XAML bound to that flag, or the amber "pending" highlight never appears.
+# flag on the row (init_pending creates them) and a CellStyle in the XAML that
+# reads it through the cell string bridge (GridPendingEdits.CELL_BRIDGE_PROPERTY),
+# or the amber "pending" highlight never appears.
 VIEW_EDIT_FIELDS = ("name", "view_template", "scale", "detail_level", "title_on_sheet")
 TMPL_EDIT_FIELDS = ("name",)
 
@@ -646,7 +647,7 @@ class ViewManagerWindow(T3WPFWindow):
     def _refresh_grid_later(self, grid):
         """Redraw the grid once the edit has finished committing.
 
-        The rows carry no INotifyPropertyChanged, so the amber DataTrigger only
+        The rows carry no INotifyPropertyChanged, so the amber cell style only
         re-reads `dirty_<field>` on a refresh — and calling Refresh() while the
         cell is still committing throws "not allowed during an EditItem
         transaction". Hence the trip through the dispatcher.

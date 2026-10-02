@@ -37,6 +37,9 @@ Kích thước cửa sổ: S 420×260–320 (NoResize) · M 560×420–560 · L 
 4. `HorizontalScrollBarVisibility="Disabled"` mọi grid/list. Không đủ chỗ thì bỏ bớt cột.
 5. Số căn phải (Consolas), text căn trái, Element ID căn trái Consolas.
 6. Footer cố định: trái = dot + câu trạng thái; phải = ghost huỷ → secondary → secondary → MỘT primary. Gap 8.
+   Nút footer giữ kích thước của style (không tự đặt Height/Padding); nhãn trong nút kế thừa font/màu của
+   nút (icon `T3.Icon` margin 8 + TextBlock trơn); Pause/Stop: thanh `T3.ProgressBar` 160px cao 8 (luật 27,
+   `audit_t3.py` bắt).
 7. Panel lồng tối đa 2 cấp. Chia section bằng label uppercase + `Separator`, không bằng card.
 8. `UseLayoutRounding="True"`, `SnapsToDevicePixels="True"`, `TextOptions.TextFormattingMode="Display"`
    trên Window. Luôn có MinWidth/MinHeight. Không set Height cho TextBlock. Không fix Width cho text dịch.
@@ -257,21 +260,33 @@ Bảng cho sửa ô thì theo đúng ba luật này, không tự chế kiểu kh
 <DataGridTextColumn Header="SHEET NAME" Binding="{Binding sheet_name}" Width="*">
   <DataGridTextColumn.CellStyle>
     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+      <!-- string bridge của chính ô: cờ Python → thuộc tính string của ô -->
+      <Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_sheet_name}"/>
       <Style.Triggers>
-        <DataTrigger Binding="{Binding dirty_sheet_name}" Value="True">
+        <Trigger Property="AutomationProperties.ItemStatus" Value="True">
           <Setter Property="Background"      Value="{StaticResource T3.Warning.Fill}"/>
           <Setter Property="BorderBrush"     Value="{StaticResource T3.Warning.Accent}"/>
           <Setter Property="BorderThickness" Value="3,0,0,0"/>
-        </DataTrigger>
+        </Trigger>
       </Style.Triggers>
     </Style>
   </DataGridTextColumn.CellStyle>
 </DataGridTextColumn>
 ```
 
+**Không** viết `<DataTrigger Binding="{Binding dirty_sheet_name}" Value="True">`
+— mẫu cũ của mục này, và nó **không bao giờ nổ** (xem "Trigger trên dòng
+Python" ngay dưới). Ô `DataGridCell` không có template để đặt TextBlock bridge,
+nên ô tự làm bridge: Setter chép cờ vào `AutomationProperties.ItemStatus` (một
+thuộc tính **string** của ô — WPF đổi PyObject sang chuỗi `"True"`/`"False"`),
+rồi `Trigger` thường so chuỗi đó. Cột vẫn là `DataGridTextColumn` /
+`DataGridComboBoxColumn`, nên `CellEditEnding`, `column_key()` và
+`editor_text()` không đổi gì. Tên thuộc tính nằm ở
+`GridPendingEdits.CELL_BRIDGE_PROPERTY`.
+
 Python — `GUI/GridPendingEdits.py` lo phần treo, `init_pending` phải chạy trên
-mọi dòng lúc nạp, nếu không cờ `dirty_*` không tồn tại và DataTrigger **im lặng
-không bao giờ nổ**:
+mọi dòng lúc nạp, nếu không cờ `dirty_*` không tồn tại và ô **im lặng không bao
+giờ vàng**:
 
 ```python
 from GUI import GridPendingEdits as _pend
@@ -288,6 +303,27 @@ def _on_cell_edit(self, sender, args):              # grid.CellEditEnding
     else:
         _pend.stage(item, field, typed)
 ```
+
+### Trigger trên dòng Python — luôn qua string bridge (luật 28)
+
+Dòng của bảng là object Python thì pythonnet đưa **mọi** thuộc tính cho WPF dưới
+dạng `PyObject` — kể cả thuộc tính kiểu `str`. Thuộc tính WPF kiểu string
+(`Text`, ...) đổi được nó sang chuỗi, nên cột chữ hiện đúng. Nhưng
+`<DataTrigger Binding="{Binding severity}" Value="Danger">` so **chính PyObject**
+với `"Danger"` → không bao giờ khớp, trigger im lặng không nổ. Model Auditor
+từng tô mọi ô HEALTH cùng một màu xám vì đúng lỗi này (2026-10-02).
+
+| Trigger nằm ở đâu | Cách đọc đúng |
+|---|---|
+| Trong `DataTemplate` / `CellTemplate` | TextBlock ẩn làm bridge: `<TextBlock x:Name="sev_text" Text="{Binding severity}" Visibility="Collapsed"/>` rồi `<DataTrigger Binding="{Binding Text, ElementName=sev_text}" Value="Danger">` (mẫu: `ModelAuditor.xaml`) |
+| Phần tử đã hiện chính giá trị đó (`Text="{Binding DWGType}"`) | Trigger trên `Text` của chính nó: `<Trigger Property="Text" Value="Import">` |
+| `CellStyle` / `ElementStyle` (không có template) | Setter `AutomationProperties.ItemStatus` = `{Binding field}` + `<Trigger Property="AutomationProperties.ItemStatus" Value="True">` (mẫu ô vàng ở trên) |
+
+So bool Python bằng chuỗi `"True"` / `"False"` (`str(True)`). `audit_t3.py` (luật
+28, P1) bắt mọi `DataTrigger` / `Condition` bind thẳng vào DataContext — không có
+`ElementName` / `RelativeSource` / `Source`. Dòng là object .NET thật
+(`DataRowView`) thì bind thẳng vẫn đúng: khai file vào `PYROW_TRIGGER_EXEMPT`
+kèm lý do.
 
 ### Hai cái bẫy phải biết
 
@@ -346,7 +382,7 @@ tiêu đề trang / handler), không theo đối tượng chung của cả tool:
 | Glyph | Khái niệm | Đang dùng ở |
 |---|---|---|
 | `E8FD` BulletedList | Danh sách · inventory · chọn mục | ManaPara Browse · ManaSheets Inventory · ManaViews Inventory · ManaStyles Style Manager · ExportManager(+Test) Selection · UIStandardShowcase Element Inventory |
-| `E9D5` CheckList | Audit · soát theo luật | AutoWork QA/QC, IFCSG Compliance Checker |
+| `E9D5` CheckList | Audit · soát theo luật | AutoWork QA/QC, IFCSG Compliance Checker, ModelAuditor Health |
 | `E945` LightningBolt | Tự động hoá · macro | AutoWork Macro |
 | `E8B5` Import | Import · nạp vào model | FamiGen From CAD · ManaFami Family Loader · ManaPara Parameter Loader |
 | `E8AB` Switch | Hoán đổi · chuyển giữa hai phía | ManaPara Transfer · AutoJoin nút Switch |
@@ -361,7 +397,6 @@ tiêu đề trang / handler), không theo đối tượng chung của cả tool:
 | `E81E` MapLayers | Workset · layer | ManaWorkset Worksets |
 | `E90F` Repair | Công cụ · sửa hàng loạt | ManaWorkset Bulk Tools |
 | `F158` DialShape3 | 3D view | ManaWorkset 3D Views |
-| `E95E` Health | Sức khoẻ model | ModelAuditor Health |
 | `E8EF` Calculator | Tổng hợp · tính toán | ManaContains Elements to Rooms |
 | `E790` Color | Màu · ghi đè đồ hoạ | ManaStyles Color Splasher |
 | `E943` Code | Code · JSON | FamiGen AI / JSON |

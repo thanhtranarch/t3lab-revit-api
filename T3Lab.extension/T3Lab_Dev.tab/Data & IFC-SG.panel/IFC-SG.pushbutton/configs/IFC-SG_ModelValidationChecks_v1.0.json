@@ -1,6 +1,0 @@
-{
-  "name": "IFC-SG Schema Model Validation Checks", 
-  "description": "Checks related to the IFC-SG parameters, v1.0", 
-  "source": "XML", 
-  "disciplines": {}
-}

@@ -46,9 +46,37 @@ Thumbs.db
 # first use, and previously leaked developer machine paths/conversation
 # content into the repo. See T3Lab.extension/lib/Services/tool_discovery.py
 # and Intelligence/t3lab_assistant.py — both handle a missing file gracefully.
+# These now live in %APPDATA%\T3LabAI (core.paths.user_data_path); the old
+# in-extension copies are only read once as a legacy source.
 T3Lab.extension/lib/config/tool_registry.json
-T3Lab.extension/lib/config/learned_patterns.json
 T3Lab.extension/lib/config/chat_history/
+T3Lab.extension/lib/Intelligence/config/learned_patterns.json
+T3Lab.extension/lib/Intelligence/config/assistant_feedback.json
+T3Lab.extension/lib/Intelligence/config/assistant_memory.json
+T3Lab.extension/lib/GUI/join_rules.json
+**/ManaLoca.pushbutton/session.json
+T3Lab.extension/lib/GUI/ManaLoca_session.json
+**/IFC-SG.pushbutton/reports/
+# Older builds saved imported configs here. To ship a config with the tool,
+# add it with `git add -f`.
+**/IFC-SG.pushbutton/configs/
 
 # Local fine-tune build artifacts (finetune_local.py default --out)
 tools/train/out/
+
+# Model Auditor score history is per-user project data: it lives in
+# %APPDATA%\T3LabAI\model_auditor\history. The old in-extension folder must
+# never be committed again (it exposed client project names, 2026-10-02).
+T3Lab.extension/lib/GUI/Resources/ModelAuditorHistory/
+
+# Per-user tool state lives in %APPDATA%\T3LabAI (core.paths.user_data_path).
+# Legacy copies that older builds wrote next to the scripts must not be
+# committed again.
+**/dqt_bg_config.json
+**/dqt_ribbon_*.json
+**/.ribbon-*.tmp
+
+# Visual Studio workspace / Copilot index caches
+.vs/
+# Personal Claude Code permissions (machine paths) — keep local, never commit
+.claude/settings.local.json

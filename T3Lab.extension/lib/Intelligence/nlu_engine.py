@@ -887,7 +887,7 @@ def _name_variants(text):
 
 
 # Words that describe the IMPLEMENTATION, not the capability. Tool docstrings
-# are written for developers ("DQT BCF Reader (v2 - pyRevit WPFWindow
+# are written for developers ("T3Lab BCF Reader (v2 - pyRevit WPFWindow
 # modeless)"), and every one of those words used to be a matchable capability
 # topic — so "modeless"/"window"/"script" could name a tool to the user.
 _DESC_NOISE = {

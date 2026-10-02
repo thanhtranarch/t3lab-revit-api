@@ -2,10 +2,10 @@
 """
 Purge Categories Configuration v2.0
 Defines all 28 purge categories organized in 5 groups
-Copyright (c) 2025 Dang Quoc Truong (DQT)
+Copyright (c) 2025 T3Lab
 """
 
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 
 
 # Safety levels

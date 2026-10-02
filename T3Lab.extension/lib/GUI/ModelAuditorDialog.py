@@ -249,7 +249,21 @@ METRIC_THRESHOLDS = OrderedDict([
 #  https://help.autodesk.com/view/MODALY/ENU/?guid=MODALY_Understanding_Data_ama_reports_html)
 # ============================================================================
 _CONFIG_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), 'Resources', 'model_auditor_thresholds.json'))
-_HISTORY_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), 'Resources', 'ModelAuditorHistory'))
+# Per-model score history is data about the user's projects, so it lives in
+# %APPDATA%\T3LabAI\model_auditor\history — never inside the extension. The
+# old Resources/ModelAuditorHistory/ sat in the clone and was committed to the
+# public repo with client project names in its file names (2026-10-02); it is
+# now only read once per model to carry the trend across (_history_file_for_doc).
+_LEGACY_HISTORY_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), 'Resources', 'ModelAuditorHistory'))
+
+
+def _history_dir():
+    try:
+        from core.paths import settings_dir
+        base = settings_dir()
+    except Exception:
+        base = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'T3LabAI')
+    return os.path.join(base, 'model_auditor', 'history')
 
 
 def _save_metric_config():
@@ -428,6 +442,30 @@ def _threshold_bands(value, thresholds, unit=""):
     }
 
 
+def _over_limit(value, thresholds, unit=""):
+    """OVER LIMIT cell: how far `value` is above the Acceptable limit.
+
+    The Acceptable band ends at thresholds[1]; anything above it is a
+    Warning or worse (_STATUS_ATTENTION). Returns (display, tooltip):
+    '+60' / '+62.5 MB' for a problem row, an em dash for a row within the
+    limit — the number tells the user how much to remove, not just that
+    something is wrong.
+    """
+    limit = thresholds[1]
+    suffix = " " + unit if unit else ""
+    if _status_for(value, thresholds) not in _STATUS_ATTENTION:
+        return "—", "Within the Acceptable limit ({}{} or less).".format(
+            _fmt_number(limit), suffix)
+    over = value - limit
+    if isinstance(over, float):
+        over = round(over, 2)
+    return ("+{}{}".format(_fmt_number(over), suffix),
+            "{}{} above the Acceptable limit of {}{} — reduce it to {}{} or "
+            "less to get back to Acceptable.".format(
+                _fmt_number(over), suffix, _fmt_number(limit), suffix,
+                _fmt_number(limit), suffix))
+
+
 def _rag_status(score):
     """Red/Amber/Green classification matching Autodesk Model Analytics'
     health-check indicators. Returns (label, fill token, text token)."""
@@ -441,12 +479,23 @@ def _rag_status(score):
 def _history_file_for_doc(doc):
     name = os.path.basename(doc.PathName) if doc.PathName else doc.Title
     safe = re.sub(r'[^A-Za-z0-9_.-]', '_', name) or "UnsavedProject"
-    if not os.path.isdir(_HISTORY_DIR):
+    hist_dir = _history_dir()
+    if not os.path.isdir(hist_dir):
         try:
-            os.makedirs(_HISTORY_DIR)
+            os.makedirs(hist_dir)
         except Exception:
             pass
-    return os.path.join(_HISTORY_DIR, safe + '.json')
+    path = os.path.join(hist_dir, safe + '.json')
+    # One-time carry-over from the old in-extension folder, so "vs last run"
+    # keeps working after the move. The legacy file is left untouched.
+    legacy = os.path.join(_LEGACY_HISTORY_DIR, safe + '.json')
+    if not os.path.isfile(path) and os.path.isfile(legacy):
+        try:
+            import shutil
+            shutil.copyfile(legacy, path)
+        except Exception:
+            pass
+    return path
 
 
 def _load_history(doc):
@@ -1274,6 +1323,7 @@ class ModelAuditorWindow(T3WPFWindow):
             value_display = "{}{}".format(value, " " + unit if unit else "")
             band = _threshold_bands(value, thresholds, unit)
             ticks = band["ticks"]
+            over_display, over_tooltip = _over_limit(value, thresholds, unit)
 
             # Element selectability
             has_elements = len(self.health_analyzer.element_ids.get(key, [])) > 0
@@ -1284,6 +1334,7 @@ class ModelAuditorWindow(T3WPFWindow):
             grid_data.append(GridRow(
                 key=key,
                 label=m_info["label"],
+                tooltip=m_info["tooltip"],
                 value_display=value_display,
                 status=status,
                 severity=_STATUS_SEVERITY[status],
@@ -1303,6 +1354,9 @@ class ModelAuditorWindow(T3WPFWindow):
                 band_tick_4=ticks[4],
                 band_unit=unit,
                 thresholds_tooltip=band["tooltip"],
+                # OVER LIMIT column: distance past the Acceptable limit.
+                over_display=over_display,
+                over_tooltip=over_tooltip,
                 select_visibility="Visible" if selectable else "Collapsed",
                 recommendation=m_info["recommendation"],
             ))
@@ -1338,6 +1392,9 @@ class ModelAuditorWindow(T3WPFWindow):
         # Worst first: a list you read top-down and stop when you run out of
         # time is worth more than one in metric order.
         recs_data.sort(key=lambda row: row.impact, reverse=True)
+        # The table too — problems on top, Severe first. sort() is stable, so
+        # rows of equal status keep METRIC_THRESHOLDS order.
+        grid_data.sort(key=lambda row: _STATUS_ORDER.index(row.status), reverse=True)
 
         self._set_rows(self.dg_health_metrics, 'empty_health_metrics', grid_data)
         self._set_rows(self.lst_health_recommendations,

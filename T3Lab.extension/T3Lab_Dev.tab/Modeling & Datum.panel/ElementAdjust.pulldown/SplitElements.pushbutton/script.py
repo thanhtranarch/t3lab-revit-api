@@ -1,7 +1,7 @@
 #! python3
 # -*- coding: utf-8 -*-
 __title__ = "Split\nElements"
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 __doc__ = "Split Elements — Split Walls, Columns, or Floors at selected levels."
 
 import os, sys

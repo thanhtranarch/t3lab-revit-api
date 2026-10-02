@@ -5,10 +5,10 @@
         Width="1100" Height="720"
         MinWidth="900" MinHeight="560"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="None" AllowsTransparency="False"
-        ResizeMode="CanResizeWithGrip"
+        WindowStyle="None" AllowsTransparency="True"
+        ResizeMode="CanResize"
         ShowInTaskbar="True"
-        Background="{DynamicResource T3.Canvas}"
+        Background="Transparent"
         FontFamily="Segoe UI" FontSize="13"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
@@ -771,7 +771,9 @@
 
           <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
                có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
-               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
+               <Column.CellStyle>. Dòng là object Python thì dùng cell bridge
+               (AutomationProperties.ItemStatus + Trigger, xem GUI/GridPendingEdits.py),
+               không DataTrigger bind thẳng field. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -979,7 +981,9 @@
           <Style TargetType="ListViewItem" BasedOn="{StaticResource T3.ListViewItem}"/>
 
           <!-- Status pill: nền tint + dot + CHỮ. Không bao giờ chỉ dùng màu.
-               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger"). -->
+               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger").
+               Severity đi qua TextBlock ẩn "sev" (string bridge): dòng là object Python thì
+               DataTrigger bind thẳng {Binding Severity} không bao giờ khớp. -->
           <DataTemplate x:Key="T3.StatusPill">
             <Border x:Name="pill" CornerRadius="{StaticResource T3.R.Pill}" Padding="7,2"
                     HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -988,20 +992,21 @@
                 <TextBlock x:Name="txt" Text="{Binding StatusText}"
                            FontFamily="Segoe UI" FontSize="12" FontWeight="SemiBold"
                            VerticalAlignment="Center"/>
+                <TextBlock x:Name="sev" Text="{Binding Severity}" Visibility="Collapsed"/>
               </StackPanel>
             </Border>
             <DataTemplate.Triggers>
-              <DataTrigger Binding="{Binding Severity}" Value="Success">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Success">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Success.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Warning">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Warning">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Warning.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Danger">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Danger">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Danger.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
@@ -1707,8 +1712,8 @@
     <!-- Outer Window Container (Zero-Gap) -->
     <Border Background="{StaticResource T3.Surface}"
             BorderBrush="{StaticResource T3.BorderStrong}"
-            BorderThickness="1.5"
-            CornerRadius="12" ClipToBounds="True">
+            BorderThickness="1"
+            CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title Bar -->
@@ -1884,17 +1889,21 @@
                                     <DataTemplate>
                                         <Border CornerRadius="4" Padding="8,4" HorizontalAlignment="Left"
                                                 Background="{StaticResource T3.SurfaceSunken}">
+                                            <!-- String bridge (binding only, the look is unchanged): the
+                                                 triggers read this TextBlock's own Text, a real string.
+                                                 A DataTrigger on {Binding DWGType} compares a PyObject with
+                                                 "Import" and never fires. -->
                                             <TextBlock Text="{Binding DWGType}" FontWeight="SemiBold">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Caption}">
                                                         <Setter Property="Foreground" Value="{StaticResource T3.TextMuted}"/>
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding DWGType}" Value="Import">
+                                                            <Trigger Property="Text" Value="Import">
                                                                 <Setter Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding DWGType}" Value="Link">
+                                                            </Trigger>
+                                                            <Trigger Property="Text" Value="Link">
                                                                 <Setter Property="Foreground" Value="{StaticResource T3.Ink}"/>
-                                                            </DataTrigger>
+                                                            </Trigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </TextBlock.Style>
@@ -1976,16 +1985,16 @@
                         <!-- Right: Action buttons -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <Button x:Name="RefreshButton" Content="Refresh"
-                                    Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0" Margin="0,0,8,0"
+                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
                                     Click="refresh_button_clicked" ToolTip="Reload DWG imports and links"/>
 
-                            <Button x:Name="RenameButton" Content="Rename"
-                                    Style="{StaticResource T3.Button.Primary}" IsDefault="True" Height="28" Padding="16,0" Margin="0,0,8,0"
-                                    Click="rename_button_clicked" ToolTip="Rename the selected item"/>
-
                             <Button x:Name="DeleteButton" Content="Delete Selected"
-                                    Style="{StaticResource T3.Button.Danger}" Height="28" Padding="12,0"
+                                    Style="{StaticResource T3.Button.Danger}" Margin="0,0,8,0"
                                     Click="delete_button_clicked" ToolTip="Delete all selected CAD imports or links"/>
+
+                            <Button x:Name="RenameButton" Content="Rename"
+                                    Style="{StaticResource T3.Button.Primary}" IsDefault="True"
+                                    Click="rename_button_clicked" ToolTip="Rename the selected item"/>
                         </StackPanel>
                     </Grid>
                 </Border>

@@ -31,9 +31,10 @@ thư viện chuẩn của engine pyRevit và .NET.
 git clone <repo-url> C:\T3Lab
 ```
 
-Nếu phải copy tay thay vì clone: copy **cả thư mục**, rồi xoá mọi `__pycache__`
-và `T3Lab.extension\lib\config\tool_registry.json` (file này chứa đường dẫn
-tuyệt đối của máy cũ).
+Nếu phải copy tay thay vì clone: copy **cả thư mục**, rồi xoá mọi `__pycache__`.
+Dữ liệu riêng của từng người (chat history, tool registry, assistant memory,
+lịch sử Model Auditor…) nằm ở `%APPDATA%\T3LabAI`, không nằm trong extension,
+nên không cần dọn gì thêm.
 
 > **Đặt ở đâu:** ổ cục bộ, đường dẫn ngắn (`C:\T3Lab` là tốt nhất).
 > Tránh `C:\Program Files` (không ghi được) và tránh thư mục OneDrive đang bật

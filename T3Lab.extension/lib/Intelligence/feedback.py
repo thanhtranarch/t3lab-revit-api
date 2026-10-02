@@ -45,15 +45,17 @@ _lock = threading.Lock()
 _cache = None
 
 
+# 👍/👎 votes are the user's usage data: per user in %APPDATA%/T3LabAI/
+# assistant, never in the extension folder (a shared, public git clone; this
+# file used to be committed). The old in-extension file is copied over once.
+_LEGACY_FEEDBACK_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'config', 'assistant_feedback.json')
+
+
 def _feedback_file():
-    lib_dir = os.path.dirname(os.path.abspath(__file__))
-    config_dir = os.path.join(lib_dir, 'config')
-    if not os.path.exists(config_dir):
-        try:
-            os.makedirs(config_dir)
-        except Exception:
-            pass
-    return os.path.join(config_dir, 'assistant_feedback.json')
+    from core.paths import user_data_path
+    return user_data_path('assistant', 'assistant_feedback.json',
+                          legacy=[_LEGACY_FEEDBACK_FILE])
 
 
 def _blank():

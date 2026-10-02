@@ -5,6 +5,6 @@ description: |
   Assign parameter values to contained elements based on their container's properties
   Collect and aggregate element data, then write summary values back into the container
   Supports all spatial container types available in Revit
-author: "Dang Quoc Truong"
+author: "T3Lab"
 version: "1.0.0"
 context: "doc-project"

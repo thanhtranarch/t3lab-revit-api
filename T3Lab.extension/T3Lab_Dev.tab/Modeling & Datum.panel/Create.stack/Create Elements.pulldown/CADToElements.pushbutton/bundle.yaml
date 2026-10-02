@@ -6,5 +6,5 @@ description: |
   Walls and beams from paired parallel lines, floors/ceilings/rooms from closed outlines,
   columns from rectangles and circles, grids from axis lines, model/detail lines,
   and ducts, pipes, cable trays or conduits from single or double lines.
-author: "Dang Quoc Truong"
+author: "T3Lab"
 version: "2.0.0"

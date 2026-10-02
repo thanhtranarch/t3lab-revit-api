@@ -35,6 +35,8 @@ READ_TOOLS = frozenset([
     "get_available_family_types", "get_element_bounding_box",
     "get_material_quantities",
     "list_open_documents", "switch_active_document",
+    # Scan-to-BIM reads: list / sample / detect — nothing is created.
+    "list_point_clouds", "analyze_point_cloud", "detect_point_cloud_elements",
 ])
 
 MODIFY_TOOLS = frozenset([

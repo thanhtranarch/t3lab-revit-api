@@ -1,20 +1,20 @@
 #! python3
 # -*- coding: utf-8 -*-
 """
-DQT - Ribbon Name Manager
+T3Lab - Ribbon Name Manager
 Shorten / restore Revit ribbon tab names with full control. Unlike the classic
 fixed-JSON tool, this reads every live ribbon tab, lets you edit each short
 name inline (double-click), toggle Short/Full for all tabs, persists your own
 mappings, and needs no external Snippets dependency or per-language files.
 
-Dang Quoc Truong - DQT (c) 2026
+T3Lab (c) 2026
 """
 
 __title__     = "Ribbon Name\nManager"
-__author__    = "Dang Quoc Truong (DQT)"
+__author__    = "T3Lab"
 __version__   = "1.0.0"
-__copyright__ = "Copyright (c) 2026 by Dang Quoc Truong (DQT)"
-__doc__       = """DQT - Ribbon Name Manager
+__copyright__ = "Copyright (c) 2026 by T3Lab"
+__doc__       = """T3Lab - Ribbon Name Manager
 
 
 Improved ribbon-name tool. Opens a themed window listing every ribbon tab with
@@ -66,10 +66,18 @@ try:
 except Exception:
     app = None
 
+# Per-user state lives in %APPDATA%\T3LabAI\ribbon_names — the originals file
+# lists this machine's installed ribbon tabs and was committed with the repo
+# while it sat next to this script. Old files are carried over once.
+from core.paths import user_data_path
+
 PATH_SCRIPT  = os.path.dirname(__file__)
-MAP_PATH     = os.path.join(PATH_SCRIPT, "dqt_ribbon_map.json")
-ORIG_PATH    = os.path.join(PATH_SCRIPT, "dqt_ribbon_originals.json")
-STATE_PATH   = os.path.join(PATH_SCRIPT, "dqt_ribbon_state.json")
+MAP_PATH     = user_data_path("ribbon_names", "ribbon_map.json",
+                              legacy=[os.path.join(PATH_SCRIPT, "dqt_ribbon_map.json")])
+ORIG_PATH    = user_data_path("ribbon_names", "ribbon_originals.json",
+                              legacy=[os.path.join(PATH_SCRIPT, "dqt_ribbon_originals.json")])
+STATE_PATH   = user_data_path("ribbon_names", "ribbon_state.json",
+                              legacy=[os.path.join(PATH_SCRIPT, "dqt_ribbon_state.json")])
 
 DEFAULT_MAP = {
     "Architecture": "Arch",
@@ -165,7 +173,7 @@ def get_ribbon_tabs():
 def main():
     live_tabs = get_ribbon_tabs()
     if not live_tabs:
-        forms.alert("No ribbon tabs found.", title="DQT - Ribbon Name Manager")
+        forms.alert("No ribbon tabs found.", title="T3Lab - Ribbon Name Manager")
         return
 
     short_map = load_map()

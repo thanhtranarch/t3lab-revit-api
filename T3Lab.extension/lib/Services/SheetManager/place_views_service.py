@@ -2,7 +2,7 @@
 """
 Sheet Manager - Place Views Service
 
-Copyright © Dang Quoc Truong (DQT)
+Copyright © T3Lab
 """
 
 from Autodesk.Revit.DB import FilteredElementCollector, View, Viewport, XYZ, UV

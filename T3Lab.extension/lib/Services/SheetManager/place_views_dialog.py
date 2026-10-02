@@ -6,7 +6,7 @@ Fixes:
   - Search box for views
   - Column order: Sheet Number | Sheet Name | View Name
 
-Copyright (c) Dang Quoc Truong (DQT) 2026
+Copyright (c) T3Lab 2026
 """
 
 import clr
@@ -30,7 +30,7 @@ import System.Windows.Controls as WPFControls
 from Autodesk.Revit.DB import (FilteredElementCollector, View, ViewType, Viewport,
                                  XYZ, BoundingBoxUV, Transaction, TransactionStatus, ViewSheet)
 
-# ─── DQT Brand Colors ───────────────────────────────────────────────────────
+# ─── T3Lab Brand Colors ───────────────────────────────────────────────────────
 def _brush(hex_color):
     return BrushConverter().ConvertFromString(hex_color)
 

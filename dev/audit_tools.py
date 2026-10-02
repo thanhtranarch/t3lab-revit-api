@@ -68,6 +68,10 @@ KNOWN_ORPHAN_XAML = {
     # Wizard-nav reference example named in .claude/CLAUDE.md — kept in place on
     # purpose, not wired to any pushbutton.
     "ExportManagerTest.xaml",
+    # The one UI reference template named in T3LAB_UI_STANDARD.md and
+    # new-tool-standard.md; its showcase pushbutton/dialog were removed
+    # (2026-10-02) but the XAML stays as the copy-from example.
+    "UIStandardShowcase.xaml",
 }
 
 

@@ -9,5 +9,5 @@
   <rect x="17" y="10" width="7" height="1" fill="#A8A8A8"/>
   <rect x="17" y="13" width="9" height="1" fill="#A8A8A8"/>
   <!-- title block -->
-  <rect x="19.5" y="20.5" width="8" height="6" fill="#FFC14D" stroke="#EDEDED" stroke-width="1"/>
+  <rect x="20" y="21" width="7" height="5" fill="#FFC14D"/>
 </svg>

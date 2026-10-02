@@ -7,15 +7,15 @@ Unified tool combining Dimension and Text Note management:
   - Delete selected instances / types
   - Double-click Name cell to rename inline (types and text note content)
   - Auto-rename all types based on their properties
-  - Collaborative tool by T3Lab & Dang Quoc Truong.
+  - T3Lab tool.
 
 --------------------------------------------------------
-Author: Tran Tien Thanh & Dang Quoc Truong
+Author: Tran Tien Thanh
 --------------------------------------------------------
 """
 
 __title__   = "Annotation Manager"
-__author__  = "Tran Tien Thanh & Dang Quoc Truong"
+__author__  = "Tran Tien Thanh"
 __version__ = "1.1.0"
 
 # IMPORT LIBRARIES

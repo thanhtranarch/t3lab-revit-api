@@ -3,7 +3,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- khung group bao 3 phan tu -->
   <rect x="2.5" y="6.5" width="27" height="19" fill="#EDEDED" stroke="#EDEDED" stroke-width="1"/>
-  <rect x="5" y="9" width="7" height="14" fill="#A8A8A8"/>
-  <rect x="14" y="9" width="6" height="14" fill="#A8A8A8"/>
-  <rect x="22" y="9" width="5" height="14" fill="#FFC14D"/>
+  <rect x="7" y="10" width="4" height="12" fill="#A8A8A8"/>
+  <rect x="14" y="10" width="4" height="12" fill="#A8A8A8"/>
+  <rect x="21" y="10" width="4" height="12" fill="#FFC14D"/>
 </svg>

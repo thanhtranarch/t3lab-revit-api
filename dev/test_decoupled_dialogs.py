@@ -29,8 +29,6 @@ def check(name, condition, detail=""):
 
 DIALOGS_TO_VERIFY = [
     ("AutoJoinDialog.py", "AutoJoin.xaml"),
-    ("AutoWorkDialog.py", "AutoWork.xaml"),
-    ("BCFReaderDialog.py", "BCFReader.xaml"),
     ("BatchOutDialog.py", "ExportManager.xaml"),
     ("DoorThresholdDialog.py", "DoorThreshold.xaml"),
     ("ImageToDraftingDialog.py", "ImageToDrafting.xaml"),

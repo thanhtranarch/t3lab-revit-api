@@ -2,7 +2,8 @@
      Nguon: icon.svg . Bang mau: dev/icons/tokens.json -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- tier B - hai net CAD song song thanh mot buc tuong -->
-  <rect x="3" y="5" width="26" height="2" fill="#A8A8A8"/>
-  <rect x="3" y="10" width="26" height="2" fill="#A8A8A8"/>
-  <rect x="3.5" y="18.5" width="25" height="9" fill="#FFC14D" stroke="#EDEDED" stroke-width="1"/>
+  <rect x="3" y="4" width="26" height="2" fill="#A8A8A8"/>
+  <rect x="3" y="9" width="26" height="2" fill="#A8A8A8"/>
+  <polygon points="11,13 21,13 16,18" fill="#FFC14D"/>
+  <rect x="3.5" y="20.5" width="25" height="7" fill="#EDEDED" stroke="#EDEDED" stroke-width="1"/>
 </svg>

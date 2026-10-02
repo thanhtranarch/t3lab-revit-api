@@ -3,8 +3,8 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="MCP Control"
-        Width="560" Height="560"
-        MinWidth="520" MinHeight="480"
+        Width="460" Height="620"
+        MinWidth="440" MinHeight="520"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="True"
         ResizeMode="CanResize"
@@ -771,7 +771,9 @@
 
           <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
                có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
-               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
+               <Column.CellStyle>. Dòng là object Python thì dùng cell bridge
+               (AutomationProperties.ItemStatus + Trigger, xem GUI/GridPendingEdits.py),
+               không DataTrigger bind thẳng field. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -979,7 +981,9 @@
           <Style TargetType="ListViewItem" BasedOn="{StaticResource T3.ListViewItem}"/>
 
           <!-- Status pill: nền tint + dot + CHỮ. Không bao giờ chỉ dùng màu.
-               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger"). -->
+               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger").
+               Severity đi qua TextBlock ẩn "sev" (string bridge): dòng là object Python thì
+               DataTrigger bind thẳng {Binding Severity} không bao giờ khớp. -->
           <DataTemplate x:Key="T3.StatusPill">
             <Border x:Name="pill" CornerRadius="{StaticResource T3.R.Pill}" Padding="7,2"
                     HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -988,20 +992,21 @@
                 <TextBlock x:Name="txt" Text="{Binding StatusText}"
                            FontFamily="Segoe UI" FontSize="12" FontWeight="SemiBold"
                            VerticalAlignment="Center"/>
+                <TextBlock x:Name="sev" Text="{Binding Severity}" Visibility="Collapsed"/>
               </StackPanel>
             </Border>
             <DataTemplate.Triggers>
-              <DataTrigger Binding="{Binding Severity}" Value="Success">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Success">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Success.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Warning">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Warning">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Warning.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Danger">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Danger">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Danger.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
@@ -1762,20 +1767,30 @@
             <Border Grid.Row="1" Background="{StaticResource T3.SurfaceSunken}"
                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
                     Padding="16,4">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <RadioButton x:Name="chip_tab_setup" Content="Setup" GroupName="mcp_tabs"
-                                 Style="{StaticResource T3.Chip}" IsChecked="True"
-                                 Checked="tab_chip_checked" Tag="0"
-                                 ToolTip="Start the server and connect your AI app"/>
-                    <RadioButton x:Name="chip_tab_manual" Content="Manual Config" GroupName="mcp_tabs"
-                                 Style="{StaticResource T3.Chip}"
-                                 Checked="tab_chip_checked" Tag="1"
-                                 ToolTip="Config entry to paste into an AI app that is not listed in Setup"/>
-                    <RadioButton x:Name="chip_tab_advanced" Content="Advanced" GroupName="mcp_tabs"
-                                 Style="{StaticResource T3.Chip}"
-                                 Checked="tab_chip_checked" Tag="2"
-                                 ToolTip="Port, auto-start, file task watcher and teaching capture"/>
-                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <RadioButton x:Name="chip_tab_setup" Content="Setup" GroupName="mcp_tabs"
+                                     Style="{StaticResource T3.Chip}" IsChecked="True"
+                                     Checked="tab_chip_checked" Tag="0"
+                                     ToolTip="Start the server and connect your AI app"/>
+                        <RadioButton x:Name="chip_tab_manual" Content="Manual Config" GroupName="mcp_tabs"
+                                     Style="{StaticResource T3.Chip}"
+                                     Checked="tab_chip_checked" Tag="1"
+                                     ToolTip="Config entry to paste into an AI app that is not listed in Setup"/>
+                        <RadioButton x:Name="chip_tab_advanced" Content="Advanced" GroupName="mcp_tabs"
+                                     Style="{StaticResource T3.Chip}"
+                                     Checked="tab_chip_checked" Tag="2"
+                                     ToolTip="Port, auto-start, file task watcher and teaching capture"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" x:Name="refresh_btn" Content="Refresh"
+                            Style="{StaticResource T3.Button.Ghost}"
+                            Height="28" Padding="12,0" VerticalAlignment="Center"
+                            ToolTip="Check the server, AI apps and active model again"/>
+                </Grid>
             </Border>
 
             <!-- ══════════════════ ROW 2: TAB CONTENT ══════════════════ -->
@@ -1859,7 +1874,7 @@
                                                        ToolTip="The ChatGPT app's own Connectors need a public https URL — a local server is reached through Codex."/>
                                             <TextBlock x:Name="chatgpt_cfg_label" Text="Checking..."
                                                        Style="{StaticResource T3.Caption}" TextWrapping="Wrap"/>
-                                            <TextBlock Text="Works in the Codex app and CLI, not in ChatGPT chat."
+                                            <TextBlock Text="Codex app and CLI only, not ChatGPT chat."
                                                        Style="{StaticResource T3.Caption}" TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <Button Grid.Column="2" x:Name="configure_chatgpt_btn" Content="Connect"
@@ -1900,7 +1915,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="configure_all_label" Grid.Column="0"
-                                           Text="Restart the AI app after connecting so it loads T3Lab."
+                                           Text="Restart the AI app after connecting."
                                            Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
                                            Margin="0,0,12,0"/>
                                 <Button Grid.Column="1" x:Name="configure_all_btn" Content="Connect All"
@@ -1945,7 +1960,7 @@
                                       Margin="0,0,0,12"
                                       ToolTip="Choose the syntax your AI app expects">
                                 <ComboBoxItem Style="{StaticResource T3.ComboBoxItem}" IsSelected="True"
-                                              Content="JSON — Claude Desktop, Claude Code, Cursor, Windsurf, Antigravity"/>
+                                              Content="JSON — Claude, Cursor, Windsurf, Antigravity"/>
                                 <ComboBoxItem Style="{StaticResource T3.ComboBoxItem}"
                                               Content="TOML — ChatGPT (Codex)"/>
                             </ComboBox>
@@ -1953,7 +1968,7 @@
                             <TextBlock Text="CONFIG ENTRY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
                             <TextBox x:Name="config_box" IsReadOnly="True"
                                      Style="{StaticResource T3.TextBox.Mono}"
-                                     Height="200" Padding="8" VerticalContentAlignment="Top"
+                                     Height="240" Padding="8" VerticalContentAlignment="Top"
                                      AcceptsReturn="True" TextWrapping="NoWrap"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
 
@@ -2006,13 +2021,12 @@
 
                             <!-- File task watcher -->
                             <TextBlock Text="FILE TASK WATCHER" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                            <TextBlock Text="Zero-network alternative to the server: runs task.json files dropped into the data folder."
+                            <TextBlock Text="Server-free option: runs task.json files from the data folder."
                                        Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                            <Grid Margin="0,0,0,4">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <Border x:Name="watcher_indicator" Grid.Column="0" Width="8" Height="8" CornerRadius="4"
@@ -2024,14 +2038,20 @@
                                 <Button Grid.Column="2" x:Name="watcher_toggle_btn" Content="Start Watcher"
                                         Style="{StaticResource T3.Button.Secondary}" IsEnabled="False"
                                         Height="28" Padding="12,0"/>
-                                <Button Grid.Column="3" x:Name="open_dir_btn" Content="Open Folder"
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="data_dir_label" Grid.Column="0" Style="{StaticResource T3.Mono}"
+                                           TextTrimming="CharacterEllipsis" Margin="16,0,12,0"
+                                           ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                                <Button Grid.Column="1" x:Name="open_dir_btn" Content="Open Folder"
                                         Style="{StaticResource T3.Button.Secondary}"
-                                        Height="28" Padding="12,0" Margin="8,0,0,0"
+                                        Height="28" Padding="12,0"
                                         ToolTip="Open the T3Lab_AI_Data folder in Explorer"/>
                             </Grid>
-                            <TextBlock x:Name="data_dir_label" Style="{StaticResource T3.Mono}"
-                                       TextTrimming="CharacterEllipsis" Margin="16,0,0,0"
-                                       ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
 
                             <Separator Style="{StaticResource T3.Rule}" Margin="0,16"/>
 
@@ -2068,7 +2088,7 @@
                                         Height="28" Padding="12,0"
                                         ToolTip="Use the active model as the teaching sandbox"/>
                             </Grid>
-                            <TextBlock Text="While recording, model-editing tools may only change the sandbox model."
+                            <TextBlock Text="While recording, AI edits may only change this model."
                                        Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
 
                         </StackPanel>
@@ -2078,7 +2098,7 @@
 
             <!-- ══════════════════ ROW 3: FOOTER BAR ══════════════════
                  Left: copyright | overall readiness (dot + words).
-                 Right: Refresh (ghost) + ONE primary that names the next step:
+                 Right: ONE primary that names the next step (Refresh lives in the tab strip):
                  "Start Server" while the server is down, "Done" once it runs. -->
             <Border Grid.Row="3" Style="{StaticResource T3.FooterBar}">
                 <Grid>
@@ -2105,9 +2125,6 @@
                     </Grid>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="refresh_btn" Content="Refresh"
-                                Style="{StaticResource T3.Button.Ghost}" Margin="0,0,8,0"
-                                ToolTip="Check the server, AI apps and active model again"/>
                         <Button x:Name="next_btn" Content="Done"
                                 Style="{StaticResource T3.Button.Primary}" IsDefault="True"/>
                     </StackPanel>

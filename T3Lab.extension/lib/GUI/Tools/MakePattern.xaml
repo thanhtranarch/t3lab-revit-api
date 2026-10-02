@@ -772,7 +772,9 @@
 
           <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
                có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
-               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
+               <Column.CellStyle>. Dòng là object Python thì dùng cell bridge
+               (AutomationProperties.ItemStatus + Trigger, xem GUI/GridPendingEdits.py),
+               không DataTrigger bind thẳng field. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -980,7 +982,9 @@
           <Style TargetType="ListViewItem" BasedOn="{StaticResource T3.ListViewItem}"/>
 
           <!-- Status pill: nền tint + dot + CHỮ. Không bao giờ chỉ dùng màu.
-               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger"). -->
+               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger").
+               Severity đi qua TextBlock ẩn "sev" (string bridge): dòng là object Python thì
+               DataTrigger bind thẳng {Binding Severity} không bao giờ khớp. -->
           <DataTemplate x:Key="T3.StatusPill">
             <Border x:Name="pill" CornerRadius="{StaticResource T3.R.Pill}" Padding="7,2"
                     HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -989,20 +993,21 @@
                 <TextBlock x:Name="txt" Text="{Binding StatusText}"
                            FontFamily="Segoe UI" FontSize="12" FontWeight="SemiBold"
                            VerticalAlignment="Center"/>
+                <TextBlock x:Name="sev" Text="{Binding Severity}" Visibility="Collapsed"/>
               </StackPanel>
             </Border>
             <DataTemplate.Triggers>
-              <DataTrigger Binding="{Binding Severity}" Value="Success">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Success">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Success.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Warning">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Warning">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Warning.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Danger">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Danger">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Danger.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
@@ -1707,7 +1712,7 @@
 
 
     <!-- ═══ Outer window border (rule 26: custom chrome, rounded, no HWND bleed) ═══ -->
-    <Border Background="{StaticResource T3.Canvas}"
+    <Border Background="{StaticResource T3.Surface}"
             BorderBrush="{StaticResource T3.BorderStrong}"
             BorderThickness="1"
             CornerRadius="{StaticResource T3.R.Window}"
@@ -1754,10 +1759,12 @@
             </Border>
 
             <!-- ══════════════════ ROW 1: WORKSPACE — ONE PANEL, THREE COLUMNS ══════════════════
-                 Settings | Module canvas | Surface preview share one T3.Panel surface.
-                 Shared header row (40) and shared info strip row (40) keep every column
-                 aligned; columns are divided by 1px T3.Border rules, no floating gaps. -->
-            <Border Grid.Row="1" Margin="16" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                 Settings | Module canvas | Surface preview fill the window edge to edge:
+                 no outer margin, no inset card, so no grey T3.Canvas band shows between
+                 the title bar, the panel and the footer. Shared header row (40) and shared
+                 info strip row (40) keep every column aligned; columns are divided by 1px
+                 T3.Border rules. -->
+            <Border Grid.Row="1" Background="{StaticResource T3.Surface}" ClipToBounds="True">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="280"/>

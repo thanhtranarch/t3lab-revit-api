@@ -70,11 +70,16 @@ CHROME_BORDER = {
     "CornerRadius": "{StaticResource T3.R.Window}",
     "ClipToBounds": "True",
 }
-# File UI-LOCKED theo CLAUDE.md — giữ nguyên chrome riêng của chúng.
+# Chỉ còn bề mặt chat được giữ chrome riêng. DWGManagement (UI-locked) đã theo
+# luật 26 từ 2026-10-02 theo yêu cầu của chủ repo — chỉ phần khung cửa sổ, thiết
+# kế bên trong vẫn khoá.
 CHROME_EXEMPT = {
-    "DWGManagement.xaml",   # thiết kế chốt, UI locked
     "T3LabAssistant.xaml",  # bề mặt chat theo theme Revit, đổi bo 12 ↔ 0 khi dock
 }
+
+# ── Luật 27b · Nhãn nút kế thừa font/màu của nút ──────────────────────────
+# Bề mặt chat tô nút theo theme Revit ({DynamicResource T3Theme*}) — giữ riêng.
+BUTTON_LABEL_EXEMPT = {"T3LabAssistant.xaml"}
 
 # ── Luật 23 · Select-all ở header cột checkbox ───────────────────────────
 # Miễn trừ: cột KHÔNG phải để chọn dòng mà là thuộc tính của chính dòng đó.
@@ -94,6 +99,14 @@ SELECTALL_EXEMPT = {
 #   (DWGManagement đã qua bridge 2026-09-26 — chủ repo đồng ý sửa binding,
 #    giao diện vẫn khoá nguyên.)
 BRIDGE_EXEMPT = {"ManaAnno.xaml"}
+
+# ── Luật 28 · DataTrigger đọc thuộc tính dòng Python qua string bridge ────
+# DataTrigger Binding="{Binding field}" so PyObject với Value ("True",
+# "Danger", "pending") — không bao giờ khớp, dù thuộc tính Python là str hay
+# bool (Model Auditor 2026-10-02: mọi ô HEALTH cùng màu xám). Miễn trừ CHỈ cho
+# file mà dòng là object .NET thật (binding thẳng mang giá trị có kiểu), kèm lý do:
+#   ManaAnno — dòng là DataRowView (DataTable), như BRIDGE_EXEMPT.
+PYROW_TRIGGER_EXEMPT = {"ManaAnno.xaml"}
 
 # ── Luật 22 · ICON ───────────────────────────────────────────────────────
 # UI-frozen theo CLAUDE.md: icon của 2 file này không đi theo hệ T3.Icon.*
@@ -287,6 +300,39 @@ def spacing_bad(value):
         if f != int(f) or abs(int(f)) not in SPACING_OK:
             bad.append(n)
     return bad
+
+
+_SOURCE_RE = re.compile(r"(?:^|[\s,{])(?:ElementName|RelativeSource|Source)\s*=")
+
+
+def pyrow_trigger_bindings(root):
+    """Binding text of every DataTrigger / MultiDataTrigger Condition that reads
+    the DataContext directly (no ElementName / RelativeSource / Source) — luật 28.
+
+    Both the attribute form (Binding="{Binding f}") and the element form
+    (<DataTrigger.Binding><Binding Path="f"/></DataTrigger.Binding>) count.
+    """
+    found = []
+    for el in root.iter():
+        tag = local(el.tag)
+        if tag not in ("DataTrigger", "Condition"):
+            continue
+        b = " ".join(el.attrib.get("Binding", "").split())
+        if b:
+            if b.startswith("{Binding") and not _SOURCE_RE.search(b):
+                found.append(b)
+            continue
+        for prop in el:
+            if local(prop.tag) not in ("DataTrigger.Binding", "Condition.Binding"):
+                continue
+            for bind in prop:
+                if local(bind.tag) != "Binding":
+                    continue
+                attrs = {local(k) for k in bind.attrib}
+                attrs |= {local(c.tag).split(".")[-1] for c in bind}   # <Binding.Source>
+                if not attrs & {"ElementName", "RelativeSource", "Source"}:
+                    found.append("<Binding Path=\"%s\"/>" % bind.attrib.get("Path", ""))
+    return found
 
 
 def audit(src, base, keys):
@@ -572,6 +618,73 @@ def audit(src, base, keys):
                       for a in ancestors(el))):
             issues.append(("P1", "Visibility=\"%s\" trong template dòng — thuộc tính Python "
                                  "không đổi được sang Visibility; đọc qua string bridge" % flat))
+
+    # ── Luật 28 · DataTrigger không bind thẳng thuộc tính của dòng Python ───
+    # pythonnet đưa thuộc tính Python cho WPF dưới dạng PyObject. Thuộc tính
+    # kiểu string (Text, ...) đổi được — nên cột chữ hiện đúng — nhưng
+    # DataTrigger so CHÍNH PyObject với Value: "Danger" / "True" / "pending"
+    # không bao giờ khớp và trigger im lặng không nổ (Model Auditor: mọi ô
+    # HEALTH xám; ô vàng pending-edit của Sheet/View Manager không hiện).
+    # Đúng: đọc qua string bridge —
+    #   template dòng : <TextBlock x:Name="f_text" Text="{Binding f}" Visibility="Collapsed"/>
+    #                   + DataTrigger Binding="{Binding Text, ElementName=f_text}"
+    #   CellStyle/ElementStyle (không có template để đặt TextBlock):
+    #                   <Setter Property="AutomationProperties.ItemStatus" Value="{Binding f}"/>
+    #                   + <Trigger Property="AutomationProperties.ItemStatus" Value="True">
+    # Binding có ElementName / RelativeSource / Source đọc thuộc tính WPF → bỏ qua.
+    if base not in PYROW_TRIGGER_EXEMPT:
+        for b in pyrow_trigger_bindings(root):
+            issues.append(("P1", "DataTrigger Binding=\"%s\" so PyObject của dòng Python với "
+                                 "Value — không bao giờ khớp; đọc qua string bridge "
+                                 "(TextBlock ẩn + {Binding Text, ElementName=…}, hoặc Setter "
+                                 "AutomationProperties.ItemStatus + Trigger trong CellStyle)"
+                           % b))
+
+    # ── Luật 27 · Nút đồng bộ: footer, nhãn, thứ tự (thêm 2026-10-02) ───────
+    # (a) Nút trong T3.FooterBar giữ kích thước của style (cao T3.H.Action 30,
+    #     padding mặc định): 22 tool từng tự đặt Height 26/28 + Padding riêng,
+    #     nên Pause/Stop/Cancel/Apply cạnh nhau cao thấp khác nhau.
+    # (b) Nhãn chữ trong nút Primary/Secondary/Danger kế thừa font + màu của
+    #     nút — không Style T3.Caption, không Foreground/FontSize riêng: Stop
+    #     từng hiện chữ xám 11.5 trên nền đỏ (SheetGen 2026-10-02). Nút Ghost
+    #     dạng link nhỏ trong form thì được phép.
+    # (c) Trong footer, nút Primary là nút T3 cuối cùng (ngoài cùng phải).
+    for foot in root.iter():
+        if local(foot.tag) != "Border" or "T3.FooterBar" not in foot.attrib.get("Style", ""):
+            continue
+        styles = []
+        for el in foot.iter():
+            if local(el.tag) != "Button":
+                continue
+            attrs = {local(k): v for k, v in el.attrib.items()}
+            st = re.search(r"T3\.Button\.(\w+)", attrs.get("Style", ""))
+            if not st:
+                continue
+            styles.append(st.group(1))
+            bad = [a for a in ("Height", "Padding") if a in attrs]
+            if bad:
+                issues.append(("P2", "nút footer %s tự đặt %s — bỏ để giữ chiều cao/padding "
+                                     "chuẩn của style (luật 27a)"
+                               % (attrs.get("Name", attrs.get("Content", "?")), "/".join(bad))))
+        if "Primary" in styles and styles[-1] != "Primary":
+            issues.append(("P2", "footer: nút Primary phải ở ngoài cùng phải — thứ tự hiện "
+                                 "tại %s (luật 27c)" % " → ".join(styles)))
+    for btn in (root.iter() if base not in BUTTON_LABEL_EXEMPT else ()):
+        if local(btn.tag) != "Button":
+            continue
+        st = re.search(r"T3\.Button\.(Primary|Secondary|Danger)", btn.attrib.get("Style", ""))
+        if not st:
+            continue
+        for tb in btn.iter():
+            if local(tb.tag) != "TextBlock" or tb is btn:
+                continue
+            a = {local(k): v for k, v in tb.attrib.items()}
+            if "T3.Icon" in a.get("Style", ""):
+                continue
+            if ("T3.Caption" in a.get("Style", "") or "Foreground" in a or "FontSize" in a):
+                issues.append(("P2", "nhãn \"%s\" trong nút %s tự đặt style/màu/cỡ chữ — để "
+                                     "nhãn kế thừa font và màu của nút (luật 27b)"
+                               % (a.get("Text", "?"), st.group(1))))
 
     # ── Luật 22 · ICON — một bộ icon cho toàn extension ───────────────────
     # (a) Font icon duy nhất là Segoe MDL2 Assets, và LUÔN qua style T3.Icon.*

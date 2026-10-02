@@ -6,7 +6,7 @@ Supports: Walls, Floors, Columns, Structural Columns, Beams, Structural Framing
 """
 
 __title__ = "Auto Adj\nBase Offset"
-__author__ = "Dang Quoc Truong & T3Lab"
+__author__ = "T3Lab"
 __doc__ = "Auto-adjusts Base or Top Offset when changing Level Constraint to preserve element 3D position."
 
 import os

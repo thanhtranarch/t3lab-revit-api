@@ -28,6 +28,7 @@ import sys
 SUPPORTED_REVIT = (2022, 2027)
 TITLE = "T3Lab"
 LOG_NAME = "engine_check.log"
+LOG_MAX_BYTES = 256 * 1024          # then rotated to engine_check.log.1
 PATCH_OPT_OUT_ENV = "T3LAB_NO_PYREVIT_PATCH"
 PATCH_OPT_OUT_FILE = "pyrevit_patch.disabled"
 
@@ -137,7 +138,34 @@ def find_problems():
     return problems
 
 
+def _same_as_last_entry(path, text):
+    """True when the log already ends with this exact entry. Line endings are
+    compared normalised: io.open writes \\r\\n on Windows."""
+    try:
+        want = u"\n%s\n\n" % text
+        size = os.path.getsize(path)
+        span = min(size, 2 * len(want.encode("utf-8")) + 16)
+        fh = open(path, "rb")
+        try:
+            fh.seek(size - span)
+            tail = fh.read()
+        finally:
+            fh.close()
+        tail = tail.decode("utf-8", "replace").replace(u"\r\n", u"\n")
+        return tail.endswith(want)
+    except Exception:
+        return False
+
+
 def _log(text):
+    """Append one entry to %APPDATA%\\T3LabAI\\engine_check.log. Never raises.
+
+    This file runs on every Revit start AND every pyRevit reload, and a state
+    that does not change (an unsupported pyRevit, a Revit outside the range)
+    used to append the same entry each time, forever. An entry identical to
+    the last one is now skipped, and past LOG_MAX_BYTES the log is rotated to
+    engine_check.log.1 (as ErrorGuard does with errors.log).
+    """
     try:
         base = os.environ.get("APPDATA") or os.path.expanduser("~")
         folder = os.path.join(base, "T3LabAI")
@@ -145,7 +173,19 @@ def _log(text):
             os.makedirs(folder)
         import io
         import time
-        with io.open(os.path.join(folder, LOG_NAME), "a", encoding="utf-8") as fh:
+        path = os.path.join(folder, LOG_NAME)
+        if os.path.exists(path):
+            if _same_as_last_entry(path, text):
+                return
+            if os.path.getsize(path) > LOG_MAX_BYTES:
+                backup = path + ".1"
+                try:
+                    if os.path.exists(backup):
+                        os.remove(backup)
+                    os.rename(path, backup)
+                except Exception:
+                    os.remove(path)
+        with io.open(path, "a", encoding="utf-8") as fh:
             fh.write(u"%s\n%s\n\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), text))
     except Exception:
         pass

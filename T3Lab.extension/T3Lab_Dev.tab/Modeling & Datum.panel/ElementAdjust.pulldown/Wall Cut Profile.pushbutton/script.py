@@ -5,7 +5,7 @@ Creates openings in walls based on intersecting elements from linked models.
 """
 
 __title__ = "Wall\nCut Profile"
-__author__ = "Dang Quoc Truong & T3Lab"
+__author__ = "T3Lab"
 __doc__ = "Cut wall profiles or create openings based on linked element intersections."
 
 import os

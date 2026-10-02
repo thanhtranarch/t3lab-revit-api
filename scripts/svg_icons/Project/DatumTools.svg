@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#18181B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-  <line x1="3" y1="7" x2="21" y2="7"/>
-  <line x1="3" y1="17" x2="21" y2="17"/>
-  <line x1="7" y1="3" x2="7" y2="21"/>
-  <line x1="17" y1="3" x2="17" y2="21"/>
-  <circle cx="7" cy="7" r="2" fill="#18181B" stroke="none"/>
-  <circle cx="17" cy="17" r="2" fill="#18181B" stroke="none"/>
-</svg>

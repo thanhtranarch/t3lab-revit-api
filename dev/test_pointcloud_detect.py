@@ -24,12 +24,10 @@ import os
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from tabdir import TAB  # noqa: E402  (the tab folder name changes)
-_dialog = os.path.join(REPO, 'T3Lab.extension', 'lib', 'GUI', 'PointCloudDialog.py')
-SCRIPT = _dialog if os.path.exists(_dialog) else os.path.join(
-    TAB, 'Modeling & Datum.panel',
-    'Create.stack', 'Create Elements.pulldown', 'PointCloud.pushbutton',
-    'script.py')
+# Sections 1-5 of the old pushbutton now live in one shared module, used by
+# both the Point Cloud to Model wizard and the MCP point cloud tools.
+MODULE = os.path.join(REPO, 'T3Lab.extension', 'lib', 'Services',
+                      'point_cloud_analysis.py')
 
 MM_PER_FOOT = 304.8
 M = 1000.0 / MM_PER_FOOT   # one metre in Revit internal feet
@@ -59,19 +57,15 @@ class _Marker(object):
 
 
 def load_analyzer_module():
-    """Exec Sections 1-5 of the pushbutton against stubbed Revit names."""
-    src = io.open(SCRIPT, encoding='utf-8').read()
-
-    start = src.index('# ── Section 1')
-    end   = src.index('# ── Section 6')
-    body  = src[start:end]
-
-    ns = {
-        '__name__': 'pointcloud_pure',
-        'math': math,
+    """Import Services/point_cloud_analysis.py and swap its Revit names for
+    stubs. The module imports the Revit API inside try/except, so under
+    plain CPython those names are None until the stubs go in."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('pointcloud_pure', MODULE)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    stubs = {
         'logger': _Logger(),
-        'doc': object(),
-        'REVIT_VERSION': 2026,
         'FilteredElementCollector': _Collector,
         'Grid': _Marker,
         'Level': _Marker,
@@ -79,11 +73,10 @@ def load_analyzer_module():
         'Plane': _Marker,
         'List': {},
         'PointCloudFilterFactory': _Marker,
-        'PointCloudInstance': _Marker,
-        'ISelectionFilter': object,
     }
-    exec(compile(body, SCRIPT, 'exec'), ns)
-    return ns
+    for name, value in stubs.items():
+        setattr(mod, name, value)
+    return vars(mod)
 
 
 # ── Synthetic cloud builders ──────────────────────────────────────────────────

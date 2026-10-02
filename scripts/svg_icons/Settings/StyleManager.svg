@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#18181B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-  <line x1="3" y1="6" x2="21" y2="6"/>
-  <line x1="3" y1="12" x2="21" y2="12" stroke-dasharray="4 2"/>
-  <line x1="3" y1="18" x2="21" y2="18" stroke-dasharray="1 2"/>
-  <path d="M19 4v4"/>
-  <path d="M19 10v4"/>
-  <path d="M19 16v4"/>
-</svg>

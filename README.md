@@ -25,22 +25,20 @@ Three layers form a self-sustaining ecosystem for architectural intelligence:
 
 ## Ribbon: T3Lab Tab
 
-The tab exposes **7 panels**. Buttons marked *(DQT)* were developed in collaboration with Dang Quoc Truong.
+The tab exposes **7 panels**.
 
 ### Standard
 
 | Tool | Description |
 |------|-------------|
-| **Auto Work** | Automation recorder & player — quick click at a fixed coordinate, or record and replay a full mouse sequence with timing. |
-| **UI Showcase** | Reference window for the T3Lab Lumina design standard (palette, typography, buttons, inputs). |
 
 ### Annotation & Select
 
 | Tool | Description |
 |------|-------------|
-| **Mana Anno** | Unified Find / Remove / Rename manager for Dimensions and Text Notes. *(DQT)* |
+| **Mana Anno** | Unified Find / Remove / Rename manager for Dimensions and Text Notes. |
 | **Auto Dimension** | Automatic dimension chains for walls, columns, doors, lifts and grids in the active or a chosen view. |
-| **Mana DWG** | CAD import and CAD link manager — list, rename and delete DWG imports/links. *(DQT)* |
+| **Mana DWG** | CAD import and CAD link manager — list, rename and delete DWG imports/links. |
 | **Mana Select** | Consolidated selection manager: Quick Select by parameter/text, Select Similar by type/family/category, and linked-element selection. |
 
 ### Modeling & Datum
@@ -50,9 +48,9 @@ The tab exposes **7 panels**. Buttons marked *(DQT)* were developed in collabora
 | **CAD to BIM** (pulldown) | **CAD to Elements** (map DWG layers → Walls / Floors / Beams), **Point Cloud to Model** (Scan-to-BIM wizard detecting walls, floors, ceilings, doors, windows, columns, stairs, roofs), **Room To Floor**, **Door Threshold**, **Image to Drafting**, **Text to Element**. |
 | **Property Line** | Type any address worldwide and draw its property boundary: OpenStreetMap everywhere (no API key), LightBox cadastral parcels for US addresses. |
 | **Tile Layout** | 3-step wizard: extract floor boundaries, pick a tile pattern per floor, generate and place a tiled layout. |
-| **Element Adjust** (pulldown) | **Auto Join** (rule-based joining, Shift+Click for defaults) *(DQT)*, **Split Elements** at levels, **Wall Cut Profile** from linked-model intersections, **Auto Adj Base Offset**. |
+| **Element Adjust** (pulldown) | **Auto Join** (rule-based joining, Shift+Click for defaults), **Split Elements** at levels, **Wall Cut Profile** from linked-model intersections, **Auto Adj Base Offset**. |
 | **FamiGen** | Family generator — from CAD blocks (DWG → .rfa), from a JSON schema, or from built-in batch presets. |
-| **Mana Fami** | Family manager — browse by category, search/filter, and load families from disk. *(DQT)* |
+| **Mana Fami** | Family manager — browse by category, search/filter, and load families from disk. |
 
 ### Views & Sheets
 
@@ -70,8 +68,6 @@ The tab exposes **7 panels**. Buttons marked *(DQT)* were developed in collabora
 | **Mana Sched** | Schedule manager — export to Excel with formatting, import values back, duplicate schedules. |
 | **Mana Para** | Parameter manager — transfer values by rule, Text-to-Element assignment, values-to-filled-region. |
 | **Mana Contains** | Spatial containment — find elements inside Rooms/Areas/Spaces/Zones/Masses/Scope Boxes, push container values down or aggregate element data up. |
-| **BCF Reader** | Modeless BCF issue browser (IFC Delta Viewer exports) — click an issue to navigate the view. |
-| **Foundation Volume** | Write computed volume of Structural Foundations into a chosen shared parameter. |
 | **IFC-SG Suite** | Subtype Assigner (Excel mapping → IFC Export Class & Predefined Type) + Compliance Checker against CORENET X rules. |
 
 ### Standards & Settings
@@ -207,14 +203,11 @@ t3lab-revit-api/
 │   │   │   └── config/             # Learned patterns, feedback, teacher exemplars
 │   │   ├── Services/               # Exporters, MCP service, Revit context, spell checker
 │   │   ├── Selection/              # Element selection helpers
-│   │   ├── Renaming/               # Renaming engine classes
-│   │   ├── Snippets/               # 22 reusable Revit API code snippets
+│   │   ├── Snippets/               # Reusable Revit API helpers
 │   │   ├── Utils/                  # CAD/family helpers
 │   │   ├── config/                 # Settings, project store, user profile
-│   │   ├── core/                   # MCP server, ExternalEvent bridge, teaching capture, paths
-│   │   └── ui/                     # Button states, settings dialog
+│   │   └── core/                   # MCP server, ExternalEvent bridge, teaching capture, paths
 │   ├── checks/                     # Model checker script validations
-│   ├── commands/                   # Standalone command scripts
 │   ├── hooks/                      # pyRevit event hooks
 │   └── startup.py                  # Extension startup
 ├── api/                            # Cloud serverless functions (family metadata)

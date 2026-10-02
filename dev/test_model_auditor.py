@@ -499,9 +499,10 @@ class HealthDashboardTests(unittest.TestCase):
         # a differently-named attribute shows up as a silently empty column,
         # which is exactly how CURRENT VALUE and HEALTH went blank in Revit.
         for row in rows:
-            for field in ('label', 'value_display', 'status', 'weight_stars',
+            for field in ('label', 'tooltip', 'value_display', 'status', 'weight_stars',
                           'band_index', 'band_tick_0', 'band_tick_4',
-                          'thresholds_tooltip', 'select_visibility'):
+                          'thresholds_tooltip', 'over_display', 'over_tooltip',
+                          'select_visibility'):
                 self.assertTrue(getattr(row, field, None) not in (None, ''),
                                 '{} is empty on {}'.format(field, row.label))
             self.assertIn(row.status, MOD._STATUS_ORDER)
@@ -520,12 +521,47 @@ class HealthDashboardTests(unittest.TestCase):
 
     def test_pills_never_bind_a_brush_from_python(self):
         """PythonNet không đưa được Brush qua binding: pill phải tô bằng
-        DataTrigger trên `severity`, nếu không nó hiện chữ mà không có nền."""
+        DataTrigger, nếu không nó hiện chữ mà không có nền."""
         self.assertNotIn('Binding bg_brush', XAML_SOURCE)
         self.assertNotIn('Binding fg_brush', XAML_SOURCE)
+
+    def test_severity_triggers_read_a_string_bridge(self):
+        """A DataTrigger bound straight to a Python field compares a PyObject
+        with "Danger" and never fires — Revit showed every HEALTH cell grey
+        (2026-10-02). Triggers must read a hidden TextBlock by ElementName."""
+        import re
+        body = XAML_SOURCE[XAML_SOURCE.index('HẾT T3 STYLES'):]
+        direct = re.findall(r'<DataTrigger Binding="\{Binding [a-z_]+\}"', body)
+        self.assertEqual(direct, [], 'DataTrigger on a Python field never fires')
+        for bridge in ('metric_sev_text', 'health_sev_text', 'value_sev_text',
+                       'over_sev_text', 'rec_sev_text'):
+            self.assertIn('x:Name="%s" Text="{Binding severity}"' % bridge, body)
         for fam in ('Success', 'Warning', 'Danger'):
-            self.assertIn('<DataTrigger Binding="{Binding severity}" Value="%s">' % fam,
-                          XAML_SOURCE)
+            self.assertIn('<DataTrigger Binding="{Binding Text, ElementName=health_sev_text}" '
+                          'Value="%s">' % fam, body)
+            self.assertIn('<DataTrigger Binding="{Binding Text, ElementName=rec_sev_text}" '
+                          'Value="%s">' % fam, body)
+
+    def test_action_is_the_last_column_and_metric_the_only_star(self):
+        import re
+        grid = XAML_SOURCE[XAML_SOURCE.index('x:Name="dg_health_metrics"'):]
+        grid = grid[:grid.index('</DataGrid.Columns>')]
+        columns = re.findall(r'<DataGrid(?:Template|Text)Column\s[^>]*>', grid)
+        self.assertIn('Header="METRIC"', columns[0])
+        self.assertIn('Header="ACTION"', columns[-1])
+        stars = [c for c in columns if 'Width="*"' in c]
+        self.assertEqual(stars, [columns[0]], 'only METRIC may take the spare width')
+
+    def test_problems_are_listed_first(self):
+        doc = FakeDoc(elements={
+            'ImportInstance': [SimpleNamespace(Id=FakeElementId(i), IsLinked=False,
+                                               Pinned=True) for i in range(40)],
+        }, warnings=[FakeWarning('Room not enclosed')] * 6000)
+        win = self._window(doc)
+        win.on_health_run(SimpleNamespace(IsEnabled=True), None)
+        ranks = [MOD._STATUS_ORDER.index(r.status) for r in win.dg_health_metrics.ItemsSource]
+        self.assertEqual(ranks, sorted(ranks, reverse=True))
+        self.assertGreater(ranks[0], 1, 'a problem metric must head the table')
 
     def test_every_row_carries_a_severity_the_xaml_knows(self):
         win = self._window(FakeDoc())
@@ -658,6 +694,17 @@ class ThresholdBandTests(unittest.TestCase):
         band = MOD._threshold_bands(3, [5, 5, 8, 15, 20])
         self.assertEqual(band['bands'][1][1], 'not used (same limit as Good)')
 
+    def test_over_limit_counts_from_the_acceptable_limit(self):
+        self.assertEqual(MOD._over_limit(40, self.CUTS)[0], '—')
+        self.assertEqual(MOD._over_limit(500, self.CUTS)[0], '—')
+        display, tip = MOD._over_limit(1227, self.CUTS)
+        self.assertEqual(display, '+727')
+        self.assertIn('Acceptable limit of 500', tip)
+        self.assertEqual(MOD._over_limit(312.5, [100, 250, 500, 750, 1000], 'MB')[0],
+                         '+62.5 MB')
+        self.assertEqual(MOD._over_limit(1184.3, [100, 1000, 5000, 9000, 10000])[0],
+                         '+184.3')
+
     def test_ticks_fit_the_slot(self):
         ticks = MOD._threshold_bands(0, [1000, 5000, 10000, 25000, 50000])['ticks']
         self.assertEqual(ticks, ['1000', '5000', '10k', '25k', '50k'])
@@ -668,11 +715,13 @@ class ThresholdBandTests(unittest.TestCase):
                 self.assertLessEqual(len(tick), 5, tick)
 
     def test_xaml_raises_the_band_from_a_string_index(self):
-        """band_index drives DataTriggers — it must be a string like severity."""
+        """band_index drives DataTriggers through the string bridge."""
         grid = XAML_SOURCE[XAML_SOURCE.index('x:Name="dg_health_metrics"'):]
         grid = grid[:grid.index('</DataGrid>')]
+        self.assertIn('x:Name="band_index_text" Text="{Binding band_index}"', grid)
         for i in range(6):
-            self.assertIn('<DataTrigger Binding="{Binding band_index}" Value="%d">' % i, grid)
+            self.assertIn('<DataTrigger Binding="{Binding Text, ElementName=band_index_text}" '
+                          'Value="%d">' % i, grid)
             self.assertIn('x:Name="band_seg_%d"' % i, grid)
         self.assertIn('ToolTip="{Binding thresholds_tooltip}"', grid)
 
@@ -1069,6 +1118,62 @@ class NavigationTests(unittest.TestCase):
 
 
 # ───────────────────────── source / XAML contracts ──────────────────────────
+class HistoryLocationTests(unittest.TestCase):
+    """Score history is data about the user's projects: it must live under
+    %APPDATA%\\T3LabAI, never in the extension folder (the old in-extension
+    folder was committed to a public repo with client names, 2026-10-02)."""
+
+    def setUp(self):
+        import os, tempfile
+        self.tmp = tempfile.mkdtemp()
+        self.appdata = os.path.join(self.tmp, 'appdata')
+        self.legacy = os.path.join(self.tmp, 'legacy')
+        os.makedirs(self.legacy)
+        self._env = os.environ.get('APPDATA')
+        os.environ['APPDATA'] = self.appdata
+        # load_dialog() execs functions and classes only, so module constants
+        # are injected here the way the other suites inject their fakes.
+        globs = MOD._history_file_for_doc.__globals__
+        self._old_legacy = globs.get('_LEGACY_HISTORY_DIR')
+        globs['_LEGACY_HISTORY_DIR'] = self.legacy
+        globs.setdefault('re', __import__('re'))
+
+    def tearDown(self):
+        import os, shutil
+        globs = MOD._history_file_for_doc.__globals__
+        if self._old_legacy is None:
+            globs.pop('_LEGACY_HISTORY_DIR', None)
+        else:
+            globs['_LEGACY_HISTORY_DIR'] = self._old_legacy
+        if self._env is None:
+            os.environ.pop('APPDATA', None)
+        else:
+            os.environ['APPDATA'] = self._env
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_history_goes_to_appdata_not_the_extension(self):
+        import os
+        doc = types.SimpleNamespace(PathName=r'C:\\Jobs\\Client Tower.rvt', Title='Client Tower')
+        path = MOD._history_file_for_doc(doc)
+        self.assertTrue(path.startswith(os.path.join(self.appdata, 'T3LabAI', 'model_auditor', 'history')), path)
+        self.assertNotIn(os.path.join('GUI', 'Resources'), path)
+
+    def test_legacy_history_is_carried_over_once(self):
+        import os, json
+        name = 'Client_Tower.rvt.json'
+        with open(os.path.join(self.legacy, name), 'w') as f:
+            json.dump([{'score': 71.0}], f)
+        doc = types.SimpleNamespace(PathName='Client Tower.rvt', Title='Client Tower')
+        path = MOD._history_file_for_doc(doc)
+        with open(path) as f:
+            self.assertEqual(json.load(f), [{'score': 71.0}])
+        with open(path, 'w') as f:
+            json.dump([{'score': 80.0}], f)
+        MOD._history_file_for_doc(doc)
+        with open(path) as f:
+            self.assertEqual(json.load(f), [{'score': 80.0}], 'a newer file is never overwritten')
+
+
 class SourceContractTests(unittest.TestCase):
     """Guards that removed code and known traps do not creep back in."""
 

@@ -206,6 +206,10 @@ def record(trace, path=None):
         line = json.dumps(data, ensure_ascii=True, sort_keys=True)
         if isinstance(line, bytes):
             line = line.decode('ascii')
+        if path is None and _telemetry is not None:
+            # Traces carry the user's own sentence (goal): same 30-day
+            # retention as telemetry, applied once per session.
+            _telemetry.prune_once()
         with io.open(path or _log_path(), 'a', encoding='utf-8') as f:
             f.write(line + u'\n')
         return True

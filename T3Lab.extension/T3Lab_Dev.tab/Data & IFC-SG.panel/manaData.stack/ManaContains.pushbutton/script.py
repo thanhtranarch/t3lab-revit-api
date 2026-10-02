@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Contains Manager - Find elements in spatial containers or collect element data into spatial elements.
-Copyright (c) 2026 Dang Quoc Truong (DQT)
+Copyright (c) 2026 T3Lab
 """
 
 __title__ = "Contains\nManager"
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 __doc__ = "Find elements in spatial containers or collect element data into spatial elements."
 
 import os

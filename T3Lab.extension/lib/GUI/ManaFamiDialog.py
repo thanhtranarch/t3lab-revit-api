@@ -41,6 +41,7 @@ from System.Windows.Threading import Dispatcher
 from pyrevit import revit, DB, forms, script
 from GUI.WPF_Base import T3WPFWindow, to_items_source
 from Snippets._compat import elem_name
+from core.paths import user_data_path
 
 from Autodesk.Revit.DB import (
     FilteredElementCollector,
@@ -69,7 +70,17 @@ _XAML = os.path.join(os.path.dirname(__file__), 'Tools', 'ManaFami.xaml')
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".t3lab")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "family_loader_config.json")
 
-THUMBNAIL_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".t3lab", "thumbnails")
+# Family preview cache. It is a CACHE — every entry can be rebuilt from its
+# .rfa — so it lives with the other per-user data under %APPDATA%\T3LabAI and is
+# capped. It used to grow in ~/.t3lab/thumbnails forever: one JPEG per family
+# *version* ever previewed (the key carries mtime + size). Nothing is carried
+# over from that folder. Least recently used entries go first: a cache hit
+# touches its file, so its mtime is the last time it was shown.
+THUMBNAIL_CACHE_DIR = user_data_path("famithumbs")
+THUMBNAIL_CACHE_MAX_FILES = 500
+THUMBNAIL_CACHE_MAX_BYTES = 200 * 1024 * 1024
+# A scan of a big library prunes every this many new thumbnails, and at its end.
+THUMBNAIL_PRUNE_EVERY = 50
 SCAN_BATCH_SIZE = 20
 
 # Rail modes -> TabControl index. Batch Operations (Family Management) is used
@@ -150,6 +161,59 @@ def _get_thumbnail_cache_path(rfa_path):
         return os.path.join(THUMBNAIL_CACHE_DIR, key)
     except Exception:
         return None
+
+def prune_thumbnail_cache(folder=None, max_files=None, max_bytes=None):
+    """Delete the least recently used thumbnails beyond the caps.
+
+    Newest first (by mtime) are kept while both caps hold; everything older
+    than the first one that would break a cap is removed. Only the cache's own
+    ``*.jpg`` files are ever touched. Returns how many files were removed and
+    never raises — a failed clean-up must not cost the preview that triggered it.
+    """
+    folder = folder or THUMBNAIL_CACHE_DIR
+    max_files = THUMBNAIL_CACHE_MAX_FILES if max_files is None else max_files
+    max_bytes = THUMBNAIL_CACHE_MAX_BYTES if max_bytes is None else max_bytes
+    try:
+        names = os.listdir(folder)
+    except Exception:
+        return 0
+    entries = []
+    for name in names:
+        if not name.lower().endswith(".jpg"):
+            continue
+        path = os.path.join(folder, name)
+        try:
+            if not os.path.isfile(path):
+                continue
+            st = os.stat(path)
+        except Exception:
+            continue
+        entries.append((st.st_mtime, st.st_size, path))
+    entries.sort(key=lambda e: e[0], reverse=True)
+    kept_files = kept_bytes = 0
+    removed = 0
+    full = False
+    for _mtime, size, path in entries:
+        if not full and kept_files + 1 <= max_files and kept_bytes + size <= max_bytes:
+            kept_files += 1
+            kept_bytes += size
+            continue
+        full = True
+        try:
+            os.remove(path)
+            removed += 1
+        except Exception:
+            pass
+    return removed
+
+
+def _touch(path):
+    """Mark a cache entry as just used (LRU order for prune_thumbnail_cache)."""
+    try:
+        os.utime(path, None)
+    except Exception:
+        pass
+
 
 def _extract_rfa_preview(rfa_path):
     try:
@@ -992,12 +1056,26 @@ class ManaFamiWindow(T3WPFWindow):
         except Exception as ex:
             logger.debug("Error search text changed: {}".format(ex))
 
+    def _refresh_family_cards(self):
+        """Redraw the cards after Python changed IsChecked.
+
+        FamilyItem raises no PropertyChanged WPF can hear, so the card checkbox
+        and its selected border (both read IsChecked through the hidden
+        row_is_checked_text bridge) only see a new value when the items are
+        regenerated.
+        """
+        try:
+            self.items_families.Items.Refresh()
+        except Exception:
+            pass
+
     def select_all_loader_clicked(self, sender, e):
         try:
             self._is_updating = True
             for family in self.filtered_families:
                 family.IsChecked = True
             self._is_updating = False
+            self._refresh_family_cards()
             self.update_result_count()
         except Exception as ex:
             logger.debug("Error select all loader: {}".format(ex))
@@ -1008,6 +1086,7 @@ class ManaFamiWindow(T3WPFWindow):
             for family in self.filtered_families:
                 family.IsChecked = False
             self._is_updating = False
+            self._refresh_family_cards()
             self.update_result_count()
         except Exception as ex:
             logger.debug("Error select none loader: {}".format(ex))
@@ -1094,6 +1173,7 @@ class ManaFamiWindow(T3WPFWindow):
 
     def _thumbnail_worker(self, families):
         batch = 0
+        written = 0
         for family in families:
             if self._thumb_cancel:
                 break
@@ -1108,6 +1188,7 @@ class ManaFamiWindow(T3WPFWindow):
                     try:
                         with open(cache_path, 'rb') as cf:
                             img_bytes = cf.read()
+                        _touch(cache_path)
                     except Exception:
                         img_bytes = None
 
@@ -1119,6 +1200,9 @@ class ManaFamiWindow(T3WPFWindow):
                                 os.makedirs(THUMBNAIL_CACHE_DIR)
                             with open(cache_path, 'wb') as cf:
                                 cf.write(img_bytes)
+                            written += 1
+                            if written % THUMBNAIL_PRUNE_EVERY == 0:
+                                prune_thumbnail_cache()
                         except Exception:
                             pass
 
@@ -1133,6 +1217,8 @@ class ManaFamiWindow(T3WPFWindow):
                             time.sleep(0.05)
             except Exception:
                 pass
+        if written:
+            prune_thumbnail_cache()
 
     def _apply_thumbnail(self, family, bitmap):
         try:

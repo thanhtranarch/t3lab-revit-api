@@ -2,8 +2,8 @@
      Nguon: icon.svg . Bang mau: dev/icons/tokens.json -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- tier B - noi dung text chay ngang sang parameter cua phan tu -->
-  <rect x="2" y="7" width="13" height="2" fill="#A8A8A8"/>
-  <rect x="2" y="12" width="10" height="2" fill="#A8A8A8"/>
-  <polygon points="16,8 22,13 16,18" fill="#FFC14D"/>
-  <rect x="23.5" y="6.5" width="6" height="14" fill="#EDEDED" stroke="#EDEDED" stroke-width="1"/>
+  <rect x="2" y="12" width="12" height="2" fill="#A8A8A8"/>
+  <rect x="2" y="17" width="9" height="2" fill="#A8A8A8"/>
+  <polygon points="15,11 21,16 15,21" fill="#FFC14D"/>
+  <rect x="22.5" y="5.5" width="7" height="21" fill="#EDEDED" stroke="#EDEDED" stroke-width="1"/>
 </svg>

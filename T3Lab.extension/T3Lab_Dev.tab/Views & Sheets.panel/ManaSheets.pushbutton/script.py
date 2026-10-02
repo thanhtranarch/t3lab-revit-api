@@ -7,7 +7,7 @@ Unified tool to manage sheets, sets, views on sheets, parameters, and re-number 
 Copyright (c) 2026 T3Lab
 """
 __title__ = "Sheet\nManager"
-__author__ = "Dang Quoc Truong & Antigravity"
+__author__ = "T3Lab"
 
 import os
 import sys

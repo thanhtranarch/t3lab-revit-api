@@ -774,7 +774,9 @@
 
           <!-- Background/BorderBrush/BorderThickness đi qua TemplateBinding để một cột
                có thể tô sáng riêng ô của nó (ví dụ ô vừa sửa, đang chờ Apply) bằng
-               <Column.CellStyle> + DataTrigger. Mặc định vẫn trong suốt, không đổi. -->
+               <Column.CellStyle>. Dòng là object Python thì dùng cell bridge
+               (AutomationProperties.ItemStatus + Trigger, xem GUI/GridPendingEdits.py),
+               không DataTrigger bind thẳng field. Mặc định vẫn trong suốt, không đổi. -->
           <Style x:Key="T3.DataGridCell" TargetType="DataGridCell">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -982,7 +984,9 @@
           <Style TargetType="ListViewItem" BasedOn="{StaticResource T3.ListViewItem}"/>
 
           <!-- Status pill: nền tint + dot + CHỮ. Không bao giờ chỉ dùng màu.
-               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger"). -->
+               Row VM cần 2 property: StatusText (string) và Severity ("Success"/"Warning"/"Danger").
+               Severity đi qua TextBlock ẩn "sev" (string bridge): dòng là object Python thì
+               DataTrigger bind thẳng {Binding Severity} không bao giờ khớp. -->
           <DataTemplate x:Key="T3.StatusPill">
             <Border x:Name="pill" CornerRadius="{StaticResource T3.R.Pill}" Padding="7,2"
                     HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -991,20 +995,21 @@
                 <TextBlock x:Name="txt" Text="{Binding StatusText}"
                            FontFamily="Segoe UI" FontSize="12" FontWeight="SemiBold"
                            VerticalAlignment="Center"/>
+                <TextBlock x:Name="sev" Text="{Binding Severity}" Visibility="Collapsed"/>
               </StackPanel>
             </Border>
             <DataTemplate.Triggers>
-              <DataTrigger Binding="{Binding Severity}" Value="Success">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Success">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Success.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Warning">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Warning">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Warning.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
               </DataTrigger>
-              <DataTrigger Binding="{Binding Severity}" Value="Danger">
+              <DataTrigger Binding="{Binding Text, ElementName=sev}" Value="Danger">
                 <Setter TargetName="pill" Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                 <Setter TargetName="dot"  Property="Fill"       Value="{StaticResource T3.Danger.Accent}"/>
                 <Setter TargetName="txt"  Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
@@ -2026,27 +2031,32 @@
                                                                 ElementStyle="{StaticResource T3.Cell.Number}"/>
                                             <!-- WORKSET: sửa trực tiếp. Đổi = TREO (ô vàng), Apply mới ghi.
                                                  row_state "pending"/"applied"/"failed" tô ô; chữ ở cột STATUS.
-                                                 Dòng không đổi được (WorksetEditable="no") chỉ hiện chữ + tooltip lý do. -->
+                                                 Dòng không đổi được (WorksetEditable="no") chỉ hiện chữ + tooltip lý do.
+                                                 STRING BRIDGE: dòng là object Python nên giá trị tới WPF là PyObject —
+                                                 DataTrigger bind thẳng {Binding row_state} không bao giờ khớp "pending".
+                                                 Ô (CellStyle) đọc row_state qua AutomationProperties.ItemStatus (thuộc
+                                                 tính string của chính ô); trong template đọc qua TextBlock ẩn *_text. -->
                                             <DataGridTemplateColumn Header="WORKSET" Width="240" SortMemberPath="WorksetName">
                                                 <DataGridTemplateColumn.CellStyle>
                                                     <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
                                                         <Setter Property="Padding" Value="4,0"/>
+                                                        <Setter Property="AutomationProperties.ItemStatus" Value="{Binding row_state}"/>
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding row_state}" Value="pending">
+                                                            <Trigger Property="AutomationProperties.ItemStatus" Value="pending">
                                                                 <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                                                                 <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
                                                                 <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding row_state}" Value="applied">
+                                                            </Trigger>
+                                                            <Trigger Property="AutomationProperties.ItemStatus" Value="applied">
                                                                 <Setter Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                                                                 <Setter Property="BorderBrush" Value="{StaticResource T3.Success.Accent}"/>
                                                                 <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding row_state}" Value="failed">
+                                                            </Trigger>
+                                                            <Trigger Property="AutomationProperties.ItemStatus" Value="failed">
                                                                 <Setter Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                                                                 <Setter Property="BorderBrush" Value="{StaticResource T3.Danger.Accent}"/>
                                                                 <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                                            </DataTrigger>
+                                                            </Trigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </DataGridTemplateColumn.CellStyle>
@@ -2054,12 +2064,14 @@
                                                     <DataTemplate>
                                                         <Grid ToolTip="{Binding WorksetTip}">
                                                             <TextBlock x:Name="row_ws_name_text" Text="{Binding WorksetName}" Visibility="Collapsed"/>
+                                                            <TextBlock x:Name="row_ws_editable_text" Text="{Binding WorksetEditable}" Visibility="Collapsed"/>
+                                                            <TextBlock x:Name="row_ws_state_text" Text="{Binding row_state}" Visibility="Collapsed"/>
                                                             <TextBlock Text="{Binding WorksetName}" Padding="4,0" VerticalAlignment="Center">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Muted}">
                                                                         <Setter Property="Visibility" Value="Collapsed"/>
                                                                         <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding WorksetEditable}" Value="no">
+                                                                            <DataTrigger Binding="{Binding Text, ElementName=row_ws_editable_text}" Value="no">
                                                                                 <Setter Property="Visibility" Value="Visible"/>
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
@@ -2073,20 +2085,20 @@
                                                                 <ComboBox.Style>
                                                                     <Style TargetType="ComboBox" BasedOn="{StaticResource T3.ComboBox}">
                                                                         <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding WorksetEditable}" Value="no">
+                                                                            <DataTrigger Binding="{Binding Text, ElementName=row_ws_editable_text}" Value="no">
                                                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                                             </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding row_state}" Value="pending">
+                                                                            <DataTrigger Binding="{Binding Text, ElementName=row_ws_state_text}" Value="pending">
                                                                                 <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
                                                                                 <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
                                                                                 <Setter Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
                                                                             </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding row_state}" Value="applied">
+                                                                            <DataTrigger Binding="{Binding Text, ElementName=row_ws_state_text}" Value="applied">
                                                                                 <Setter Property="Background" Value="{StaticResource T3.Success.Fill}"/>
                                                                                 <Setter Property="BorderBrush" Value="{StaticResource T3.Success.Accent}"/>
                                                                                 <Setter Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
                                                                             </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding row_state}" Value="failed">
+                                                                            <DataTrigger Binding="{Binding Text, ElementName=row_ws_state_text}" Value="failed">
                                                                                 <Setter Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
                                                                                 <Setter Property="BorderBrush" Value="{StaticResource T3.Danger.Accent}"/>
                                                                                 <Setter Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>

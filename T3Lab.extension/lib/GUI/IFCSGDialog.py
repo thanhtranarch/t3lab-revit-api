@@ -998,6 +998,119 @@ class ExcelReporter:
 
 
 # ==============================================================================
+# Config & report storage
+# ==============================================================================
+# Compliance configs come from two folders. The ones shipped with the tool
+# (IFC-SG.pushbutton/configs) are read-only: the extension is a shared git
+# clone, and every open used to create configs/ and reports/ inside it and
+# save imported configs there. What the user imports or saves goes to
+# %APPDATA%\T3LabAI\ifcsg\configs. Deleting a shipped config only hides it for
+# this user (ifcsg\hidden_configs.json); importing one with the same name shows
+# it again.
+
+_HIDDEN_CONFIGS_FILE = 'hidden_configs.json'
+
+
+def _hidden_configs_file(user_dir):
+    # Next to the configs folder, not in it: it is not a config.
+    return os.path.join(os.path.dirname(os.path.abspath(user_dir)),
+                        _HIDDEN_CONFIGS_FILE)
+
+
+def _user_configs_dir():
+    """%APPDATA%\\T3LabAI\\ifcsg\\configs, created on first use."""
+    from core.paths import user_data_path
+    folder = user_data_path('ifcsg', 'configs')
+    if not os.path.isdir(folder):
+        try:
+            os.makedirs(folder)
+        except OSError:
+            pass
+    return folder
+
+
+def _config_names(folder):
+    names = set()
+    try:
+        for f in os.listdir(folder):
+            if f.lower().endswith('.json'):
+                names.add(os.path.splitext(f)[0])
+    except OSError:
+        pass
+    return names
+
+
+def _hidden_configs(user_dir):
+    try:
+        with io.open(_hidden_configs_file(user_dir), 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return set(data) if isinstance(data, list) else set()
+    except Exception:
+        return set()
+
+
+def _save_hidden_configs(user_dir, hidden):
+    try:
+        with io.open(_hidden_configs_file(user_dir), 'w', encoding='utf-8') as f:
+            f.write(json.dumps(sorted(hidden)))
+    except Exception:
+        pass
+
+
+def list_config_names(builtin_dir, user_dir):
+    """Sorted config names: the user's, plus the shipped ones not hidden."""
+    builtin = _config_names(builtin_dir) - _hidden_configs(user_dir)
+    return sorted(builtin | _config_names(user_dir))
+
+
+def config_path(builtin_dir, user_dir, name):
+    """The user's copy of a config when there is one, else the shipped one."""
+    user_path = os.path.join(user_dir, name + '.json')
+    if os.path.isfile(user_path):
+        return user_path
+    return os.path.join(builtin_dir, name + '.json')
+
+
+def unhide_config(user_dir, name):
+    """A config imported under a hidden shipped name is visible again."""
+    hidden = _hidden_configs(user_dir)
+    if name in hidden:
+        hidden.discard(name)
+        _save_hidden_configs(user_dir, hidden)
+
+
+def delete_config(builtin_dir, user_dir, name):
+    """Remove a config from the user's list. The user's file is deleted; a
+    shipped config is hidden for this user, never deleted from the extension."""
+    user_path = os.path.join(user_dir, name + '.json')
+    if os.path.isfile(user_path):
+        os.remove(user_path)
+    if os.path.isfile(os.path.join(builtin_dir, name + '.json')):
+        hidden = _hidden_configs(user_dir)
+        hidden.add(name)
+        _save_hidden_configs(user_dir, hidden)
+
+
+def _default_report_dir(document=None):
+    """Where the Export Report dialog opens: the user's Documents, else the
+    model's folder. Never the extension folder."""
+    try:
+        from System import Environment
+        docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+        if docs and os.path.isdir(docs):
+            return docs
+    except Exception:
+        pass
+    try:
+        folder = os.path.dirname(document.PathName) if document is not None else ''
+        if folder and os.path.isdir(folder):
+            return folder
+    except Exception:
+        pass
+    return ''
+
+
+# ==============================================================================
 # Unified IFC-SG Suite Window
 # ==============================================================================
 
@@ -1160,15 +1273,12 @@ class IFCSGSuiteWindow(T3WPFWindow):
         self.checker = ParamChecker(self.doc)
         self.reporter = ExcelReporter(self.doc)
 
-        # Load saved compliance configurations
-        self.configs_dir = os.path.join(self._script_dir, "configs")
-        self.reports_dir = os.path.join(self._script_dir, "reports")
-        for d in [self.configs_dir, self.reports_dir]:
-            if not os.path.exists(d):
-                try:
-                    os.makedirs(d)
-                except:
-                    pass
+        # Load saved compliance configurations. The configs shipped with the
+        # tool (IFC-SG.pushbutton/configs) are read-only; everything the user
+        # imports or saves lives in %APPDATA%\T3LabAI\ifcsg\configs. Nothing
+        # is ever created inside the extension folder (shared git clone).
+        self.builtin_configs_dir = os.path.join(self._script_dir, "configs")
+        self.configs_dir = _user_configs_dir()
         # The Checker's own opening status; _on_config_changed overwrites it
         # when a saved config loads (or fails to).
         self.txtStatus.Text = "Import an XML or Excel config to start"
@@ -1641,7 +1751,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
         fail = 0
         debug_lines = []
 
-        t = Transaction(self.doc, "DQT - Set IFC-SG Subtypes")
+        t = Transaction(self.doc, "T3Lab - Set IFC-SG Subtypes")
         t.Start()
         try:
             for row in rows:
@@ -1776,7 +1886,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
         total_ok = 0
         total_fail = 0
 
-        t = Transaction(self.doc, "DQT - Auto-Assign IFC-SG Subtypes")
+        t = Transaction(self.doc, "T3Lab - Auto-Assign IFC-SG Subtypes")
         t.Start()
         try:
             for comp_name, rows, entity, subtype_str, is_ud in auto_plan:
@@ -1838,10 +1948,8 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
     def _load_saved_configs(self):
         self.cmbConfig.Items.Clear()
-        if os.path.exists(self.configs_dir):
-            for f in sorted(os.listdir(self.configs_dir)):
-                if f.endswith('.json'):
-                    self.cmbConfig.Items.Add(os.path.splitext(f)[0])
+        for name in list_config_names(self.builtin_configs_dir, self.configs_dir):
+            self.cmbConfig.Items.Add(name)
         if self.cmbConfig.Items.Count > 0:
             self.cmbConfig.SelectedIndex = 0
 
@@ -1851,7 +1959,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
             # Nothing selected (last config deleted): nothing left to run.
             self._clear_config()
             return
-        path = os.path.join(self.configs_dir, str(sel) + ".json")
+        path = config_path(self.builtin_configs_dir, self.configs_dir, str(sel))
         try:
             self.config = ParamCheckConfig.from_json(path)
             self._refresh_tree()
@@ -1884,6 +1992,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
                 name = os.path.splitext(os.path.basename(dlg.FileName))[0]
                 save_path = os.path.join(self.configs_dir, name + ".json")
                 self.config.to_json(save_path)
+                unhide_config(self.configs_dir, name)
                 
                 self._load_saved_configs()
                 for i in range(self.cmbConfig.Items.Count):
@@ -1908,6 +2017,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
                 name = os.path.splitext(os.path.basename(dlg.FileName))[0]
                 save_path = os.path.join(self.configs_dir, name + ".json")
                 self.config.to_json(save_path)
+                unhide_config(self.configs_dir, name)
                 
                 self._load_saved_configs()
                 for i in range(self.cmbConfig.Items.Count):
@@ -1938,14 +2048,12 @@ class IFCSGSuiteWindow(T3WPFWindow):
             return
         # Destructive: the safe answer (No) is the default, so Enter cancels.
         result = WPFMessageBox.Show(
-            "Delete config '{}'?\n\nThis removes {}.json from the configs folder "
+            "Delete config '{}'?\n\nThis removes {}.json from your saved configs "
             "and cannot be undone.".format(sel, sel),
             "Delete Config", MessageBoxButton.YesNo, MessageBoxImage.Warning,
             MessageBoxResult.No)
         if result == MessageBoxResult.Yes:
-            path = os.path.join(self.configs_dir, str(sel) + ".json")
-            if os.path.exists(path):
-                os.remove(path)
+            delete_config(self.builtin_configs_dir, self.configs_dir, str(sel))
             self._load_saved_configs()
 
     def _refresh_tree(self):
@@ -2512,7 +2620,9 @@ class IFCSGSuiteWindow(T3WPFWindow):
         dlg = SaveFileDialog()
         dlg.Filter = "Excel Files (*.xlsx)|*.xlsx"
         dlg.Title = "Export Compliance Report"
-        dlg.InitialDirectory = self.reports_dir
+        report_dir = _default_report_dir(doc)
+        if report_dir:
+            dlg.InitialDirectory = report_dir
         
         import System.IO
         dlg.FileName = "IFC-SG_Check_{}_{}".format(

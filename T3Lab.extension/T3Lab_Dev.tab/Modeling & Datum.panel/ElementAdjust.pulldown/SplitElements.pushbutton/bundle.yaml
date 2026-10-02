@@ -5,5 +5,5 @@ description: |
   Choose one or more target levels as split planes
   Generates separate elements above and below each cut plane
   Preserves parameters and constraints from the original element
-author: "Dang Quoc Truong"
+author: "T3Lab"
 version: "1.0.0"

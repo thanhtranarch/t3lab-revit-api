@@ -1174,7 +1174,7 @@ class ParameterAdder(object):
         """Create temp shared param file using TEMP env var (not script dir)."""
         self._original_sp_path = self.app.SharedParametersFilename
         temp_dir = os.environ.get('TEMP', os.path.dirname(__file__))
-        self._temp_sp_path = os.path.join(temp_dir, 'DQT_IFC_SG_SharedParams.txt')
+        self._temp_sp_path = os.path.join(temp_dir, 'T3Lab_IFC_SG_SharedParams.txt')
 
         if not os.path.exists(self._temp_sp_path):
             with open(self._temp_sp_path, 'w') as f:

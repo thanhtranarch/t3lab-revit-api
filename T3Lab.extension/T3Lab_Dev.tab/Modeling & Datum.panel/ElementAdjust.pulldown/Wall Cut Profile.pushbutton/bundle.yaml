@@ -5,5 +5,5 @@ description: |
   Creates void openings or sketch-based profile cuts
   Supports linked structural members, MEP penetrations, and floors
   Preview intersections before committing changes
-author: "Dang Quoc Truong"
+author: "T3Lab"
 version: "1.0.0"

@@ -95,6 +95,8 @@ SHRINK_PASSES = 60          # repeated halving bottoms out long before this
 LARGE_RESULT_CHARS = 200000
 LARGE_RESULT_TOOLS = (
     'analyze_model_statistics',
+    'analyze_point_cloud',
+    'detect_point_cloud_elements',
     'audit_model',
     'get_all_parameters',
     'get_current_view_elements',

@@ -4,14 +4,14 @@ Auto Dimension
 
 Auto-dimension walls, structural columns, architectural columns,
 and grids in the current view.
-Collaborative tool by T3Lab & Dang Quoc Truong.
+T3Lab tool.
 
 --------------------------------------------------------
-Author: Tran Tien Thanh & Dang Quoc Truong
+Author: Tran Tien Thanh
 --------------------------------------------------------
 """
 
-__author__  = "Tran Tien Thanh & Dang Quoc Truong"
+__author__  = "Tran Tien Thanh"
 __title__   = "Auto Dimension"
 __version__ = "2.2.2"
 

@@ -13,6 +13,7 @@
 | 3 | Vẽ lại **45/45** icon (gồm cả 7 tool T3Lab trong Support panel) | ✅ xong |
 | 4 | Dọn tài sản chết — xoá 6 script ghi đè icon | ✅ xong |
 | 5 | Chốt tài liệu + bật `STRICT` | ✅ xong |
+| 6 | Siết đồng nhất cả bộ (§2.2 "Siết cách dùng", 2026-10-02) — 34 icon | ✅ xong |
 | — | **QA trong Revit thật** (§8) | ⬜ **chưa làm — cần anh mở Revit** |
 
 Hết nợ migration nên `dev/audit_icons.py` đã bật `STRICT = True`: từ đây một icon
@@ -152,6 +153,28 @@ sáng. Nay dùng `#E07B00` → hiện ra `#E38F2D`, cam đậm rõ, bật tốt 
 Lục `#82D99F` cũng nhạt cùng kiểu nên đậm lên `#57B97A`.
 
 Navy `#182A3E` **bị loại khỏi icon ribbon** (vẫn giữ trong UI cửa sổ).
+
+#### Siết cách dùng — 2026-10-02: một bộ, một cách vẽ
+
+Luật ở trên cho phép nhiều cách vẽ; trên ribbon thật các cách đó trộn lẫn (khối hổ
+phách lớn cạnh line-art mảnh, dấu "+" và tick màu lục) nên bộ icon không đọc ra là
+**một** bộ. Không đổi token, không đổi gate — chỉ chốt **một** lựa chọn trong những gì
+chuẩn đã cho phép:
+
+| Luật | Giá trị |
+|------|---------|
+| Màu accent | **chỉ `accent.amber`**. `accent.blue` / `accent.green` vẫn nằm trong `tokens.json` nhưng **không dùng cho icon ribbon** — "+" tạo mới và tick cũng là hổ phách (§6: hổ phách là sợi chỉ xuyên suốt) |
+| Lượng accent | **một** chi tiết gọn, **2–6 %** canvas (≈ 20–60 unit², tối đa cỡ ô 8×8). 20 % ở trên là trần của gate; 6 % là mức để cả bộ đều nhau |
+| Accent là gì | phần tử đang được chọn / xử lý, hoặc huy hiệu hành động — **không bao giờ** là thân hình chính, **không** có viền `line` |
+| Nét accent | dạng đường (dimension, leader, "+", thân mũi tên, đường cắt) dày **2 unit** |
+| Huy hiệu hành động | "+" · mũi tên xuất/nhập · tick · cảnh báo: **góc dưới-phải**, trong ô `x,y 20–30`, cách viền hình chính ≥ 1 unit. Hình mẫu: `SheetGen`/`FamiGen` (+), `BatchOut`/`PDF import` (mũi tên), `IFC-SG` (tick), `ModelAuditor` (cảnh báo) |
+| Hình chính | luôn `surface` + nét `line` 1 unit — kể cả "kết quả" của icon chuyển đổi (RoomToFloor, CADToElements) |
+| `detail` | chỉ cho nội dung phụ (dòng chữ, ô con, trục, witness line), tổng ≤ ~12 % canvas — không tô cả mảng |
+| Nét bên trong hình | `detail`, **không** `line`: ở bản dark `line` = `surface` nên nét đen bên trong hình biến mất (luật khoảng hở §2.1) |
+| Dòng chữ | tier A: `detail` cao 1 unit · tier B: cao 2 unit |
+
+Đo trên 45 icon sau khi siết: accent 2.0–5.5 %, `detail` 0–11.7 %, tổng mực 11–24 %
+(trước: 1.2–18.8 % · 0–25.8 % · 11–44 %, 3 icon accent lục).
 
 ### 2.3 Dark theme — silhouette, không phải đảo màu
 

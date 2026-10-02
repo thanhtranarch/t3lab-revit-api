@@ -186,18 +186,60 @@ class TestSameText(unittest.TestCase):
         self.assertTrue(pend.same_text(50, "50"))
 
 
-class TestXamlWiring(unittest.TestCase):
-    """Every staged field needs a matching amber DataTrigger in the XAML.
+PNS = "{http://schemas.microsoft.com/winfx/2006/xaml/presentation}"
 
-    A field the Python stages but the XAML has no `dirty_<field>` trigger for
-    is an edit the user cannot see is pending — which is how this whole class
-    of bug goes unnoticed.
+
+def _local(tag):
+    return tag.split('}')[-1]
+
+
+def _column_field(column):
+    """Row field a DataGrid column edits, from its Binding / SelectedItemBinding."""
+    for attribute in ('Binding', 'SelectedItemBinding'):
+        hit = re.match(r'\{Binding (\w+)(?:,[^}]*)?\}$', (column.get(attribute) or '').strip())
+        if hit:
+            return hit.group(1)
+    return ''
+
+
+def _bridged_flag(style, prefix):
+    """Field whose `<prefix><field>` flag `style` reads through the string
+    bridge — a Setter copying it into GridPendingEdits.CELL_BRIDGE_PROPERTY plus
+    a property Trigger on that property for "True" — or ''."""
+    prop = pend.CELL_BRIDGE_PROPERTY
+    flag = ''
+    for setter in style.findall(PNS + 'Setter'):          # direct children only
+        if setter.get('Property') == prop:
+            hit = re.match(r'\{Binding %s(\w+)\}$' % prefix, setter.get('Value') or '')
+            flag = hit.group(1) if hit else ''
+    if not flag:
+        return ''
+    fires = [t for t in style.iter(PNS + 'Trigger')
+             if t.get('Property') == prop and t.get('Value') == 'True']
+    return flag if fires else ''
+
+
+class TestXamlWiring(unittest.TestCase):
+    """Every staged field needs a working amber highlight in the XAML.
+
+    A field the Python stages but the XAML cannot paint is an edit the user
+    cannot see is pending — which is how this whole class of bug goes
+    unnoticed. "Working" is the point: a `DataTrigger Binding="{Binding
+    dirty_<field>}"` exists in the file yet never fires, because the Python row
+    hands WPF a PyObject that never equals "True". The column that edits the
+    field must read its flag through the cell string bridge instead.
     """
 
     CASES = (
         ('ManaViews.xaml', 'ManaViewsDialog.py', 'VIEW_EDIT_FIELDS'),
         ('ManaViews.xaml', 'ManaViewsDialog.py', 'TMPL_EDIT_FIELDS'),
         ('ManaSheets.xaml', 'ManaSheetsDialog.py', 'SHEET_EDIT_FIELDS'),
+    )
+    # Tools that compute the flag themselves instead of staging through
+    # GridPendingEdits — same highlight, same bridge.
+    OWN_FLAGS = (
+        ('ManaGroup.xaml', ('NewName',)),
+        ('ManaLoca.xaml', ('x_mm', 'y_mm', 'z_mm')),
     )
 
     @staticmethod
@@ -208,21 +250,65 @@ class TestXamlWiring(unittest.TestCase):
         return [f.strip().strip('"\'') for f in match.group(1).split(',') if f.strip()]
 
     @staticmethod
-    def _trigger_fields(xaml):
-        source = _read(os.path.join(TOOLS, xaml))
-        return set(re.findall(r'\{Binding dirty_(\w+)\}', source))
+    def _bridged_columns(xaml):
+        """{field: flag} for every column whose CellStyle paints through the bridge."""
+        root = ET.fromstring(_read(os.path.join(TOOLS, xaml)))
+        out = {}
+        for column in root.iter():
+            tag = _local(column.tag)
+            if not (tag.startswith('DataGrid') and tag.endswith('Column')):
+                continue
+            for style in column.iter(PNS + 'Style'):
+                if style.get('TargetType') != 'DataGridCell':
+                    continue
+                flag = _bridged_flag(style, pend.DIRTY_PREFIX)
+                if flag:
+                    out[_column_field(column)] = flag
+        return out
 
-    def test_every_editable_field_has_an_amber_trigger(self):
+    def _assert_bridged(self, xaml, fields, origin):
+        cells = self._bridged_columns(xaml)
+        for field in fields:
+            self.assertIn(
+                field, cells,
+                "%s stages '%s' but no column of %s bound to it paints dirty_%s "
+                "through the cell bridge" % (origin, field, xaml, field))
+            self.assertEqual(cells[field], field,
+                             "%s: the column bound to '%s' reads dirty_%s"
+                             % (xaml, field, cells[field]))
+
+    def test_every_editable_field_has_a_working_amber_cell(self):
         for xaml, dialog, constant in self.CASES:
-            triggers = self._trigger_fields(xaml)
-            for field in self._declared_fields(dialog, constant):
-                self.assertIn(
-                    field, triggers,
-                    "%s stages '%s' but %s has no dirty_%s DataTrigger"
-                    % (dialog, field, xaml, field))
+            self._assert_bridged(xaml, self._declared_fields(dialog, constant), dialog)
 
-    def test_group_manager_highlights_its_new_name_cell(self):
-        self.assertIn('NewName', self._trigger_fields('ManaGroup.xaml'))
+    def test_tools_with_their_own_flags_use_the_same_bridge(self):
+        for xaml, fields in self.OWN_FLAGS:
+            self._assert_bridged(xaml, fields, xaml)
+
+    def test_no_trigger_binds_a_dirty_flag_directly(self):
+        for xaml in ('ManaViews.xaml', 'ManaSheets.xaml', 'ManaGroup.xaml', 'ManaLoca.xaml'):
+            source = _read(os.path.join(TOOLS, xaml))
+            self.assertNotRegex(source, r'<DataTrigger Binding="\{Binding dirty_',
+                                xaml + ": a DataTrigger on a Python flag never fires")
+
+    def test_odd_coordinates_turn_red_through_the_bridge(self):
+        """ManaLoca's red digits are an ElementStyle (TextBlock), same bridge."""
+        root = ET.fromstring(_read(os.path.join(TOOLS, 'ManaLoca.xaml')))
+        red = set()
+        for column in root.iter(PNS + 'DataGridTextColumn'):
+            for holder in column.findall(PNS + 'DataGridTextColumn.ElementStyle'):
+                for style in holder.findall(PNS + 'Style'):
+                    flag = _bridged_flag(style, 'odd_')
+                    if flag:
+                        self.assertEqual(flag, _column_field(column))
+                        red.add(flag)
+        self.assertEqual(red, {'x_mm', 'y_mm', 'z_mm'})
+
+    def test_bridge_property_is_a_real_string_attached_property(self):
+        """The name the XAML uses — WPF's AutomationProperties.ItemStatus is a
+        string-typed attached property, so the binding converts the PyObject
+        to text exactly like TextBlock.Text does."""
+        self.assertEqual(pend.CELL_BRIDGE_PROPERTY, "AutomationProperties.ItemStatus")
 
     def test_edited_columns_are_not_read_only(self):
         """A column the tool stages edits for must actually be editable.

@@ -128,11 +128,6 @@ class LLMRouter(object):
                         provider.set_model(saved_model)
                     except Exception:
                         pass
-
-            # Log restored startup configuration
-            active_provider = self.get_active_provider()
-            active_model = active_provider.get_active_model() if active_provider else None
-            s.log_model_usage("STARTUP_RESTORE", self._active_name, active_model)
         except Exception as ex:
             _debug_log("LLMRouter: failed to restore settings: {}".format(ex))
 
@@ -192,12 +187,6 @@ class LLMRouter(object):
             except Exception:
                 pass
 
-        # Log provider hot-swap action
-        try:
-            s.log_model_usage("SWITCH_PROVIDER", name, model)
-        except Exception:
-            pass
-
         # A switch changes which provider is "active"; the cached snapshot
         # tracks that live, but the model may have changed too.
         with self._status_lock:
@@ -224,7 +213,6 @@ class LLMRouter(object):
                 from config.settings import T3LabAISettings
                 s = T3LabAISettings()
                 s.set_provider_model(provider_name, model_name)
-                s.log_model_usage("SET_MODEL", provider_name, model_name)
             except Exception:
                 pass
             # Keep the cached snapshot honest. get_status_instant() /
