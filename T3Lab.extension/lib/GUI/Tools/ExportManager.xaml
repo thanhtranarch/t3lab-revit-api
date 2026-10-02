@@ -1955,10 +1955,21 @@
                                     <ListView.View>
                                         <GridView x:Name="items_gridview">
                                             <GridViewColumn Width="40">
+                                                <!-- Cột checkbox: header và ô dòng phải cùng một tâm ngang.
+                                                     T3.GridViewColumnHeader có Padding 8,0 + căn trái, còn ô dòng
+                                                     được GridViewRowPresenter căn giữa trong margin 6,0,6,0 →
+                                                     ô select-all lệch trái ~5px. Header container bỏ padding + căn
+                                                     giữa (tương đương T3.DataGridColumnHeader.Check cho GridView;
+                                                     DESIGN SYSTEM GAP: chưa có khóa T3.GridViewColumnHeader.Check). -->
+                                                <GridViewColumn.HeaderContainerStyle>
+                                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource T3.GridViewColumnHeader}">
+                                                        <Setter Property="Padding" Value="0"/>
+                                                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                    </Style>
+                                                </GridViewColumn.HeaderContainerStyle>
                                                 <GridViewColumn.Header>
                                                     <CheckBox x:Name="header_checkbox"
-                                                              Style="{StaticResource T3.CheckBox}"
-                                                              HorizontalAlignment="Center"
+                                                              Style="{StaticResource T3.CheckBox.Cell}"
                                                               ToolTip="Select All / Deselect All"
                                                               Click="header_checkbox_clicked"/>
                                                 </GridViewColumn.Header>
@@ -1974,7 +1985,6 @@
                                                             <TextBlock x:Name="row_selected_text" Text="{Binding IsSelected}" Visibility="Collapsed"/>
                                                             <CheckBox IsChecked="{Binding Text, ElementName=row_selected_text, Mode=OneWay}"
                                                                       Style="{StaticResource T3.CheckBox.Cell}"
-                                                                      HorizontalAlignment="Center"
                                                                       Click="row_checkbox_clicked"/>
                                                         </Grid>
                                                     </DataTemplate>

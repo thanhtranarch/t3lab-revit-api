@@ -28,7 +28,7 @@ X = '{http://schemas.microsoft.com/winfx/2006/xaml}'
 P = '{http://schemas.microsoft.com/winfx/2006/xaml/presentation}'
 
 EMPTY_STATES = {'AutoDimension.xaml': 'lst_views', 'DoorThreshold.xaml': 'door_datagrid',
-                'PointCloud.xaml': 'results_grid', 'QuickElement.xaml': 'dataGrid',
+                'PointCloud.xaml': 'results_grid',
                 'RoomToFloor.xaml': 'room_datagrid', 'TextToElement.xaml': 'dg_preview',
                 'TileLayout.xaml': 'floors_listview'}
 

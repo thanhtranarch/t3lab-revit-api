@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
-"""Select-Similar predicates, shared between the ribbon tool and the MCP server.
+"""Select-Similar predicates, used by the MCP server / Assistant tools.
 
 The rules for "what counts as similar" (which categories have no meaningful
 Type and must fall back to Category matching, how to read an element's
-BuiltInCategory across Revit versions, how to find its Family) used to live
-only in `lib/Selection/dqt_select/core.py`. That module cannot be imported from
-`core/server.py`: it calls `__revit__` at module scope and pulls in
-`pyrevit.forms`, so importing it from the HTTP server thread would either throw
-or pop a dialog.
+BuiltInCategory across Revit versions, how to find its Family) used to be
+duplicated in `lib/Selection/dqt_select/core.py`, which ManaSelect's old
+Select Similar mode used. That mode and module were removed on 2026-10-02
+(Explore + Revit's own "Select All Instances" cover it), so this file is now
+the only copy.
 
 These three predicates are the whole reusable part, and they are pure — they
-take an element and return a value, touch no UI and no ambient document. Both
-callers import them from here.
+take an element and return a value, touch no UI and no ambient document.
 
 Author: Tran Tien Thanh
 """

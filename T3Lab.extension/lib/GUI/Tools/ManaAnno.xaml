@@ -1739,8 +1739,6 @@
                         <RowDefinition Height="Auto"/> <!-- Tab 1: Dimensions -->
                         <RowDefinition Height="Auto"/> <!-- Tab 2: Text Notes -->
                         <RowDefinition Height="Auto"/> <!-- Tab 3: DimText -->
-                        <RowDefinition Height="Auto"/> <!-- Tab 4: Utilities -->
-                        <RowDefinition Height="Auto"/> <!-- Tab 5: Settings -->
                         <RowDefinition Height="*"/>    <!-- Spacer -->
                     </Grid.RowDefinitions>
 
@@ -1776,30 +1774,6 @@
                         <Path Data="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
                               StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Tab 4: Utilities -->
-                    <ToggleButton x:Name="nav_utils" Grid.Row="3"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  ToolTip="Utilities" Click="nav_utils_checked">
-                        <Path Data="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Tab 5: Settings -->
-                    <ToggleButton x:Name="nav_settings" Grid.Row="4"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8"
-                                  ToolTip="Settings" Click="nav_settings_checked">
-                        <Path Data="M12 15 a3 3 0 1 0 0 -6 a3 3 0 0 0 0 6 M19.4 15 a1.65 1.65 0 0 0 .33 1.82 l.06 .06 a2 2 0 0 1 -2.83 2.83 l-.06 -.06 a1.65 1.65 0 0 0 -1.82 -.33 a1.65 1.65 0 0 0 -1 1.51 V21 a2 2 0 0 1 -4 0 v-.09 A1.65 1.65 0 0 0 9 19.4 a1.65 1.65 0 0 0 -1.82 .33 l-.06 .06 a2 2 0 0 1 -2.83 -2.83 l.06 -.06 a1.65 1.65 0 0 0 .33 -1.82 a1.65 1.65 0 0 0 -1.51 -1 H3 a2 2 0 0 1 0 -4 h.09 A1.65 1.65 0 0 0 4.6 9 a1.65 1.65 0 0 0 -.33 -1.82 l-.06 -.06 a2 2 0 0 1 2.83 -2.83 l.06 .06 a1.65 1.65 0 0 0 1.82 .33 H9 a1.65 1.65 0 0 0 1 -1.51 V3 a2 2 0 0 1 4 0 v.09 a1.65 1.65 0 0 0 1 1.51 a1.65 1.65 0 0 0 1.82 -.33 l.06 -.06 a2 2 0 0 1 2.83 2.83 l-.06 .06 a1.65 1.65 0 0 0 -.33 1.82 V9 a1.65 1.65 0 0 0 1.51 1 H21 a2 2 0 0 1 0 4 h-.09 a1.65 1.65 0 0 0 -1.51 1 z"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
                               Width="18" Height="18" Stretch="Uniform"
                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </ToggleButton>
@@ -2283,151 +2257,6 @@
                                     <Button x:Name="btn_apply" Content="Apply" HorizontalAlignment="Right"
                                             Style="{StaticResource T3.Button.Secondary}" Click="dimtext_apply" MinWidth="100"/>
                                 </Grid>
-                            </Border>
-                        </Grid>
-                    </TabItem>
-
-                    <!-- ── TAB 4: UTILITIES ── -->
-                    <TabItem>
-                        <Grid Background="{DynamicResource T3.Surface}" Margin="24,16,24,16">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>     <!-- Header -->
-                                <RowDefinition Height="*"/>        <!-- Cards Grid -->
-                            </Grid.RowDefinitions>
-
-                            <StackPanel Grid.Row="0" Margin="0,0,0,24">
-                                <TextBlock Text="ANNOTATION UTILITIES" Style="{StaticResource T3.Label}"/>
-                                <TextBlock Text="Helper tools for renumbering, case formatting, and document syncing."
-                                           Style="{StaticResource T3.Caption}" Margin="0,4,0,0"/>
-                            </StackPanel>
-
-                            <!-- Utility launchers -->
-                            <UniformGrid Grid.Row="1" Columns="2" Rows="2">
-                                <!-- Card 1: Copy Annotation -->
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="4" Padding="16" Margin="0,0,8,8"
-                                        Background="{StaticResource T3.SurfaceSunken}">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <StackPanel Grid.Row="0">
-                                            <TextBlock Text="Copy Annotations" Style="{StaticResource T3.BodyStrong}"/>
-                                            <TextBlock Text="Transfer dimensions, text notes, tags, and detail components from this model to another open Revit document." 
-                                                       Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap" Margin="0,8,0,16"/>
-                                        </StackPanel>
-                                        <Button Grid.Row="2" x:Name="btn_util_copy_anno" Style="{StaticResource T3.Button.Secondary}" Content="Open Annotation Copier"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Card 2: Renumber Along Spline -->
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="4" Padding="16" Margin="8,0,0,8"
-                                        Background="{StaticResource T3.SurfaceSunken}">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <StackPanel Grid.Row="0">
-                                            <TextBlock Text="Renumber Along Spline" Style="{StaticResource T3.BodyStrong}"/>
-                                            <TextBlock Text="Renumber any category of elements (such as doors, rooms, equipment) sequentially along a selected line/spline path." 
-                                                       Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap" Margin="0,8,0,16"/>
-                                        </StackPanel>
-                                        <Button Grid.Row="2" x:Name="btn_util_renumber_spline" Style="{StaticResource T3.Button.Secondary}" Content="Open Renumbering Tool"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Card 3: Upper Case All -->
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="4" Padding="16" Margin="0,8,8,0"
-                                        Background="{StaticResource T3.SurfaceSunken}">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <StackPanel Grid.Row="0">
-                                            <TextBlock Text="Uppercase All Texts" Style="{StaticResource T3.BodyStrong}"/>
-                                            <TextBlock Text="Convert view names, sheet names, title block parameter strings, text notes, and dimension overrides to UPPERCASE." 
-                                                       Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap" Margin="0,8,0,16"/>
-                                        </StackPanel>
-                                        <Button Grid.Row="2" x:Name="btn_util_upper_all" Style="{StaticResource T3.Button.Secondary}" Content="Open Uppercase Converter"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Card 4: Tag Checker -->
-                                <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                        CornerRadius="4" Padding="16" Margin="8,8,0,0"
-                                        Background="{StaticResource T3.SurfaceSunken}">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <StackPanel Grid.Row="0">
-                                            <TextBlock Text="Tag Checker" Style="{StaticResource T3.BodyStrong}"/>
-                                            <TextBlock Text="Audit the active view for untagged elements, orphaned tags, and tags with missing values."
-                                                       Style="{StaticResource T3.Body.Secondary}" TextWrapping="Wrap" Margin="0,8,0,16"/>
-                                        </StackPanel>
-                                        <Button Grid.Row="2" x:Name="btn_util_tag_checker"
-                                                Style="{StaticResource T3.Button.Secondary}" Content="Open Tag Checker"/>
-                                    </Grid>
-                                </Border>
-                            </UniformGrid>
-                        </Grid>
-                    </TabItem>
-
-                    <!-- ── TAB 5: SETTINGS ── -->
-                    <TabItem>
-                        <Grid Margin="24,16,24,16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Left Card: General Preferences -->
-                            <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                    CornerRadius="4" Padding="16" Margin="0,0,12,0">
-                                <StackPanel>
-                                    <TextBlock Text="GENERAL PREFERENCES" Style="{StaticResource T3.Label}"/>
-                                    <TextBlock Text="Configure behavior settings for Annotation Manager." Style="{StaticResource T3.Caption}" Margin="0,4,0,16"/>
-
-                                    <CheckBox x:Name="chk_auto_select"
-                                              Content="Auto-select matching elements in view when clicking a row"
-                                              Style="{StaticResource T3.CheckBox}" IsChecked="True" Margin="0,0,0,12"/>
-                                    <CheckBox x:Name="chk_include_groups"
-                                              Content="Include annotations inside groups in search results"
-                                              Style="{StaticResource T3.CheckBox}" IsChecked="False" Margin="0,0,0,12"/>
-                                    <CheckBox x:Name="chk_confirm_delete"
-                                              Content="Confirm before deleting elements"
-                                              Style="{StaticResource T3.CheckBox}" IsChecked="True"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Right Card: About & Info -->
-                            <Border Grid.Column="1" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                    CornerRadius="4" Padding="16" Margin="12,0,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="ABOUT T3LAB ANNOTATION SUITE" Style="{StaticResource T3.Label}"/>
-                                    <TextBlock Text="Unified management for Revit drafting elements." Style="{StaticResource T3.Caption}" Margin="0,4,0,16"/>
-
-                                    <TextBlock Text="Annotation Manager" Style="{StaticResource T3.BodyStrong}"/>
-                                    <TextBlock Text="Version 1.1.0" Style="{StaticResource T3.Caption}" Margin="0,4,0,8"/>
-                                    <TextBlock Text="Author: Tran Tien Thanh" Style="{StaticResource T3.Body}" Margin="0,0,0,4"/>
-                                    <TextBlock Text="Contact: trantienthanh909@gmail.com" Style="{StaticResource T3.Caption}" Margin="0,0,0,16"/>
-
-                                    <Border Background="{StaticResource T3.Surface}" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" Padding="12">
-                                        <TextBlock Text="This utility combines multiple annotation control panels into a unified tool, optimizing your Revit models by standardizing text, cleaning unused styles, and offering rapid auto-renaming of DimensionTypes and TextNoteTypes based on physical parameters."
-                                                   TextWrapping="Wrap" Style="{StaticResource T3.Caption}"/>
-                                    </Border>
-                                </StackPanel>
                             </Border>
                         </Grid>
                     </TabItem>

@@ -1,102 +1,90 @@
 # -*- coding: utf-8 -*-
-"""Regression tests for PythonNet module identity safety in ManaAnno.
+"""Regression tests for the ManaAnno sidebar rail after the 2026-10-02 cleanup.
 
-Importing a module that defines CLR interface implementations under two names
-(for example ``GUI.CopyAnnotationDialog`` and ``CopyAnnotationDialog``) makes
-PythonNet define the same CLR type twice and raises:
-``TypeError: Duplicate type name within an assembly``.
+The Utilities (wrench) and Settings (gear) modes were removed together with the
+helper modules only they used (CopyAnnotationDialog, TagCheckerDialog,
+RenumberAlongSpline, UpperAll, TagChecker.xaml). These tests keep it that way:
+
+  - ManaAnnoDialog never imports a removed module again (a lazy import of a
+    deleted file would only fail when the user clicks the button);
+  - every rail ToggleButton maps to an existing TabItem, in order, so the
+    headerless TabControl never selects a missing page.
 """
 import ast
 import os
+import re
 import sys
 import unittest
 
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GUI_DIR = os.path.join(REPO, "T3Lab.extension", "lib", "GUI")
+LIB_DIR = os.path.join(REPO, "T3Lab.extension", "lib")
+GUI_DIR = os.path.join(LIB_DIR, "GUI")
 MANA_ANNO = os.path.join(GUI_DIR, "ManaAnnoDialog.py")
-TAG_CHECKER = os.path.join(GUI_DIR, "TagCheckerDialog.py")
-UTILITY_MODULES = {
+MANA_ANNO_XAML = os.path.join(GUI_DIR, "Tools", "ManaAnno.xaml")
+REMOVED_MODULES = {
     "CopyAnnotationDialog",
     "TagCheckerDialog",
     "UpperAll",
     "RenumberAlongSpline",
 }
+REMOVED_NAMES = (
+    "nav_utils", "nav_settings",
+    "btn_util_copy_anno", "btn_util_renumber_spline",
+    "btn_util_upper_all", "btn_util_tag_checker",
+    "chk_auto_select", "chk_include_groups", "chk_confirm_delete",
+)
 
 
-def _tree(path):
+def _read(path):
     with open(path, encoding="utf-8-sig") as source:
-        return ast.parse(source.read(), filename=path)
+        return source.read()
 
 
-def _startup_imports(tree):
-    """Yield imports executed at module load, including imports inside guards."""
-    pending = list(tree.body)
-    while pending:
-        node = pending.pop()
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            yield node
-            continue
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
-            continue
-        pending.extend(ast.iter_child_nodes(node))
-
-
-class ManaAnnoImportSafety(unittest.TestCase):
-    def test_no_bare_utility_imports(self):
-        """Utilities must always load through their canonical package name."""
+class ManaAnnoRailCleanup(unittest.TestCase):
+    def test_no_imports_of_removed_modules(self):
         offenders = []
-        for node in ast.walk(_tree(MANA_ANNO)):
+        for node in ast.walk(ast.parse(_read(MANA_ANNO), filename=MANA_ANNO)):
+            names = []
             if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.split(".")[-1] in UTILITY_MODULES:
-                        offenders.append((node.lineno, alias.name))
+                names = [alias.name for alias in node.names]
             elif isinstance(node, ast.ImportFrom):
-                if node.module and node.module.split(".")[-1] in UTILITY_MODULES:
-                    offenders.append((node.lineno, node.module))
-                for alias in node.names:
-                    if not node.module and alias.name in UTILITY_MODULES:
-                        offenders.append((node.lineno, alias.name))
+                names = [node.module or ""] + [alias.name for alias in node.names]
+            for name in names:
+                if name.split(".")[-1] in REMOVED_MODULES:
+                    offenders.append((node.lineno, name))
         self.assertEqual(offenders, [])
 
-    def test_utilities_are_not_imported_at_startup(self):
-        """One broken optional utility must not prevent ManaAnno from opening."""
-        offenders = []
-        for node in _startup_imports(_tree(MANA_ANNO)):
-            names = [alias.name.split(".")[-1] for alias in node.names]
-            module_name = node.module.split(".")[-1] if isinstance(node, ast.ImportFrom) and node.module else None
-            if UTILITY_MODULES.intersection(names) or module_name in UTILITY_MODULES:
-                offenders.append((node.lineno, module_name, names))
-        self.assertEqual(offenders, [])
+    def test_removed_modules_are_gone(self):
+        leftovers = [
+            path for path in (
+                os.path.join(GUI_DIR, "CopyAnnotationDialog.py"),
+                os.path.join(GUI_DIR, "TagCheckerDialog.py"),
+                os.path.join(GUI_DIR, "Tools", "TagChecker.xaml"),
+                os.path.join(LIB_DIR, "Utils", "UpperAll.py"),
+                os.path.join(LIB_DIR, "Utils", "RenumberAlongSpline.py"),
+            ) if os.path.exists(path)
+        ]
+        self.assertEqual(leftovers, [])
 
-    def test_tag_checker_explicitly_imports_clr_interfaces(self):
-        """PythonNet wildcard imports do not reliably expose CLR interfaces."""
-        imported = set()
-        for node in _tree(TAG_CHECKER).body:
-            if isinstance(node, ast.ImportFrom) and node.module == "Autodesk.Revit.DB":
-                imported.update(alias.name for alias in node.names if alias.name != "*")
-        self.assertTrue(
-            {"IFailuresPreprocessor", "FailureProcessingResult"}.issubset(imported),
-            "TagChecker must explicitly import its CLR interface and result enum",
-        )
+    def test_removed_controls_not_referenced(self):
+        xaml, code = _read(MANA_ANNO_XAML), _read(MANA_ANNO)
+        found = [name for name in REMOVED_NAMES if name in xaml or name in code]
+        self.assertEqual(found, [])
 
-    def test_warning_swallower_has_stable_namespace(self):
-        classes = {
-            node.name: node
-            for node in _tree(TAG_CHECKER).body
-            if isinstance(node, ast.ClassDef)
-        }
-        warning_swallower = classes.get("WarningSwallower")
-        self.assertIsNotNone(warning_swallower)
-        namespace = None
-        for node in warning_swallower.body:
-            if (
-                isinstance(node, ast.Assign)
-                and any(isinstance(target, ast.Name) and target.id == "__namespace__" for target in node.targets)
-                and isinstance(node.value, ast.Constant)
-            ):
-                namespace = node.value.value
-        self.assertEqual(namespace, "T3Lab.TagChecker")
+    def test_rail_buttons_map_to_tabs_in_order(self):
+        xaml, code = _read(MANA_ANNO_XAML), _read(MANA_ANNO)
+        rail = re.findall(r'<ToggleButton x:Name="(nav_\w+)"[^>]*Click="(\w+)"', xaml)
+        tab_count = len(re.findall(r"<TabItem[\s>]", xaml))
+        self.assertEqual([name for name, _ in rail], ["nav_dim", "nav_txt", "nav_dimtext"])
+        self.assertEqual(tab_count, len(rail))
+        for index, (name, handler) in enumerate(rail):
+            body = re.search(
+                r"def {}\(self, sender, args\):(.*?)(?=\n    def |\Z)".format(handler),
+                code, re.S)
+            self.assertIsNotNone(body, "missing handler " + handler)
+            self.assertIn("self.{})".format(name), body.group(1))
+            self.assertIn("SelectedIndex = {}".format(index), body.group(1))
 
 
 if __name__ == "__main__":

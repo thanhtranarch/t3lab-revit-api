@@ -7,7 +7,7 @@ trực tiếp được ở đây. Test này cắm stub vào `sys.modules` TRƯ�
 soi đúng phần logic thuần Python: gom nhóm, đếm, gộp ElementId, lọc theo
 search, trần INSTANCE_CAP và xuất CSV.
 
-Phần chạm Revit thật (collect / build_warning_tree) không test được ở đây —
+Phần chạm Revit thật (collect) không test được ở đây —
 chúng cần một document; xem checklist QA trong Revit.
 
 Usage:
@@ -248,6 +248,37 @@ def test_search():
     check("blank search keeps all", blank.count == 20, "got %d" % blank.count)
 
 
+def test_search_tokens_and_ids():
+    rows = sample()
+    # Mọi từ phải khớp (AND): "bifold 31" chỉ ra 2 cửa 31", không ra cả 6 bifold.
+    hit = explorer.build_tree(rows, search="bifold 31", with_instances=False)
+    check("words are ANDed", hit.count == 2, "got %d" % hit.count)
+    hit = explorer.build_tree(rows, search="BIFOLD   ada", with_instances=False)
+    check("case and extra spaces ignored", hit.count == 6, "got %d" % hit.count)
+    # Category/Family/Type luôn tìm được, kể cả khi gom theo Type.
+    hit = explorer.build_tree(rows, group_by=explorer.GROUP_TYPE,
+                              search="casework", with_instances=False)
+    check("category searchable when grouped by type", hit.count == 3,
+          "got %d" % hit.count)
+
+    target = rows[7]
+    hit = explorer.build_tree(rows, search=str(target.id_int), with_instances=False)
+    ids = [r.id_int for r in hit.walk_records()]
+    check("exact Element Id hits that element", target.id_int in ids, str(ids))
+    hit = explorer.build_tree(rows, search="doors %d" % rows[0].id_int,
+                              with_instances=False)
+    check("id combines with words", hit.count == 1, "got %d" % hit.count)
+
+
+def test_element_rows():
+    rows = sample()
+    out = explorer.element_rows(list(reversed(rows)))
+    check("one row per element", len(out) == len(rows), "got %d" % len(out))
+    check("row width matches header",
+          all(len(r) == len(explorer.ELEMENT_COLUMNS) for r in out))
+    check("sorted by category first", out[0][1] == "Casework", str(out[0]))
+
+
 def test_instances_and_cap():
     root = explorer.build_tree(sample(), with_instances=True)
     doors = dict((c.label, c) for c in root.children)["Doors"]
@@ -308,6 +339,11 @@ def test_constants():
     check("filter list starts with None",
           explorer.FILTER_ORDER[0] == explorer.FILTER_NONE)
     check("scopes declared", len(explorer.SCOPES) == 3)
+    check("filter names unique",
+          len(set(explorer.FILTER_ORDER)) == len(explorer.FILTER_ORDER))
+    check("loadable/system filters offered",
+          explorer.FILTER_LOADABLE in explorer.FILTER_ORDER
+          and explorer.FILTER_SYSTEM in explorer.FILTER_ORDER)
 
 
 TESTS = (
@@ -315,6 +351,8 @@ TESTS = (
     ("other groupings", test_other_groupings),
     ("id dedupe", test_ids_are_deduped),
     ("search", test_search),
+    ("search tokens & ids", test_search_tokens_and_ids),
+    ("element rows", test_element_rows),
     ("instances & cap", test_instances_and_cap),
     ("csv rows", test_tree_rows),
     ("walk helpers", test_walk_helpers),

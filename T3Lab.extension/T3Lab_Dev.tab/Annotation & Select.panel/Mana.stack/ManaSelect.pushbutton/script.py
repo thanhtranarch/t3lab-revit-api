@@ -1,13 +1,11 @@
 #! python3
 # -*- coding: utf-8 -*-
-"""ManaSelect — Unified smart selection manager.
+"""ManaSelect — Element explorer: counted tree of every element in scope.
 
-Consolidates:
-  - Explore (counted tree: Category > Family > Type, with scope/sort/filter)
-  - Quick Select (Query by parameters/text)
-  - Select Similar (Match type/family/category)
-  - Select on Sheets (Title blocks & CAD imports)
-  - Warnings (model warnings and the elements they flag)
+Tick any Category / Family / Type, then Select, Add to Selection, Zoom,
+Isolate, Hide, Export CSV or Delete. (Quick Select / Select Similar /
+On Sheets / Warnings were removed 2026-10-02 — they duplicated Explore,
+Revit's own Select All Instances, ManaDWG and ModelAuditor.)
 
 Cửa sổ chạy MODELESS để người dùng bấm chọn trong model mà tool vẫn mở. Điều
 đó cần engine thường trú, nên `__persistentengine__ = True` ở dưới; nếu engine

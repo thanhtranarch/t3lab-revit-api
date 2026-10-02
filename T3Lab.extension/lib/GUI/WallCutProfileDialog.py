@@ -11,7 +11,9 @@ try:
 except Exception:
     _theme = None
 
-from GUI.WPF_Base import T3WPFWindow
+import System
+
+from GUI.WPF_Base import T3WPFWindow, set_items_source
 from Snippets._compat import eid_value
 
 _XAML = os.path.join(os.path.dirname(__file__), 'Tools', 'WallCutProfile.xaml')
@@ -132,7 +134,7 @@ class WallCutProfileWindow(T3WPFWindow):
     def _init_controls(self):
         if hasattr(self, 'cmb_method') and self.cmb_method:
             methods = ["Place Opening Family", "Edit Wall Profile", "Wall Opening"]
-            self.cmb_method.ItemsSource = methods
+            set_items_source(self.cmb_method, methods)
             self.cmb_method.SelectedIndex = 0
 
     def _load_links(self):
@@ -153,7 +155,7 @@ class WallCutProfileWindow(T3WPFWindow):
             names.append(title)
 
         if hasattr(self, 'cmb_links') and self.cmb_links:
-            self.cmb_links.ItemsSource = names
+            set_items_source(self.cmb_links, names)
             if len(names) > 0:
                 self.cmb_links.SelectedIndex = 0
                 self._selected_link = links[0]
@@ -192,7 +194,7 @@ class WallCutProfileWindow(T3WPFWindow):
 
         self._opening_families = sorted(unique, key=lambda x: x.name)
         if hasattr(self, 'cmb_families') and self.cmb_families:
-            self.cmb_families.ItemsSource = [f.name for f in self._opening_families]
+            set_items_source(self.cmb_families, [f.name for f in self._opening_families])
             if len(self._opening_families) > 0:
                 self.cmb_families.SelectedIndex = 0
 

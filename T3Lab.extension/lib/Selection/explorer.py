@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Element explorer — thu thập và gom nhóm phần tử thành cây có đếm.
 
-Tầng LOGIC REVIT thuần của ManaSelect Explore: không import WPF, không biết gì
+Tầng LOGIC REVIT thuần của ManaSelect: không import WPF, không biết gì
 về cửa sổ. UI chỉ gọi `collect()` -> `build_tree()` rồi dựng TreeViewItem.
 
 Cây ra giống Ideate Explorer: một node gốc mang tổng số, dưới nó là các bậc gom
@@ -25,6 +25,11 @@ from Autodesk.Revit.DB import (
     ImportInstance,
     RevitLinkInstance,
 )
+
+try:
+    from Autodesk.Revit.DB import FamilyInstance
+except ImportError:                 # stub test ngoài Revit không có class này
+    FamilyInstance = None
 from System import Int64
 from System.Collections.Generic import List
 
@@ -64,8 +69,11 @@ FILTER_GROUPED = 'Grouped Elements'
 FILTER_IMPORTS = 'Imports & Links'
 FILTER_PINNED = 'Pinned Elements'
 FILTER_WARNINGS = 'Elements with Warnings'
-FILTER_ORDER = (FILTER_NONE, FILTER_MODEL, FILTER_ANNOTATION, FILTER_INPLACE,
-                FILTER_GROUPED, FILTER_IMPORTS, FILTER_PINNED, FILTER_WARNINGS)
+FILTER_LOADABLE = 'Loadable Families'
+FILTER_SYSTEM = 'System Families'
+FILTER_ORDER = (FILTER_NONE, FILTER_MODEL, FILTER_ANNOTATION, FILTER_LOADABLE,
+                FILTER_SYSTEM, FILTER_INPLACE, FILTER_GROUPED, FILTER_IMPORTS,
+                FILTER_PINNED, FILTER_WARNINGS)
 
 # Node lá liệt kê từng instance -- trần để một node không dựng hàng nghìn
 # TreeViewItem. Vượt trần thì thêm một node báo còn bao nhiêu chưa hiện.
@@ -468,6 +476,22 @@ def _passes_filter(element, filter_name, category, warning_ids):
     if filter_name == FILTER_IMPORTS:
         return isinstance(element, (ImportInstance, RevitLinkInstance))
 
+    if filter_name in (FILTER_LOADABLE, FILTER_SYSTEM):
+        # Loadable = FamilyInstance của family .rfa thật (không in-place).
+        # System = mọi thứ còn lại có Category: tường, sàn, ống, tag hệ thống…
+        # Import/link không phải "family" nên không thuộc nhóm nào.
+        if isinstance(element, (ImportInstance, RevitLinkInstance)):
+            return False
+        loadable = False
+        try:
+            if FamilyInstance is not None and isinstance(element, FamilyInstance):
+                symbol = element.Symbol
+                loadable = not (symbol is not None and symbol.Family is not None
+                                and symbol.Family.IsInPlace)
+        except Exception:
+            loadable = False
+        return loadable if filter_name == FILTER_LOADABLE else not loadable
+
     if filter_name == FILTER_PINNED:
         try:
             return bool(element.Pinned)
@@ -512,26 +536,48 @@ def collect(doc, uidoc=None, scope=SCOPE_VIEW, filter_name=FILTER_NONE):
 # ==========================================================================
 # TREE
 # ==========================================================================
-def _matches(record, needle, levels):
-    if not needle:
-        return True
+def _search_tokens(search):
+    """Chuỗi tìm kiếm -> các từ thường hoá. Mọi từ phải khớp (AND), nên gõ
+    "door 900" ra đúng cửa 900 thay vì mọi cửa + mọi thứ 900."""
+    return [token for token in (search or '').strip().lower().split() if token]
+
+
+def _haystack(record, levels):
+    """Mọi chuỗi một từ tìm kiếm có thể khớp: category/family/type luôn có mặt
+    (dù đang gom theo Workset hay Level), cộng các bậc gom nhóm và nhãn."""
+    fields = [record.category or '', record.family or '', record.type_name or '',
+              record.label or '']
     for name in levels:
-        if needle in record.key(name).lower():
-            return True
-    return needle in record.label.lower()
+        if name not in ('category', 'family', 'type_name'):
+            fields.append(record.key(name))
+    return [field.lower() for field in fields]
+
+
+def _matches(record, tokens, levels):
+    if not tokens:
+        return True
+    hay = _haystack(record, levels)
+    id_text = str(record.id_int)
+    for token in tokens:
+        # Element Id phải khớp TRỌN — "12" không được kéo theo Id 1203.
+        if token == id_text:
+            continue
+        if not any(token in field for field in hay):
+            return False
+    return True
 
 
 def build_tree(records, group_by=GROUP_CATEGORY, search='', root_label=None,
                with_instances=True):
     """Node gốc của cây gom nhóm.
 
-    `search` lọc theo MỌI bậc gom nhóm cộng nhãn instance, nên gõ tên type ra
-    đúng type, gõ tên category ra cả nhánh category.
+    `search` tách theo khoảng trắng, MỌI từ phải khớp category / family / type /
+    bậc gom nhóm / nhãn (Mark hoặc tên) — hoặc trùng đúng Element Id.
     """
     levels = GROUPINGS.get(group_by, GROUPINGS[GROUP_CATEGORY])
-    needle = (search or '').strip().lower()
+    tokens = _search_tokens(search)
 
-    kept = [r for r in records if _matches(r, needle, levels)]
+    kept = [r for r in records if _matches(r, tokens, levels)]
 
     root = Node(root_label or 'All elements', kind='root')
     buckets = {}                    # tuple khoá -> Node
@@ -582,83 +628,6 @@ def _attach_instances(root):
 
 
 # ==========================================================================
-# WARNINGS
-# ==========================================================================
-def build_warning_tree(doc, search=''):
-    """Cây cảnh báo: loại cảnh báo -> từng lần xảy ra -> phần tử liên quan.
-
-    Trả (root, total) — total là số cảnh báo thật, khác `root.count` (đếm phần
-    tử) vì một cảnh báo có thể chạm nhiều phần tử.
-    """
-    needle = (search or '').strip().lower()
-    root = Node('All warnings', kind='root')
-    try:
-        warnings = doc.GetWarnings() or []
-    except Exception:
-        return root, 0
-
-    by_text = {}
-    total = 0
-    type_cache = {}
-
-    for warning in warnings:
-        try:
-            text = warning.GetDescriptionText() or 'Unnamed warning'
-        except Exception:
-            text = 'Unnamed warning'
-
-        element_ids = []
-        for getter in ('GetFailingElements', 'GetAdditionalElements'):
-            try:
-                for element_id in getattr(warning, getter)() or []:
-                    element_ids.append(element_id)
-            except Exception:
-                continue
-
-        records = []
-        for element_id in element_ids:
-            try:
-                element = doc.GetElement(element_id)
-                if element is None:
-                    continue
-                category_name, _cat = _category_of(element)
-                family, type_name = _family_and_type(element, doc, type_cache)
-                records.append(ElementRecord(element, doc,
-                                             category_name or NONE_LABEL,
-                                             family, type_name))
-            except Exception:
-                continue
-
-        if needle and needle not in text.lower():
-            if not any(needle in r.label.lower()
-                       or needle in r.category.lower()
-                       or needle in r.type_name.lower() for r in records):
-                continue
-
-        total += 1
-        group = by_text.get(text)
-        if group is None:
-            group = Node(text, kind='group')
-            by_text[text] = group
-            root.children.append(group)
-
-        occurrence = Node('Warning %d - %d element(s)'
-                          % (len(group.children) + 1, len(records)),
-                          kind='leaf')
-        for record in records:
-            child = Node('%s / %s [Id %d]'
-                         % (record.category, record.type_name, record.id_int),
-                         kind='element')
-            child.records.append(record)
-            occurrence.children.append(child)
-        group.children.append(occurrence)
-
-    root.children.sort(key=lambda child: (-len(child.children),
-                                          child.label.lower()))
-    return root, total
-
-
-# ==========================================================================
 # EXPORT
 # ==========================================================================
 def tree_rows(root):
@@ -673,3 +642,19 @@ def tree_rows(root):
 
     walk(root, 0)
     return rows
+
+
+ELEMENT_COLUMNS = ('Element Id', 'Category', 'Family', 'Type', 'Mark / Name',
+                   'Level', 'Workset')
+
+
+def element_rows(records):
+    """[ElementRecord] -> hàng CSV, mỗi phần tử một dòng, xếp theo
+    Category / Family / Type / Id. Level và Workset đọc lười nên hàm này phải
+    chạy TRONG Revit API context."""
+    ordered = sorted(records, key=lambda r: ((r.category or '').lower(),
+                                             (r.family or '').lower(),
+                                             (r.type_name or '').lower(),
+                                             r.id_int))
+    return [(r.id_int, r.category, r.family, r.type_name, r.label,
+             r.level, r.workset) for r in ordered]

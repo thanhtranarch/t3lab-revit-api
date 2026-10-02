@@ -1,5 +1,5 @@
 title: "Mana\nAnno"
-tooltip: Unified tool to Find, Remove and Rename Dimensions and Text Notes (Collab with DQT)
+tooltip: Unified tool to Find, Remove and Rename Dimensions and Text Notes, and edit Dimension text (Collab with DQT)
 description: |
   Annotation Manager consolidates all Dimension and Text Note tools
   into one window with switchable tabs. Developed in collaboration with Dang Quoc Truong.
@@ -13,6 +13,9 @@ description: |
   - Find Notes: search text notes by content -> jump to view
   - Find Types: search TextNoteTypes by name -> delete types
   - Auto-rename all TextNoteTypes by properties
+
+  Dim Text tab:
+  - Set prefix, suffix, above, below or override text on dimensions
 
 author: Tran Tien Thanh & Dang Quoc Truong
 version: 1.1.0

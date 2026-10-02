@@ -16,6 +16,12 @@ suy doan. Chay:  python3 dev/audit_cpython.py [--quiet]
   C10 P0  `with DB.Transaction(...)` tran        -> TypeError: does not support the
           context manager protocol (pythonnet 3 khong bien IDisposable thanh
           context manager). Boc bang Snippets._compat.disposing(...).
+  C11 P0  `.ItemsSource = <list Python>`        -> TypeError: 'list' value cannot
+          be converted to System.Collections.IEnumerable (WallCutProfile,
+          2026-10-02). Dung GUI.WPF_Base.set_items_source(ctrl, items) hoac
+          to_items_source(items). Chi bat RHS ro rang la list: literal [...],
+          list comprehension, sorted()/list()/tuple(), hoac ten bien ma lan
+          gan gan nhat trong cung ham la mot trong cac dang do.
 """
 
 import ast
@@ -49,6 +55,11 @@ PRINT_CALL = re.compile(r'^\s*print\s*\(')
 DOTNET_WITH = re.compile(
     r'^\s*with\s+(?!revit\.)((?:\w+\.)*(?:Transaction|TransactionGroup|'
     r'SubTransaction|FilteredElementCollector))\s*\(')
+# C11: `<ctrl>.ItemsSource = <rhs>` (khong phai `==`).
+ITEMS_SOURCE = re.compile(r'^\s*[\w.\[\]]+\.ItemsSource\s*=(?!=)\s*(.*)$')
+# RHS chac chan la sequence Python thuan.
+PY_SEQ_EXPR = re.compile(r'^(\[|(sorted|list|tuple)\s*\()')
+PY_NAME = re.compile(r'^((?:self\.)?[A-Za-z_]\w*)$')
 
 
 def iter_py():
@@ -90,6 +101,19 @@ def audit():
                 break
         body = chr(10).join(lines[start:end])
         return '.Value' in body or "'Value'" in body or '"Value"' in body
+
+    def last_assign_is_py_seq(lines, idx, name):
+        """True neu lan gan gan nhat cua `name` truoc dong idx (0-based), trong
+        cung ham, la list/sorted()/list()/tuple() Python. Dung o `def` bao quanh."""
+        assign = re.compile(r'^\s*' + re.escape(name) + r'\s*=(?!=)\s*(.*)$')
+        for j in range(idx - 1, -1, -1):
+            st = lines[j].lstrip()
+            if st.startswith('def ') or st.startswith('async def '):
+                return False
+            m = assign.match(lines[j])
+            if m:
+                return bool(PY_SEQ_EXPR.match(m.group(1).strip()))
+        return False
 
     def add(sev, code, path, line, msg):
         findings.append((sev, code, rel(path), line, msg))
@@ -168,6 +192,19 @@ def audit():
                     'with %s(...) tran - pythonnet 3 nem TypeError; dung '
                     '`with disposing(%s(...)) as t:` (Snippets._compat)'
                     % (m.group(1), m.group(1)))
+
+            m = ITEMS_SOURCE.match(line.split('#')[0])
+            if m:
+                rhs = m.group(1).strip()
+                bad = bool(PY_SEQ_EXPR.match(rhs))
+                if not bad:
+                    m_name = PY_NAME.match(rhs)
+                    if m_name and rhs != 'None':
+                        bad = last_assign_is_py_seq(lines, i - 1, m_name.group(1))
+                if bad:
+                    add('P0', 'C11', path, i,
+                        'ItemsSource = list Python - pythonnet 3 khong doi sang '
+                        'IEnumerable; dung set_items_source(ctrl, items) (GUI.WPF_Base)')
 
         # C9: bare reload() call (CPython 3 requires importlib.reload)
         try:

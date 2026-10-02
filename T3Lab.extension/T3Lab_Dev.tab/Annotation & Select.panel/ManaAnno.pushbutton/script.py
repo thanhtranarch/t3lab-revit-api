@@ -5,9 +5,7 @@
 Consolidates:
   - Dimensions (Audit & manage dimension types/instances)
   - Text Notes (Audit & search text note contents)
-  - Tag Checker (Search & delete orphan tags)
   - DimText (Manage dimension text overrides)
-  - Utilities (Renumber along spline, Copy annotations, Upper all)
 
 Author: T3Lab
 """
@@ -35,7 +33,7 @@ except Exception:
 
 def _main():
     # Import once per CPython runtime. Deleting and re-importing GUI modules can
-    # duplicate PythonNet wrapper types (TagChecker implements a CLR interface).
+    # duplicate PythonNet wrapper types for classes that implement CLR interfaces.
     from GUI.ManaAnnoDialog import show_dialog
     show_dialog()
 

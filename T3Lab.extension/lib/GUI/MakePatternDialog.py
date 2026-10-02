@@ -655,10 +655,11 @@ class MakePatternDialog(T3WPFWindow):
 
     def _set_status(self, text, is_error=False):
         self.status_text.Text = text
-        if is_error:
-            self.status_dot.Fill = self.FindResource("T3.Danger.Accent")
-        else:
-            self.status_dot.Fill = self.FindResource("T3.Success.Accent")
+        key = "T3.Danger.Accent" if is_error else "T3.Success.Accent"
+        try:
+            self.status_dot.Fill = self.FindResource(key)
+        except Exception:
+            pass
 
     def _on_export_pat_click(self, sender, e):
         if not self.lines:
