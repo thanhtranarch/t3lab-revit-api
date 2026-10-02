@@ -15,7 +15,7 @@ TOOLS = os.path.join(GUI, 'Tools')
 
 # XAML -> (file dialog, số nút AI)
 AI_TOOLS = {
-    'CADToElements.xaml': ('CADToElementsDialog.py', 7),
+    'CADToElements.xaml': ('CADToElementsDialog.py', 1),
     'IFCSG.xaml': ('IFCSGDialog.py', 1),
     'ManaPara.xaml': ('ManaParaDialog.py', 1),
     'FamiGen.xaml': ('FamiGenDialog.py', 1),

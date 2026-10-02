@@ -206,7 +206,8 @@ class ShippedXaml(unittest.TestCase):
         # + DWGManagement (binding only, its UI stays frozen)
         # + DatumSync, CropSync, FamilyTransfer x2 (2026-09-29)
         # - QuickElement (deleted with ManaSelect's Quick Select mode, 2026-10-02)
-        self.assertEqual(count, 43)
+        # + CADToElements layer list (one shared grid for every mode, 2026-10-02)
+        self.assertEqual(count, 44)
 
     def test_read_only_workset_state_is_display_only(self):
         root = ET.parse(os.path.join(TOOLS, 'ManaWorkset.xaml')).getroot()
@@ -251,8 +252,9 @@ class CheckColumnAlignment(unittest.TestCase):
         # 15 aligned first, 16 more on 2026-09-26 (AutoWork, BatchLink, DoorThreshold,
         # FamiGen, ManaAnno, ManaFami, ManaGroup, ManaPara, PointCloud, QuickElement,
         # RoomToFloor), then DatumSync, CropSync, FamilyTransfer x2 (2026-09-29);
-        # QuickElement dropped 2026-10-02 (ManaSelect keeps only Explore)
-        self.assertEqual(len(seen), 34, seen)
+        # QuickElement dropped 2026-10-02 (ManaSelect keeps only Explore);
+        # CADToElements layer list added 2026-10-02
+        self.assertEqual(len(seen), 35, seen)
 
     def test_renumber_tab_has_the_same_metrics_frame_as_the_sheets_tab(self):
         root = ET.parse(os.path.join(TOOLS, 'ManaSheets.xaml')).getroot()

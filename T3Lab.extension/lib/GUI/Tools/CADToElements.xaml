@@ -1,13 +1,10 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        mc:Ignorable="d"
         Title="CAD to Elements"
-        Width="940" Height="820"
-        MinWidth="780" MinHeight="600"
+        Width="1000" Height="620"
+        MinWidth="1000" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="True"
         Background="Transparent"
@@ -1667,1188 +1664,807 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <!-- ═══ Outer Window Border ═══ -->
+    <!-- ═══ CAD to Elements — one fixed shell for every mode ═══
+         Title bar 48 · body (rail 58 | content) · footer 48. Window size class L.
+         Content rows: A source/level (shared) · B mode header · C options | D layers.
+         Every mode's options live in an `opt_<mode>` grid with the SAME row
+         heights (52 · 60 · 60 · 60 · 60 · 24 · 24 · *), stacked in one cell:
+         switching mode toggles which grid is visible, nothing moves.
+         Within a mode, fields that do not apply are disabled, never collapsed. -->
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
-            CornerRadius="12" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
+            CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True"
+            Background="{StaticResource T3.Surface}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title Bar -->
-                <RowDefinition Height="*"/>       <!-- Row 1: Main Body with Sidebar Rail -->
-                <RowDefinition Height="48"/>      <!-- Row 2: Full-width Footer Bar -->
+                <RowDefinition Height="48"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="48"/>
             </Grid.RowDefinitions>
 
-            <!-- ══════════════════ ROW 0: FULL-WIDTH TITLE BAR ══════════════════ -->
+            <!-- ══════════════ TITLE BAR ══════════════ -->
             <Border Grid.Row="0" Style="{StaticResource T3.TitleBar}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Title and Subtitle -->
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,0"
-                                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Image x:Name="logo_image" Height="28" Margin="0,0,12,0"
-                                   VerticalAlignment="Center"
-                                   RenderOptions.BitmapScalingMode="HighQuality"/>
-                            <StackPanel Orientation="Vertical" VerticalAlignment="Center">
-                                <TextBlock Text="CAD to Elements" Style="{StaticResource T3.Title}"/>
-                                <TextBlock Text="Convert CAD linework into walls, floors, beams or MEP runs" Style="{StaticResource T3.Subtitle}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Image x:Name="logo_image" Height="28" Margin="0,0,12,0" VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="CAD to Elements" Style="{StaticResource T3.Title}"/>
+                            <TextBlock Text="Convert CAD linework into walls, floors, ceilings, rooms, columns, beams, grids, lines or MEP runs"
+                                       Style="{StaticResource T3.Subtitle}"/>
+                        </StackPanel>
+                        <!-- AI MODE BADGE — T3 standard (T3LAB_UI_STANDARD.md § AI Mode). Code: init_ai_badge() -->
+                        <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}" Height="24" Margin="16,0,0,0"
+                                Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                <TextBlock x:Name="txt_ai_status" Text="AI off" Style="{StaticResource T3.Caption}"
+                                           VerticalAlignment="Center"/>
                             </StackPanel>
-                            <!-- AI MODE BADGE — chuẩn T3 (T3LAB_UI_STANDARD.md § AI Mode). Code: init_ai_badge() -->
-                            <Border x:Name="ai_mode_badge" Style="{StaticResource T3.Pill}" Height="24" Margin="16,0,0,0"
-                                    Visibility="Collapsed">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                    <TextBlock x:Name="txt_ai_status" Text="AI off" Style="{StaticResource T3.Caption}"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- AI Mode Status Pill & Window controls -->
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal"
-                                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
-
-                            <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
-                                <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
-                            </Button>
-                            <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize">
-                                <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
-                            </Button>
-                            <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close" IsCancel="True">
-                                <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
-                            </Button>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-            <!-- ══════════════════ ROW 1: WORKSPACE WITH REFINED SIDEBAR ══════════════════ -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="58"/>    <!-- Col 0: Left Navigation Icon Rail -->
-                    <ColumnDefinition Width="*"/>     <!-- Col 1: Main Content Work Area -->
-                </Grid.ColumnDefinitions>
-
-                <!-- ══════════════════ COL 0: LEFT NAVIGATION ICON RAIL ══════════════════ -->
-                <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
-                <Grid Margin="0,12,0,12">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/> <!-- Wall -->
-                        <RowDefinition Height="Auto"/> <!-- Floor -->
-                        <RowDefinition Height="Auto"/> <!-- Beam -->
-                        <RowDefinition Height="Auto"/> <!-- Divider -->
-                        <RowDefinition Height="Auto"/> <!-- Duct -->
-                        <RowDefinition Height="Auto"/> <!-- Pipe -->
-                        <RowDefinition Height="Auto"/> <!-- Tray -->
-                        <RowDefinition Height="Auto"/> <!-- Conduit -->
-                        <RowDefinition Height="*"/>    <!-- Spacer -->
-                    </Grid.RowDefinitions>
-
-                    <!-- Wall button -->
-                    <ToggleButton x:Name="btn_type_wall" Grid.Row="0"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8" IsChecked="True" ToolTip="Wall">
-                        <Path Data="M4 4 h7 v7 h-7 z M13 4 h7 v7 h-7 z M4 13 h7 v7 h-7 z M13 13 h7 v7 h-7 z"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Floor button -->
-                    <ToggleButton x:Name="btn_type_floor" Grid.Row="1"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8" ToolTip="Floor">
-                        <Path Data="M4 8 L12 4 L20 8 L12 12 Z M4 8 V16 L12 20 L12 12 M20 8 V16 L12 20"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Beam button -->
-                    <ToggleButton x:Name="btn_type_beam" Grid.Row="2"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8" ToolTip="Beam">
-                        <Path Data="M4 6 h16 M4 6 v3 M20 6 v3 M4 18 h16 M4 18 v-3 M20 18 v-3 M7 9 h10 v6 h-10 z"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- MEP group divider -->
-                    <Border Grid.Row="3" Height="1" Width="28" Background="{StaticResource T3.Border}" Margin="0,4,0,8" HorizontalAlignment="Center"/>
-
-                    <!-- Duct button -->
-                    <ToggleButton x:Name="btn_type_duct" Grid.Row="4"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8" ToolTip="Duct">
-                        <Path Data="M4 7 h16 v10 h-16 z M8 10 l3 2 -3 2 M14 10 l3 2 -3 2"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Pipe button -->
-                    <ToggleButton x:Name="btn_type_pipe" Grid.Row="5"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8" ToolTip="Pipe">
-                        <Path Data="M4 8 h9 a7 7 0 0 1 7 7 v5 M4 12 h8 a3 3 0 0 1 3 3 v5"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Cable Tray button -->
-                    <ToggleButton x:Name="btn_type_tray" Grid.Row="6"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  Margin="0,0,0,8" ToolTip="Cable Tray">
-                        <Path Data="M5 5 v14 M19 5 v14 M5 9 h14 M5 15 h14"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
-
-                    <!-- Conduit button -->
-                    <ToggleButton x:Name="btn_type_conduit" Grid.Row="7"
-                                  Style="{StaticResource T3.Rail.Tile}"
-                                  ToolTip="Conduit">
-                        <Path Data="M4 12 h6 M14 12 h6 M12 12 m-2.5 0 a2.5 2.5 0 1 0 5 0 a2.5 2.5 0 1 0 -5 0"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </ToggleButton>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize">
+                            <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
+                        </Button>
+                        <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize">
+                            <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
+                        </Button>
+                        <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close" IsCancel="True">
+                            <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
 
-                <!-- ══════════════════ COL 1: MAIN WORKSPACE ══════════════════ -->
-                <!-- ROW 1: MAIN CONTENT -->
-                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="16,12">
-                    <StackPanel>
+            <!-- ══════════════ BODY ══════════════ -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="58"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                        <!-- ─── CAD SOURCE & LEVEL (always visible) ─── -->
-                        <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
+                <!-- ── MODE RAIL — tile order follows MODES in Snippets/_cad_geometry.py ── -->
+                <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}"
+                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,1,0">
+                    <StackPanel Margin="0,12,0,12">
+                        <!-- Architecture -->
+                        <ToggleButton x:Name="btn_mode_wall" Tag="wall" Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4" IsChecked="True" Click="mode_tile_clicked"
+                                      ToolTip="Walls — paired parallel lines become walls">
+                            <Path Data="M3 5 H21 V19 H3 Z M3 9.7 H21 M3 14.3 H21 M9 5 V9.7 M15 5 V9.7 M6 9.7 V14.3 M12 9.7 V14.3 M18 9.7 V14.3 M9 14.3 V19 M15 14.3 V19"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.6" StrokeLineJoin="Round" Width="18" Height="18" Stretch="Uniform"/>
+                        </ToggleButton>
+                        <ToggleButton x:Name="btn_mode_floor" Tag="floor" Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4" Click="mode_tile_clicked"
+                                      ToolTip="Floors — closed outlines become floors">
+                            <Path Data="M3 12 L12 7.5 L21 12 L12 16.5 Z M3 12 V14.5 L12 19 L21 14.5 V12 M12 16.5 V19"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.6" StrokeLineJoin="Round" Width="18" Height="18" Stretch="Uniform"/>
+                        </ToggleButton>
+                        <ToggleButton x:Name="btn_mode_ceiling" Tag="ceiling" Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4" Click="mode_tile_clicked"
+                                      ToolTip="Ceilings — closed outlines become ceilings">
+                            <Path Data="M3 4 H21 V9 H3 Z M9 4 V9 M15 4 V9 M12 20 V12.5 M9 15.5 L12 12.5 L15 15.5"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.6" StrokeLineJoin="Round" Width="18" Height="18" Stretch="Uniform"/>
+                        </ToggleButton>
+                        <ToggleButton x:Name="btn_mode_room" Tag="room" Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4" Click="mode_tile_clicked"
+                                      ToolTip="Rooms — separation lines and a room in every closed outline">
+                            <Path Data="M4 4 H20 V20 H4 Z M4 4 L20 20 M20 4 L4 20"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.6" StrokeLineJoin="Round" Width="18" Height="18" Stretch="Uniform"/>
+                        </ToggleButton>
+                        <Border Height="1" Width="28" Background="{StaticResource T3.Border}" Margin="0,4,0,8"/>
+                        <!-- Structure -->
+                        <ToggleButton x:Name="btn_mode_column" Tag="column" Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4" Click="mode_tile_clicked"
+                                      ToolTip="Columns — closed rectangles and circles become columns">
+                            <Path Data="M6 3 H18 V6 H6 Z M6 18 H18 V21 H6 Z M8.5 6 V18 M15.5 6 V18"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.6" StrokeLineJoin="Round" Width="18" Height="18" Stretch="Uniform"/>
+                        </ToggleButton>
+                        <ToggleButton x:Name="btn_mode_beam" Tag="beam" Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4" Click="mode_tile_clicked"
+                                      ToolTip="Beams — paired parallel lines become structural beams">
+                            <Path Data="M5 4 H19 V7 H13.5 V17 H19 V20 H5 V17 H10.5 V7 H5 Z"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.6" StrokeLineJoin="Round" Width="18" Height="18" Stretch="Uniform"/>
+                        </ToggleButton>
+                        <Border Height="1" Width="28" Background="{StaticResource T3.Border}" Margin="0,4,0,8"/>
+                        <!-- Datum and linework -->
+                        <ToggleButton x:Name="btn_mode_grid" Tag="grid" Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4" Click="mode_tile_clicked"
+                                      ToolTip="Grids — axis lines become named grids">
+                            <Path Data="M4 5 A3 3 0 1 1 10 5 A3 3 0 1 1 4 5 Z M7 8 V21 M14 5 A3 3 0 1 1 20 5 A3 3 0 1 1 14 5 Z M17 8 V21"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.6" StrokeLineJoin="Round" Width="18" Height="18" Stretch="Uniform"/>
+                        </ToggleButton>
+                        <ToggleButton x:Name="btn_mode_lines" Tag="lines" Style="{StaticResource T3.Rail.Tile}"
+                                      Margin="0,0,0,4" Click="mode_tile_clicked"
+                                      ToolTip="Lines — linework becomes model or detail lines">
+                            <Path Data="M3 19 L9 9 L14 15 L21 5"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.6" StrokeLineJoin="Round" Width="18" Height="18" Stretch="Uniform"/>
+                        </ToggleButton>
+                        <Border Height="1" Width="28" Background="{StaticResource T3.Border}" Margin="0,4,0,8"/>
+                        <!-- MEP -->
+                        <ToggleButton x:Name="btn_mode_mep" Tag="mep" Style="{StaticResource T3.Rail.Tile}"
+                                      Click="mode_tile_clicked"
+                                      ToolTip="MEP Runs — lines become ducts, pipes, cable trays or conduits">
+                            <Path Data="M4 8 H13 A7 7 0 0 1 20 15 V20 M4 12 H12 A3 3 0 0 1 15 15 V20"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.6" StrokeLineJoin="Round" Width="18" Height="18" Stretch="Uniform"/>
+                        </ToggleButton>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── CONTENT ── -->
+                <Grid Grid.Column="1" Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>  <!-- A: source / level (shared by every mode) -->
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="Auto"/>  <!-- B: mode header -->
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="*"/>     <!-- C | D -->
+                    </Grid.RowDefinitions>
+
+                    <!-- A · CAD SOURCE | LEVEL -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="CAD SOURCE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="cmb_cad_files" Style="{StaticResource T3.ComboBox}"
+                                      SelectionChanged="cad_file_changed"
+                                      ToolTip="Imported or linked CAD file to read"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="LEVEL" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="cmb_levels" Style="{StaticResource T3.ComboBox}"
+                                      SelectionChanged="level_changed"
+                                      ToolTip="Level the new elements are hosted on"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- B · MODE HEADER -->
+                    <StackPanel Grid.Row="2">
+                        <TextBlock x:Name="txt_mode_title" Text="Walls" Style="{StaticResource T3.Title}"/>
+                        <TextBlock x:Name="txt_mode_desc" Style="{StaticResource T3.Caption}" TextTrimming="CharacterEllipsis"
+                                   Text="Trace paired parallel lines into walls; thickness comes from the line spacing."/>
+                    </StackPanel>
+
+                    <!-- C | D -->
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="424"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- C · OPTIONS — one fixed card, one overlay grid per mode -->
+                        <Border Grid.Column="0" Style="{StaticResource T3.Panel}" Padding="12" ClipToBounds="True">
                             <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="16"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
 
-                                <!-- CAD Source -->
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="CAD SOURCE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                    <ComboBox x:Name="cmb_cad_files" Style="{StaticResource T3.ComboBox}" Height="28"
-                                              ToolTip="Select an imported or linked CAD file"/>
-                                </StackPanel>
+                                <!-- ═══ WALLS ═══ -->
+                                <Grid x:Name="opt_wall">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="52"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
+                                        <TextBlock Text="CREATE AS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rb_wall_mode" Content="Walls" GroupName="wall_mode" IsChecked="True"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="create_as_changed"/>
+                                            <RadioButton x:Name="rb_wall_part_mode" Content="Parts (DirectShape)" GroupName="wall_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Checked="create_as_changed"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                        <TextBlock Text="BASE WALL TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_wall_type" Style="{StaticResource T3.ComboBox}"
+                                                  ToolTip="Basic wall type the new walls (and per-thickness copies) are based on"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="0">
+                                        <TextBlock Text="HEIGHT (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_wall_height" Style="{StaticResource T3.TextBox}" Text="3000"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="2">
+                                        <TextBlock Text="BASE OFFSET (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_wall_offset" Style="{StaticResource T3.TextBox}" Text="0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="0">
+                                        <TextBlock Text="UNPAIRED THICKNESS (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_wall_thickness" Style="{StaticResource T3.TextBox}" Text="200"
+                                                 ToolTip="Thickness used for single lines when Include unpaired lines is on"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="2">
+                                        <TextBlock Text="PART CATEGORY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_wall_part_category" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_wall_match_thickness" Content="Type per detected thickness" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}" Margin="0,0,16,0"/>
+                                        <CheckBox x:Name="chk_structural" Content="Structural" Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="6" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_merge_collinear" Content="Merge collinear lines" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}" Margin="0,0,16,0"/>
+                                        <CheckBox x:Name="chk_include_unpaired" Content="Include unpaired lines"
+                                                  Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Bottom"
+                                               Text="Two parallel lines up to 610 mm apart make one wall on their centerline."/>
+                                </Grid>
 
-                                <!-- Level -->
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="LEVEL" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                    <ComboBox x:Name="cmb_levels" Style="{StaticResource T3.ComboBox}" Height="28"
-                                              ToolTip="Select the target level"/>
-                                </StackPanel>
+                                <!-- ═══ FLOORS ═══ -->
+                                <Grid x:Name="opt_floor" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="52"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
+                                        <TextBlock Text="CREATE AS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rb_floor_mode" Content="Floors" GroupName="floor_mode" IsChecked="True"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="create_as_changed"/>
+                                            <RadioButton x:Name="rb_part_mode" Content="Parts (DirectShape)" GroupName="floor_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Checked="create_as_changed"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                        <TextBlock Text="FLOOR TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_floor_type" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="0">
+                                        <TextBlock Text="HEIGHT OFFSET (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_floor_offset" Style="{StaticResource T3.TextBox}" Text="0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="2">
+                                        <TextBlock Text="PART THICKNESS (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_part_thickness" Style="{StaticResource T3.TextBox}" Text="200"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="0">
+                                        <TextBlock Text="PART CATEGORY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_part_category" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_floor_holes" Content="Inner outlines become openings" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}" Margin="0,0,16,0"/>
+                                        <CheckBox x:Name="chk_floor_structural" Content="Structural" Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Bottom"
+                                               Text="Closed polylines, circles and loose lines that close on themselves all count as outlines."/>
+                                </Grid>
+
+                                <!-- ═══ CEILINGS ═══ -->
+                                <Grid x:Name="opt_ceiling" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="52"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
+                                        <TextBlock Text="CREATE AS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rb_ceiling_mode" Content="Ceilings" GroupName="ceiling_mode" IsChecked="True"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="create_as_changed"/>
+                                            <RadioButton x:Name="rb_ceiling_part_mode" Content="Parts (DirectShape)" GroupName="ceiling_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Checked="create_as_changed"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                        <TextBlock Text="CEILING TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_ceiling_type" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="0">
+                                        <TextBlock Text="HEIGHT OFFSET (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_ceiling_offset" Style="{StaticResource T3.TextBox}" Text="2700"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="2">
+                                        <TextBlock Text="PART THICKNESS (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_ceiling_part_thickness" Style="{StaticResource T3.TextBox}" Text="25"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="0">
+                                        <TextBlock Text="PART CATEGORY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_ceiling_part_category" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_ceiling_holes" Content="Inner outlines become openings" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Bottom"
+                                               Text="The height offset is measured from the level to the ceiling surface."/>
+                                </Grid>
+
+                                <!-- ═══ ROOMS ═══ -->
+                                <Grid x:Name="opt_room" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="52"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
+                                        <TextBlock Text="CREATE AS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rb_room_both" Content="Rooms + lines" GroupName="room_mode" IsChecked="True"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="create_as_changed"/>
+                                            <RadioButton x:Name="rb_room_lines" Content="Lines only" GroupName="room_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="create_as_changed"/>
+                                            <RadioButton x:Name="rb_room_only" Content="Rooms only" GroupName="room_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Checked="create_as_changed"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                        <TextBlock Text="PLAN VIEW" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_room_view" Style="{StaticResource T3.ComboBox}"
+                                                  ToolTip="Floor plan of the chosen level that receives the room separation lines"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="0">
+                                        <TextBlock Text="ROOM NAME" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_room_name" Style="{StaticResource T3.TextBox}" Text="Room"
+                                                 ToolTip="Name given to every new room; leave empty for Revit's default"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_room_skip_existing" Content="Skip outlines that already hold a room" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Bottom"
+                                               Text="Separation lines follow all selected linework; rooms Revit cannot enclose are removed again."/>
+                                </Grid>
+
+                                <!-- ═══ COLUMNS ═══ -->
+                                <Grid x:Name="opt_column" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="52"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
+                                        <TextBlock Text="CREATE AS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rb_column_structural" Content="Structural columns" GroupName="column_mode" IsChecked="True"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="create_as_changed"/>
+                                            <RadioButton x:Name="rb_column_arch" Content="Architectural columns" GroupName="column_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Checked="create_as_changed"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                        <TextBlock Text="RECTANGULAR COLUMN TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_column_type" Style="{StaticResource T3.ComboBox}"
+                                                  ToolTip="Type placed on rectangles (copied per size when Type per detected size is on)"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.ColumnSpan="3">
+                                        <TextBlock Text="ROUND COLUMN TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_column_round_type" Style="{StaticResource T3.ComboBox}"
+                                                  ToolTip="Type placed on circles"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="0">
+                                        <TextBlock Text="TOP LEVEL" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_column_top_level" Style="{StaticResource T3.ComboBox}"
+                                                  SelectionChanged="column_top_level_changed"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="2">
+                                        <TextBlock Text="HEIGHT (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_column_height" Style="{StaticResource T3.TextBox}" Text="3000"
+                                                 ToolTip="Used when the top level is Unconnected"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="4" Grid.Column="0">
+                                        <TextBlock Text="SIZE ROUNDING (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_column_rounding" Style="{StaticResource T3.TextBox}" Text="10"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_column_match_size" Content="Type per detected size" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}" Margin="0,0,16,0"/>
+                                        <CheckBox x:Name="chk_column_rotate" Content="Rotate to match CAD" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Bottom"
+                                               Text="Shapes 100–3000 mm are read; a column drawn twice is placed once."/>
+                                </Grid>
+
+                                <!-- ═══ BEAMS ═══ -->
+                                <Grid x:Name="opt_beam" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="52"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
+                                        <TextBlock Text="CREATE AS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rb_beam_mode" Content="Beams" GroupName="beam_mode" IsChecked="True"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="create_as_changed"/>
+                                            <RadioButton x:Name="rb_beam_part_mode" Content="Parts (DirectShape)" GroupName="beam_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Checked="create_as_changed"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                        <TextBlock Text="BEAM TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cb_beam_types" Style="{StaticResource T3.ComboBox}"
+                                                  ToolTip="Structural framing type (copied per size when Type per detected size is on)"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="0">
+                                        <TextBlock Text="TOP OFFSET (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_beam_offset" Style="{StaticResource T3.TextBox}" Text="-50"
+                                                 ToolTip="Height of the beam top relative to the level"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="2">
+                                        <TextBlock Text="PART CATEGORY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_beam_part_category" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="0">
+                                        <TextBlock Text="MIN WIDTH (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_beam_min_width" Style="{StaticResource T3.TextBox}" Text="50"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="2">
+                                        <TextBlock Text="MAX WIDTH (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_beam_max_width" Style="{StaticResource T3.TextBox}" Text="1500"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_beam_match_size" Content="Type per detected size" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}" Margin="0,0,16,0"/>
+                                        <CheckBox x:Name="chk_beam_merge" Content="Merge collinear lines" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Bottom"
+                                               Text="Width rounds to 50 mm; depth follows it (200→500, 300→600, 400→800, 500→1000)."/>
+                                </Grid>
+
+                                <!-- ═══ GRIDS ═══ -->
+                                <Grid x:Name="opt_grid" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="52"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
+                                        <TextBlock Text="NAMING" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rb_grid_autoname" Content="1, 2, 3 and A, B, C" GroupName="grid_mode" IsChecked="True"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="create_as_changed"/>
+                                            <RadioButton x:Name="rb_grid_revitname" Content="Revit default names" GroupName="grid_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Checked="create_as_changed"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                        <TextBlock Text="GRID TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_grid_type" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="0">
+                                        <TextBlock Text="FIRST NUMBER" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_grid_start_number" Style="{StaticResource T3.TextBox}" Text="1"
+                                                 ToolTip="Steep axes are numbered left to right from this number"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="2">
+                                        <TextBlock Text="FIRST LETTER" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_grid_start_letter" Style="{StaticResource T3.TextBox}" Text="A"
+                                                 ToolTip="Flat axes are lettered bottom to top from this letter (I and O are skipped)"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="0">
+                                        <TextBlock Text="EXTEND ENDS (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_grid_extend" Style="{StaticResource T3.TextBox}" Text="0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="2">
+                                        <TextBlock Text="MIN LENGTH (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_grid_min_length" Style="{StaticResource T3.TextBox}" Text="1000"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_grid_skip_existing" Content="Skip axes that already have a grid" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Bottom"
+                                               Text="Dashed axis lines are joined into one grid. CAD bubble text is not read."/>
+                                </Grid>
+
+                                <!-- ═══ LINES ═══ -->
+                                <Grid x:Name="opt_lines" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="52"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
+                                        <TextBlock Text="CREATE AS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rb_lines_model" Content="Model lines" GroupName="lines_mode" IsChecked="True"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="create_as_changed"/>
+                                            <RadioButton x:Name="rb_lines_detail" Content="Detail lines (active view)" GroupName="lines_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Checked="create_as_changed"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                        <TextBlock Text="LINE STYLE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_line_style" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="0">
+                                        <TextBlock Text="OFFSET FROM LEVEL (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_lines_offset" Style="{StaticResource T3.TextBox}" Text="0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_lines_merge" Content="Merge collinear lines" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Bottom"
+                                               Text="Lines, arcs, circles and splines are copied. Detail lines need a plan or drafting view open."/>
+                                </Grid>
+
+                                <!-- ═══ MEP RUNS ═══ -->
+                                <Grid x:Name="opt_mep" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="52"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="60"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="24"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
+                                        <TextBlock Text="CREATE AS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="rb_mep_duct" Content="Ducts" Tag="duct" GroupName="mep_mode" IsChecked="True"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="mep_category_changed"/>
+                                            <RadioButton x:Name="rb_mep_pipe" Content="Pipes" Tag="pipe" GroupName="mep_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="mep_category_changed"/>
+                                            <RadioButton x:Name="rb_mep_tray" Content="Cable trays" Tag="tray" GroupName="mep_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Margin="0,0,16,0" Checked="mep_category_changed"/>
+                                            <RadioButton x:Name="rb_mep_conduit" Content="Conduits" Tag="conduit" GroupName="mep_mode"
+                                                         Style="{StaticResource T3.RadioButton}" Checked="mep_category_changed"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                        <TextBlock x:Name="lbl_mep_type" Text="DUCT TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_mep_type" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="0">
+                                        <TextBlock Text="SYSTEM TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_mep_system" Style="{StaticResource T3.ComboBox}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="2">
+                                        <TextBlock Text="LINE MODE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="cmb_mep_line_mode" Style="{StaticResource T3.ComboBox}" SelectedIndex="0"
+                                                  SelectionChanged="mep_line_mode_changed">
+                                            <ComboBoxItem Content="Single line (centerline)" Style="{StaticResource T3.ComboBoxItem}"/>
+                                            <ComboBoxItem Content="Double line (detect width)" Style="{StaticResource T3.ComboBoxItem}"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="0">
+                                        <TextBlock x:Name="lbl_mep_width" Text="WIDTH / DIAMETER (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_mep_width" Style="{StaticResource T3.TextBox}" Text="300"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="3" Grid.Column="2">
+                                        <TextBlock Text="HEIGHT (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_mep_height" Style="{StaticResource T3.TextBox}" Text="250"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="4" Grid.Column="0">
+                                        <TextBlock Text="OFFSET FROM LEVEL (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="txt_mep_offset" Style="{StaticResource T3.TextBox}" Text="2800"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                        <CheckBox x:Name="chk_mep_elbows" Content="Auto elbow fittings" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}" Margin="0,0,16,0"/>
+                                        <CheckBox x:Name="chk_mep_merge" Content="Merge collinear lines" IsChecked="True"
+                                                  Style="{StaticResource T3.CheckBox}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               VerticalAlignment="Bottom"
+                                               Text="Straight lines only; arcs are skipped. Sizes snap to the type's size catalog."/>
+                                </Grid>
                             </Grid>
                         </Border>
 
-                        <!-- ─── 1. WALL SETTINGS PANEL ─── -->
-                        <StackPanel x:Name="pnl_wall" Visibility="Visible">
-                            <!-- Wall mode selection -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="CREATE MODE" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <RadioButton x:Name="rb_wall_mode" Content="Wall"
-                                                     GroupName="wall_mode" IsChecked="True"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center" Margin="0,0,24,0"/>
-                                        <RadioButton x:Name="rb_wall_part_mode" Content="Part (DirectShape)"
-                                                     GroupName="wall_mode"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
+                        <!-- D · CAD LAYERS — same toolbar, list and tally for every mode -->
+                        <Border Grid.Column="2" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="44"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="32"/>
+                                </Grid.RowDefinitions>
 
-                            <!-- Wall params card -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <StackPanel>
-                                    <Grid>
+                                <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
+                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1" Padding="12,0">
+                                    <Grid VerticalAlignment="Center">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="16"/>
-                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock Text="WALL HEIGHT (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                            <TextBox x:Name="txt_wall_height" Style="{StaticResource T3.TextBox}" Height="28" Text="3000"/>
-                                        </StackPanel>
-
-                                        <StackPanel Grid.Column="2">
-                                            <TextBlock Text="DEFAULT THICKNESS (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                            <TextBox x:Name="txt_wall_thickness" Style="{StaticResource T3.TextBox}" Height="28" Text="200"/>
+                                        <TextBox x:Name="txt_layer_search" Grid.Column="0" Style="{StaticResource T3.Search}"
+                                                 Tag="Search layers..." TextChanged="layer_search_changed"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
+                                            <Button x:Name="btn_ai_select" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
+                                                    Click="ai_select_clicked"
+                                                    ToolTip="Tick the CAD layers that most likely hold this element type">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                    <TextBlock Text="AI Select" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="btn_layers_all" Content="Select All" Style="{StaticResource T3.Button.Secondary}"
+                                                    Margin="0,0,8,0" Click="layers_select_all_clicked" ToolTip="Tick every layer shown"/>
+                                            <Button x:Name="btn_layers_clear" Content="Clear" Style="{StaticResource T3.Button.Secondary}"
+                                                    Click="layers_clear_clicked" ToolTip="Untick every layer shown"/>
                                         </StackPanel>
                                     </Grid>
+                                </Border>
 
-                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                        <CheckBox x:Name="chk_structural" Content="Structural Wall"
-                                                  Style="{StaticResource T3.CheckBox}" Margin="0,0,24,0"/>
-                                        <CheckBox x:Name="chk_merge_collinear" Content="Merge Collinear Lines"
-                                                  Style="{StaticResource T3.CheckBox}" IsChecked="True" Margin="0,0,24,0"/>
-                                        <CheckBox x:Name="chk_include_unpaired" Content="Include Unpaired Lines"
-                                                  Style="{StaticResource T3.CheckBox}"/>
-                                    </StackPanel>
-
-                                    <!-- Part-only: category (collapsed by default) -->
-                                    <Grid x:Name="pnl_wall_part_category" Margin="0,12,0,0" Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CATEGORY" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <ComboBox x:Name="cmb_wall_part_category" Style="{StaticResource T3.ComboBox}" Height="28" Grid.Column="1"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Wall Layer list card -->
-                            <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Header row -->
-                                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CAD LAYERS (WALL LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_wall_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0"
-                                                ToolTip="Tick the CAD layers that most likely hold this element type">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
-                                        <Button x:Name="btn_wall_select_all" Grid.Column="3"
-                                                Content="Select All" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                        <Button x:Name="btn_wall_clear" Grid.Column="5"
-                                                Content="Clear" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                    </Grid>
-
-                                    <!-- Search -->
-                                    <Border Grid.Row="1" Height="28" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                            BorderThickness="1" CornerRadius="4" Padding="8,0" Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
-                                            <Grid Grid.Column="1">
-                                                <TextBlock x:Name="lbl_wall_search_placeholder" Text="Search layers..."
-                                                           Foreground="{StaticResource T3.TextDisabled}" FontSize="12.5" VerticalAlignment="Center"
-                                                           IsHitTestVisible="False"/>
-                                                <TextBox x:Name="txt_layer_search" Background="Transparent" BorderThickness="0"
-                                                         Padding="0" VerticalAlignment="Center" VerticalContentAlignment="Center"
-                                                         Height="24" FontSize="12.5" Foreground="{StaticResource T3.Text}"/>
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- Layer list -->
-                                    <Border Grid.Row="2" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" MinHeight="180" MaxHeight="320">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <StackPanel x:Name="pnl_wall_layers" Margin="8,4"/>
-                                        </ScrollViewer>
-                                    </Border>
+                                <Grid Grid.Row="1">
+                                    <DataGrid x:Name="grid_layers" Style="{StaticResource T3.DataGrid}" BorderThickness="0"
+                                              AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                              CanUserReorderColumns="False" SelectionMode="Single" HeadersVisibility="Column">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                    CellStyle="{StaticResource T3.DataGridCell.Check}">
+                                                <DataGridTemplateColumn.Header>
+                                                    <CheckBox x:Name="chk_all_grid_layers" Style="{StaticResource T3.CheckBox.Cell}"
+                                                              Click="select_all_grid_layers_clicked" ToolTip="Select all rows"/>
+                                                </DataGridTemplateColumn.Header>
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Grid>
+                                                            <TextBlock x:Name="row_is_selected_text" Text="{Binding is_selected}" Visibility="Collapsed"/>
+                                                            <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
+                                                                      Style="{StaticResource T3.CheckBox.Cell}"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="LAYER" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
+                                            <DataGridTextColumn Header="LINES" Binding="{Binding count}" Width="96" IsReadOnly="True"
+                                                                ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <TextBlock x:Name="txt_layers_empty" Style="{StaticResource T3.Empty}" Margin="24"
+                                               Visibility="Collapsed"
+                                               Text="No CAD layers to show. Import or link a DWG, pick it under CAD SOURCE, or clear the search."/>
                                 </Grid>
-                            </Border>
-                        </StackPanel>
 
-                        <!-- ─── 2. FLOOR SETTINGS PANEL ─── -->
-                        <StackPanel x:Name="pnl_floor" Visibility="Collapsed">
-                            <!-- Floor mode selection -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="CREATE MODE" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <RadioButton x:Name="rb_floor_mode" Content="Floor"
-                                                     GroupName="floor_mode" IsChecked="True"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center" Margin="0,0,24,0"/>
-                                        <RadioButton x:Name="rb_part_mode" Content="Part (DirectShape)"
-                                                     GroupName="floor_mode"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <!-- Floor params card -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <StackPanel>
-                                    <!-- Floor Type row -->
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="FLOOR TYPE" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <ComboBox x:Name="cmb_floor_type" Style="{StaticResource T3.ComboBox}" Height="28" Grid.Column="1"/>
-                                    </Grid>
-
-                                    <!-- Offset + structural -->
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="16"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="FLOOR OFFSET (MM)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <TextBox x:Name="txt_floor_offset" Grid.Column="1"
-                                                 Style="{StaticResource T3.TextBox}" Height="28" Text="0"/>
-                                        <CheckBox x:Name="chk_floor_structural" Grid.Column="3"
-                                                  Content="Structural Floor" Style="{StaticResource T3.CheckBox}"
-                                                  VerticalAlignment="Center"/>
-                                    </Grid>
-
-                                    <!-- Part-only: category (collapsed by default) -->
-                                    <Grid x:Name="pnl_part_category" Margin="0,0,0,8" Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CATEGORY" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <ComboBox x:Name="cmb_part_category" Style="{StaticResource T3.ComboBox}" Height="28" Grid.Column="1"/>
-                                    </Grid>
-
-                                    <!-- Part-only: thickness (collapsed by default) -->
-                                    <Grid x:Name="pnl_part_thickness" Margin="0,0,0,0" Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="PART THICKNESS (MM)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <TextBox x:Name="txt_part_thickness" Grid.Column="1"
-                                                 Style="{StaticResource T3.TextBox}" Height="28" Text="200"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Floor layer list card -->
-                            <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Header row -->
-                                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CAD LAYERS (FLOOR OUTLINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_floor_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0"
-                                                ToolTip="Tick the CAD layers that most likely hold this element type">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
-                                        <Button x:Name="btn_floor_select_all" Grid.Column="3"
-                                                Content="Select All" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                        <Button x:Name="btn_floor_clear" Grid.Column="5"
-                                                Content="Clear" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                    </Grid>
-
-                                    <!-- Search -->
-                                    <Border Grid.Row="1" Height="28" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                            BorderThickness="1" CornerRadius="4" Padding="8,0" Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
-                                            <Grid Grid.Column="1">
-                                                <TextBlock x:Name="lbl_floor_search_placeholder" Text="Search layers..."
-                                                           Foreground="{StaticResource T3.TextDisabled}" FontSize="12.5" VerticalAlignment="Center"
-                                                           IsHitTestVisible="False"/>
-                                                <TextBox x:Name="txt_floor_layer_search" Background="Transparent" BorderThickness="0"
-                                                         Padding="0" VerticalAlignment="Center" VerticalContentAlignment="Center"
-                                                         Height="24" FontSize="12.5" Foreground="{StaticResource T3.Text}"/>
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- Layer list -->
-                                    <Border Grid.Row="2" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" MinHeight="180" MaxHeight="320">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <StackPanel x:Name="pnl_floor_layers" Margin="8,4"/>
-                                        </ScrollViewer>
-                                    </Border>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- ─── 3. BEAM SETTINGS PANEL ─── -->
-                        <StackPanel x:Name="pnl_beam" Visibility="Collapsed">
-                            <!-- Beam mode selection -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="CREATE MODE" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <RadioButton x:Name="rb_beam_mode" Content="Beam"
-                                                     GroupName="beam_mode" IsChecked="True"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center" Margin="0,0,24,0"/>
-                                        <RadioButton x:Name="rb_beam_part_mode" Content="Part (DirectShape)"
-                                                     GroupName="beam_mode"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <!-- Beam params card -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <StackPanel>
-                                    <!-- Beam family -->
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="BEAM FAMILY" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <ComboBox x:Name="cb_beam_types" Style="{StaticResource T3.ComboBox}" Height="28" Grid.Column="1"
-                                                  ToolTip="Select the structural framing family"/>
-                                    </Grid>
-
-                                    <!-- Z Offset -->
-                                    <Grid Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Z OFFSET (MM)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <TextBox x:Name="txt_beam_offset" Grid.Column="1"
-                                                 Style="{StaticResource T3.TextBox}" Height="28" Text="-50"/>
-                                    </Grid>
-
-                                    <!-- Part-only: category (collapsed by default) -->
-                                    <Grid x:Name="pnl_beam_part_category" Margin="0,0,0,0" Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CATEGORY" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <ComboBox x:Name="cmb_beam_part_category" Style="{StaticResource T3.ComboBox}" Height="28" Grid.Column="1"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Beam layer card -->
-                            <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Header row -->
-                                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CAD LAYERS (BEAM OUTLINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_beam_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0"
-                                                ToolTip="Tick the CAD layers that most likely hold this element type">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
-                                        <Button x:Name="btn_beam_select_all" Grid.Column="3"
-                                                Content="Select All" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                        <Button x:Name="btn_beam_clear" Grid.Column="5"
-                                                Content="Clear" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                    </Grid>
-
-                                    <!-- Search -->
-                                    <Border Grid.Row="1" Height="28" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                            BorderThickness="1" CornerRadius="4" Padding="8,0" Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
-                                            <Grid Grid.Column="1">
-                                                <TextBlock x:Name="lbl_beam_search_placeholder" Text="Search layers..."
-                                                           Foreground="{StaticResource T3.TextDisabled}" FontSize="12.5" VerticalAlignment="Center"
-                                                           IsHitTestVisible="False"/>
-                                                <TextBox x:Name="txt_beam_layer_search" Background="Transparent" BorderThickness="0"
-                                                         Padding="0" VerticalAlignment="Center" VerticalContentAlignment="Center"
-                                                         Height="24" FontSize="12.5" Foreground="{StaticResource T3.Text}"/>
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- Layer list -->
-                                    <Border Grid.Row="2" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" MinHeight="180" MaxHeight="320">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <StackPanel x:Name="pnl_beam_layers" Margin="8,4"/>
-                                        </ScrollViewer>
-                                    </Border>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- ─── 4. DUCT SETTINGS PANEL ─── -->
-                        <StackPanel x:Name="pnl_duct" Visibility="Collapsed">
-                            <!-- Duct line mode selection -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="LINE MODE" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <RadioButton x:Name="rb_duct_single" Content="Single line (centerline)"
-                                                     GroupName="duct_line_mode" IsChecked="True"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center" Margin="0,0,24,0"/>
-                                        <RadioButton x:Name="rb_duct_double" Content="Double line (detect width)"
-                                                     GroupName="duct_line_mode"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <!-- Duct params card -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="16"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="16"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <StackPanel Grid.Row="0" Grid.Column="0">
-                                        <TextBlock Text="DUCT TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <ComboBox x:Name="cmb_duct_type" Style="{StaticResource T3.ComboBox}" Height="28"
-                                                  ToolTip="Rectangular or round duct type"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="3">
-                                        <TextBlock Text="SYSTEM TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <ComboBox x:Name="cmb_duct_system" Style="{StaticResource T3.ComboBox}" Height="28"
-                                                  ToolTip="Mechanical system type (Supply / Return / Exhaust)"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,0,0">
-                                        <TextBlock Text="WIDTH / Ø (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_duct_width" Style="{StaticResource T3.TextBox}" Height="28" Text="300"
-                                                 ToolTip="Width for rectangular ducts; diameter for round duct types. Auto-detected in double-line mode."/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,8,0,0">
-                                        <TextBlock Text="HEIGHT (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_duct_height" Style="{StaticResource T3.TextBox}" Height="28" Text="250"
-                                                 ToolTip="Height for rectangular ducts (ignored for round types)"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="4" Margin="0,8,0,0">
-                                        <TextBlock Text="OFFSET FROM LEVEL (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_duct_offset" Style="{StaticResource T3.TextBox}" Height="28" Text="2800"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5"
-                                                Orientation="Horizontal" Margin="0,12,0,0">
-                                        <CheckBox x:Name="chk_duct_elbows" Content="Auto elbow fittings"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True" Margin="0,0,24,0"/>
-                                        <CheckBox x:Name="chk_duct_merge" Content="Merge Collinear Lines"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True"/>
-                                    </StackPanel>
-
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="5" Margin="0,8,0,0"
-                                               Text="Arcs and curved segments are skipped — straight lines only."
-                                               Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}"/>
-                                </Grid>
-                            </Border>
-
-                            <!-- Duct layer card -->
-                            <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Header row -->
-                                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CAD LAYERS (DUCT LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_duct_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0"
-                                                ToolTip="Tick the CAD layers that most likely hold this element type">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
-                                        <Button x:Name="btn_duct_select_all" Grid.Column="3"
-                                                Content="Select All" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                        <Button x:Name="btn_duct_clear" Grid.Column="5"
-                                                Content="Clear" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                    </Grid>
-
-                                    <!-- Search -->
-                                    <Border Grid.Row="1" Height="28" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                            BorderThickness="1" CornerRadius="4" Padding="8,0" Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
-                                            <Grid Grid.Column="1">
-                                                <TextBlock x:Name="lbl_duct_search_placeholder" Text="Search layers..."
-                                                           Foreground="{StaticResource T3.TextDisabled}" FontSize="12.5" VerticalAlignment="Center"
-                                                           IsHitTestVisible="False"/>
-                                                <TextBox x:Name="txt_duct_layer_search" Background="Transparent" BorderThickness="0"
-                                                         Padding="0" VerticalAlignment="Center" VerticalContentAlignment="Center"
-                                                         Height="24" FontSize="12.5" Foreground="{StaticResource T3.Text}"/>
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- Layer list -->
-                                    <Border Grid.Row="2" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" MinHeight="180" MaxHeight="320">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <StackPanel x:Name="pnl_duct_layers" Margin="8,4"/>
-                                        </ScrollViewer>
-                                    </Border>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- ─── 5. PIPE SETTINGS PANEL ─── -->
-                        <StackPanel x:Name="pnl_pipe" Visibility="Collapsed">
-                            <!-- Pipe params card -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="16"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <StackPanel Grid.Row="0" Grid.Column="0">
-                                        <TextBlock Text="PIPE TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <ComboBox x:Name="cmb_pipe_type" Style="{StaticResource T3.ComboBox}" Height="28"
-                                                  ToolTip="Pipe type (routing preferences drive fittings)"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="0" Grid.Column="2">
-                                        <TextBlock Text="SYSTEM TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <ComboBox x:Name="cmb_pipe_system" Style="{StaticResource T3.ComboBox}" Height="28"
-                                                  ToolTip="Piping system type (Domestic / Sanitary / Hydronic)"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,0,0">
-                                        <TextBlock Text="DIAMETER (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_pipe_diameter" Style="{StaticResource T3.TextBox}" Height="28" Text="100"
-                                                 ToolTip="Nominal diameter — snaps to the pipe segment size catalog"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,8,0,0">
-                                        <TextBlock Text="OFFSET FROM LEVEL (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_pipe_offset" Style="{StaticResource T3.TextBox}" Height="28" Text="2600"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
-                                                Orientation="Horizontal" Margin="0,12,0,0">
-                                        <CheckBox x:Name="chk_pipe_elbows" Content="Auto elbow fittings"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True" Margin="0,0,24,0"/>
-                                        <CheckBox x:Name="chk_pipe_merge" Content="Merge Collinear Lines"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True"/>
-                                    </StackPanel>
-
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,8,0,0"
-                                               Text="Arcs and curved segments are skipped — straight lines only."
-                                               Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}"/>
-                                </Grid>
-                            </Border>
-
-                            <!-- Pipe layer card -->
-                            <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Header row -->
-                                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CAD LAYERS (PIPE LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_pipe_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0"
-                                                ToolTip="Tick the CAD layers that most likely hold this element type">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
-                                        <Button x:Name="btn_pipe_select_all" Grid.Column="3"
-                                                Content="Select All" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                        <Button x:Name="btn_pipe_clear" Grid.Column="5"
-                                                Content="Clear" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                    </Grid>
-
-                                    <!-- Search -->
-                                    <Border Grid.Row="1" Height="28" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                            BorderThickness="1" CornerRadius="4" Padding="8,0" Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
-                                            <Grid Grid.Column="1">
-                                                <TextBlock x:Name="lbl_pipe_search_placeholder" Text="Search layers..."
-                                                           Foreground="{StaticResource T3.TextDisabled}" FontSize="12.5" VerticalAlignment="Center"
-                                                           IsHitTestVisible="False"/>
-                                                <TextBox x:Name="txt_pipe_layer_search" Background="Transparent" BorderThickness="0"
-                                                         Padding="0" VerticalAlignment="Center" VerticalContentAlignment="Center"
-                                                         Height="24" FontSize="12.5" Foreground="{StaticResource T3.Text}"/>
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- Layer list -->
-                                    <Border Grid.Row="2" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" MinHeight="180" MaxHeight="320">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <StackPanel x:Name="pnl_pipe_layers" Margin="8,4"/>
-                                        </ScrollViewer>
-                                    </Border>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- ─── 6. CABLE TRAY SETTINGS PANEL ─── -->
-                        <StackPanel x:Name="pnl_tray" Visibility="Collapsed">
-                            <!-- Tray line mode selection -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="LINE MODE" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <RadioButton x:Name="rb_tray_single" Content="Single line (centerline)"
-                                                     GroupName="tray_line_mode" IsChecked="True"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center" Margin="0,0,24,0"/>
-                                        <RadioButton x:Name="rb_tray_double" Content="Double line (detect width)"
-                                                     GroupName="tray_line_mode"
-                                                     Style="{StaticResource T3.RadioButton}"
-                                                     VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <!-- Tray params card -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="16"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="16"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="5">
-                                        <TextBlock Text="CABLE TRAY TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <ComboBox x:Name="cmb_tray_type" Style="{StaticResource T3.ComboBox}" Height="28"
-                                                  ToolTip="Cable tray type (ladder / channel)"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,0,0">
-                                        <TextBlock Text="WIDTH (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_tray_width" Style="{StaticResource T3.TextBox}" Height="28" Text="300"
-                                                 ToolTip="Tray width. Auto-detected in double-line mode."/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,8,0,0">
-                                        <TextBlock Text="HEIGHT (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_tray_height" Style="{StaticResource T3.TextBox}" Height="28" Text="100"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="4" Margin="0,8,0,0">
-                                        <TextBlock Text="OFFSET FROM LEVEL (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_tray_offset" Style="{StaticResource T3.TextBox}" Height="28" Text="2700"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5"
-                                                Orientation="Horizontal" Margin="0,12,0,0">
-                                        <CheckBox x:Name="chk_tray_elbows" Content="Auto elbow fittings"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True" Margin="0,0,24,0"/>
-                                        <CheckBox x:Name="chk_tray_merge" Content="Merge Collinear Lines"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True"/>
-                                    </StackPanel>
-
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="5" Margin="0,8,0,0"
-                                               Text="Arcs and curved segments are skipped — straight lines only."
-                                               Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}"/>
-                                </Grid>
-                            </Border>
-
-                            <!-- Tray layer card -->
-                            <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Header row -->
-                                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CAD LAYERS (CABLE TRAY LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_tray_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0"
-                                                ToolTip="Tick the CAD layers that most likely hold this element type">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
-                                        <Button x:Name="btn_tray_select_all" Grid.Column="3"
-                                                Content="Select All" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                        <Button x:Name="btn_tray_clear" Grid.Column="5"
-                                                Content="Clear" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                    </Grid>
-
-                                    <!-- Search -->
-                                    <Border Grid.Row="1" Height="28" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                            BorderThickness="1" CornerRadius="4" Padding="8,0" Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
-                                            <Grid Grid.Column="1">
-                                                <TextBlock x:Name="lbl_tray_search_placeholder" Text="Search layers..."
-                                                           Foreground="{StaticResource T3.TextDisabled}" FontSize="12.5" VerticalAlignment="Center"
-                                                           IsHitTestVisible="False"/>
-                                                <TextBox x:Name="txt_tray_layer_search" Background="Transparent" BorderThickness="0"
-                                                         Padding="0" VerticalAlignment="Center" VerticalContentAlignment="Center"
-                                                         Height="24" FontSize="12.5" Foreground="{StaticResource T3.Text}"/>
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- Layer list -->
-                                    <Border Grid.Row="2" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" MinHeight="180" MaxHeight="320">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <StackPanel x:Name="pnl_tray_layers" Margin="8,4"/>
-                                        </ScrollViewer>
-                                    </Border>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- ─── 7. CONDUIT SETTINGS PANEL ─── -->
-                        <StackPanel x:Name="pnl_conduit" Visibility="Collapsed">
-                            <!-- Conduit params card -->
-                            <Border Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="16"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3">
-                                        <TextBlock Text="CONDUIT TYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <ComboBox x:Name="cmb_conduit_type" Style="{StaticResource T3.ComboBox}" Height="28"
-                                                  ToolTip="Conduit type (with or without fittings)"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,0,0">
-                                        <TextBlock Text="DIAMETER (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_conduit_diameter" Style="{StaticResource T3.TextBox}" Height="28" Text="25"
-                                                 ToolTip="Trade size — snaps to the conduit size table"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,8,0,0">
-                                        <TextBlock Text="OFFSET FROM LEVEL (MM)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="txt_conduit_offset" Style="{StaticResource T3.TextBox}" Height="28" Text="2700"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
-                                                Orientation="Horizontal" Margin="0,12,0,0">
-                                        <CheckBox x:Name="chk_conduit_elbows" Content="Auto elbow fittings"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True" Margin="0,0,24,0"/>
-                                        <CheckBox x:Name="chk_conduit_merge" Content="Merge Collinear Lines"
-                                                  Style="{StaticResource T3.CheckBox}"
-                                                  IsChecked="True"/>
-                                    </StackPanel>
-
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,8,0,0"
-                                               Text="Arcs and curved segments are skipped — straight lines only."
-                                               Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextMuted}"/>
-                                </Grid>
-                            </Border>
-
-                            <!-- Conduit layer card -->
-                            <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
-                                    BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Header row -->
-                                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="CAD LAYERS (CONDUIT LINES)" Style="{StaticResource T3.Label}" VerticalAlignment="Center"/>
-                                        <Button x:Name="btn_conduit_ai" Grid.Column="1" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="8,0"
-                                                ToolTip="Tick the CAD layers that most likely hold this element type">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                                <TextBlock Text="AI Select" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
-                                        <Button x:Name="btn_conduit_select_all" Grid.Column="3"
-                                                Content="Select All" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                        <Button x:Name="btn_conduit_clear" Grid.Column="5"
-                                                Content="Clear" Style="{StaticResource T3.Button.Secondary}"
-                                                Height="26" Padding="12,0"/>
-                                    </Grid>
-
-                                    <!-- Search -->
-                                    <Border Grid.Row="1" Height="28" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
-                                            BorderThickness="1" CornerRadius="4" Padding="8,0" Margin="0,0,0,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
-                                            <Grid Grid.Column="1">
-                                                <TextBlock x:Name="lbl_conduit_search_placeholder" Text="Search layers..."
-                                                           Foreground="{StaticResource T3.TextDisabled}" FontSize="12.5" VerticalAlignment="Center"
-                                                           IsHitTestVisible="False"/>
-                                                <TextBox x:Name="txt_conduit_layer_search" Background="Transparent" BorderThickness="0"
-                                                         Padding="0" VerticalAlignment="Center" VerticalContentAlignment="Center"
-                                                         Height="24" FontSize="12.5" Foreground="{StaticResource T3.Text}"/>
-                                            </Grid>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- Layer list -->
-                                    <Border Grid.Row="2" BorderBrush="{StaticResource T3.Border}" BorderThickness="1"
-                                            CornerRadius="4" MinHeight="180" MaxHeight="320">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <StackPanel x:Name="pnl_conduit_layers" Margin="8,4"/>
-                                        </ScrollViewer>
-                                    </Border>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-
-                    </StackPanel>
-                </ScrollViewer>
-
-                <!-- ROW 2: FOOTER BAR -->
+                                <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
+                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0" Padding="12,0">
+                                    <TextBlock x:Name="txt_layer_tally" Style="{StaticResource T3.Tally}"
+                                               TextTrimming="CharacterEllipsis" Text="0 of 0 layers selected"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
             </Grid>
 
-            <!-- ══════════════════ ROW 2: UNIFIED FOOTER BAR ══════════════════ -->
+            <!-- ══════════════ FOOTER — identical for every mode ══════════════ -->
             <Border Grid.Row="2" Style="{StaticResource T3.FooterBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource T3.Copyright}"/>
-                        <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="12,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="txt_status" Text="Select a CAD file and click Refresh"
-                                   Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
+                        <Border Width="1" Height="14" Background="{StaticResource T3.Border}" Margin="12,0" VerticalAlignment="Center"/>
+                        <Ellipse x:Name="dot_status" Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.Success.Accent}"/>
+                        <StackPanel x:Name="progress_panel" Orientation="Horizontal" VerticalAlignment="Center"
+                                    Visibility="Collapsed" Margin="0,0,12,0">
+                            <ProgressBar x:Name="pb_run" Style="{StaticResource T3.ProgressBar}" Width="120"/>
+                        </StackPanel>
+                        <TextBlock x:Name="txt_status" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="560" Text="Ready"/>
                     </StackPanel>
-
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btn_refresh"
-                                Content="Refresh"
-                                Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="16,0" Margin="0,0,8,0"
-                                ToolTip="Reload CAD files and layers"/>
-
-                        <Button x:Name="btn_run"
-                                Content="Run"
-                                Style="{StaticResource T3.Button.Primary}"
-                                Height="28" Padding="16,0" Margin="0,0,8,0"
-                                IsDefault="True"
-                                ToolTip="Run conversion"/>
-
-                        <Button x:Name="btn_close_bar"
-                                Content="Close"
-                                Style="{StaticResource T3.Button.Secondary}"
-                                Height="28" Padding="16,0"
-                                ToolTip="Close"/>
+                        <Button x:Name="btn_close_bar" Content="Close" Style="{StaticResource T3.Button.Ghost}"
+                                Margin="0,0,8,0" Click="close_bar_clicked" ToolTip="Close without creating anything"/>
+                        <Button x:Name="btn_refresh" Content="Rescan" Style="{StaticResource T3.Button.Secondary}"
+                                Margin="0,0,8,0" Click="refresh_clicked"
+                                ToolTip="Reload CAD files, levels, types and layers (F5)"/>
+                        <Button x:Name="btn_run" Content="Create Walls" Style="{StaticResource T3.Button.Primary}"
+                                MinWidth="152" IsDefault="True" Click="run_clicked"
+                                ToolTip="Review the count, then create the elements"/>
                     </StackPanel>
                 </Grid>
             </Border>
