@@ -10,10 +10,6 @@ from GUI.WPF_Base import T3WPFWindow, to_items_source
 from Snippets._host import get_revit_version
 from Snippets._compat import make_eid, eid_value, net_list
 
-try:
-    from GUI import RevitTheme as _theme
-except Exception:
-    _theme = None
 
 import clr
 clr.AddReference('PresentationFramework')
@@ -240,31 +236,9 @@ class RoomToFloorWindow(T3WPFWindow):
         self._all_rooms = []
         self._floor_type_map = {}
 
-        self._adopt_host_font()
-        self._apply_theme()
         self._load_rooms()
         self._load_floor_types()
         self._update_status()
-
-    def _adopt_host_font(self):
-        if _theme is None:
-            return
-        family, size = _theme.host_font()
-        if family:
-            try:
-                self.FontFamily = family
-                if size and size > 0:
-                    self.FontSize = size
-            except Exception:
-                pass
-
-    def _apply_theme(self, theme=None):
-        if _theme is None:
-            return
-        try:
-            _theme.apply(self, theme)
-        except Exception:
-            pass
 
     def _load_rooms(self):
         try:

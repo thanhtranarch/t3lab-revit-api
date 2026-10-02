@@ -6,10 +6,6 @@ import sys
 
 from pyrevit import forms
 
-try:
-    from GUI import RevitTheme as _theme
-except Exception:
-    _theme = None
 
 import System
 
@@ -93,30 +89,8 @@ class WallAdjustBaseWindow(T3WPFWindow):
         self._elements = []
         self._levels = []
 
-        self._adopt_host_font()
-        self._apply_theme()
         self._load_levels()
         self._check_initial_selection()
-
-    def _adopt_host_font(self):
-        if _theme is None:
-            return
-        family, size = _theme.host_font()
-        if family:
-            try:
-                self.FontFamily = family
-                if size and size > 0:
-                    self.FontSize = size
-            except Exception:
-                pass
-
-    def _apply_theme(self, theme=None):
-        if _theme is None:
-            return
-        try:
-            _theme.apply(self, theme)
-        except Exception:
-            pass
 
     def _load_levels(self):
         if not self._doc:

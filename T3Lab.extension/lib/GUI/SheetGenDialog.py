@@ -116,10 +116,6 @@ if lib_dir not in sys.path:
 XAML_FILE  = os.path.join(os.path.dirname(__file__), 'Tools', 'SheetGen.xaml')
 
 from GUI.ProgressPauseMixin import ProgressPauseMixin
-try:
-    import GUI.RevitTheme as RevitTheme
-except Exception:
-    RevitTheme = None
 
 # Printable margin inside the title block (~20 mm), shared by the layout
 # preview and the real viewport placement so they can never drift apart.
@@ -222,8 +218,6 @@ class CreateRoomPlanWindow(T3WPFWindow):
         if uidoc_param:
             uidoc = uidoc_param
         T3WPFWindow.__init__(self, XAML_FILE)
-        self._adopt_host_font()
-        self._apply_theme()
         self._all_rooms = []
         self._first_sheet = None
         self._generated_sheets = []
@@ -236,22 +230,6 @@ class CreateRoomPlanWindow(T3WPFWindow):
         self._update_status()
         self._update_mockup()
 
-
-    def _adopt_host_font(self):
-        """Adopt host font per T3 standard."""
-        if RevitTheme:
-            try:
-                RevitTheme.adopt_font(self)
-            except Exception:
-                pass
-
-    def _apply_theme(self):
-        """Apply theme per T3 standard."""
-        if RevitTheme:
-            try:
-                RevitTheme.apply(self)
-            except Exception:
-                pass
 
     # ── Data loading ──────────────────────────────────
     def _load_rooms(self):

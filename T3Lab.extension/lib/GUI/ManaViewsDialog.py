@@ -91,13 +91,6 @@ except Exception:
 GUI_DIR = os.path.dirname(__file__)
 XAML_FILE = os.path.join(GUI_DIR, 'Tools', 'ManaViews.xaml')
 
-try:
-    from GUI import RevitTheme as _theme
-except Exception:
-    try:
-        import RevitTheme as _theme
-    except Exception:
-        _theme = None
 
 from GUI.ProgressPauseMixin import ProgressPauseMixin
 from GUI.DataGridColumnFilter import ColumnFilterController
@@ -236,8 +229,6 @@ class ViewManagerWindow(T3WPFWindow):
         self.doc = revit.doc
         self.uidoc = revit.uidoc
 
-        self._adopt_host_font()
-        self._apply_theme()
         
         # Data collections
         self.all_views = []
@@ -396,26 +387,6 @@ class ViewManagerWindow(T3WPFWindow):
         """Ghi một câu trạng thái ra footer (dùng chung cho cả 2 tab)."""
         try:
             self.txt_status_bar.Text = text
-        except Exception:
-            pass
-
-    def _adopt_host_font(self):
-        if _theme is None:
-            return
-        family, size = _theme.host_font()
-        if family:
-            try:
-                self.FontFamily = family
-                if size and size > 0:
-                    self.FontSize = size
-            except Exception:
-                pass
-
-    def _apply_theme(self, theme=None):
-        if _theme is None:
-            return
-        try:
-            _theme.apply(self, theme)
         except Exception:
             pass
 

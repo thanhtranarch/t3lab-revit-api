@@ -52,13 +52,6 @@ except Exception as e:
     # Print error in case imports fail
     print("Error importing services: {}".format(e))
 
-try:
-    from GUI import RevitTheme as _theme
-except Exception:
-    try:
-        import RevitTheme as _theme
-    except Exception:
-        _theme = None
 
 # `revit.doc` / `revit.uidoc` RAISE AttributeError (not return None) when no
 # UIDocument is active. At module scope that kills the import outright, so the
@@ -165,8 +158,6 @@ class SheetManagerWindow(T3WPFWindow):
         T3WPFWindow.__init__(self, XAML_FILE)
         self.doc = revit.doc
 
-        self._adopt_host_font()
-        self._apply_theme()
         
         # Initialize Core Services
         self.revit_service = RevitService(self.doc)
@@ -321,26 +312,6 @@ class SheetManagerWindow(T3WPFWindow):
         """Ghi một câu trạng thái ra footer."""
         try:
             self.txt_status_bar.Text = text
-        except Exception:
-            pass
-
-    def _adopt_host_font(self):
-        if _theme is None:
-            return
-        family, size = _theme.host_font()
-        if family:
-            try:
-                self.FontFamily = family
-                if size and size > 0:
-                    self.FontSize = size
-            except Exception:
-                pass
-
-    def _apply_theme(self, theme=None):
-        if _theme is None:
-            return
-        try:
-            _theme.apply(self, theme)
         except Exception:
             pass
 

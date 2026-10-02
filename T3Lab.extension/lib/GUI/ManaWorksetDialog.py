@@ -9,10 +9,6 @@ from GUI.WPF_Base import T3WPFWindow, to_items_source
 from Snippets._compat import eid_value
 from Snippets._host import get_revit_version
 
-try:
-    from GUI import RevitTheme as _theme
-except Exception:
-    _theme = None
 
 import clr
 clr.AddReference('System')
@@ -212,8 +208,6 @@ class WorksetManagerWindow(T3WPFWindow):
         T3WPFWindow.__init__(self, XAML_FILE)
         self._doc = doc or revit.doc
 
-        self._adopt_host_font()
-        self._apply_theme()
 
 
         self.list_file_path = DEFAULT_LIST_FILE
@@ -240,26 +234,6 @@ class WorksetManagerWindow(T3WPFWindow):
             self._set_worksharing_state(enabled=True)
             self._refresh_worksets()
         self._update_status()
-
-    def _adopt_host_font(self):
-        if _theme is None:
-            return
-        family, size = _theme.host_font()
-        if family:
-            try:
-                self.FontFamily = family
-                if size and size > 0:
-                    self.FontSize = size
-            except Exception:
-                pass
-
-    def _apply_theme(self, theme=None):
-        if _theme is None:
-            return
-        try:
-            _theme.apply(self, theme)
-        except Exception:
-            pass
 
     def minimize_button_clicked(self, sender, e):
         self.WindowState = WindowState.Minimized

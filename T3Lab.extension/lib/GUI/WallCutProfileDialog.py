@@ -6,10 +6,6 @@ import sys
 
 from pyrevit import forms
 
-try:
-    from GUI import RevitTheme as _theme
-except Exception:
-    _theme = None
 
 import System
 
@@ -112,31 +108,9 @@ class WallCutProfileWindow(T3WPFWindow):
         self._picked_walls = []
         self._opening_families = []
 
-        self._adopt_host_font()
-        self._apply_theme()
         self._init_controls()
         self._load_links()
         self._load_opening_families()
-
-    def _adopt_host_font(self):
-        if _theme is None:
-            return
-        family, size = _theme.host_font()
-        if family:
-            try:
-                self.FontFamily = family
-                if size and size > 0:
-                    self.FontSize = size
-            except Exception:
-                pass
-
-    def _apply_theme(self, theme=None):
-        if _theme is None:
-            return
-        try:
-            _theme.apply(self, theme)
-        except Exception:
-            pass
 
     def _init_controls(self):
         if hasattr(self, 'cmb_method') and self.cmb_method:
