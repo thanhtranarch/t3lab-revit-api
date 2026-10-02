@@ -142,6 +142,14 @@ class LengthUnit(object):
         text = "{:.{}f}".format(value, self.decimals)
         return text.rstrip("0").rstrip(".") if "." in text else text
 
+    def show(self, feet):
+        """Text for a sentence, with the unit: '2800 mm', '1.25 m',
+        '9\' - 2 1/4"' (feet-inches and inches already carry ' and ")."""
+        text = self.text(feet)
+        if self.style == "decimal":
+            return "{} {}".format(text, self.tag)
+        return text
+
     def default_text(self, mm):
         """A default the code keeps in mm, shown in this unit."""
         return self.text(float(mm) / MM_PER_FT)
@@ -161,10 +169,13 @@ class LengthUnit(object):
         m = re.match(r"^({n})\s*(?:'|ft|feet|foot)\s*-?\s*({n})\s*(?:\"|in|inch|inches)?$"
                      .format(n=_NUM), s)
         if m:
-            ft = _number(m.group(1))
-            inch = _number(m.group(2))
-            sign = -1.0 if ft < 0 else 1.0
-            return ft + sign * inch / 12.0
+            # The sign comes from the TEXT: "-0' - 2\"" has ft == -0.0, which is
+            # not < 0, and used to come back as +2" (a beam offset 2" above the
+            # level instead of below it).
+            sign = -1.0 if m.group(1).strip().startswith("-") else 1.0
+            ft = abs(_number(m.group(1)))
+            inch = abs(_number(m.group(2)))
+            return sign * (ft + inch / 12.0)
 
         # one number with an explicit unit
         m = re.match(r"^({n})\s*(mm|cm|dm|m|ft|feet|foot|'|in|inch|inches|\")$"
