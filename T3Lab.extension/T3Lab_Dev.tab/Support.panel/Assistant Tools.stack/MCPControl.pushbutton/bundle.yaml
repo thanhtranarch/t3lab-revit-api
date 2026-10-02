@@ -1,9 +1,9 @@
 title: "MCP\nControl"
-tooltip: "AI Connection & MCP Control Panel - Start/Stop the MCP server and manage connection settings."
+tooltip: "Connect AI apps (Claude Desktop, ChatGPT Codex, Antigravity) to Revit through the T3Lab MCP server."
 description: |
-  Start or stop the local MCP server process
-  View server status and active connection info
-  Configure host, port, and authentication settings
+  Setup: start the server, connect your AI app, check the active model
+  Manual Config: copy the MCP entry for any other AI app
+  Advanced: auto-start, port, file task watcher, teaching capture
   Enables Claude AI (and other MCP clients) to interact directly with Revit
 author: "Tran Tien Thanh & Dang Quoc Truong"
-version: "1.0.0"
+version: "1.1.0"
