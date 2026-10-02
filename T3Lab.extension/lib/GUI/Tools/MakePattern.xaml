@@ -1707,7 +1707,7 @@
 
 
     <!-- ═══ Outer window border (rule 26: custom chrome, rounded, no HWND bleed) ═══ -->
-    <Border Background="{StaticResource T3.Canvas}"
+    <Border Background="{StaticResource T3.Surface}"
             BorderBrush="{StaticResource T3.BorderStrong}"
             BorderThickness="1"
             CornerRadius="{StaticResource T3.R.Window}"
@@ -1754,10 +1754,12 @@
             </Border>
 
             <!-- ══════════════════ ROW 1: WORKSPACE — ONE PANEL, THREE COLUMNS ══════════════════
-                 Settings | Module canvas | Surface preview share one T3.Panel surface.
-                 Shared header row (40) and shared info strip row (40) keep every column
-                 aligned; columns are divided by 1px T3.Border rules, no floating gaps. -->
-            <Border Grid.Row="1" Margin="16" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                 Settings | Module canvas | Surface preview fill the window edge to edge:
+                 no outer margin, no inset card, so no grey T3.Canvas band shows between
+                 the title bar, the panel and the footer. Shared header row (40) and shared
+                 info strip row (40) keep every column aligned; columns are divided by 1px
+                 T3.Border rules. -->
+            <Border Grid.Row="1" Background="{StaticResource T3.Surface}" ClipToBounds="True">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="280"/>
