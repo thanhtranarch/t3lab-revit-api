@@ -776,7 +776,7 @@ class ReportGenerator(object):
         name = WC.TextBlock()
         name.Text = u"Option {}".format(opt.option_id)
         if is_chosen:
-            name.Text += u"   \u2605 chosen"
+            name.Text += u"   chosen"
         name.FontSize = 13; name.FontWeight = SW.FontWeights.SemiBold
         name.Foreground = brush_chosen if is_chosen else brush_text
         stack.Children.Add(name)
@@ -978,7 +978,7 @@ class TileLayoutWindow(T3WPFWindow):
             self.btn_next.Content = "Generate Concepts →"
             self.btn_next.IsEnabled = bool(self._floors)
         else:
-            self.btn_next.Content = "Apply to Model ✓"
+            self.btn_next.Content = "Apply to Model"
             self.btn_next.IsEnabled = self._every_floor_has_choice()
 
     def _every_floor_has_choice(self):
@@ -1204,7 +1204,7 @@ class TileLayoutWindow(T3WPFWindow):
         if n_kept:
             msg += "  Previous choice kept on {} floor(s).".format(n_kept)
         if bw_gap:
-            msg += (u"  ⚠ Basket Weave needs tile length = k × width "
+            msg += (u"  Basket Weave needs tile length = k × width "
                     u"(e.g. 600×300) — current size leaves gaps.")
         self.status_text.Text = msg
         return True
@@ -1271,7 +1271,7 @@ class TileLayoutWindow(T3WPFWindow):
 
         stack = WC.StackPanel()
 
-        # Header: "● Option A                              [↗ Expand]"
+        # Header: "Option A                                [↗ Expand]"
         header = WC.Grid()
         cdef0 = WC.ColumnDefinition(); cdef0.Width = SW.GridLength(1, SW.GridUnitType.Star)
         cdef1 = WC.ColumnDefinition(); cdef1.Width = SW.GridLength.Auto
@@ -1279,14 +1279,13 @@ class TileLayoutWindow(T3WPFWindow):
         header.ColumnDefinitions.Add(cdef1)
 
         header_left = WC.StackPanel(); header_left.Orientation = WC.Orientation.Horizontal
-        dot = WC.TextBlock()
-        dot.Text = "●"; dot.FontSize = 16; dot.Foreground = brush_sub
-        dot.Margin = SW.Thickness(0, 0, 6, 0)
+        # No decorative bullet before the name (T3 rule 22: no Unicode
+        # characters as icons) — "Option A" stands on its own.
         name = WC.TextBlock()
         name.Text = "Option {}".format(opt.option_id)
         name.FontSize = 13; name.FontWeight = SW.FontWeights.SemiBold
         name.Foreground = brush_text
-        header_left.Children.Add(dot); header_left.Children.Add(name)
+        header_left.Children.Add(name)
         WC.Grid.SetColumn(header_left, 0)
         header.Children.Add(header_left)
 

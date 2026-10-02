@@ -97,8 +97,10 @@ Window class **L 1000×620**, no `SizeToContent`.
   Trays"). `MinWidth="152"` stops the label change from moving anything.
 - **Rail:** tiles are grouped Architecture · Structure · Datum/Lines · MEP.
   Each tile has a tooltip, and the selected tile is the T3.Rail.Tile checked
-  state. Icons are 24-unit line art: brick wall, slab, ceiling with an up
-  arrow, room cross, column, I-section, grid bubbles, polyline, and pipe elbow.
+  state. Icons are Segoe MDL2 glyphs (`T3.Icon.Rail`, one glyph per concept
+  in the standard's table): Tiles (wall courses), TiltUp (floor plane),
+  TiltDown (ceiling grid), Home (room), Bank (columns), IBeam (beam section),
+  MapPin2 (grid head), Flow (line with two end grips) and Wire (MEP run).
   The four MEP tiles became one **MEP Runs** tile with Ducts / Pipes / Cable
   trays / Conduits as its CREATE AS choice, because their options were the same
   apart from system and height. This keeps nine tiles inside the 524 px body.

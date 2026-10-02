@@ -99,6 +99,8 @@ _RED    = _brush(239, 68, 68)
 # rows. Named because it renders BLANK in a terminal, which has already led
 # to it being mistaken for an empty string and "fixed" away.
 _GLYPH_CANCEL = u""
+# Segoe MDL2 "Refresh" (U+E72C) — rescan a linked project folder.
+_GLYPH_REFRESH = u"\uE72C"
 
 
 class LLMSettingWindow(T3WPFWindow):
@@ -398,7 +400,7 @@ class LLMSettingWindow(T3WPFWindow):
             router = LLMRouter()
             router.set_model(router.get_active_name(), item.ToString())
             self.model_saved_hint.Foreground = _GREEN
-            self.model_saved_hint.Text = u"✓ Saved"
+            self.model_saved_hint.Text = u"Saved"
             self._flash_saved_hint()
         except Exception as ex:
             logger.debug("save_model_clicked error: {}".format(ex))
@@ -558,12 +560,12 @@ class LLMSettingWindow(T3WPFWindow):
                         self._models_cache[name] = models
                         self._populate_model_combo(name)
                         self.model_saved_hint.Foreground = _GREEN
-                        self.model_saved_hint.Text = u"✓ Connected ({} models)".format(len(models))
+                        self.model_saved_hint.Text = u"Connected ({} models)".format(len(models))
                     else:
                         self._models_cache.pop(name, None)
                         self._populate_model_combo(name)
                         self.model_saved_hint.Foreground = _RED
-                        self.model_saved_hint.Text = u"✗ Invalid key or connection failed"
+                        self.model_saved_hint.Text = u"Invalid key or connection failed"
                     self._set_status_dot(name, ok)
 
                 self._ui_invoke(_apply)
@@ -603,7 +605,7 @@ class LLMSettingWindow(T3WPFWindow):
             self._host_dirty = False
             self._models_cache.pop(name, None)
             self._update_instant()
-            self._flash_hint(self.model_saved_hint, u"✓ Server URL saved")
+            self._flash_hint(self.model_saved_hint, u"Server URL saved")
 
             def _probe():
                 try:
@@ -884,9 +886,24 @@ class LLMSettingWindow(T3WPFWindow):
         if not self._start_worker(_bg):
             self._probing = False
 
+    # ─── Icon-only button content ──────────────────────────────────────────
+
+    def _icon_content(self, glyph):
+        """Content of an icon-only button: a Segoe MDL2 glyph TextBlock styled
+        T3.Icon (T3 rule 22), never a Unicode character. Colour follows the
+        button's Foreground."""
+        from System.Windows.Controls import TextBlock
+        tb = TextBlock()
+        tb.Text = glyph
+        try:
+            tb.Style = self.FindResource("T3.Icon")
+        except Exception:
+            tb.FontFamily = System.Windows.Media.FontFamily("Segoe MDL2 Assets")
+        return tb
+
     # ─── Generic hint flash ─────────────────────────────────────────────────
 
-    def _flash_hint(self, tb, text=u"✓ Saved", seconds=2.0):
+    def _flash_hint(self, tb, text=u"Saved", seconds=2.0):
         """Show a short confirmation next to a field, then clear it."""
         try:
             tb.Foreground = _GREEN
@@ -1490,7 +1507,7 @@ class LLMSettingWindow(T3WPFWindow):
                 grid.Children.Add(tb)
 
                 rb = Button()
-                rb.Content = u"↻"
+                rb.Content = self._icon_content(_GLYPH_REFRESH)
                 rb.FontSize = 11
                 rb.Width = 20
                 rb.Height = 20
@@ -1510,7 +1527,7 @@ class LLMSettingWindow(T3WPFWindow):
                 grid.Children.Add(rb)
 
                 btn = Button()
-                btn.Content = u"✕"
+                btn.Content = self._icon_content(_GLYPH_CANCEL)
                 btn.FontSize = 10
                 btn.Width = 20
                 btn.Height = 20
@@ -2083,7 +2100,7 @@ class LLMSettingWindow(T3WPFWindow):
 
                 if removable:
                     btn = Button()
-                    btn.Content = u"✕"
+                    btn.Content = self._icon_content(_GLYPH_CANCEL)
                     btn.FontSize = 10
                     btn.Width = 20
                     btn.Height = 20

@@ -219,6 +219,12 @@
                Cách dùng — icon LUÔN là <TextBlock>, không bao giờ là Content của Button:
                  <TextBlock Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
 
+               Ô rail (T3.Rail.Tile) cũng vậy — glyph T3.Icon.Rail, KHÔNG tự vẽ <Path>:
+                 <RadioButton x:Name="nav_browse" Style="{StaticResource T3.Rail.Tile}"
+                              ToolTip="Browse Parameters" ...>
+                   <TextBlock Text="&#xE8FD;" Style="{StaticResource T3.Icon.Rail}"/>
+                 </RadioButton>
+
                Bảng glyph chuẩn (dùng đúng glyph này cho đúng khái niệm, toàn dự án):
                  E721 Search      E8BB Close      E921 Minimize   E922 Maximize
                  E768 Play        E769 Pause      E71A Stop       E72C Refresh
@@ -227,13 +233,30 @@
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
                  E8A3 Zoom        E7B3 Isolate    E7C9 Pick       E7C3 Document
-                 E896 Download    EA80 Insight    ED1A Hide
+                 E896 Download/Export  EA80 Insight  F140 Hide    E923 Restore
+                 E74A ArrowUp (move to top, north)  E74B ArrowDown (move to bottom)
+                 E9A6 Fit (zoom to fit)  EA3A Open (unresolved)  E707 Map  E753 PointCloud
+
+               Khái niệm trang — glyph của ô rail chọn theo VIỆC trang đó làm:
+                 E8FD List/inventory   E9D5 Audit/checklist  E945 Automation
+                 E8B5 Import/load      E8AB Swap/transfer    E71B Link
+                 E8C8 Duplicate        E8AC Rename/renumber  E9E9 Template/preset
+                 E70F Edit/override    E81C History/log      E8A1 Preview/mockup
+                 E8F1 Families         E81E Worksets         E90F Tools/bulk edit
+                 F158 3D view          E95E Model health     E8EF Aggregate
+                 E790 Colour           E943 Code/JSON        ED5E Dimension
+                 E8D2 Text             E727 Pattern          E8EC Classify/assign
+                 E80F Room             E809 Floor            E80A Ceiling
+                 ECA5 Wall             E825 Column           E933 Beam
+                 E7B7 Grid             EF90 Line             E95F MEP run
+                 (+ E713 Settings · E896 Export · E7BA Warning · E74D Delete/purge)
 
                Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
                  1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
                     Search, nên Zoom phải là E8A3 (kính lúp có dấu +).
-                 2. Codepoint có thật trong font — glyph không tồn tại ra ô vuông tofu và
-                    audit_t3.py không bắt được, nó chỉ grep source.
+                 2. Codepoint có thật trong Segoe MDL2 Assets — glyph không tồn tại ra ô
+                    vuông tofu. audit_t3.py đối chiếu dev/icons/mdl2_codepoints.tsv
+                    (P1). ED1A Hide là glyph của Segoe Fluent Icons, KHÔNG có trong MDL2.
           -->
 
           <!-- Icon nền: cỡ Label (11), màu thừa kế từ control chứa nó. -->
@@ -268,6 +291,15 @@
             <Setter Property="FontSize"   Value="{StaticResource T3.Size.Caption}"/>
             <Setter Property="Margin"     Value="0,0,8,0"/>
             <Setter Property="VerticalAlignment" Value="Top"/>
+          </Style>
+
+          <!-- Icon của ô rail (T3.Rail.Tile, 42×42). Cỡ 16 = lưới thiết kế gốc của
+               Segoe MDL2 — nét rơi đúng pixel, sắc ở 100% lẫn 125%. Đây là cỡ ICON, không
+               thuộc thang 7 size chữ. KHÔNG set Foreground: glyph thừa kế màu từ tile
+               (T3.TextMuted → T3.Ink khi hover/checked) qua ContentPresenter. -->
+          <Style x:Key="T3.Icon.Rail" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
           </Style>
 
           <!-- ══════════════════ 6 · BUTTONS ══════════════════
@@ -1748,11 +1780,7 @@
                                   Style="{StaticResource T3.Rail.Tile}"
                                   Margin="0,0,0,8" IsChecked="True"
                                   ToolTip="Family Management" Click="nav_toggle_clicked">
-                        <Path Data="M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Text="&#xE8F1;" Style="{StaticResource T3.Icon.Rail}"/>
                     </ToggleButton>
 
                     <!-- Mode 1: Family Loader -->
@@ -1760,11 +1788,7 @@
                                   Style="{StaticResource T3.Rail.Tile}"
                                   Margin="0,0,0,8"
                                   ToolTip="Family Loader" Click="nav_toggle_clicked">
-                        <Path Data="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01l8.73-5.05 M12 22.08V12"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Text="&#xE8B5;" Style="{StaticResource T3.Icon.Rail}"/>
                     </ToggleButton>
                 </Grid>
             </Border>

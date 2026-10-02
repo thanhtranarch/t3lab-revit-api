@@ -1865,7 +1865,7 @@ class PointCloudModelWindow(T3WPFWindow):
                 w_m = ft_to_mm(self._custom_max_pt.X - self._custom_min_pt.X) / 1000.0
                 d_m = ft_to_mm(self._custom_max_pt.Y - self._custom_min_pt.Y) / 1000.0
                 self.lbl_region_info.Text = (
-                    u"✓ Region set: {:.1f} × {:.1f} m".format(w_m, d_m))
+                    u"Region set: {:.1f} × {:.1f} m".format(w_m, d_m))
                 self.lbl_region_info.Foreground = self._brush('#0B8A5A')
                 self.btn_pick_region.Content    = u"Re-pick Region"
             else:

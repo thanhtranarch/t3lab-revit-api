@@ -1354,7 +1354,7 @@ class PropertyLineDialog(T3WPFWindow):
         self.border_no_results.Visibility = Visibility.Visible
 
     def _show_address_warning(self, msg):
-        self.txt_address_warning.Text = u"⚠  " + msg
+        self.txt_address_warning.Text = msg
         self.txt_address_warning.Visibility = Visibility.Visible
 
     def _hide_address_warning(self):
