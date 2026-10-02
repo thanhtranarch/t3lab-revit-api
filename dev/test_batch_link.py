@@ -227,5 +227,285 @@ class TestBatchLinkLogic(unittest.TestCase):
         found.sort()
         self.assertEqual(found, ["Model_A.rvt", "Model_B.rvt"])
 
+
+# ── LINK WORKSET TAB: pending / applied / failed state ───────────────────────
+
+from GUI import BatchLinkWorksets as WS   # pure Python, no clr / Revit
+
+
+class _Rec(object):
+    def __init__(self, name, instance_count=1):
+        self.name = name
+        self.instance_count = instance_count
+
+
+def _row(name="A.rvt", current=("ARC_Walls", 10), can_move=True,
+         note="Ready", severity="Success", lock_reason=""):
+    return WS.LinkWorksetRow(_Rec(name), current[0], current[1], can_move,
+                             note, severity, lock_reason=lock_reason)
+
+
+class TestWorksetRowState(unittest.TestCase):
+
+    def test_fresh_row_is_clean(self):
+        row = _row()
+        self.assertEqual(row.row_state, "")
+        self.assertEqual(row.WorksetName, "ARC_Walls")
+        self.assertEqual(row.WorksetEditable, "yes")
+        self.assertEqual((row.StatusText, row.Severity), ("Ready", "Success"))
+
+    def test_stage_marks_pending_and_shows_target(self):
+        row = _row()
+        self.assertTrue(row.stage(20, "Links"))
+        self.assertEqual(row.row_state, "pending")
+        self.assertEqual(row.WorksetName, "Links")
+        self.assertEqual((row.StatusText, row.Severity), ("Pending", "Warning"))
+        self.assertIn("ARC_Walls", row.WorksetTip)
+        self.assertIn("Links", row.WorksetTip)
+
+    def test_same_pick_twice_is_no_change(self):
+        row = _row()
+        row.stage(20, "Links")
+        self.assertFalse(row.stage(20, "Links"))
+
+    def test_picking_current_workset_unstages(self):
+        row = _row()
+        row.stage(20, "Links")
+        self.assertTrue(row.stage(10, "ARC_Walls"))
+        self.assertEqual(row.row_state, "")
+        self.assertIsNone(row.pending_id)
+        self.assertEqual(row.StatusText, "Ready")
+
+    def test_regeneration_does_not_wipe_green(self):
+        """Grid refresh re-selects the shown value: an applied row stays green."""
+        row = _row()
+        row.stage(20, "Links")
+        row.mark_applied("Moved")
+        self.assertFalse(row.stage(20, "Links"))
+        self.assertEqual(row.row_state, "applied")
+
+    def test_regeneration_does_not_wipe_failed(self):
+        row = _row()
+        row.stage(20, "Links")
+        row.mark_failed("Owned by bob")
+        self.assertFalse(row.stage(20, "Links"))
+        self.assertEqual(row.row_state, "failed")
+
+    def test_locked_row_ignores_stage_and_explains(self):
+        row = _row(can_move=False, note="Not placed", severity="Warning",
+                   lock_reason="This link is not placed in the model.")
+        self.assertFalse(row.stage(20, "Links"))
+        self.assertEqual(row.WorksetEditable, "no")
+        self.assertEqual(row.WorksetTip, "This link is not placed in the model.")
+        self.assertEqual(WS.pending_count([row]), 0)
+
+    def test_mark_applied_moves_current(self):
+        row = _row()
+        row.stage(20, "Links")
+        row.mark_applied("Moved")
+        self.assertEqual((row.current_id, row.current_label), (20, "Links"))
+        self.assertIsNone(row.pending_id)
+        self.assertEqual((row.row_state, row.StatusText, row.Severity),
+                         ("applied", "Moved", "Success"))
+
+    def test_mark_failed_keeps_pending_for_retry(self):
+        row = _row()
+        row.stage(20, "Links")
+        row.mark_failed("Owned by bob\nmore detail")
+        self.assertEqual(row.row_state, "failed")
+        self.assertEqual(row.pending_id, 20)
+        self.assertEqual(row.current_id, 10)
+        self.assertEqual(row.Severity, "Danger")
+        self.assertTrue(row.StatusText.startswith("Failed: Owned by bob"))
+        self.assertNotIn("\n", row.StatusText)
+        self.assertLessEqual(len(row.StatusText), WS.STATUS_MAX)
+        self.assertIn("Owned by bob", row.WorksetTip)
+        self.assertEqual(WS.pending_count([row]), 1)
+
+    def test_long_failure_is_shortened_in_cell_not_tooltip(self):
+        row = _row()
+        row.stage(20, "Links")
+        long = "The element is borrowed by another user on a different machine"
+        row.mark_failed(long)
+        self.assertLessEqual(len(row.StatusText), WS.STATUS_MAX)
+        self.assertIn(long, row.WorksetTip)
+
+    def test_clear_result_only_drops_green(self):
+        a, b, c = _row("a"), _row("b"), _row("c")
+        a.stage(20, "Links"); a.mark_applied()
+        b.stage(20, "Links"); b.mark_failed("x")
+        c.stage(20, "Links")
+        self.assertEqual(WS.clear_results([a, b, c]), 1)
+        self.assertEqual([r.row_state for r in (a, b, c)], ["", "failed", "pending"])
+
+    def test_set_current_drops_pending_already_there(self):
+        row = _row()
+        row.stage(20, "Links")
+        row.set_current("Links", 20)
+        self.assertIsNone(row.pending_id)
+        self.assertEqual(row.row_state, "")
+
+
+class TestWorksetBulkAndApply(unittest.TestCase):
+
+    def _rows(self):
+        rows = [_row("a"), _row("b"), _row("c", current=("Links", 20)),
+                _row("d", can_move=False, note="Not placed", severity="Warning")]
+        for r in rows:
+            r.IsSelected = True
+        rows[1].IsSelected = False
+        return rows
+
+    def test_stage_checked_only_touches_checked_movable_rows(self):
+        rows = self._rows()
+        staged, unchanged = WS.stage_checked(rows, 20, "Links")
+        self.assertEqual((staged, unchanged), (1, 1))     # a staged, c already there
+        self.assertEqual([r.row_state for r in rows], ["pending", "", "", ""])
+        self.assertEqual(WS.pending_count(rows), 1)
+
+    def test_primary_label(self):
+        self.assertEqual(WS.primary_label(0), "Apply")
+        self.assertEqual(WS.primary_label(3), "Apply (3)")
+
+    def test_tally_text_counts_pending(self):
+        rows = self._rows()
+        self.assertEqual(WS.tally_text(rows),
+                         u"4 links · 3 can move · 2 checked")
+        rows[0].stage(30, "MEP")
+        rows[1].stage(30, "MEP")
+        self.assertEqual(WS.tally_text(rows),
+                         u"4 links · 3 can move · 2 checked · 2 pending")
+
+    def test_apply_pending_records_each_row(self):
+        rows = [_row("ok"), _row("same"), _row("bad"), _row("boom"), _row("idle")]
+        for r in rows[:4]:
+            r.stage(20, "Links")
+        seen = []
+
+        def move_one(row):
+            seen.append(row.LinkName)
+            if row.LinkName == "bad":
+                return False, "Owned by bob"
+            if row.LinkName == "boom":
+                raise RuntimeError("API exploded\nstack")
+            if row.LinkName == "same":
+                return True, "Already there"
+            return True, "Moved"
+
+        steps = []
+        result = WS.apply_pending(rows, move_one,
+                                  step=lambda r, i, n: steps.append((i, n)))
+        self.assertEqual(result, (1, 1, 2))
+        self.assertEqual(seen, ["ok", "same", "bad", "boom"])   # idle untouched
+        self.assertEqual(steps, [(1, 4), (2, 4), (3, 4), (4, 4)])
+        self.assertEqual([r.row_state for r in rows],
+                         ["applied", "applied", "failed", "failed", ""])
+        self.assertEqual(rows[1].StatusText, "Already there")
+        self.assertEqual(rows[3].result_message, "API exploded")
+        # failed rows keep their target, so Apply (2) retries them
+        self.assertEqual(WS.pending_count(rows), 2)
+
+    def test_rollback_all_reverts_applied_rows_only(self):
+        old_green = _row("old")
+        old_green.stage(30, "MEP"); old_green.mark_applied()
+        a, b = _row("a"), _row("b")
+        a.stage(20, "Links"); b.stage(20, "Links")
+        rows = [old_green, a, b]
+        WS.snapshot_before(rows)
+        WS.apply_pending(rows, lambda r: (True, "Moved") if r is a else (False, "Owned"))
+        WS.rollback_all(rows, "Rolled back: commit failed")
+        self.assertEqual((a.row_state, a.current_id, a.pending_id), ("failed", 10, 20))
+        self.assertEqual(a.result_message, "Rolled back: commit failed")
+        self.assertEqual(b.result_message, "Owned")                   # own reason kept
+        self.assertEqual((old_green.row_state, old_green.current_id), ("applied", 30))
+
+    def test_summary_text(self):
+        self.assertEqual(WS.summary_text(1, 0, 0), u"1 link moved · 0 failed")
+        self.assertEqual(WS.summary_text(3, 2, 1),
+                         u"3 links moved · 2 already there · 1 failed")
+
+
+# ── LINK WORKSET TAB: XAML / dialog contract ─────────────────────────────────
+
+XAML_PATH = os.path.join(LIB_DIR, 'GUI', 'Tools', 'BatchLink.xaml')
+DIALOG_PATH = os.path.join(LIB_DIR, 'GUI', 'BatchLinkDialog.py')
+
+
+def _read(path):
+    with open(path, 'r', encoding='utf-8') as handle:
+        return handle.read()
+
+
+class TestWorksetTabContract(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        xaml = _read(XAML_PATH)
+        start = xaml.index('x:Name="grid_ws_links"')
+        cls.grid = xaml[start:xaml.index('</DataGrid>', start)]
+        cls.tab = xaml[xaml.index('x:Name="tab_item_worksets"'):
+                       xaml.index('x:Name="tab_item_display"')]
+        cls.dialog = _read(DIALOG_PATH)
+
+    def test_single_editable_workset_column(self):
+        self.assertIn('Header="WORKSET"', self.grid)
+        self.assertNotIn('CURRENT WORKSET', self.grid)
+        self.assertNotIn('NEW WORKSET', self.grid)
+        self.assertIn('<ComboBox ItemsSource="{Binding Tag, RelativeSource='
+                      '{RelativeSource AncestorType=DataGrid}}"', self.grid)
+
+    def test_combo_reads_through_string_bridge(self):
+        self.assertIn('x:Name="row_ws_name_text" Text="{Binding WorksetName}"', self.grid)
+        self.assertIn('SelectedValue="{Binding Text, ElementName=row_ws_name_text, '
+                      'Mode=OneWay}"', self.grid)
+
+    def test_locked_rows_show_text_not_combo(self):
+        self.assertIn('<DataTrigger Binding="{Binding WorksetEditable}" Value="no">',
+                      self.grid)
+
+    def test_states_painted_from_t3_tokens(self):
+        for state, token in (("pending", "Warning"), ("applied", "Success"),
+                             ("failed", "Danger")):
+            self.assertIn('<DataTrigger Binding="{Binding row_state}" Value="%s">'
+                          % state, self.grid)
+            self.assertIn('{StaticResource T3.%s.Fill}' % token, self.grid)
+        self.assertNotRegex(self.grid, r'"#[0-9A-Fa-f]{3,8}"')
+
+    def test_no_templated_selection_changed(self):
+        """SelectionChanged= in a DataTemplate is never wired; Python adds it."""
+        self.assertNotIn('SelectionChanged=', self.grid)
+        self.assertIn('Selector.SelectionChangedEvent', self.dialog)
+
+    def test_bulk_editor_stages_only(self):
+        self.assertIn('x:Name="btn_ws_stage_checked"', self.tab)
+        self.assertIn('Click="ws_stage_checked_clicked"', self.tab)
+        self.assertIn('def ws_stage_checked_clicked', self.dialog)
+        self.assertNotIn('ws_target_changed', self.tab + self.dialog)
+        self.assertIn('nothing is written until you press Apply', self.tab)
+
+    def test_apply_is_one_transaction_with_rollback(self):
+        body = self.dialog[self.dialog.index('def _apply_worksets'):
+                           self.dialog.index('def _confirm_discard_ws')]
+        self.assertEqual(body.count('disposing(Transaction('), 1)
+        self.assertIn('disposing(SubTransaction(', body)
+        self.assertIn('TransactionStatus.Committed', body)
+        self.assertIn('rollback_all', body)
+        self.assertNotIn('Transaction(doc', body.replace('disposing(Transaction(doc', '')
+                         .replace('disposing(SubTransaction(doc', ''))
+
+    def test_primary_label_is_apply(self):
+        self.assertIn('TAB_WORKSETS: "Apply"', self.dialog)
+        self.assertNotIn('Move to Workset', self.dialog)
+
+    def test_refresh_and_close_confirm_discard(self):
+        reload_body = self.dialog[self.dialog.index('def reload_links_clicked'):]
+        reload_body = reload_body[:reload_body.index('\n    def ')]
+        self.assertIn('_confirm_discard_ws', reload_body)
+        self.assertIn('self.Closing += self._on_closing', self.dialog)
+        closing = self.dialog[self.dialog.index('def _on_closing'):]
+        closing = closing[:closing.index('\n    def ')]
+        self.assertIn('_confirm_discard_ws', closing)
+
+
 if __name__ == '__main__':
     unittest.main()

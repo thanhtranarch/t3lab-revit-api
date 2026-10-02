@@ -1949,6 +1949,7 @@
                                 <Grid Grid.Row="0">
                                     <DataGrid x:Name="grid_ws_links"
                                               Style="{StaticResource T3.DataGrid}"
+                                              RowHeight="{StaticResource T3.H.Control}"
                                               BorderThickness="0"
                                               AutoGenerateColumns="False"
                                               EnableRowVirtualization="True"
@@ -1972,7 +1973,7 @@
                                                             <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text_2, Mode=OneWay}"
                                                                       IsEnabled="{Binding IsEnabled}"
                                                                       Style="{StaticResource T3.CheckBox.Cell}"
-                                                                      ToolTip="Checked = this link moves to the workset chosen below"
+                                                                      ToolTip="Checked = Set for checked (below) stages this link"
                                                                       Click="ws_link_checkbox_clicked"/>
                                                         </Grid>
                                                     </DataTemplate>
@@ -1982,9 +1983,81 @@
                                             <DataGridTextColumn Header="LINK" Width="*" Binding="{Binding LinkName}"/>
                                             <DataGridTextColumn Header="PLACED" Width="80" Binding="{Binding InstanceCount}"
                                                                 ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                            <DataGridTextColumn Header="CURRENT WORKSET" Width="200" Binding="{Binding CurrentWorkset}"/>
-                                            <DataGridTextColumn Header="NEW WORKSET" Width="200" Binding="{Binding TargetWorkset}"
-                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
+                                            <!-- WORKSET: sửa trực tiếp. Đổi = TREO (ô vàng), Apply mới ghi.
+                                                 row_state "pending"/"applied"/"failed" tô ô; chữ ở cột STATUS.
+                                                 Dòng không đổi được (WorksetEditable="no") chỉ hiện chữ + tooltip lý do. -->
+                                            <DataGridTemplateColumn Header="WORKSET" Width="240" SortMemberPath="WorksetName">
+                                                <DataGridTemplateColumn.CellStyle>
+                                                    <Style TargetType="DataGridCell" BasedOn="{StaticResource T3.DataGridCell}">
+                                                        <Setter Property="Padding" Value="4,0"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding row_state}" Value="pending">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding row_state}" Value="applied">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Success.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Success.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding row_state}" Value="failed">
+                                                                <Setter Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Danger.Accent}"/>
+                                                                <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTemplateColumn.CellStyle>
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Grid ToolTip="{Binding WorksetTip}">
+                                                            <TextBlock x:Name="row_ws_name_text" Text="{Binding WorksetName}" Visibility="Collapsed"/>
+                                                            <TextBlock Text="{Binding WorksetName}" Padding="4,0" VerticalAlignment="Center">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Muted}">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding WorksetEditable}" Value="no">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <ComboBox ItemsSource="{Binding Tag, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                      SelectedValue="{Binding Text, ElementName=row_ws_name_text, Mode=OneWay}"
+                                                                      Height="{StaticResource T3.H.Row}"
+                                                                      VerticalAlignment="Center">
+                                                                <ComboBox.Style>
+                                                                    <Style TargetType="ComboBox" BasedOn="{StaticResource T3.ComboBox}">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding WorksetEditable}" Value="no">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding row_state}" Value="pending">
+                                                                                <Setter Property="Background" Value="{StaticResource T3.Warning.Fill}"/>
+                                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Warning.Accent}"/>
+                                                                                <Setter Property="Foreground" Value="{StaticResource T3.Warning.Text}"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding row_state}" Value="applied">
+                                                                                <Setter Property="Background" Value="{StaticResource T3.Success.Fill}"/>
+                                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Success.Accent}"/>
+                                                                                <Setter Property="Foreground" Value="{StaticResource T3.Success.Text}"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding row_state}" Value="failed">
+                                                                                <Setter Property="Background" Value="{StaticResource T3.Danger.Fill}"/>
+                                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Danger.Accent}"/>
+                                                                                <Setter Property="Foreground" Value="{StaticResource T3.Danger.Text}"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </ComboBox.Style>
+                                                            </ComboBox>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
                                             <DataGridTemplateColumn Header="STATUS" Width="120"
                                                                     CellTemplate="{StaticResource T3.StatusPill}"/>
                                         </DataGrid.Columns>
@@ -2018,22 +2091,27 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="280"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="Move checked links to workset"
+                                    <TextBlock Grid.Column="0" Text="Set checked links to workset"
                                                Style="{StaticResource T3.Body}"
                                                VerticalAlignment="Center" Margin="0,0,12,0"/>
                                     <ComboBox Grid.Column="1" x:Name="cb_ws_target"
                                               Style="{StaticResource T3.ComboBox}"
-                                              ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                                              SelectionChanged="ws_target_changed"/>
-                                    <CheckBox Grid.Column="2" x:Name="chk_ws_include_type"
+                                              ItemContainerStyle="{StaticResource T3.ComboBoxItem}"/>
+                                    <Button Grid.Column="2" x:Name="btn_ws_stage_checked" Content="Set for checked"
+                                            Style="{StaticResource T3.Button.Secondary}"
+                                            Padding="12,0" Margin="8,0,0,0"
+                                            ToolTip="Stage this workset on every checked link. Nothing is written until Apply."
+                                            Click="ws_stage_checked_clicked"/>
+                                    <CheckBox Grid.Column="3" x:Name="chk_ws_include_type"
                                               Content="Move the link type onto the same workset"
                                               Style="{StaticResource T3.CheckBox}"
                                               IsChecked="True" VerticalAlignment="Center" Margin="16,0,0,0"/>
                                 </Grid>
                                 <TextBlock Style="{StaticResource T3.Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
-                                           Text="This changes the workset the link sits on in the CURRENT model. Worksets inside the linked files are not touched, and no link is reloaded."/>
+                                           Text="Change a link's WORKSET cell, or use Set for checked: the change is staged (yellow) and nothing is written until you press Apply, which moves every staged link in one step (one Ctrl+Z). This changes the workset the link sits on in the CURRENT model only. Worksets inside the linked files are not touched, and no link is reloaded."/>
                             </StackPanel>
                         </Border>
                     </Grid>
