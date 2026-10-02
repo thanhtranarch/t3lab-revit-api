@@ -30,10 +30,19 @@ try:
         IFailuresPreprocessor,
         FailureProcessingResult,
         FailureSeverity,
+        Options,
+        ViewDetailLevel,
+        Solid,
+        GeometryInstance,
+        GeometryElement,
+        BooleanOperationsUtils,
+        BooleanOperationsType,
     )
 except Exception:
     Transaction = TransactionStatus = FilteredElementCollector = BuiltInCategory = JoinGeometryUtils = None
     BoundingBoxIntersectsFilter = Outline = IFailuresPreprocessor = FailureProcessingResult = FailureSeverity = None
+    Options = ViewDetailLevel = Solid = GeometryInstance = GeometryElement = None
+    BooleanOperationsUtils = BooleanOperationsType = None
 
 logger = script.get_logger()
 JOIN_CANCELLED_MESSAGE = (
@@ -153,6 +162,237 @@ def _get_intersecting_elements(doc, el, target_bic, scope, view_id=None):
         return []
 
 
+# ==================================================
+# EMBEDDED ELEMENTS — keep an element that sits inside another one visible
+# ==================================================
+# Một join luôn có một bên CẮT và một bên BỊ CẮT. Nếu bên bị cắt nằm trọn trong
+# bên cắt (dầm chìm trong sàn, cột nằm trong tường, tường ngắn trong tường dày)
+# thì Revit khoét mất toàn bộ hình của nó — element vẫn còn trong model nhưng
+# biến mất khỏi mọi view. Bảo vệ: element nằm trong luôn là bên CẮT, đè lên thứ
+# tự của rule.
+
+# An element counts as embedded when at least this share of its volume lies
+# inside the other one — a column that pokes out by a modelling sliver still counts.
+EMBEDDED_RATIO = 0.98
+# Bounding-box slack for the cheap pre-check (feet, about 6 mm).
+BBOX_TOL = 0.02
+# Solid volume at or below this (cubic feet) means nothing is left to draw.
+MIN_VOLUME = 1e-6
+
+
+class EmbedCheck(object):
+    """Verdict on one pair: which element (if any) lies inside the other.
+
+    inner     — the embedded element, which must be the cutting one.
+    duplicate — both lie inside each other (an exact overlap): a join would
+                hide one of them whichever way round it goes.
+    certain   — False when the geometry could not settle it; the caller then
+                measures the cut element after the join instead.
+    volumes   — pre-join volumes by element id, kept for that measurement.
+    """
+    def __init__(self, inner=None, duplicate=False, certain=True, volumes=None):
+        self.inner = inner
+        self.duplicate = duplicate
+        self.certain = certain
+        self.volumes = volumes or {}
+
+
+def _box_inside(inner, outer, tol=BBOX_TOL):
+    """True when box `inner` fits inside box `outer` ((min xyz), (max xyz)).
+
+    A missing box means "unknown", so the expensive check still runs.
+    """
+    if inner is None or outer is None:
+        return True
+    (imin, imax), (omin, omax) = inner, outer
+    return all(imin[i] >= omin[i] - tol and imax[i] <= omax[i] + tol for i in range(3))
+
+
+def _verdict_from_ratios(a, b, ratio_a_in_b, ratio_b_in_a, threshold=EMBEDDED_RATIO):
+    """Turn the two "share of my volume inside the other" ratios into a verdict."""
+    a_inside = ratio_a_in_b >= threshold
+    b_inside = ratio_b_in_a >= threshold
+    if a_inside and b_inside:
+        return EmbedCheck(duplicate=True)
+    if a_inside:
+        return EmbedCheck(inner=a)
+    if b_inside:
+        return EmbedCheck(inner=b)
+    return EmbedCheck()
+
+
+def _walk_solids(geometry, depth=0):
+    """Yield every Solid in a GeometryElement, recursing into family instances."""
+    if geometry is None or depth > 4:
+        return
+    for obj in geometry:
+        try:
+            if isinstance(obj, Solid):
+                yield obj
+            elif isinstance(obj, GeometryInstance):
+                for solid in _walk_solids(obj.GetInstanceGeometry(), depth + 1):
+                    yield solid
+            elif isinstance(obj, GeometryElement):
+                for solid in _walk_solids(obj, depth + 1):
+                    yield solid
+        except Exception:
+            continue
+
+
+def _element_solids(el):
+    """Solids of el as Revit draws it now (after the joins it already has)."""
+    try:
+        opts = Options()
+        opts.ComputeReferences = False
+        opts.DetailLevel = ViewDetailLevel.Fine
+        geometry = el.get_Geometry(opts)
+    except Exception:
+        return []
+    solids = []
+    for solid in _walk_solids(geometry):
+        try:
+            if solid.Volume > MIN_VOLUME:
+                solids.append(solid)
+        except Exception:
+            continue
+    return solids
+
+
+def _solid_volume(el):
+    return sum(s.Volume for s in _element_solids(el))
+
+
+def _inside_ratio(inner, outer):
+    """Share of inner's volume that lies inside outer (0..1). Raises if Revit's
+    boolean fails, so the caller can fall back to measuring after the join."""
+    inner_solids = _element_solids(inner)
+    total = sum(s.Volume for s in inner_solids)
+    if total <= MIN_VOLUME:
+        return 0.0
+    outer_solids = _element_solids(outer)
+    shared = 0.0
+    for a in inner_solids:
+        for b in outer_solids:
+            common = BooleanOperationsUtils.ExecuteBooleanOperation(
+                a, b, BooleanOperationsType.Intersect)
+            if common is not None:
+                shared += common.Volume
+    return min(shared / total, 1.0)
+
+
+class EmbedState(object):
+    """Per-run memory: boxes and volumes as they were when first read, and one
+    verdict per pair so a pair met again by a later rule keeps the same order."""
+
+    def __init__(self):
+        self._boxes = {}
+        self._volumes = {}
+        self.verdicts = {}
+        self.protected = set()
+        self.duplicates = set()
+
+    def box(self, el):
+        key = eid_value(el.Id)
+        if key not in self._boxes:
+            try:
+                bb = el.get_BoundingBox(None)
+                self._boxes[key] = ((bb.Min.X, bb.Min.Y, bb.Min.Z),
+                                    (bb.Max.X, bb.Max.Y, bb.Max.Z)) if bb else None
+            except Exception:
+                self._boxes[key] = None
+        return self._boxes[key]
+
+    def volume(self, el):
+        key = eid_value(el.Id)
+        if key not in self._volumes:
+            self._volumes[key] = _solid_volume(el)
+        return self._volumes[key]
+
+    def check(self, document, el, cand, joined, pair_key):
+        if pair_key not in self.verdicts:
+            self.verdicts[pair_key] = _find_embedded(document, el, cand, joined, self)
+        return self.verdicts[pair_key]
+
+
+def _find_embedded(document, a, b, joined, state):
+    """Decide whether a or b lies inside the other, before this run changes them."""
+    a_in_b = _box_inside(state.box(a), state.box(b))
+    b_in_a = _box_inside(state.box(b), state.box(a))
+
+    if joined:
+        # Revit has already cut one of them. A cut element with nothing left
+        # to draw was swallowed whole: that is the element to bring back.
+        try:
+            a_cuts = JoinGeometryUtils.IsCuttingElementInJoin(document, a, b)
+        except Exception:
+            return EmbedCheck()
+        cutter, cut = (a, b) if a_cuts else (b, a)
+        if state.volume(cut) <= MIN_VOLUME:
+            return EmbedCheck(inner=cut)
+        # The cut element still shows, so it is not inside the cutter. Whether
+        # the cutter sits inside the cut one cannot be read from a shape that
+        # already has the cutter's hole in it — measure after any switch.
+        cutter_in_cut = a_in_b if a_cuts else b_in_a
+        if not cutter_in_cut:
+            return EmbedCheck()
+        return EmbedCheck(certain=False,
+                          volumes={eid_value(cutter.Id): state.volume(cutter)})
+
+    if not (a_in_b or b_in_a):
+        return EmbedCheck()
+    try:
+        ratio_a = _inside_ratio(a, b) if a_in_b else 0.0
+        ratio_b = _inside_ratio(b, a) if b_in_a else 0.0
+    except Exception:
+        return EmbedCheck(certain=False,
+                          volumes={eid_value(a.Id): state.volume(a),
+                                   eid_value(b.Id): state.volume(b)})
+    return _verdict_from_ratios(a, b, ratio_a, ratio_b)
+
+
+def _apply_join_order(document, el, cand, switch_order, inner):
+    """Make the right element of a joined pair the cutting one.
+
+    The embedded element wins; otherwise the rule's priority element cuts when
+    switch_order is on; otherwise Revit's own order is left alone.
+    Returns True when the order was switched.
+    """
+    cutter = inner if inner is not None else (el if switch_order else None)
+    if cutter is None:
+        return False
+    other = cand if cutter is el else el
+    if JoinGeometryUtils.IsCuttingElementInJoin(document, cutter, other):
+        return False
+    JoinGeometryUtils.SwitchJoinOrder(document, cutter, other)
+    return True
+
+
+def _rescue_swallowed(document, el, cand, volumes):
+    """After a join or switch the geometry could not predict: regenerate, and if
+    the element now being cut has (almost) nothing left, make it the cutter.
+    Returns the rescued element, or None."""
+    try:
+        document.Regenerate()
+    except Exception:
+        return None
+    cut = cand if JoinGeometryUtils.IsCuttingElementInJoin(document, el, cand) else el
+    before = volumes.get(eid_value(cut.Id), 0.0)
+    if before <= MIN_VOLUME:
+        return None
+    if _solid_volume(cut) > before * (1.0 - EMBEDDED_RATIO):
+        return None
+    other = el if cut is cand else cand
+    JoinGeometryUtils.SwitchJoinOrder(document, cut, other)
+    return cut
+
+
+def _fill_stats(stats, state, saved=True):
+    if stats is None:
+        return
+    stats["protected"] = len(state.protected) if (state and saved) else 0
+    stats["duplicates"] = len(state.duplicates) if state else 0
+
+
 def _commit_join(transaction):
     status = transaction.Commit()
     if status != TransactionStatus.Committed:
@@ -161,8 +401,17 @@ def _commit_join(transaction):
 
 
 def run_join(rules, scope="Active View", mode="Join", switch_order=False,
-             progress_callback=None, cancel_check=None, doc=None, uidoc=None):
-    """Execute join/unjoin operations based on rules."""
+             progress_callback=None, cancel_check=None, doc=None, uidoc=None,
+             protect_embedded=False, stats=None):
+    """Execute join/unjoin operations based on rules.
+
+    protect_embedded — an element that lies fully inside the other element of
+        a pair always cuts it, whatever the rule order says, so the join never
+        hides it; exact overlaps (duplicates) are not joined at all.
+    stats — optional dict, filled with "protected" (pairs where an embedded
+        element was kept visible) and "duplicates" (overlapping pairs left
+        unjoined). Returns (joined, skipped, errors, message) as before.
+    """
     document = doc or revit.doc
     ui_doc = uidoc
     if ui_doc is None:
@@ -188,6 +437,7 @@ def run_join(rules, scope="Active View", mode="Join", switch_order=False,
     total_skipped = 0
     total_errors  = 0
     total_rules = len(rules)
+    state = EmbedState() if (protect_embedded and mode == "Join") else None
 
     t = None
     try:
@@ -210,21 +460,23 @@ def run_join(rules, scope="Active View", mode="Join", switch_order=False,
                 total_errors += 1
                 continue
 
+            rule_label = "Rule {}/{} · {} cuts {}".format(
+                rule_idx + 1, total_rules, priority_name, joinwith_name)
             if progress_callback:
-                progress_callback(
-                    rule_idx, total_rules,
-                    "Processing: {} → {} ...".format(priority_name, joinwith_name)
-                )
+                progress_callback(rule_idx, total_rules, rule_label + u" …")
 
             priority_elements = _collect_elements(
                 document, priority_bic, scope, view_id, selected_ids
             )
+            n_elements = len(priority_elements)
 
             processed_pairs = set()
 
-            for el in priority_elements:
+            for el_idx, el in enumerate(priority_elements):
                 if cancel_check and cancel_check():
                     _commit_join(t)
+                    if stats is not None:
+                        _fill_stats(stats, state)
                     return (total_joined, total_skipped, total_errors,
                             JOIN_CANCELLED_MESSAGE)
 
@@ -249,15 +501,32 @@ def run_join(rules, scope="Active View", mode="Join", switch_order=False,
                         are_joined = JoinGeometryUtils.AreElementsJoined(document, el, cand)
 
                         if mode == "Join":
+                            check = None
+                            if state is not None:
+                                check = state.check(document, el, cand, are_joined, pair_key)
+                                if check.duplicate and not are_joined:
+                                    # Exact overlap: a join hides one of the two.
+                                    state.duplicates.add(pair_key)
+                                    total_skipped += 1
+                                    continue
+
                             if not are_joined:
                                 JoinGeometryUtils.JoinGeometry(document, el, cand)
                                 total_joined += 1
                             else:
                                 total_skipped += 1
 
-                            if switch_order and JoinGeometryUtils.AreElementsJoined(document, el, cand):
-                                if not JoinGeometryUtils.IsCuttingElementInJoin(document, el, cand):
-                                    JoinGeometryUtils.SwitchJoinOrder(document, el, cand)
+                            if JoinGeometryUtils.AreElementsJoined(document, el, cand):
+                                inner = check.inner if check is not None else None
+                                switched = _apply_join_order(
+                                    document, el, cand, switch_order, inner)
+                                if (check is not None and inner is None and not check.certain
+                                        and (switched or not are_joined)):
+                                    inner = _rescue_swallowed(document, el, cand, check.volumes)
+                                    if inner is not None:
+                                        state.verdicts[pair_key] = EmbedCheck(inner=inner)
+                                if inner is not None:
+                                    state.protected.add(pair_key)
 
                         elif mode == "Unjoin":
                             if are_joined:
@@ -270,11 +539,20 @@ def run_join(rules, scope="Active View", mode="Join", switch_order=False,
                         logger.debug("Join operation error: {}".format(ex))
                         total_errors += 1
 
+                if progress_callback:
+                    progress_callback(
+                        rule_idx + float(el_idx + 1) / n_elements, total_rules,
+                        u"{} · {}/{}".format(rule_label, el_idx + 1, n_elements))
+
         _commit_join(t)
+        if stats is not None:
+            _fill_stats(stats, state)
         return (total_joined, total_skipped, total_errors, None)
 
     except Exception as ex:
         if t is not None and t.GetStatus() == TransactionStatus.Started:
             t.RollBack()
+        if stats is not None:
+            _fill_stats(stats, state, saved=False)
         # Attempted joins are not saved joins after rollback or while Pending.
         return (0, total_skipped, total_errors + 1, str(ex))
