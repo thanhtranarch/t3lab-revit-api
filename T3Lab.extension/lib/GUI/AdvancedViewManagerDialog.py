@@ -210,7 +210,6 @@ class AdvancedViewManagerWindow(T3WPFWindow):
         self.rename_btn.Click += self._on_batch_rename
         self.dup_btn.Click += self._on_duplicate
         self.del_btn.Click += self._on_delete
-        self.close_btn.Click += self._on_close
         
         self.data_grid.SelectionChanged += self._on_selection_changed
         self.data_grid.CellEditEnding += self._on_cell_edit
@@ -838,10 +837,6 @@ class AdvancedViewManagerWindow(T3WPFWindow):
             MessageBox.Show("Error refreshing views: {0}".format(str(e)), "Error",
                           MessageBoxButton.OK, MessageBoxImage.Error)
     
-    def _on_close(self, sender, args):
-        """Close"""
-        self.Close()
-        
     def _on_header_right_click(self, sender, args):
         """Show context menu on header right-click"""
         try:

@@ -226,6 +226,23 @@ READ_ONLY_TOOL_NAMES = frozenset([
 ])
 
 
+# Tools whose only side effect is a NEW FILE (PDF, DWG, image, IFC/NWC, CSV):
+# the model itself is untouched. They stay "modifying" above — a bare "/skill"
+# must still not spray files into a folder nobody chose — but "Ask before
+# edits" in the assistant means edits to the MODEL, so the gate lets these run
+# (owner's decision, 2026-10-02). Saving / syncing the model is not here: those
+# are destructive in core.server and always confirm.
+FILE_OUTPUT_TOOL_NAMES = frozenset([
+    "export_dwg", "export_image", "export_model", "export_room_data",
+    "export_sheets_pdf",
+])
+
+
+def is_file_output_only(name):
+    """True when `name` only writes a new file and never edits the model."""
+    return name in FILE_OUTPUT_TOOL_NAMES
+
+
 def is_model_modifying(name):
     """True when `name` edits the document or writes a file.
 

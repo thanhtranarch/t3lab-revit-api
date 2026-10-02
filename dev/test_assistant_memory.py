@@ -138,7 +138,136 @@ def test_add_exact_dedup_still_holds():
     check('still a single fact', len(_texts(pid)) == 1, _texts(pid))
 
 
+# ─── scope API (the Settings memory manager) ──────────────────────────────────
+
+def _scope_texts(scope, pid=None):
+    return [f['text'] for f in M.list_scope_facts(scope, pid)]
+
+
+def test_scope_listing_is_per_bucket():
+    print('[memory scope: list one scope, 0-based index]')
+    pid = _sandbox()
+    M.add_fact('global one', scope='global')
+    M.add_fact('global two', scope='global')
+    M.add_fact('project one', scope='project', project_id=pid)
+    M.add_fact('other project fact', scope='project', project_id='PID-OTHER')
+
+    g = M.list_scope_facts(M.GLOBAL_SCOPE)
+    p = M.list_scope_facts(M.PROJECT_SCOPE, pid)
+    check('global list holds only global facts',
+          [f['text'] for f in g] == ['global one', 'global two'], g)
+    check('project list holds only this project',
+          [f['text'] for f in p] == ['project one'], p)
+    check('index is 0-based within the scope',
+          [f['index'] for f in g] == [0, 1] and p[0]['index'] == 0)
+    check('created date carried', bool(g[0]['created']), g[0])
+    check('project scope without a project is empty',
+          M.list_scope_facts(M.PROJECT_SCOPE, None) == [])
+    check('count_scope', M.count_scope(M.GLOBAL_SCOPE) == 2
+          and M.count_scope(M.PROJECT_SCOPE, pid) == 1)
+
+
+def test_add_scope_fact_targets_exact_scope():
+    print('[memory scope: add lands in the chosen list]')
+    pid = _sandbox()
+    ok, note = M.add_scope_fact('use metric units', M.PROJECT_SCOPE, None)
+    check('project add without a project is refused (not silently global)',
+          not ok and 'project' in note.lower(), note)
+    check('nothing was stored', M.count_scope(M.GLOBAL_SCOPE) == 0)
+    ok, _ = M.add_scope_fact('use metric units', M.GLOBAL_SCOPE)
+    check('global add ok', ok and _scope_texts(M.GLOBAL_SCOPE) == ['use metric units'])
+    ok, _ = M.add_scope_fact('prefix WH-', M.PROJECT_SCOPE, pid)
+    check('project add ok', ok and _scope_texts(M.PROJECT_SCOPE, pid) == ['prefix WH-'])
+    ok, note = M.add_scope_fact('x y z w', 'bogus', pid)
+    check('unknown scope refused', not ok, note)
+
+
+def test_edit_fact_at():
+    print('[memory scope: edit by index]')
+    pid = _sandbox()
+    M.add_fact('alpha fact', scope='global')
+    M.add_fact('beta fact', scope='project', project_id=pid)
+    M.add_fact('gamma fact', scope='project', project_id=pid)
+
+    ok, note = M.edit_fact_at(M.PROJECT_SCOPE, 1, '  gamma   revised ', pid)
+    check('edit ok', ok, note)
+    check('text normalised and replaced in place',
+          _scope_texts(M.PROJECT_SCOPE, pid) == ['beta fact', 'gamma revised'],
+          _scope_texts(M.PROJECT_SCOPE, pid))
+    check('updated stamp written',
+          bool(M.list_scope_facts(M.PROJECT_SCOPE, pid)[1]['updated']))
+    check('global untouched by a project edit',
+          _scope_texts(M.GLOBAL_SCOPE) == ['alpha fact'])
+
+    ok, note = M.edit_fact_at(M.PROJECT_SCOPE, 1, 'BETA FACT', pid)
+    check('duplicate of another fact in the scope refused', not ok, note)
+    ok, note = M.edit_fact_at(M.PROJECT_SCOPE, 0, '  ', pid)
+    check('degenerate text refused', not ok, note)
+    ok, note = M.edit_fact_at(M.PROJECT_SCOPE, 7, 'out of range', pid)
+    check('out-of-range index refused', not ok, note)
+    ok, note = M.edit_fact_at(M.GLOBAL_SCOPE, 0, 'alpha fact', pid)
+    check('same text is a no-op success', ok, note)
+    long_text = 'x' * (M.MAX_FACT_CHARS + 50)
+    M.edit_fact_at(M.GLOBAL_SCOPE, 0, long_text)
+    check('edit is clipped like add',
+          len(_scope_texts(M.GLOBAL_SCOPE)[0]) == M.MAX_FACT_CHARS)
+
+
+def test_delete_fact_at():
+    print('[memory scope: delete by index]')
+    pid = _sandbox()
+    M.add_fact('g keep', scope='global')
+    M.add_fact('p first', scope='project', project_id=pid)
+    M.add_fact('p second', scope='project', project_id=pid)
+
+    ok, removed = M.delete_fact_at(M.PROJECT_SCOPE, 0, pid)
+    check('delete ok + returns text', ok and removed == 'p first', removed)
+    check('only that fact left the project',
+          _scope_texts(M.PROJECT_SCOPE, pid) == ['p second'])
+    check('global untouched', _scope_texts(M.GLOBAL_SCOPE) == ['g keep'])
+    ok, removed = M.delete_fact_at(M.PROJECT_SCOPE, 5, pid)
+    check('bad index is a clean miss', ok is False and removed is None)
+    ok, removed = M.delete_fact_at(M.GLOBAL_SCOPE, 0)
+    check('global delete', ok and removed == 'g keep'
+          and M.count_scope(M.GLOBAL_SCOPE) == 0)
+
+
+def test_clear_scope_never_crosses_scopes():
+    print('[memory scope: clear one scope only]')
+    pid = _sandbox()
+    M.add_fact('g one', scope='global')
+    M.add_fact('g two', scope='global')
+    M.add_fact('p one', scope='project', project_id=pid)
+    M.add_fact('p two', scope='project', project_id=pid)
+    M.add_fact('other', scope='project', project_id='PID-OTHER')
+
+    n = M.clear_scope(M.PROJECT_SCOPE, pid)
+    check('project clear returns its count', n == 2, n)
+    check('global memory survives a project clear',
+          _scope_texts(M.GLOBAL_SCOPE) == ['g one', 'g two'])
+    check('other projects survive', _scope_texts(M.PROJECT_SCOPE, 'PID-OTHER') == ['other'])
+    check('cleared project key is dropped from the file',
+          pid not in M._load()['projects'])
+    check('clearing an unknown project is 0', M.clear_scope(M.PROJECT_SCOPE, 'nope') == 0)
+    check('project clear without pid is 0 (never global)',
+          M.clear_scope(M.PROJECT_SCOPE, None) == 0
+          and M.count_scope(M.GLOBAL_SCOPE) == 2)
+
+    n = M.clear_scope(M.GLOBAL_SCOPE)
+    check('global clear returns its count', n == 2, n)
+    check('projects survive a global clear',
+          _scope_texts(M.PROJECT_SCOPE, 'PID-OTHER') == ['other'])
+    check('prompt block now only carries the other project',
+          'other' in M.build_memory_block('PID-OTHER')
+          and M.build_memory_block(pid) == '')
+
+
 def main():
+    test_scope_listing_is_per_bucket()
+    test_add_scope_fact_targets_exact_scope()
+    test_edit_fact_at()
+    test_delete_fact_at()
+    test_clear_scope_never_crosses_scopes()
     test_update_supersedes_in_place()
     test_update_by_number()
     test_update_missing_falls_back_to_add()

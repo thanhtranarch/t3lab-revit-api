@@ -10,9 +10,9 @@ Layout — three tabs, ordered by who needs them:
                 server, connect an AI app, ask it about the active model.
   Manual Config paste-it-yourself entry for apps not listed in Setup.
   Advanced      auto-start, port, file task watcher, teaching capture.
-The footer always states how ready the whole chain is, and its one primary
-button names the next step: "Start Server" while the server is down, "Done"
-once it runs.
+The footer always states how ready the whole chain is. It has no button:
+Start/Stop Server sits in Step 1 and the title-bar X closes the window, so a
+footer "Start Server" / "Done" only repeated them.
 """
 
 import os
@@ -111,8 +111,7 @@ def apply_server_status(status, indicator, label, btn, resources=None):
     Update server status widgets from an MCPService.server_status() dict.
     All widget args may be None (skipped gracefully).
 
-    The button is never Primary here: the window keeps exactly one Primary
-    (the footer's next-step button), so Start is Secondary and Stop is Danger.
+    Start is Secondary and Stop is Danger.
     """
     if not status:
         status = {}
@@ -202,8 +201,8 @@ class MCPControlWindow(T3WPFWindow):
     def __init__(self):
         T3WPFWindow.__init__(self, _XAML)
 
-        # Last known state of each step — the footer summary and the primary
-        # button are derived from these, never re-queried on their own.
+        # Last known state of each step — the footer summary is derived from
+        # these, never re-queried on its own.
         self._server_state  = {}
         self._server_error  = None     # last Start/Stop failure, shown in step 1
         self._client_states = {}
@@ -297,10 +296,7 @@ class MCPControlWindow(T3WPFWindow):
         # Footer
         self._footer_dot    = self.FindName('footer_dot')
         self._footer_status = self.FindName('footer_status')
-        self._next_btn      = self.FindName('next_btn')
         refresh_btn         = self.FindName('refresh_btn')
-        if self._next_btn:
-            self._next_btn.Click += self._on_next
         if refresh_btn:
             refresh_btn.Click += self._on_refresh
 
@@ -332,11 +328,6 @@ class MCPControlWindow(T3WPFWindow):
         b = _brush(key, resources=self.Resources)
         if b is not None:
             dot.Background = b
-
-    def _can_start_server(self):
-        """The footer's next step is Start Server only when that can work."""
-        state = self._server_state or {}
-        return HAS_SERVICE and not state.get('running') and not state.get('error')
 
     def _current_port(self):
         """Valid port typed in the box, or None to let the service decide."""
@@ -548,8 +539,6 @@ class MCPControlWindow(T3WPFWindow):
         if self._footer_status:
             self._footer_status.Text = text
             self._footer_status.ToolTip = tip
-        if self._next_btn:
-            self._next_btn.Content = 'Start Server' if self._can_start_server() else 'Done'
 
     # ── Server ─────────────────────────────────────────────────────────────────
 
@@ -569,12 +558,6 @@ class MCPControlWindow(T3WPFWindow):
 
     def _on_toggle(self, sender, e):
         self._toggle_server()
-
-    def _on_next(self, sender, e):
-        if self._can_start_server():
-            self._toggle_server()
-        else:
-            self.Close()
 
     def _on_refresh(self, sender, e):
         # A Start/Stop failure stays visible until the user asks for a fresh

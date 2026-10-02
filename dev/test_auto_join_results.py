@@ -53,6 +53,16 @@ class JoinResultTests(unittest.TestCase):
         self.assertIn('Confirmed joined pairs: 4', message)
         self.assertIn('Skipped pairs: 3', message)
 
+    def test_embedded_protection_and_overlaps_are_reported(self):
+        _, message = describe('Join', 2, 4, 3, 0, None, protected=2, duplicates=1)
+        self.assertIn('Embedded elements kept visible: 2 pair(s)', message)
+        self.assertIn('Exact overlaps not joined: 1 pair(s)', message)
+
+    def test_no_protection_lines_when_nothing_was_protected(self):
+        _, message = describe('Join', 2, 4, 3, 0, None)
+        self.assertNotIn('Embedded', message)
+        self.assertNotIn('overlaps', message)
+
 
 if __name__ == '__main__':
     unittest.main()

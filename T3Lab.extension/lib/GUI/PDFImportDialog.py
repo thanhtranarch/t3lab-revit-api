@@ -404,7 +404,6 @@ class PDFImportDialog(T3WPFWindow):
         self.txt_search.IsEnabled        = enabled
         self.btn_select_all.IsEnabled    = enabled and self._mode == _MODE_SEQUENTIAL
         self.btn_select_none.IsEnabled   = enabled
-        self.btn_cancel.IsEnabled        = not busy
         if enabled:
             self.btn_import.IsEnabled = bool(
                 self._pdf_path and any(i.IsSelected for i in self._items))

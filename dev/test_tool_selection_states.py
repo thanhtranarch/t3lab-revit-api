@@ -168,6 +168,7 @@ class JoinEmptyTests(unittest.TestCase):
         dialog.rules_grid = SimpleNamespace()
         dialog.rules_grid_empty = SimpleNamespace()
         dialog.rule_count_text = SimpleNamespace()
+        dialog.status_text = SimpleNamespace()
         dialog._rules = []
         dialog._refresh_rules()
         self.assertEqual(dialog.rules_grid_empty.Visibility, 'visible')
@@ -179,6 +180,7 @@ class JoinEmptyTests(unittest.TestCase):
         dialog.btn_remove_rule_click(None, None)
         self.assertEqual(dialog.rules_grid_empty.Visibility, 'visible')
         self.assertEqual(dialog.rule_count_text.Text, '0 rule(s) defined')
+        self.assertEqual(dialog.status_text.Text, 'Removed 1 rule(s).')
 
 
 if __name__ == '__main__':

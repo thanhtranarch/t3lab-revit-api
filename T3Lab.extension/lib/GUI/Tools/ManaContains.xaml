@@ -2089,8 +2089,6 @@
                                     <Button x:Name="tab1_btn_set" Content="Set Value"
                                             Style="{StaticResource T3.Button.Primary}" IsDefault="True" Margin="0,0,8,0"/>
                                     <Button x:Name="tab1_btn_sel" Content="Select"
-                                            Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                    <Button x:Name="tab1_btn_close" Content="Close"
                                             Style="{StaticResource T3.Button.Secondary}"/>
                                 </StackPanel>
                             </Border>
@@ -2344,8 +2342,6 @@
                                     <Button x:Name="tab2_btn_apply" Content="Apply to Rooms"
                                             Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                     <Button x:Name="tab2_btn_select" Content="Select Elements"
-                                            Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                    <Button x:Name="tab2_btn_close" Content="Close"
                                             Style="{StaticResource T3.Button.Secondary}"/>
                                 </StackPanel>
                             </Border>

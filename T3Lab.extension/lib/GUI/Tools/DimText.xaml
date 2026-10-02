@@ -1879,9 +1879,6 @@
                         <Button x:Name="btn_clear_fields" Content="Clear Fields"
                                 Style="{StaticResource T3.Button.Ghost}"
                                 Click="clear_fields_clicked" Margin="0,0,8,0"/>
-                        <Button x:Name="btn_cancel" Content="Cancel"
-                                Style="{StaticResource T3.Button.Secondary}"
-                                Click="close_button_clicked" Margin="0,0,8,0"/>
                         <Button x:Name="btn_apply" Content="Apply"
                                 Style="{StaticResource T3.Button.Primary}"
                                 Click="apply_clicked" IsDefault="True"/>

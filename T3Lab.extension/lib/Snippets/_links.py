@@ -9,6 +9,8 @@ Revit API helpers for managing Revit links (RVT links):
 * read and change the **host workset** a link instance sits on
 * read and apply the per-view **display settings** of a link
   (By Host View / By Linked View / Custom)
+* **manage** existing links: reload, reload from, unload, remove, pin,
+  overlay / attachment, and the workset a new link lands on
 
 Kept free of any WPF/UI reference so it can be reused by other tools.
 
@@ -19,9 +21,11 @@ older releases (see display_api_available()).
 Part of T3Lab Extension.
 """
 
+import ntpath
 import os
 
 from Autodesk.Revit.DB import (
+    AttachmentType,
     BuiltInParameter,
     CheckoutStatus,
     Element,
@@ -41,6 +45,7 @@ from Autodesk.Revit.DB import (
     WorksetConfigurationOption,
     WorksetId,
     WorksetKind,
+    WorksetTable,
     WorksharingUtils,
 )
 
@@ -209,6 +214,15 @@ class LinkRecord(object):
         except Exception:
             self.path_type = ""
 
+        self.attachment = attachment_label(link_type)
+        self.pinned_count = 0
+        for inst in instances:
+            try:
+                if inst.Pinned:
+                    self.pinned_count += 1
+            except Exception:
+                pass
+
         self.host_workset = ""
         if instance is not None:
             try:
@@ -290,6 +304,169 @@ def existing_link_keys(doc):
     except Exception:
         pass
     return paths, names
+
+
+# -- MANAGE EXISTING LINKS ---------------------------------------------------
+# Reload / Reload From / Unload chạy KHI KHÔNG có transaction nào mở — Revit
+# tự reload ngoài mô hình transaction và XOÁ lịch sử Undo (luật của Revit, giống
+# hệt hộp thoại Manage Links). Pin / Overlay-Attachment / Remove thì ngược lại:
+# cần một transaction ĐANG MỞ của caller, và Ctrl+Z hoàn tác được.
+
+# LinkedFileStatus -> (label shown in the STATUS pill, severity)
+_STATUS_LABELS = {
+    "Loaded":          ("Loaded", "Success"),
+    "NotFound":        ("Not found", "Danger"),
+    "Unloaded":        ("Unloaded", "Warning"),
+    "LocallyUnloaded": ("Unloaded for me", "Warning"),
+    "InClosedWorkset": ("Closed workset", "Warning"),
+    "Invalid":         ("Invalid", "Danger"),
+}
+
+
+def status_label(status):
+    """(text, severity) for a LinkedFileStatus string."""
+    text, severity = _STATUS_LABELS.get(str(status), (str(status) or "Unknown", "Warning"))
+    return text, severity
+
+
+def pinned_label(pinned_count, instance_count):
+    """PINNED column: Yes / No / "1 of 3" / "—" when nothing is placed."""
+    if not instance_count:
+        return u"\u2014"
+    if pinned_count >= instance_count:
+        return "Yes"
+    if pinned_count <= 0:
+        return "No"
+    return "{} of {}".format(pinned_count, instance_count)
+
+
+def attachment_label(link_type):
+    """"Overlay" / "Attachment" (or "" when Revit does not say)."""
+    try:
+        value = link_type.AttachmentType
+    except Exception:
+        return ""
+    if value == AttachmentType.Overlay:
+        return "Overlay"
+    if value == AttachmentType.Attachment:
+        return "Attachment"
+    return str(value)
+
+
+def _load_result(load_result, ok_text):
+    """(ok, message) from a LinkLoadResult."""
+    if load_result is None:
+        return False, "Revit returned no result"
+    res = load_result.LoadResult
+    ok_results = [LinkLoadResultType.LinkLoaded]
+    for extra in ('LinkAlreadyLoaded', 'UsedExisting'):
+        if hasattr(LinkLoadResultType, extra):
+            ok_results.append(getattr(LinkLoadResultType, extra))
+    if res in ok_results:
+        return True, ok_text
+    return False, str(res)
+
+
+def reload_link(link_type):
+    """Reload (or load) a link from where it points now. NO transaction open."""
+    if link_type is None:
+        return False, "Link no longer exists"
+    try:
+        return _load_result(link_type.Reload(), "Reloaded")
+    except Exception as ex:
+        return False, str(ex).split("\n")[0]
+
+
+def reload_link_from(link_type, file_path):
+    """Point a link at another .rvt file and load it. NO transaction open."""
+    if link_type is None:
+        return False, "Link no longer exists"
+    if not file_path or not os.path.isfile(file_path):
+        return False, "File not found"
+    try:
+        model_path = ModelPathUtils.ConvertUserVisiblePathToModelPath(file_path)
+        config = WorksetConfiguration(WorksetConfigurationOption.OpenAllWorksets)
+        return _load_result(link_type.LoadFrom(model_path, config), "Reloaded from new path")
+    except Exception as ex:
+        return False, str(ex).split("\n")[0]
+
+
+def unload_link(link_type):
+    """Unload a link for everyone. NO transaction open."""
+    if link_type is None:
+        return False, "Link no longer exists"
+    try:
+        link_type.Unload(None)
+        return True, "Unloaded"
+    except Exception as ex:
+        return False, str(ex).split("\n")[0]
+
+
+def set_link_pinned(link_record, pinned):
+    """Pin or unpin every placed instance of a link. Needs an OPEN transaction."""
+    instances = list(getattr(link_record, 'instances', None) or [])
+    if not instances:
+        return False, "Not placed in this model"
+    changed = 0
+    for inst in instances:
+        try:
+            if bool(inst.Pinned) != bool(pinned):
+                inst.Pinned = bool(pinned)
+                changed += 1
+        except Exception as ex:
+            return False, str(ex).split("\n")[0]
+    if not changed:
+        return True, "Already pinned" if pinned else "Already unpinned"
+    return True, "Pinned" if pinned else "Unpinned"
+
+
+def set_link_attachment(link_type, overlay):
+    """Switch a link between Overlay and Attachment. Needs an OPEN transaction."""
+    if link_type is None:
+        return False, "Link no longer exists"
+    target = AttachmentType.Overlay if overlay else AttachmentType.Attachment
+    label = "Overlay" if overlay else "Attachment"
+    try:
+        if link_type.AttachmentType == target:
+            return True, "Already " + label
+        link_type.AttachmentType = target
+        return True, "Set to " + label
+    except Exception as ex:
+        return False, str(ex).split("\n")[0]
+
+
+def remove_link(doc, link_record):
+    """Delete a link type and every placed instance. Needs an OPEN transaction."""
+    if link_record is None:
+        return False, "Link no longer exists"
+    try:
+        doc.Delete(link_record.type_id)
+        return True, "Removed"
+    except Exception as ex:
+        return False, str(ex).split("\n")[0]
+
+
+def link_workset_name(prefix, file_name):
+    """Workset name for one link: prefix + the file name without .rvt."""
+    # ntpath splits on both \\ and /, so a full Windows path works anywhere.
+    base = os.path.splitext(ntpath.basename(file_name or ""))[0].strip()
+    return u"{}{}".format(prefix or "", base).strip()
+
+
+def ensure_workset(doc, name):
+    """Id of the user workset called `name`, created when missing. Needs an
+    OPEN transaction and a workshared doc. Returns -1 when it cannot."""
+    if not is_workshared(doc) or not name:
+        return -1
+    for ws in get_host_worksets(doc):
+        if ws.name.lower() == name.lower():
+            return ws.workset_id
+    try:
+        if not WorksetTable.IsWorksetNameUnique(doc, name):
+            return -1
+        return eid_int_workset(DB.Workset.Create(doc, name).Id)
+    except Exception:
+        return -1
 
 
 # -- WORKSETS OF A LINKED MODEL ----------------------------------------------

@@ -2487,8 +2487,6 @@
                                    Style="{StaticResource T3.Body.Secondary}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btn_cancel" Content="Close" Style="{StaticResource T3.Button.Ghost}"
-                                Margin="0,0,8,0" Click="cancel_button_clicked"/>
                         <Button x:Name="btn_primary" Content="Apply Rename" IsDefault="True"
                                 Style="{StaticResource T3.Button.Primary}" Click="primary_button_clicked"/>
                     </StackPanel>

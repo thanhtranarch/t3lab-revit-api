@@ -522,5 +522,87 @@ class TestWorksetTabContract(unittest.TestCase):
         self.assertIn('_confirm_discard_ws', closing)
 
 
+
+class TestManageLinks(unittest.TestCase):
+    """Manage Links tab: status/pin labels, workset naming, tally, tab contract."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.links = _load_links_module()
+        cls.xaml = _read(os.path.join(LIB_DIR, 'GUI', 'Tools', 'BatchLink.xaml'))
+        cls.dialog = _read(os.path.join(LIB_DIR, 'GUI', 'BatchLinkDialog.py'))
+
+    def test_status_labels_and_severity(self):
+        self.assertEqual(self.links.status_label("Loaded"), ("Loaded", "Success"))
+        self.assertEqual(self.links.status_label("NotFound"), ("Not found", "Danger"))
+        self.assertEqual(self.links.status_label("LocallyUnloaded"),
+                         ("Unloaded for me", "Warning"))
+        self.assertEqual(self.links.status_label("Weird"), ("Weird", "Warning"))
+
+    def test_pinned_label(self):
+        self.assertEqual(self.links.pinned_label(0, 0), u"\u2014")
+        self.assertEqual(self.links.pinned_label(2, 2), "Yes")
+        self.assertEqual(self.links.pinned_label(0, 3), "No")
+        self.assertEqual(self.links.pinned_label(1, 3), "1 of 3")
+
+    def test_link_workset_name(self):
+        self.assertEqual(self.links.link_workset_name("Link_", r"C:\x\ARC Model.rvt"),
+                         "Link_ARC Model")
+        self.assertEqual(self.links.link_workset_name("", "STR.rvt"), "STR")
+
+    def test_manage_tally(self):
+        import ast
+        tree = ast.parse(self.dialog)
+        tree.body = [n for n in tree.body
+                     if isinstance(n, ast.FunctionDef) and n.name == 'manage_tally']
+        scope = {}
+        exec(compile(tree, 'BatchLinkDialog.py', 'exec'), scope)
+        row = lambda loaded, checked=False: type('R', (), {
+            'record': type('Rec', (), {'is_loaded': loaded})(), 'IsSelected': checked})()
+        self.assertEqual(scope['manage_tally']([row(True), row(False, True)]),
+                         "2 links · 1 loaded · 1 not loaded · 1 checked")
+        self.assertEqual(scope['manage_tally']([row(True)]), "1 link · 1 loaded")
+
+    def test_tabs_follow_the_daily_flow_and_match_the_constants(self):
+        order = [self.xaml.index('x:Name="tab_item_{}"'.format(n))
+                 for n in ('manage', 'link', 'worksets', 'display')]
+        self.assertEqual(order, sorted(order))
+        for name, tag in (('manage', 0), ('link', 1), ('worksets', 2), ('display', 3)):
+            chip = self.xaml[self.xaml.index('x:Name="chip_tab_{}"'.format(name)):]
+            self.assertIn('Tag="{}"'.format(tag), chip[:300])
+        for const, value in (('TAB_MANAGE', 0), ('TAB_LINK', 1),
+                             ('TAB_WORKSETS', 2), ('TAB_DISPLAY', 3)):
+            self.assertIn('{} = {}'.format(const, value), self.dialog)
+
+    def test_no_close_or_select_all_duplicates(self):
+        # The title-bar X closes; each table's header checkbox selects all/none.
+        for name in ('btn_cancel', 'btn_select_all', 'btn_select_none',
+                     'btn_ws_select_all', 'btn_ws_select_none'):
+            self.assertNotIn('x:Name="{}"'.format(name), self.xaml)
+        for handler in ('cancel_button_clicked', 'def select_all_clicked',
+                        'def ws_select_all_clicked'):
+            self.assertNotIn(handler, self.dialog)
+
+    def test_every_tab_has_the_same_toolbar_and_count_strip(self):
+        for invert, refresh, count in (
+                ('btn_mng_invert', 'btn_mng_refresh', 'lbl_mng_count'),
+                ('btn_invert', 'btn_rescan', 'lbl_file_count'),
+                ('btn_ws_invert', 'btn_ws_reload_links', 'lbl_ws_link_count'),
+                ('btn_disp_invert', 'btn_disp_refresh', 'lbl_disp_count')):
+            for name in (invert, refresh, count):
+                self.assertIn('x:Name="{}"'.format(name), self.xaml)
+        self.assertEqual(self.xaml.count('Style="{StaticResource T3.Search}"'), 4)
+        self.assertEqual(self.xaml.count('Tag="Search'), 4)
+
+    def test_reload_and_unload_never_run_inside_a_transaction(self):
+        body = self.dialog[self.dialog.index('def _mng_run'):
+                           self.dialog.index('def _mng_reload')]
+        self.assertIn('if transaction_name:', body)
+        for handler in ('def _mng_reload', 'def mng_unload_clicked',
+                        'def mng_reload_from_clicked'):
+            start = self.dialog.index(handler)
+            end = self.dialog.index('\n    def ', start + 10)
+            self.assertNotIn('transaction_name=', self.dialog[start:end])
+
 if __name__ == '__main__':
     unittest.main()

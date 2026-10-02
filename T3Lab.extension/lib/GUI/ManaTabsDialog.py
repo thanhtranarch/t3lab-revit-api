@@ -85,7 +85,6 @@ class TabManagerWindow(T3WPFWindow):
         self.filtered_items = ObservableCollection[Object]()
         
         self.BtnApply.Click += self._on_apply
-        self.BtnClose.Click += self._on_close
         
         self.applied = False
         self.selected_names = []
@@ -126,9 +125,6 @@ class TabManagerWindow(T3WPFWindow):
         # Collect checked items
         self.selected_names = [item.Name for item in self.all_items if item.IsChecked]
         self.applied = True
-        self.Close()
-
-    def _on_close(self, sender, e):
         self.Close()
 
 def show_tab_manager_dialog(current_lst):

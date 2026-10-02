@@ -294,7 +294,6 @@ class ManaSelectWindow(T3WPFWindow):
         # Footer
         self.btn_apply.Click += self._on_apply
         self.btn_add_selection.Click += self._on_add_selection
-        self.btn_close_footer.Click += self._on_close_footer
         self.Closed += self._on_closed
 
     def _on_closed(self, sender, e):
@@ -1067,9 +1066,6 @@ class ManaSelectWindow(T3WPFWindow):
 
     def _on_check_none(self, sender, e):
         self._set_all_checks(False)
-
-    def _on_close_footer(self, sender, e):
-        self.Close()
 
     def _on_apply(self, sender, e):
         ids = self._require_checked('Select')

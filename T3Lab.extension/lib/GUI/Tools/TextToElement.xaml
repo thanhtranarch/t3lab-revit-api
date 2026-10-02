@@ -1909,11 +1909,6 @@
                         <TextBlock x:Name="txt_status" Text="Ready"
                                    Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                     </StackPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="Close" Style="{StaticResource T3.Button.Secondary}"
-                                Click="_on_close" IsCancel="True"/>
-                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

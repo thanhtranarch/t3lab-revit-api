@@ -255,6 +255,211 @@ def test_popups_fit_a_docked_pane():
           'FrameworkElement.MinWidthProperty' in SCRIPT_SRC)
 
 
+_P = '{http://schemas.microsoft.com/winfx/2006/xaml/presentation}'
+_X = '{http://schemas.microsoft.com/winfx/2006/xaml}'
+
+
+def _tree():
+    root = ET.fromstring(XAML_SRC)
+    parent = {c: p for p in root.iter() for c in p}
+    return root, parent
+
+
+def _named(root, name):
+    for el in root.iter():
+        if el.get(_X + 'Name') == name:
+            return el
+    return None
+
+
+def _method(name):
+    m = re.search(r'\n    def {}\(.*?(?=\n    def |\nclass |\Z)'.format(name),
+                  SCRIPT_SRC, re.S)
+    return m.group() if m else ''
+
+
+def _column_width(el, parent):
+    """Width of the ColumnDefinition `el` sits in, or None."""
+    grid = parent.get(el)
+    if grid is None or grid.tag != _P + 'Grid':
+        return None
+    defs = grid.find(_P + 'Grid.ColumnDefinitions')
+    if defs is None:
+        return None
+    cols = list(defs)
+    idx = int(el.get('Grid.Column', '0'))
+    return cols[idx].get('Width', '*') if idx < len(cols) else None
+
+
+def test_pane_has_no_wide_floor():
+    """Owner report 2026-10-02: docked at ~400px beside Properties, the
+    greeting, the composer hint, the project / mode row and the copyright were
+    cut off on the right. The pane content had MinWidth 380 — and a 400px
+    dock at 125% scaling is only 320 DIP, so everything past 320 was clipped
+    instead of laid out."""
+    print('[layout: pane floor]')
+    pane_src = _read(os.path.join(EXT, 'lib', 'GUI', 'AssistantPaneControl.py'))
+    m = re.search(r'^PANE_MIN_WIDTH\s*=\s*(\d+)', pane_src, re.M)
+    floor = int(m.group(1)) if m else None
+    check('the pane floor is a named constant', floor is not None)
+    check('the pane floor is below a 300px dock at 125% (240 DIP)',
+          floor is not None and floor <= 240, floor)
+    check('the pane content uses it',
+          'content.MinWidth = PANE_MIN_WIDTH' in pane_src)
+    check('no hardcoded 380 floor on the pane content',
+          re.search(r'content\.MinWidth\s*=\s*3\d\d', pane_src) is None)
+    root, _ = _tree()
+    chrome = _named(root, 'root_chrome')
+    mw = chrome.get('MinWidth') if chrome is not None else None
+    check('root_chrome (= the docked content) carries no wide MinWidth',
+          mw is None or float(mw) <= 240, mw)
+
+
+def test_text_adapts_instead_of_clipping():
+    print('[layout: text]')
+    root, parent = _tree()
+    g = _named(root, 'welcome_greeting_text')
+    check('the greeting wraps', g is not None and g.get('TextWrapping') == 'Wrap')
+    check('the greeting is centred line by line',
+          g is not None and g.get('TextAlignment') == 'Center')
+    panel = _named(root, 'welcome_greeting_panel')
+    check('the greeting panel spans the width (a centred panel would not)',
+          panel is not None
+          and panel.get('HorizontalAlignment', 'Stretch') == 'Stretch')
+
+    ph = _named(root, 'composer_placeholder')
+    check('the composer hint trims',
+          ph is not None and ph.get('TextTrimming') == 'CharacterEllipsis')
+    short = re.search(r'_PLACEHOLDER_SHORT\s*=\s*u?"([^"]+)"', SCRIPT_SRC)
+    full = re.search(r'_PLACEHOLDER_FULL\s*=\s*u?"([^"]+)"', SCRIPT_SRC)
+    check('the narrow hint is shorter than the full one',
+          short and full and len(short.group(1)) < len(full.group(1)))
+    check('the full hint matches the XAML text',
+          full is not None and ph is not None
+          and ph.get('Text') == full.group(1))
+
+    for name in ('model_chip_text', 'project_chip_text', 'revit_ctx_view'):
+        el = _named(root, name)
+        check('{} trims'.format(name),
+              el is not None and el.get('TextTrimming') == 'CharacterEllipsis')
+
+    # TextTrimming inside a horizontal StackPanel never fires: the panel
+    # measures its children with infinite width. Every one of these was a
+    # label that clipped at the pane edge instead of trimming.
+    dead = []
+    for el in root.iter(_P + 'TextBlock'):
+        if not el.get('TextTrimming'):
+            continue
+        anc = [a.tag for a in _ancestors(el, parent)]
+        if _P + 'Window.Resources' in anc:
+            continue
+        p = parent.get(el)
+        if (p is not None and p.tag == _P + 'StackPanel'
+                and p.get('Orientation') == 'Horizontal'):
+            dead.append(el.get(_X + 'Name') or el.get('Text') or el.get('Style'))
+    check('no TextTrimming inside a horizontal StackPanel', not dead, dead)
+
+
+def _ancestors(el, parent):
+    while el in parent:
+        el = parent[el]
+        yield el
+
+
+def test_trimming_chips_sit_in_star_columns():
+    """An Auto column measures its content with infinite width, so a chip in
+    one never trims — it pushes its neighbours out of the pane instead."""
+    print('[layout: chip columns]')
+    root, parent = _tree()
+    model = _named(root, 'model_chip_btn')
+    check('the model chip sits in a * column',
+          model is not None and _column_width(model, parent) == '*',
+          model is not None and _column_width(model, parent))
+    check('... right-aligned, next to Send',
+          model is not None and model.get('HorizontalAlignment') == 'Right')
+    proj = _named(root, 'project_chip_btn')
+    check('the project chip sits in a * column',
+          proj is not None and _column_width(proj, parent) == '*')
+    inner = parent.get(proj) if proj is not None else None
+    check('... of a LEFT-aligned grid, so Mode stays beside it on a wide pane',
+          inner is not None and inner.get('HorizontalAlignment') == 'Left')
+    check('... and that grid fills a * column of the row',
+          inner is not None and _column_width(inner, parent) == '*')
+
+
+def test_footer_keeps_the_copyright_in_the_pane():
+    print('[layout: footer]')
+    root, parent = _tree()
+    crs = [el for el in root.iter(_P + 'TextBlock')
+           if el.get('Style') == '{StaticResource T3.Copyright}']
+    check('exactly one copyright line', len(crs) == 1, len(crs))
+    cr = crs[0] if crs else None
+    box = parent.get(cr) if cr is not None else None
+    check('the footer is a DockPanel (children measured against what is left)',
+          box is not None and box.tag == _P + 'DockPanel',
+          box is not None and box.tag)
+    check('the copyright is the left-most child',
+          box is not None and list(box)[0] is cr
+          and cr.get('DockPanel.Dock') == 'Left')
+    check('the copyright trims rather than being pushed out',
+          cr is not None and cr.get('TextTrimming') == 'CharacterEllipsis')
+    check('the footer is not centred any more (T3: copyright left-aligned)',
+          box is not None and box.get('HorizontalAlignment') in (None, 'Stretch'))
+
+
+def test_labels_collapse_on_a_narrow_pane():
+    print('[layout: breakpoints]')
+    root, _ = _tree()
+    body = _method('_apply_narrow_layout')
+    check('_apply_narrow_layout exists', bool(body))
+    check('it runs on every width change',
+          re.search(r'if e\.WidthChanged:.*?_apply_narrow_layout',
+                    _method('_on_size_changed'), re.S) is not None)
+    check('it runs once at startup too',
+          '_apply_narrow_layout(' in _method('_apply_revit_skin'))
+    labels = re.findall(r"'(\w+_(?:label|text))'", body)
+    check('it collapses the secondary labels', len(labels) >= 4, labels)
+    missing = [n for n in labels if _named(root, n) is None]
+    check('every label it collapses exists in the XAML', not missing, missing)
+    check('it accounts for the floating window controls',
+          'float_ctrls_panel' in body and '_FLOAT_CTRLS_WIDTH' in body)
+
+    def _const(name):
+        m = re.search(r'^\s+{}\s*=\s*(\d+)'.format(name), SCRIPT_SRC, re.M)
+        return int(m.group(1)) if m else None
+    compact_body = _method('_apply_compact_layout')
+    check('the first-run card gets compact padding too',
+          _named(root, 'onboarding_card') is not None
+          and 'onboarding_card.Padding' in compact_body)
+
+    narrow, compact = _const('NARROW_WIDTH'), _const('COMPACT_WIDTH')
+    check('NARROW_WIDTH < COMPACT_WIDTH',
+          narrow is not None and compact is not None and narrow < compact,
+          (narrow, compact))
+
+    # An icon-only button must stay symmetric: the gap rides on the label.
+    lopsided = []
+    for n in labels:
+        el = _named(root, n)
+        if el is not None and el.get('Margin', '0').split(',')[0] in ('0', ''):
+            lopsided.append(n)
+    check('the icon-to-label gap sits on the label', not lopsided, lopsided)
+
+
+def test_popups_stay_inside_the_pane():
+    """Placement Top/Bottom aligns a popup's LEFT edge with its target. The
+    model chip and Prompts & Skills sit on the right, so their popups hung
+    past the pane over Revit's Properties palette."""
+    print('[layout: popup placement]')
+    check('the placement helper exists',
+          'def _keep_popup_in_pane(' in SCRIPT_SRC)
+    for popup in ('model_popup', 'saved_prompts_popup', 'project_popup'):
+        check('{} is kept inside the pane before it opens'.format(popup),
+              re.search(r'_keep_popup_in_pane\(self\.{0}\)\s*\n\s*self\.{0}'
+                        r'\.IsOpen = True'.format(popup), SCRIPT_SRC)
+              is not None)
+
+
 def test_theme_survives_the_docked_detach():
     """AssistantPaneControl hands the content to Revit and detaches it:
 
@@ -328,6 +533,12 @@ def main():
                test_no_stray_hardcoded_colours,
                test_no_dead_styles,
                test_popups_fit_a_docked_pane,
+               test_pane_has_no_wide_floor,
+               test_text_adapts_instead_of_clipping,
+               test_trimming_chips_sit_in_star_columns,
+               test_footer_keeps_the_copyright_in_the_pane,
+               test_labels_collapse_on_a_narrow_pane,
+               test_popups_stay_inside_the_pane,
                test_theme_survives_the_docked_detach,
                test_docked_pane_keeps_following_the_host,
                test_xaml_is_well_formed):

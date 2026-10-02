@@ -487,9 +487,6 @@ class CADToElementsWindow(T3WPFWindow):
             self._rescan()
             e.Handled = True
 
-    def close_bar_clicked(self, sender, e):
-        self.Close()
-
     # ------------------------------------------------------------------
     # Layer list (shared by every mode)
     # ------------------------------------------------------------------
@@ -565,16 +562,6 @@ class CADToElementsWindow(T3WPFWindow):
 
     def select_all_grid_layers_clicked(self, sender, e):
         self.toggle_all_rows(self.grid_layers, "is_selected", sender.IsChecked)
-        self._store_selection()
-        self._refresh_rows()
-
-    def layers_select_all_clicked(self, sender, e):
-        self.toggle_all_rows(self.grid_layers, "is_selected", True)
-        self._store_selection()
-        self._refresh_rows()
-
-    def layers_clear_clicked(self, sender, e):
-        self.toggle_all_rows(self.grid_layers, "is_selected", False)
         self._store_selection()
         self._refresh_rows()
 

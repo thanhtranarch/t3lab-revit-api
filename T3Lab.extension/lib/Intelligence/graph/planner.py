@@ -35,6 +35,8 @@ Author: Tran Tien Thanh
 """
 from __future__ import unicode_literals
 
+import re
+
 from Intelligence.graph import topology
 from Intelligence.graph.primitives import AGENT, FALLBACK, REDUCER, Node
 from Intelligence.graph.router import GraphRouter
@@ -54,6 +56,9 @@ MAX_NODES = 6
 
 # A fragment shorter than this cannot be a request on its own.
 _MIN_GOAL_CHARS = 4
+
+# One line of a bulleted / numbered list ("1. ...", "2) ...", "- ...").
+_LIST_LINE_RE = re.compile(r'(?:^|\n)\s*(?:\d{1,2}[.)]|[-*\u2022])\s+')
 
 
 class Plan(object):
@@ -82,8 +87,72 @@ class Plan(object):
     def has_writer(self):
         return any(n.writer for n in self.agent_nodes())
 
+    # ── review (plan → approve → run) ─────────────────────────────────────
+
+    def modifying_nodes(self):
+        """Steps that may change the model (or write files) — the router's
+        writer flag, the same one the executor serialises on."""
+        return [n for n in self.agent_nodes() if n.writer]
+
+    def needs_approval(self):
+        """True when the user must see this plan before ANY of it runs.
+
+        Only multi-step plans with at least one modifying step. A read-only
+        plan has nothing to lose and keeps running immediately; a single goal
+        never reaches the graph layer at all.
+        """
+        return bool(self.is_multi and self.modifying_nodes())
+
+    def review_steps(self):
+        """The plan as the approval card shows it, in the user's order.
+
+        [{'index': 1, 'id': 'n1', 'goal': ..., 'modifies': bool,
+          'role': 'Edits the model'}, ...]
+        """
+        steps = []
+        for i, node in enumerate(self.agent_nodes()):
+            steps.append({
+                'index':    i + 1,
+                'id':       node.id,
+                'goal':     node.goal,
+                'modifies': bool(node.writer),
+                'role':     step_role(node.specialist, node.writer),
+            })
+        return steps
+
+    def review_text(self):
+        """Numbered plain-text plan — what Edit puts into the composer. A
+        numbered list is a strong sequencer, so resending it re-plans into
+        the same steps the user just adjusted."""
+        return u'\n'.join(u'{}. {}'.format(s['index'], s['goal'])
+                          for s in self.review_steps())
+
     def describe(self):
         return self.graph.describe()
+
+
+# Plain-English role of a step, shown under it on the plan card. The goal
+# itself stays in the user's own words (it is their request, not ours to
+# paraphrase); this line says what KIND of work it is.
+_STEP_ROLES = {
+    'revit_data':   u'Reads model data',
+    'revit_action': u'Edits the model',
+    'modeling':     u'Creates or changes elements',
+    'export':       u'Exports files',
+    'qa_check':     u'Checks the model',
+    'multi_doc':    u'Works across open models',
+    'knowledge':    u'Looks up project knowledge',
+    'comment':      u'Reviews drawing comments',
+    'general':      u'General request',
+}
+
+
+def step_role(specialist, writer=False):
+    """Plain-English label for a step routed to `specialist`."""
+    role = _STEP_ROLES.get(specialist or 'general')
+    if role:
+        return role
+    return u'Edits the model' if writer else u'General request'
 
 
 class Planner(object):
@@ -130,8 +199,18 @@ class Planner(object):
             return [raw]
 
         try:
-            parts = (list(utt.segments) if utt is not None
-                     else _semantics.split_sequenced(raw))
+            if len(_LIST_LINE_RE.findall(raw)) >= 2:
+                # A list the user typed (or the plan card's Edit put in the
+                # composer) is already split, one step per line. The
+                # analyser's segments come from text normalised onto ONE line,
+                # where "1. count the walls\n2. color..." loses its line
+                # starts and re-splits as "1" / "count the walls 2" / ...;
+                # split_sequenced reads the list off the raw text instead.
+                parts = _semantics.split_sequenced(raw)
+            elif utt is not None:
+                parts = list(utt.segments)
+            else:
+                parts = _semantics.split_sequenced(raw)
         except Exception:
             parts = [raw]
         parts = [p.strip() for p in parts if p and p.strip()]

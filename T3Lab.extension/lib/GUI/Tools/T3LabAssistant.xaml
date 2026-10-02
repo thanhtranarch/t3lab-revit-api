@@ -1712,9 +1712,12 @@
 
     <!-- Root chrome. Floating: rounded card with 1px border. Docked:
          script.py flattens this to CornerRadius 0 / no border so the assistant
-         fills the Revit pane edge-to-edge. -->
+         fills the Revit pane edge-to-edge.
+         No MinWidth here: docked, this Border IS the pane content, and a
+         380 floor clipped everything right of ~320 DIP on a 400px dock at
+         125% scaling. The floor lives in AssistantPaneControl (PANE_MIN_WIDTH)
+         and the floating Window keeps its own MinWidth. -->
     <Border x:Name="root_chrome"
-            MinWidth="380"
             Background="{StaticResource T3.Surface}"
             BorderBrush="{StaticResource T3.Border}"
             BorderThickness="1"
@@ -1817,11 +1820,16 @@
                                     Height="26" MinWidth="0" Padding="8,0"
                                     Click="saved_prompts_clicked"
                                     ToolTip="Saved prompts &amp; skills library">
+                                <!-- Narrow pane: the label collapses, the icon stays
+                                     (_apply_narrow_layout). The 4px gap rides on the
+                                     label so the icon-only button stays symmetric. -->
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE74C;" FontFamily="Segoe MDL2 Assets" FontSize="11"
-                                               Foreground="{StaticResource T3.Ink}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Prompts &amp; Skills" Style="{StaticResource T3.Caption}" FontWeight="SemiBold"
                                                Foreground="{StaticResource T3.Ink}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="saved_prompts_label" Text="Prompts &amp; Skills"
+                                               Style="{StaticResource T3.Caption}" FontWeight="SemiBold"
+                                               Foreground="{StaticResource T3.Ink}" VerticalAlignment="Center"
+                                               Margin="4,0,0,0"/>
                                 </StackPanel>
                             </Button>
                         </Border>
@@ -1870,10 +1878,15 @@
                                   Background="{StaticResource T3.Surface}"
                                   Padding="16,12,12,8">
                         <StackPanel x:Name="chat_history_panel" Margin="0,0,0,4">
-                            <!-- Dynamic Welcome Greeting (shown when no messages) -->
-                            <StackPanel x:Name="welcome_greeting_panel" Margin="4,24,4,24" HorizontalAlignment="Center">
+                            <!-- Dynamic Welcome Greeting (shown when no messages).
+                                 Stretch + Wrap + centred text: on a narrow dock the
+                                 headline breaks onto a second centred line instead of
+                                 running off the right edge. -->
+                            <StackPanel x:Name="welcome_greeting_panel" Margin="4,24,4,24" HorizontalAlignment="Stretch">
                                 <TextBlock x:Name="welcome_greeting_text" Text="Good afternoon, Thanh"
-                                           Style="{StaticResource T3.Display}" TextAlignment="Center"/>
+                                           Style="{StaticResource T3.Display}"
+                                           TextWrapping="Wrap" TextAlignment="Center"
+                                           HorizontalAlignment="Stretch"/>
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
@@ -1894,39 +1907,67 @@
 
                     <Border Grid.Row="0" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
                             Padding="16,12" Background="{StaticResource T3.SurfaceSunken}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="Chat History" Style="{StaticResource T3.Title}"/>
-                                <TextBlock Text="Past sessions saved for this document"
-                                           Style="{StaticResource T3.Caption}" Margin="0,4,0,0"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button x:Name="btn_activity_log"
-                                        Style="{StaticResource T3.Button.Ghost}"
-                                        Height="26" MinWidth="0" Padding="8,0"
-                                        Margin="0,0,8,0"
-                                        Click="activity_log_clicked"
-                                        ToolTip="Today's activity log (daily log in the project folder)">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="11"
-                                                   Foreground="{StaticResource T3.TextSecondary}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Activity log" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="btn_clear_all_history"
-                                        Style="{StaticResource T3.Button.Ghost}"
-                                        Height="26" MinWidth="0" Padding="8,0"
-                                        Click="clear_all_history_clicked"
-                                        ToolTip="Delete all saved sessions">
-                                    <TextBlock Text="Clear all" Style="{StaticResource T3.Caption}"
-                                               Foreground="{StaticResource T3.Danger.Text}"/>
-                                </Button>
-                            </StackPanel>
-                        </Grid>
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Chat History" Style="{StaticResource T3.Title}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock x:Name="history_subtitle"
+                                               Text="Past sessions saved for this document"
+                                               Style="{StaticResource T3.Caption}" Margin="0,4,0,0"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                            Margin="8,0,0,0">
+                                    <Button x:Name="btn_activity_log"
+                                            Style="{StaticResource T3.Button.Ghost}"
+                                            Height="26" MinWidth="0" Padding="8,0"
+                                            Margin="0,0,8,0"
+                                            Click="activity_log_clicked"
+                                            ToolTip="Today's activity log (daily log in the project folder)">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                       Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="activity_log_label" Text="Activity log"
+                                                       Style="{StaticResource T3.Caption}" VerticalAlignment="Center"
+                                                       Margin="4,0,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="btn_clear_all_history"
+                                            Style="{StaticResource T3.Button.Ghost}"
+                                            Height="26" MinWidth="0" Padding="8,0"
+                                            Click="clear_all_history_clicked"
+                                            ToolTip="Delete every conversation in this list">
+                                        <TextBlock Text="Clear all" Style="{StaticResource T3.Caption}"
+                                                   Foreground="{StaticResource T3.Danger.Text}"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Search + scope. Stacked, not side by side: the pane works
+                                 from 240 DIP, where a row of box + two chips leaves the
+                                 box no room to type in. -->
+                            <TextBox x:Name="history_search_box" Style="{StaticResource T3.Search}"
+                                     Tag="Search conversations" Margin="0,12,0,0"
+                                     TextChanged="history_search_changed"
+                                     ToolTip="Search titles and messages — every word must match"/>
+                            <WrapPanel Margin="0,8,0,0">
+                                <RadioButton x:Name="history_scope_project" GroupName="history_scope"
+                                             Style="{StaticResource T3.Chip}" IsChecked="True"
+                                             Content="This project"
+                                             Checked="history_scope_changed"
+                                             ToolTip="Conversations of the active project, for this document"/>
+                                <RadioButton x:Name="history_scope_all" GroupName="history_scope"
+                                             Style="{StaticResource T3.Chip}"
+                                             Content="All projects"
+                                             Checked="history_scope_changed"
+                                             ToolTip="Conversations from every project and document"/>
+                            </WrapPanel>
+                        </StackPanel>
                     </Border>
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
@@ -1940,11 +1981,15 @@
                                 <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="19"
                                            Foreground="{StaticResource T3.TextDisabled}"
                                            HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                                <TextBlock Text="No chat history yet" Style="{StaticResource T3.BodyStrong}"
-                                           HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                                <TextBlock Text="Click + above to start a conversation."
+                                <TextBlock x:Name="history_empty_title"
+                                           Text="No chat history yet" Style="{StaticResource T3.BodyStrong}"
+                                           HorizontalAlignment="Center" Margin="0,0,0,4"
+                                           TextWrapping="Wrap" TextAlignment="Center"/>
+                                <TextBlock x:Name="history_empty_hint"
+                                           Text="Click + above to start a conversation."
                                            Style="{StaticResource T3.Caption}"
-                                           HorizontalAlignment="Center"/>
+                                           HorizontalAlignment="Center"
+                                           TextWrapping="Wrap" TextAlignment="Center"/>
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
@@ -2005,23 +2050,33 @@
                             Visibility="Collapsed"
                             Click="revit_ctx_clicked"
                             ToolTip="What the assistant sees in Revit right now — click to refresh">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="M12 2 2 7l10 5 10-5Z M2 17l10 5 10-5 M2 12l10 5 10-5"
+                        <!-- Grid, not a horizontal StackPanel: a StackPanel measures its
+                             children with infinite width, so the view name could never
+                             trim and a long name pushed "· N selected" past the pane edge.
+                             The * column takes what is left after the icon and the count. -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Path Grid.Column="0"
+                                  Data="M12 2 2 7l10 5 10-5Z M2 17l10 5 10-5 M2 12l10 5 10-5"
                                   Stroke="{StaticResource T3.TextMuted}" StrokeThickness="1.5"
                                   StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                                   StrokeLineJoin="Round"
                                   Width="11" Height="11" Stretch="Uniform"
                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock x:Name="revit_ctx_view" Text=""
+                            <TextBlock Grid.Column="1" x:Name="revit_ctx_view" Text=""
                                        FontSize="11.5" FontWeight="Normal"
                                        Foreground="{StaticResource T3.TextMuted}"
                                        VerticalAlignment="Center"
                                        MaxWidth="240" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock x:Name="revit_ctx_sel" Text=""
+                            <TextBlock Grid.Column="2" x:Name="revit_ctx_sel" Text=""
                                        FontSize="11.5" FontWeight="SemiBold"
                                        Foreground="{StaticResource T3.Ink}"
                                        VerticalAlignment="Center" Margin="8,0,0,0"/>
-                        </StackPanel>
+                        </Grid>
                     </Button>
 
                     <!-- Composer card -->
@@ -2043,19 +2098,25 @@
                                          VerticalContentAlignment="Center"
                                          KeyDown="input_keydown"
                                          TextChanged="input_text_changed"/>
+                                <!-- A narrow pane swaps in a shorter hint
+                                     (_apply_narrow_layout); trimming covers the rest. -->
                                 <TextBlock x:Name="composer_placeholder"
                                            Text="Type a request — press / for skills"
                                            FontSize="13" Foreground="{StaticResource T3.TextDisabled}"
                                            VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
                                            IsHitTestVisible="False"/>
                             </Grid>
 
-                            <!-- Bottom toolbar inside composer card -->
+                            <!-- Bottom toolbar inside composer card.
+                                 The model chip sits in the * column, right-aligned, so a
+                                 long model name trims inside the chip instead of pushing
+                                 the Send button out of the pane (an Auto column measures
+                                 its content with infinite width and never trims). -->
                             <Grid Margin="8,4,8,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>  <!-- Attach (Paperclip) -->
-                                    <ColumnDefinition Width="*"/>     <!-- spacer -->
-                                    <ColumnDefinition Width="Auto"/>  <!-- Model chip -->
+                                    <ColumnDefinition Width="*"/>     <!-- Model chip, right-aligned -->
                                     <ColumnDefinition Width="Auto"/>  <!-- Send -->
                                 </Grid.ColumnDefinitions>
 
@@ -2070,26 +2131,33 @@
                                 </Button>
 
                                 <!-- Model / provider chip -->
-                                <Button Grid.Column="2" x:Name="model_chip_btn"
+                                <Button Grid.Column="1" x:Name="model_chip_btn"
                                         Style="{StaticResource T3.Button.Ghost}"
                                         Height="32" MinWidth="0" Padding="8,0"
-                                        Margin="0,0,8,0"
+                                        Margin="8,0,8,0"
+                                        HorizontalAlignment="Right"
                                         Click="model_chip_clicked"
                                         ToolTip="Choose AI provider / model">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Ellipse x:Name="model_chip_dot" Width="6" Height="6"
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Grid.Column="0" x:Name="model_chip_dot" Width="6" Height="6"
                                                  Fill="{StaticResource T3.TextDisabled}" VerticalAlignment="Center"
                                                  Margin="0,0,8,0"/>
-                                        <TextBlock x:Name="model_chip_text" Text="AI"
+                                        <TextBlock Grid.Column="1" x:Name="model_chip_text" Text="AI"
                                                    FontSize="11.5" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                   Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="2" Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
                                                    Foreground="{StaticResource T3.TextDisabled}" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                                    </StackPanel>
+                                    </Grid>
                                 </Button>
 
                                 <!-- Send button (Primary, IsDefault="True") -->
-                                <Button Grid.Column="3" x:Name="send_button"
+                                <Button Grid.Column="2" x:Name="send_button"
                                         Style="{StaticResource T3.Button.Primary}"
                                         IsDefault="True"
                                         Width="32" Height="32" MinWidth="0" Padding="0"
@@ -2107,34 +2175,51 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Row below the card: project picker + chat actions -->
+                    <!-- Row below the card: project picker + action mode | undo.
+                         Outer * column holds a LEFT-aligned inner grid whose * column
+                         carries the project chip: the inner grid shrinks to its
+                         content on a wide pane (mode chip stays right next to the
+                         project chip), and on a narrow one the project name trims
+                         instead of shoving Mode and Undo past the pane edge. -->
                     <Grid Margin="0,8,0,4">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <Grid Grid.Column="0" HorizontalAlignment="Left">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
                             <!-- Project picker chip -->
-                            <Button x:Name="project_chip_btn"
+                            <Button Grid.Column="0" x:Name="project_chip_btn"
                                     Style="{StaticResource T3.Button.Ghost}"
                                     Height="28" MinWidth="0" Padding="8,0"
                                     Click="project_chip_clicked"
                                     ToolTip="Choose a project (workspace)">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="11"
                                                Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock x:Name="project_chip_text" Text="Project"
+                                    <TextBlock Grid.Column="1" x:Name="project_chip_text" Text="Project"
                                                FontSize="11.5" FontWeight="SemiBold"
-                                               Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                               Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="2" Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
                                                Foreground="{StaticResource T3.TextDisabled}" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                                </StackPanel>
+                                </Grid>
                             </Button>
 
-                            <!-- Harness action mode: Auto / Ask before model edits -->
-                            <Button x:Name="action_mode_btn"
+                            <!-- Harness action mode: Auto / Ask before model edits.
+                                 Narrow pane: the label collapses, the zap / shield icon
+                                 stays and the tooltip names the mode. -->
+                            <Button Grid.Column="1" x:Name="action_mode_btn"
                                     Style="{StaticResource T3.Button.Ghost}"
                                     Height="28" MinWidth="0" Padding="8,0"
                                     Margin="4,0,0,0"
@@ -2147,16 +2232,18 @@
                                           StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                                           StrokeLineJoin="Round"
                                           Width="11" Height="11" Stretch="Uniform"
-                                          VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                          VerticalAlignment="Center"/>
                                     <TextBlock x:Name="action_mode_text" Text="Auto"
                                                FontSize="11.5" FontWeight="SemiBold"
-                                               Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"/>
+                                               Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"
+                                               Margin="8,0,0,0"/>
                                 </StackPanel>
                             </Button>
-                        </StackPanel>
+                        </Grid>
 
-                        <!-- Chat actions: Undo Revit action -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Chat actions: Undo Revit action (label collapses on a narrow pane) -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                    Margin="4,0,0,0">
                             <Button x:Name="btn_undo"
                                     Style="{StaticResource T3.Button.Ghost}"
                                     Height="28" MinWidth="0" Padding="8,0"
@@ -2164,25 +2251,30 @@
                                     ToolTip="Undo last Revit action">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE7A7;" FontFamily="Segoe MDL2 Assets" FontSize="11"
-                                               Foreground="{StaticResource T3.TextSecondary}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Undo" Style="{StaticResource T3.Caption}"
                                                Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="undo_label" Text="Undo" Style="{StaticResource T3.Caption}"
+                                               Foreground="{StaticResource T3.TextSecondary}" VerticalAlignment="Center"
+                                               Margin="4,0,0,0"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
                     </Grid>
 
-                    <!-- Footer line: Centred copyright + disclaimer -->
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
-                                HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource T3.Copyright}"/>
+                    <!-- Footer line: copyright left-most (T3 rule), then the disclaimer.
+                         DockPanel, not a centred horizontal StackPanel: each child is
+                         measured against the width that is actually left, so both
+                         lines TRIM on a narrow pane instead of being pushed past the
+                         right edge. The disclaimer also collapses below COMPACT_WIDTH. -->
+                    <DockPanel Margin="0,8,0,0" LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Left" Style="{StaticResource T3.Copyright}"
+                                   TextTrimming="CharacterEllipsis"/>
                         <TextBlock x:Name="footer_disclaimer"
                                    Margin="8,0,0,0"
                                    Text="·  T3Lab AI can make mistakes  ·  Shift+Enter = new line"
                                    Style="{StaticResource T3.Caption}"
                                    Foreground="{StaticResource T3.TextDisabled}"
                                    TextTrimming="CharacterEllipsis"/>
-                    </StackPanel>
+                    </DockPanel>
 
                     <!-- Slash-skills popup -->
                     <Popup x:Name="skills_popup"
@@ -2203,7 +2295,8 @@
                                 <Border BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                         Padding="12,8">
                                     <TextBlock Text="↑↓ navigate  ·  Enter/Tab use skill  ·  Esc close"
-                                               Style="{StaticResource T3.Caption}"/>
+                                               Style="{StaticResource T3.Caption}"
+                                               TextWrapping="Wrap"/>
                                 </Border>
                             </StackPanel>
                         </Border>
@@ -2229,9 +2322,11 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
-                                            <TextBlock Text="Saved Prompts &amp; Skills" Style="{StaticResource T3.BodyStrong}"/>
+                                            <TextBlock Text="Saved Prompts &amp; Skills" Style="{StaticResource T3.BodyStrong}"
+                                                       TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Text="Select a prompt to run or manage skills"
-                                                       Style="{StaticResource T3.Caption}" Margin="0,4,0,0"/>
+                                                       Style="{StaticResource T3.Caption}" Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <Button Grid.Column="1" x:Name="btn_close_saved_prompts"
                                                 Style="{StaticResource T3.Button.Ghost}"
@@ -2346,7 +2441,11 @@
             <Border x:Name="onboarding_overlay" Visibility="Collapsed"
                     Grid.Row="0" Grid.RowSpan="99" Panel.ZIndex="997"
                     Background="{StaticResource T3.Ink}" Opacity="0.95">
-                <Border MaxWidth="380" Margin="16" VerticalAlignment="Center" HorizontalAlignment="Center"
+                <!-- Margin / Padding drop to 8 / 16 below COMPACT_WIDTH
+                     (_apply_compact_layout) so the two buttons still fit a
+                     ~280 DIP dock. -->
+                <Border x:Name="onboarding_card"
+                        MaxWidth="380" Margin="16" VerticalAlignment="Center" HorizontalAlignment="Center"
                         Background="{StaticResource T3.Surface}" CornerRadius="12" Padding="24"
                         BorderBrush="{StaticResource T3.Border}" BorderThickness="1">
                     <StackPanel>
@@ -2414,9 +2513,11 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock x:Name="project_panel_title" Text="Project" Style="{StaticResource T3.Title}"/>
+                                <TextBlock x:Name="project_panel_title" Text="Project" Style="{StaticResource T3.Title}"
+                                           TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="Instructions · Memory · Context · Scheduled"
-                                           Style="{StaticResource T3.Caption}" Margin="0,4,0,0"/>
+                                           Style="{StaticResource T3.Caption}" Margin="0,4,0,0"
+                                           TextWrapping="Wrap"/>
                             </StackPanel>
                             <Button x:Name="project_panel_close_btn" Grid.Column="1"
                                     Style="{StaticResource T3.WinCtrl}"

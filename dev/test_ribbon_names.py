@@ -18,7 +18,7 @@ class Window:
     def __init__(self, path):
         self.Grid = SimpleNamespace(CommitEdit=lambda: True)
         self.HeaderSub = SimpleNamespace()
-        for name in ('BtnShort', 'BtnFull', 'BtnSave', 'BtnReset', 'BtnClose'):
+        for name in ('BtnShort', 'BtnFull', 'BtnSave', 'BtnReset'):
             setattr(self, name, SimpleNamespace(Click=Event()))
 
 

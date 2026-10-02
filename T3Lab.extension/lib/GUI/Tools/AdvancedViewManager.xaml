@@ -1935,7 +1935,6 @@
 
                     <!-- Right: Action Buttons -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="close_btn" Content="Close" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                         <Button x:Name="excel_btn" Content="Excel" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                         <Button x:Name="refresh_btn" Content="Refresh" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                         <Button x:Name="dup_btn" Content="Duplicate" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>

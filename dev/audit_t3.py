@@ -35,6 +35,7 @@ Luật 22 (icon) còn soát mọi file Python trong lib/GUI: glyph \\uXXXX phả
 Segoe MDL2 Assets (dev/icons/mdl2_codepoints.tsv) và trong bảng glyph chuẩn của
 T3LAB_UI_STANDARD.md.
 """
+import ast
 import os
 import re
 import sys
@@ -107,6 +108,38 @@ BRIDGE_EXEMPT = {"ManaAnno.xaml"}
 # file mà dòng là object .NET thật (binding thẳng mang giá trị có kiểu), kèm lý do:
 #   ManaAnno — dòng là DataRowView (DataTable), như BRIDGE_EXEMPT.
 PYROW_TRIGGER_EXEMPT = {"ManaAnno.xaml"}
+
+# ── Luật 29 · Không nút nào CHỈ để đóng cửa sổ ngoài nút X ────────────────
+# Nút X trên title bar (T3.WinClose, IsCancel) là control duy nhất chỉ để đóng
+# cửa sổ. Nút footer/body "Close" / "Cancel" / "Done" mà handler chỉ gọi
+# Close() lặp lại đúng việc của X (MCP Control 2026-10-02: "Done" ở footer =
+# bấm X; dọn 31 cửa sổ cùng ngày). Bắt hai dạng, chỉ trong cửa sổ có nút X:
+#   (a) Click= trùng handler của nút X, hoặc là handler đóng chung của
+#       T3WPFWindow (CLOSE_HANDLERS) — kể cả nối từ Python bằng .Click +=;
+#   (b) nút được nối (Click= hoặc .Click +=) vào một hàm mà thân CHỈ có một lệnh
+#       <x>.Close() — mọi định nghĩa cùng tên trong các file Python nhắc tới
+#       XAML đó đều phải như vậy, nên handler làm thêm việc (đặt DialogResult /
+#       result, dừng tác vụ, rollback, hỏi lại...) không bao giờ bị bắt.
+# Miễn trừ — khoá (file, x:Name), kèm lý do:
+#   ContainsDefineValue / ContainsSetParam / SubtypeDefinerColMap — dialog nhập
+#   liệu OK/Cancel do cửa sổ khác mở; Cancel là một câu trả lời đi cặp với OK
+#   (cùng họ với T3Dialog / SelectFromDict / ParameterSelector).
+CLOSE_HANDLERS = {"close_button_clicked", "button_close", "win_close_clicked"}
+CLOSE_ONLY_EXEMPT = {
+    ("ContainsDefineValue.xaml", "btn_cancel"),
+    ("ContainsSetParam.xaml", "btn_cancel"),
+    ("SubtypeDefinerColMap.xaml", "btnCancel"),
+}
+EXT_DIR = os.path.join(REPO, "T3Lab.extension")
+_CLICK_WIRE_RES = (
+    re.compile(r"self\.(\w+)\.Click\s*\+=\s*(?:self\.)?(\w+)"),
+    re.compile(r"FindName\(\s*['\"](\w+)['\"]\s*\)\.Click\s*\+=\s*(?:self\.)?(\w+)"),
+)
+_CLICK_LAMBDA_CLOSE_RE = re.compile(
+    r"(?:self\.(\w+)|FindName\(\s*['\"](\w+)['\"]\s*\))\.Click\s*\+=\s*"
+    r"lambda[^:\n]*:\s*[\w.]*\.Close\(\s*\)")
+LAMBDA_CLOSE = "lambda: Close()"
+_PY_SOURCES = {}
 
 # ── Luật 22 · ICON ───────────────────────────────────────────────────────
 # UI-frozen theo CLAUDE.md: icon của 2 file này không đi theo hệ T3.Icon.*
@@ -335,6 +368,89 @@ def pyrow_trigger_bindings(root):
     return found
 
 
+def _py_sources():
+    """{path: source} của mọi file Python trong T3Lab.extension (đọc một lần)."""
+    if not _PY_SOURCES:
+        for dirpath, _dirs, names in os.walk(EXT_DIR):
+            for n in names:
+                if n.endswith(".py"):
+                    p = os.path.join(dirpath, n)
+                    try:
+                        with open(p, encoding="utf-8", errors="replace") as fh:
+                            _PY_SOURCES[p] = fh.read()
+                    except OSError:
+                        pass
+    return _PY_SOURCES
+
+
+def _close_only_body(fn):
+    """Thân hàm chỉ có đúng một lệnh <x>.Close() (bỏ qua docstring / pass)."""
+    body = [s for s in fn.body
+            if not isinstance(s, ast.Pass)
+            and not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant)
+                     and isinstance(s.value.value, str))]
+    if len(body) != 1 or not isinstance(body[0], ast.Expr):
+        return False
+    call = body[0].value
+    return (isinstance(call, ast.Call) and not call.args and not call.keywords
+            and isinstance(call.func, ast.Attribute) and call.func.attr == "Close")
+
+
+def click_wiring(base):
+    """Luật 29 — (handler chỉ-Close, {x:Name: {handler}}) từ mọi file Python
+    nhắc tới tên file XAML `base`. Handler chỉ-Close = MỌI định nghĩa cùng tên
+    trong các file đó đều chỉ gọi Close()."""
+    flags = {}
+    wired = {}
+    for src in _py_sources().values():
+        if base not in src:
+            continue
+        try:
+            tree = ast.parse(src)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                flags.setdefault(node.name, []).append(_close_only_body(node))
+        for rx in _CLICK_WIRE_RES:
+            for m in rx.finditer(src):
+                wired.setdefault(m.group(1), set()).add(m.group(2))
+        for m in _CLICK_LAMBDA_CLOSE_RE.finditer(src):
+            wired.setdefault(m.group(1) or m.group(2), set()).add(LAMBDA_CLOSE)
+    close_only = {name for name, fl in flags.items() if all(fl)} | {LAMBDA_CLOSE}
+    return close_only, wired
+
+
+def close_only_buttons(root, base):
+    """Luật 29 — [(nhãn, handlers)] của nút ngoài nút X chỉ để đóng cửa sổ."""
+    def attrs_of(el):
+        return {local(k): v for k, v in el.attrib.items()}
+
+    buttons = [el for el in root.iter() if local(el.tag) == "Button"]
+    x_buttons = [el for el in buttons if "T3.WinClose" in el.attrib.get("Style", "")]
+    if not x_buttons:
+        return []       # không có nút X → nút Close/Cancel là đường đóng duy nhất
+    x_handlers = set(CLOSE_HANDLERS)
+    x_handlers |= {attrs_of(el).get("Click") for el in x_buttons} - {None}
+    close_only, wired = click_wiring(base)
+    found = []
+    for el in buttons:
+        a = attrs_of(el)
+        style = a.get("Style", "")
+        if "T3.WinClose" in style or "T3.WinCtrl" in style:
+            continue
+        name = a.get("Name", "")
+        if (base, name) in CLOSE_ONLY_EXEMPT:
+            continue
+        handlers = ({a["Click"]} if a.get("Click") else set()) | wired.get(name, set())
+        hit = sorted(h for h in handlers if h in x_handlers or h in close_only)
+        if hit:
+            label = a.get("Content") or name or "?"
+            found.append(("%s%s" % (label, " / x:Name=%s" % name if name and name != label else ""),
+                          ", ".join(hit)))
+    return found
+
+
 def audit(src, base, keys):
     """Trả về (issues, declared_t3, legacy_debt, must).
 
@@ -422,6 +538,8 @@ def audit(src, base, keys):
     is_window = local(root.tag) == "Window"
     n_primary = 0
     has_default = has_cancel = False
+    n_x = 0             # nút X title bar (T3.WinClose)
+    x_cancel = False    # ... và nút X mang IsCancel="True"
     has_list = has_empty = False
     n_local_style = 0
 
@@ -482,6 +600,9 @@ def audit(src, base, keys):
 
         if attrs.get("Style", "").strip() == "{StaticResource T3.Button.Primary}":
             n_primary += 1
+        if tag == "Button" and "T3.WinClose" in attrs.get("Style", ""):
+            n_x += 1
+            x_cancel = x_cancel or attrs.get("IsCancel") == "True"
 
         if tag in LIST_TAGS:
             has_list = True
@@ -736,10 +857,24 @@ def audit(src, base, keys):
             missing.append("TextOptions.TextFormattingMode")
         if missing:
             issues.append(("P2", "<Window> thiếu: %s" % ", ".join(missing)))
-        if not has_default:
-            issues.append(("P2", "không có nút IsDefault=\"True\""))
-        if not has_cancel:
+        # Luật 9 (sửa 2026-10-02): IsDefault chỉ bắt buộc khi cửa sổ có hành động
+        # (một T3.Button.Primary) — cửa sổ chỉ hiện trạng thái / cài đặt áp dụng
+        # ngay (MCP Control) không có nút nào để Enter bấm. IsCancel nằm trên nút X:
+        # Esc và nút X là một đường đóng duy nhất (luật 29).
+        if n_primary and not has_default:
+            issues.append(("P2", "có nút T3.Button.Primary nhưng không nút nào "
+                                 "IsDefault=\"True\" (luật 9)"))
+        if n_x:
+            if not x_cancel:
+                issues.append(("P2", "nút X (T3.WinClose) thiếu IsCancel=\"True\" — Esc phải "
+                                     "đóng cửa sổ qua chính nút X (luật 9)"))
+        elif not has_cancel:
             issues.append(("P2", "không có nút IsCancel=\"True\""))
+        for label, handlers in close_only_buttons(root, base):
+            issues.append(("P2", "nút \"%s\" (%s) chỉ đóng cửa sổ — trùng việc của nút X "
+                                 "(T3.WinClose); bỏ nút, Esc đã đi qua IsCancel của X. Nút "
+                                 "trả lời của dialog OK/Cancel thì khai CLOSE_ONLY_EXEMPT "
+                                 "(luật 29)" % (label, handlers)))
         if not merges_sheet:
             issues.append(("P1", "chưa nhúng stylesheet T3 — chạy "
                              "`python3 dev/sync_t3_styles.py`"))

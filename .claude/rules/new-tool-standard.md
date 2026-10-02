@@ -54,7 +54,7 @@ không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy
 
 ---
 
-## 2 · XAML — 27 luật
+## 2 · XAML — 28 luật
 
 | # | Luật | Vi phạm |
 |---|------|---------|
@@ -66,7 +66,7 @@ không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy
 | 6 | `CornerRadius` chỉ `8` window · `4` control · `2` pill · `0` grid row | P3 |
 | 7 | `<Window>` có `UseLayoutRounding` · `SnapsToDevicePixels` · `TextOptions.TextFormattingMode="Display"` · `MinWidth` · `MinHeight` | P2 |
 | 8 | Có đúng **một** nút `T3.Button.Primary`, ngoài cùng phải footer | P2 |
-| 9 | Có nút `IsDefault="True"` **và** nút `IsCancel="True"` | P2 |
+| 9 | `IsCancel="True"` đặt trên nút X title bar (`T3.WinClose`) để Esc đóng cửa sổ. `IsDefault="True"` bắt buộc khi cửa sổ có hành động (`T3.Button.Primary`) và đặt trên nút đó; cửa sổ chỉ hiện trạng thái / cài đặt áp dụng ngay (không có Primary, vd MCP Control) thì không cần `IsDefault`. P5: `IsDefault` trên Cancel | P2 |
 | 10 | Mọi list/grid: `HorizontalScrollBarVisibility="Disabled"`; DataGrid thêm `EnableRowVirtualization="True"` | P1/P2 |
 | 11 | **Không bọc** `DataGrid`/`ListBox`/`ListView` trong `ScrollViewer` | **P0** |
 | 12 | Có empty state (`T3.Empty`) cho mọi list/grid | P2 |
@@ -85,6 +85,7 @@ không hardcode màu, size, margin. Logic Revit dùng lại được thì đẩy
 | 26 | **Custom chrome bo góc không được lòi HWND**: `<Window WindowStyle="None">` có outer Border bo góc phải đặt `AllowsTransparency="True" Background="Transparent"`; outer Border dùng `T3.BorderStrong`, `T3.R.Window`, `ClipToBounds="True"`, `BorderThickness="1"`. Nền `T3.Canvas`/`T3.Surface` đặt trên outer Border, không đặt trên Window. Không `ResizeMode="CanResizeWithGrip"` (grip đè góc bo). `audit_t3.py` bắt luật này | P1 |
 | 27 | **Nút đồng bộ**: (a) nút trong `T3.FooterBar` KHÔNG tự đặt `Height`/`Padding` — giữ 30px + padding của style; (b) nhãn chữ trong nút Primary/Secondary/Danger KHÔNG `Style="T3.Caption"`/`Foreground`/`FontSize` — icon `T3.Icon` `Margin="0,0,8,0"` + `<TextBlock Text="…" VerticalAlignment="Center"/>` kế thừa font/màu của nút; (c) Primary là nút ngoài cùng phải của footer. Thanh tiến trình: `T3.ProgressBar` không đặt `Height` (8px), panel Pause/Stop rộng 160 | P2 |
 | 28 | **Trigger trên dòng Python đọc qua string bridge**: dòng là object Python thì KHÔNG `<DataTrigger Binding="{Binding field}" Value="...">` — pythonnet đưa thuộc tính cho WPF dưới dạng `PyObject`, DataTrigger so PyObject với Value nên **không bao giờ nổ** (kể cả field là `str`). Trong template: `<TextBlock x:Name="field_text" Text="{Binding field}" Visibility="Collapsed"/>` + `<DataTrigger Binding="{Binding Text, ElementName=field_text}" Value="Danger">`; phần tử đã hiện chính giá trị thì `<Trigger Property="Text" ...>`; trong `CellStyle`/`ElementStyle`: `<Setter Property="AutomationProperties.ItemStatus" Value="{Binding dirty_field}"/>` + `<Trigger Property="AutomationProperties.ItemStatus" Value="True">`. Bool so bằng `"True"`/`"False"`. Mẫu: `ModelAuditor.xaml`, ô vàng của `ManaSheets.xaml`. Miễn trừ (dòng .NET thật, DataTable) khai vào `PYROW_TRIGGER_EXEMPT` trong `dev/audit_t3.py` | P1 |
+| 29 | **Không nút nào chỉ để đóng cửa sổ ngoài nút X**: nút X title bar (`T3.WinClose`, `IsCancel`) là control DUY NHẤT chỉ đóng cửa sổ. Nút footer/body Close / Cancel / Done / Exit mà handler chỉ gọi `Close()` — hoặc dùng chung handler với nút X (`close_button_clicked` / `button_close` / `win_close_clicked`) — lặp lại đúng việc của X → không đặt (MCP Control "Done", dọn 31 cửa sổ 2026-10-02). Giữ nút khi nó làm THÊM việc: đặt kết quả / `DialogResult` mà caller đọc khác X, dừng tác vụ đang chạy, rollback, lưu, hỏi lại. Giữ Cancel/No của dialog trả lời (P5, `T3Dialog`, dialog OK/Cancel kiểu `SelectFromDict`) — dialog nào bị audit bắt thì khai `CLOSE_ONLY_EXEMPT` trong `dev/audit_t3.py`. Nút chặn đóng khi đang bận thì đưa guard vào override `close_button_clicked` để nút X mang nó. `audit_t3.py` soi cả `Click=` trong XAML lẫn `.Click +=` trong Python | P2 |
 
 Thêm hai thứ `audit_t3.py` cũng bắt: `<Grid.RowDefinition/>` dot-notation (**P0**,
 crash `EMPTYPROPERTYELEMENT` lúc mở tool) và mọi `Effect` (P2).

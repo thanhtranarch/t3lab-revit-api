@@ -2157,7 +2157,9 @@
                 </TabControl>
             </Grid>
 
-            <!-- ══════════════════ ROW 2: FULL-WIDTH FOOTER BAR ══════════════════ -->
+            <!-- ══════════════════ ROW 2: FULL-WIDTH FOOTER BAR ══════════════════
+                 No Cancel / Close here: the title-bar X (IsCancel) is the one control
+                 that only closes the window. -->
             <Border Grid.Row="2" Style="{StaticResource T3.FooterBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -2178,8 +2180,6 @@
                                 Margin="0,0,8,0"/>
                         <Button x:Name="btn_export_csv" Content="Export CSV" Style="{StaticResource T3.Button.Secondary}"
                                 Margin="0,0,8,0"/>
-                        <Button Content="Cancel" Style="{StaticResource T3.Button.Secondary}"
-                                Margin="0,0,8,0" Click="close_button_clicked"/>
                         <Button x:Name="btn_execute" Content="Execute Batch (4)" IsDefault="True"
                                 Style="{StaticResource T3.Button.Primary}"/>
                     </StackPanel>

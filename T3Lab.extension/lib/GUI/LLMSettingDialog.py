@@ -2,9 +2,11 @@
 """
 LLMs Setting Dialog — the T3Lab Assistant settings hub
 
-Tabbed settings window: General (profile, action mode, data), Models
-(provider/model/API key/connection), Projects (workspaces), Knowledge
-(RAG index) and Skills. All state lives in the shared LLMRouter /
+Tabbed settings window: General (profile, personal instructions, reply
+language, global memory, behaviour, data), Models (provider/model/API
+key/connection), Projects (workspaces: name, description, instructions,
+knowledge files, project memory, schedules), Knowledge (RAG index) and
+Skills. All state lives in the shared LLMRouter /
 T3LabAISettings / UserProfile / ProjectStore singletons, so anything
 changed here is immediately visible to the T3Lab Assistant (and any
 other AI-powered tool) too.
@@ -101,6 +103,14 @@ _RED    = _brush(239, 68, 68)
 _GLYPH_CANCEL = u""
 # Segoe MDL2 "Refresh" (U+E72C) — rescan a linked project folder.
 _GLYPH_REFRESH = u"\uE72C"
+# Segoe MDL2 "Edit" (U+E70F) / "Delete" (U+E74D) — memory + file row actions.
+_GLYPH_EDIT = u"\uE70F"
+_GLYPH_DELETE = u"\uE74D"
+
+# assistant_memory scope names (kept as literals so this module imports
+# without the Intelligence package; they match GLOBAL_SCOPE / PROJECT_SCOPE).
+_MEM_GLOBAL = "global"
+_MEM_PROJECT = "project"
 
 
 class LLMSettingWindow(T3WPFWindow):
@@ -148,6 +158,11 @@ class LLMSettingWindow(T3WPFWindow):
         self._prov_guard    = False  # guards provider_changed re-entry
         self._kn_scan_busy = False
         self._ctx_busy = False   # guards concurrent context-digest rebuilds
+        self._instr_guard = False  # guards user_instructions_changed on load
+        self._lang_guard = False   # guards reply_language_changed on load
+        self._saved_user_instr = u""
+        # Row being edited in each memory list (0-based index) or None.
+        self._mem_editing = {_MEM_GLOBAL: None, _MEM_PROJECT: None}
 
         # Tabs are filled on first visit, not at construction: the projects,
         # knowledge and skills loaders all walk disk (and, for a project with a
@@ -901,12 +916,121 @@ class LLMSettingWindow(T3WPFWindow):
             tb.FontFamily = System.Windows.Media.FontFamily("Segoe MDL2 Assets")
         return tb
 
+    # ─── T3 resource helpers (rule 21: dot-notation keys, always guarded) ──
+
+    def _res(self, key):
+        """A T3 resource (brush / style) by key, or None."""
+        try:
+            return self.TryFindResource(key)
+        except Exception:
+            return None
+
+    def _apply_style(self, ctrl, key):
+        st = self._res(key)
+        if st is not None:
+            try:
+                ctrl.Style = st
+            except Exception:
+                pass
+        return ctrl
+
+    def _icon_button(self, glyph, tooltip):
+        """28×28 ghost button carrying one T3.Icon glyph (row actions)."""
+        from System.Windows.Controls import Button
+        from System.Windows import Thickness
+        btn = Button()
+        self._apply_style(btn, "T3.Button.Ghost")
+        btn.MinWidth = 0
+        btn.Width = 28
+        btn.Height = 28
+        btn.Padding = Thickness(0)
+        btn.Content = self._icon_content(glyph)
+        btn.ToolTip = tooltip
+        btn.VerticalAlignment = System.Windows.VerticalAlignment.Center
+        return btn
+
+    def _text_button(self, text, style_key, tooltip=None):
+        from System.Windows.Controls import Button
+        btn = Button()
+        self._apply_style(btn, style_key)
+        btn.Content = text
+        if tooltip:
+            btn.ToolTip = tooltip
+        btn.VerticalAlignment = System.Windows.VerticalAlignment.Center
+        return btn
+
+    def _row_border(self):
+        """White row card used by the memory and file lists."""
+        from System.Windows.Controls import Border
+        from System.Windows import Thickness, CornerRadius
+        row = Border()
+        row.Background = self._res("T3.Surface")
+        row.BorderBrush = self._res("T3.Border")
+        row.BorderThickness = Thickness(1)
+        row.CornerRadius = CornerRadius(4)
+        row.Padding = Thickness(8, 4, 4, 4)
+        row.Margin = Thickness(0, 0, 0, 4)
+        return row
+
+    def _empty_text(self, text):
+        """List empty state (T3.Empty: centred, TextDisabled)."""
+        from System.Windows.Controls import TextBlock
+        from System.Windows import Thickness
+        t = TextBlock()
+        self._apply_style(t, "T3.Empty")
+        t.Text = text
+        t.Margin = Thickness(0, 8, 0, 8)
+        return t
+
+    def _set_status(self, text):
+        """Footer status line. Never raises."""
+        try:
+            self.status_text.Text = text
+        except Exception:
+            pass
+
+    def _confirm(self, message, title, ok_text, details=None, danger=True):
+        """T3Dialog confirm (P5) owned by this window. False on any failure."""
+        try:
+            from GUI.T3Dialog import confirm as _t3_confirm
+            return bool(_t3_confirm(message, title=title, ok_text=ok_text,
+                                    cancel_text=u"Cancel", danger=danger,
+                                    details=details, owner=self))
+        except Exception as ex:
+            logger.debug("_confirm error: {}".format(ex))
+            return False
+
+    @staticmethod
+    def _plural(n, word, plural=None):
+        return u"{} {}".format(n, word if n == 1 else (plural or word + u"s"))
+
+    @staticmethod
+    def _human_size(n):
+        try:
+            n = float(n)
+        except Exception:
+            return u""
+        for unit in (u"B", u"KB", u"MB", u"GB"):
+            if n < 1024 or unit == u"GB":
+                return (u"{:.0f} {}" if unit == u"B" or n >= 100
+                        else u"{:.1f} {}").format(n, unit)
+            n /= 1024.0
+        return u""
+
+    @staticmethod
+    def _is_enter(e):
+        try:
+            from System.Windows.Input import Key
+            return e.Key in (Key.Enter, Key.Return)
+        except Exception:
+            return False
+
     # ─── Generic hint flash ─────────────────────────────────────────────────
 
     def _flash_hint(self, tb, text=u"Saved", seconds=2.0):
         """Show a short confirmation next to a field, then clear it."""
         try:
-            tb.Foreground = _GREEN
+            tb.Foreground = self._res("T3.Success.Text") or _GREEN
             tb.Text = text
             from System.Windows.Threading import DispatcherTimer
             from System import TimeSpan
@@ -981,6 +1105,367 @@ class LLMSettingWindow(T3WPFWindow):
             pass
         finally:
             self._verbosity_guard = False
+        self._load_personalization()
+        self._render_memory(_MEM_GLOBAL)
+
+    # ── General: personal instructions + reply language ─────────────────────
+
+    def _load_personalization(self):
+        """Fill the personal-instructions box and the reply-language combo."""
+        try:
+            from config.settings import get_settings
+            s = get_settings()
+            self._saved_user_instr = s.get_user_instructions()
+            self._instr_guard = True
+            try:
+                self.user_instructions_box.Text = self._saved_user_instr
+            finally:
+                self._instr_guard = False
+            self._update_instructions_counter()
+            want = s.get_reply_language()
+            self._lang_guard = True
+            try:
+                combo = self.reply_language_combo
+                for i in range(combo.Items.Count):
+                    if str(combo.Items[i].Tag or '') == want:
+                        combo.SelectedIndex = i
+                        break
+            finally:
+                self._lang_guard = False
+        except Exception as ex:
+            logger.debug("_load_personalization error: {}".format(ex))
+
+    def _update_instructions_counter(self):
+        """Live 'n / 2000' counter + Save enabled only when there is a change."""
+        try:
+            from config.settings import MAX_USER_INSTRUCTIONS_CHARS as _cap
+        except Exception:
+            _cap = 2000
+        try:
+            text = self.user_instructions_box.Text or u""
+            n = len(text)
+            dirty = (text.replace(u"\r\n", u"\n").strip()
+                     != (self._saved_user_instr or u""))
+            msg = u"{} / {} characters".format(n, _cap)
+            if dirty:
+                msg += u" · unsaved changes"
+            self.user_instructions_counter.Text = msg
+            if n >= int(_cap * 0.9):
+                self.user_instructions_counter.Foreground = (
+                    self._res("T3.Warning.Text") or _RED)
+            else:
+                from System.Windows.Controls import TextBlock as _TB
+                self.user_instructions_counter.ClearValue(
+                    _TB.ForegroundProperty)
+            self.save_user_instructions_btn.IsEnabled = bool(dirty)
+        except Exception as ex:
+            logger.debug("_update_instructions_counter error: {}".format(ex))
+
+    def user_instructions_changed(self, sender, e):
+        if getattr(self, '_instr_guard', False):
+            return
+        self._update_instructions_counter()
+
+    def save_user_instructions_clicked(self, sender, e):
+        try:
+            from config.settings import get_settings
+            s = get_settings()
+            if not s.set_user_instructions(self.user_instructions_box.Text):
+                self._set_status(
+                    u"Could not save personal instructions: settings.json is "
+                    u"locked by another Revit session or read-only. Try again.")
+                return
+            self._saved_user_instr = s.get_user_instructions()
+            # Show what was stored (trimmed), without re-marking it dirty.
+            self._instr_guard = True
+            try:
+                if (self.user_instructions_box.Text or u"") != self._saved_user_instr:
+                    self.user_instructions_box.Text = self._saved_user_instr
+            finally:
+                self._instr_guard = False
+            self._update_instructions_counter()
+            n = len(self._saved_user_instr)
+            self._flash_hint(
+                self.personal_saved_hint,
+                u"Personal instructions saved ({} characters), used from the "
+                u"next message.".format(n) if n else
+                u"Personal instructions cleared.", seconds=3.0)
+        except Exception as ex:
+            logger.debug("save_user_instructions_clicked error: {}".format(ex))
+
+    def reply_language_changed(self, sender, e):
+        """Persist agents.reply_language the moment the combo changes."""
+        if getattr(self, '_lang_guard', False):
+            return
+        try:
+            item = self.reply_language_combo.SelectedItem
+            lang = str(getattr(item, 'Tag', '') or 'auto')
+            from config.settings import get_settings
+            if get_settings().set_reply_language(lang):
+                self._flash_hint(self.personal_saved_hint, u"Reply language saved.")
+            else:
+                self._set_status(u"Could not save the reply language: "
+                                 u"settings.json is locked or read-only.")
+        except Exception as ex:
+            logger.debug("reply_language_changed error: {}".format(ex))
+
+    # ── Memory (General: global scope · Projects: project scope) ────────────
+    #
+    # One renderer for both lists. Rows address facts by their 0-based index
+    # WITHIN the scope (assistant_memory.*_fact_at), never by the combined
+    # global+project numbering the chat's /memory command uses.
+
+    def _memory_ui(self, scope):
+        """(rows panel, count label, clear button) of one scope's section."""
+        if scope == _MEM_GLOBAL:
+            return (self.global_memory_panel, self.global_memory_count,
+                    self.global_memory_clear_btn)
+        return (self.project_memory_panel, self.project_memory_count,
+                self.project_memory_clear_btn)
+
+    def _render_memory(self, scope, pid=None):
+        """Rebuild one scope's fact rows (edit mode for the row being edited)."""
+        try:
+            from Intelligence import assistant_memory as _am
+            panel, count_lbl, clear_btn = self._memory_ui(scope)
+            panel.Children.Clear()
+            facts = _am.list_scope_facts(scope, pid)
+            editing = self._mem_editing.get(scope)
+            if editing is not None and editing >= len(facts):
+                editing = self._mem_editing[scope] = None
+            cap = _am.MAX_FACTS_PER_SCOPE
+            where = (u"every chat and every project" if scope == _MEM_GLOBAL
+                     else u"this project's chats")
+            if not facts:
+                count_lbl.Text = u"No facts yet. The assistant applies these in {}.".format(where)
+            elif len(facts) >= cap:
+                count_lbl.Text = (u"{} of {} facts, the limit: adding one drops "
+                                  u"the oldest.".format(len(facts), cap))
+            else:
+                count_lbl.Text = u"{} of {} facts, applied in {}.".format(
+                    len(facts), cap, where)
+            clear_btn.IsEnabled = bool(facts)
+            if not facts:
+                panel.Children.Add(self._empty_text(
+                    u"Nothing remembered yet. Add a fact below, or tell the "
+                    u"assistant \"remember that ...\" in chat."))
+            for f in facts:
+                panel.Children.Add(self._memory_row(
+                    scope, pid, f, editing == f['index']))
+            if scope == _MEM_PROJECT:
+                n_global = _am.count_scope(_am.GLOBAL_SCOPE)
+                if n_global:
+                    from System.Windows.Controls import TextBlock
+                    from System.Windows import Thickness
+                    t = TextBlock()
+                    self._apply_style(t, "T3.Caption")
+                    t.Text = u"+ {} from the General tab also apply here.".format(
+                        self._plural(n_global, u"global fact"))
+                    t.Margin = Thickness(0, 4, 0, 0)
+                    panel.Children.Add(t)
+        except Exception as ex:
+            logger.debug("_render_memory({}) error: {}".format(scope, ex))
+
+    def _memory_row(self, scope, pid, fact, editing):
+        from System.Windows.Controls import (Grid, ColumnDefinition,
+                                             TextBlock, TextBox)
+        from System.Windows import Thickness, GridLength, TextWrapping
+        row = self._row_border()
+        grid = Grid()
+        c0 = ColumnDefinition()
+        c0.Width = GridLength(1, System.Windows.GridUnitType.Star)
+        grid.ColumnDefinitions.Add(c0)
+        for _ in range(2):
+            c = ColumnDefinition()
+            c.Width = GridLength.Auto
+            grid.ColumnDefinitions.Add(c)
+        idx = fact['index']
+
+        if editing:
+            box = TextBox()
+            self._apply_style(box, "T3.TextBox")
+            box.Text = fact.get('text') or u""
+            try:
+                from Intelligence.assistant_memory import MAX_FACT_CHARS
+                box.MaxLength = MAX_FACT_CHARS
+            except Exception:
+                pass
+            box.Margin = Thickness(0, 0, 8, 0)
+            box.VerticalAlignment = System.Windows.VerticalAlignment.Center
+            Grid.SetColumn(box, 0)
+            grid.Children.Add(box)
+
+            def _save(s=None, ev=None, _box=box):
+                self._save_memory_edit(scope, pid, idx, _box.Text)
+
+            def _key(s, ev):
+                if self._is_enter(ev):
+                    ev.Handled = True
+                    _save()
+            box.PreviewKeyDown += _key
+
+            save_btn = self._text_button(u"Save", "T3.Button.Secondary")
+            save_btn.Margin = Thickness(0, 0, 4, 0)
+            save_btn.Click += _save
+            Grid.SetColumn(save_btn, 1)
+            grid.Children.Add(save_btn)
+
+            cancel_btn = self._text_button(u"Cancel", "T3.Button.Ghost",
+                                           u"Keep the fact as it was")
+
+            def _cancel(s, ev):
+                self._mem_editing[scope] = None
+                self._render_memory(scope, pid)
+            cancel_btn.Click += _cancel
+            Grid.SetColumn(cancel_btn, 2)
+            grid.Children.Add(cancel_btn)
+
+            def _focus(s, ev, _box=box):
+                try:
+                    _box.Focus()
+                    _box.SelectAll()
+                except Exception:
+                    pass
+            box.Loaded += _focus
+        else:
+            tb = TextBlock()
+            self._apply_style(tb, "T3.Body")
+            tb.Text = fact.get('text') or u""
+            tb.TextWrapping = TextWrapping.Wrap
+            tb.VerticalAlignment = System.Windows.VerticalAlignment.Center
+            tip = u"Saved {}".format(fact.get('created') or u"(date unknown)")
+            if fact.get('updated'):
+                tip += u" · edited {}".format(fact['updated'])
+            tb.ToolTip = tip
+            Grid.SetColumn(tb, 0)
+            grid.Children.Add(tb)
+
+            edit_btn = self._icon_button(_GLYPH_EDIT, u"Edit this fact")
+            edit_btn.Margin = Thickness(8, 0, 0, 0)
+
+            def _edit(s, ev):
+                self._mem_editing[scope] = idx
+                self._render_memory(scope, pid)
+            edit_btn.Click += _edit
+            Grid.SetColumn(edit_btn, 1)
+            grid.Children.Add(edit_btn)
+
+            del_btn = self._icon_button(_GLYPH_DELETE, u"Delete this fact")
+
+            def _delete(s, ev):
+                self._delete_memory_fact(scope, pid, idx)
+            del_btn.Click += _delete
+            Grid.SetColumn(del_btn, 2)
+            grid.Children.Add(del_btn)
+
+        row.Child = grid
+        return row
+
+    def _save_memory_edit(self, scope, pid, index, text):
+        try:
+            from Intelligence import assistant_memory as _am
+            ok, note = _am.edit_fact_at(scope, index, text, pid)
+            if ok:
+                self._mem_editing[scope] = None
+                self._render_memory(scope, pid)
+                self._set_status(u"Fact updated.")
+            else:
+                self._set_status(note or u"Could not update the fact.")
+        except Exception as ex:
+            logger.debug("_save_memory_edit error: {}".format(ex))
+
+    def _delete_memory_fact(self, scope, pid, index):
+        try:
+            from Intelligence import assistant_memory as _am
+            ok, removed = _am.delete_fact_at(scope, index, pid)
+            self._mem_editing[scope] = None
+            self._render_memory(scope, pid)
+            if ok:
+                short = removed if len(removed) <= 60 else removed[:59] + u"…"
+                self._set_status(u"Deleted 1 fact: {}".format(short))
+            else:
+                self._set_status(u"That fact was already gone; the list is refreshed.")
+        except Exception as ex:
+            logger.debug("_delete_memory_fact error: {}".format(ex))
+
+    def _add_memory(self, scope, pid, box):
+        try:
+            text = (box.Text or u"").strip()
+            if not text:
+                self._set_status(u"Type the fact to remember, then click Add.")
+                return
+            from Intelligence import assistant_memory as _am
+            ok, note = _am.add_scope_fact(text, scope, pid)
+            if ok:
+                box.Text = u""
+                self._render_memory(scope, pid)
+            self._set_status(note or (u"Fact added." if ok
+                                      else u"Could not add the fact."))
+        except Exception as ex:
+            logger.debug("_add_memory error: {}".format(ex))
+
+    def _clear_memory(self, scope, pid=None):
+        """Clear ONE scope behind a P5 confirm that states the count."""
+        try:
+            from Intelligence import assistant_memory as _am
+            n = _am.count_scope(scope, pid)
+            if not n:
+                self._set_status(u"Nothing to clear.")
+                return
+            if scope == _MEM_GLOBAL:
+                where = u"global memory"
+                keep = u"Project memories are kept."
+            else:
+                try:
+                    from config.project_store import ProjectStore
+                    name = (ProjectStore().get_project(pid) or {}).get('name')
+                except Exception:
+                    name = None
+                where = u"project '{}'".format(name) if name else u"this project"
+                keep = u"Global memory and other projects are kept."
+            facts = self._plural(n, u"fact")
+            if not self._confirm(
+                    u"Clear {} from {}?".format(facts, where),
+                    title=u"Clear Memory",
+                    ok_text=u"Clear {}".format(facts.title()),
+                    details=u"The assistant stops applying them from the next "
+                            u"message. This cannot be undone. " + keep):
+                return
+            removed = _am.clear_scope(scope, pid)
+            self._mem_editing[scope] = None
+            self._render_memory(scope, pid)
+            self._set_status(u"Cleared {} from {}.".format(
+                self._plural(removed, u"fact"), where))
+        except Exception as ex:
+            logger.debug("_clear_memory error: {}".format(ex))
+
+    def global_memory_add_clicked(self, sender, e):
+        self._add_memory(_MEM_GLOBAL, None, self.global_memory_add_box)
+
+    def global_memory_add_keydown(self, sender, e):
+        if self._is_enter(e):
+            e.Handled = True
+            self._add_memory(_MEM_GLOBAL, None, self.global_memory_add_box)
+
+    def global_memory_clear_clicked(self, sender, e):
+        self._clear_memory(_MEM_GLOBAL)
+
+    def project_memory_add_clicked(self, sender, e):
+        pid = self._selected_project_id()
+        if not pid:
+            self._set_status(u"Select (or create) a project first.")
+            return
+        self._add_memory(_MEM_PROJECT, pid, self.project_memory_add_box)
+
+    def project_memory_add_keydown(self, sender, e):
+        if self._is_enter(e):
+            e.Handled = True
+            self.project_memory_add_clicked(sender, e)
+
+    def project_memory_clear_clicked(self, sender, e):
+        pid = self._selected_project_id()
+        if pid:
+            self._clear_memory(_MEM_PROJECT, pid)
 
     def save_username_clicked(self, sender, e):
         name = (self.username_box.Text or u"").strip()
@@ -1109,6 +1594,8 @@ class LLMSettingWindow(T3WPFWindow):
                 item = ComboBoxItem()
                 item.Content = meta['name']
                 item.Tag = meta['id']
+                if meta.get('description'):
+                    item.ToolTip = meta['description']
                 combo.Items.Add(item)
                 if meta['id'] == want:
                     sel = i
@@ -1129,6 +1616,7 @@ class LLMSettingWindow(T3WPFWindow):
             if meta:
                 self.project_edit_panel.Visibility = Visibility.Visible
                 self.project_name_box.Text = meta.get('name', u'')
+                self.project_description_box.Text = meta.get('description') or u''
                 self.project_instructions_box.Text = meta.get('instructions', u'')
                 # Default AI override (applied on activation)
                 try:
@@ -1153,7 +1641,10 @@ class LLMSettingWindow(T3WPFWindow):
                 except Exception:
                     pass
                 # Cheap, local-JSON renders stay inline; the CONTEXT block
-                # (files walk + linked shares) refreshes off-thread.
+                # (files walk + linked shares) refreshes off-thread. files/ is
+                # local %APPDATA%, so its row list is inline too.
+                self._mem_editing[_MEM_PROJECT] = None
+                self._render_project_files(pid)
                 self._render_project_memory(pid)
                 self._render_project_sched(pid)
                 self._refresh_project_context(pid)
@@ -1194,12 +1685,17 @@ class LLMSettingWindow(T3WPFWindow):
                 prov = None
             model = (self.project_model_box.Text or u'').strip() or None
             from config.project_store import ProjectStore
-            ProjectStore().update_project(pid, {
+            saved = ProjectStore().update_project(pid, {
                 'name': self.project_name_box.Text.strip() or u"Project",
+                'description': self.project_description_box.Text or u'',
                 'instructions': self.project_instructions_box.Text.strip(),
                 'provider': prov,
                 'model': model,
             })
+            if saved is None:
+                self._set_status(u"Could not save the project: its project.json "
+                                 u"is read-only or in use. Try again.")
+                return
             self._load_projects_tab(select_pid=pid)
             self._flash_hint(self.project_saved_hint)
         except Exception as ex:
@@ -1212,17 +1708,42 @@ class LLMSettingWindow(T3WPFWindow):
                 return
             from config.project_store import ProjectStore
             ps = ProjectStore()
-            meta = ps.get_project(pid) or {}
-            from System.Windows import MessageBox, MessageBoxButton, MessageBoxResult
-            res = MessageBox.Show(
-                u"Delete project '{}' (including its index + chat history)?".format(
-                    meta.get('name', pid)),
-                u"LLMs Setting", MessageBoxButton.YesNo)
-            if res != MessageBoxResult.Yes:
+            summ = ps.delete_summary(pid)
+            name = summ.get('name') or pid
+            parts = []
+            if summ.get('files'):
+                parts.append(self._plural(summ['files'], u"file"))
+            if summ.get('sessions'):
+                parts.append(self._plural(summ['sessions'],
+                                          u"archived conversation"))
+            if summ.get('chats'):
+                parts.append(self._plural(summ['chats'], u"chat history",
+                                          u"chat histories"))
+            if summ.get('memory'):
+                parts.append(self._plural(summ['memory'], u"remembered fact"))
+            if parts:
+                what = (u", ".join(parts[:-1]) + u" and " + parts[-1]
+                        if len(parts) > 1 else parts[0])
+                headline = u"Delete project '{}' with its {}?".format(name, what)
+            else:
+                headline = u"Delete project '{}'? It has no files or memory.".format(name)
+            details = (u"This cannot be undone. The project folder (knowledge "
+                       u"files, chat history, search index, schedules) and the "
+                       u"project's remembered facts are removed. Global memory "
+                       u"and personal instructions are kept.")
+            if summ.get('linked_dirs'):
+                details += u" {} on disk {} only unlinked, never deleted.".format(
+                    self._plural(summ['linked_dirs'], u"linked folder"),
+                    u"is" if summ['linked_dirs'] == 1 else u"are")
+            if not self._confirm(headline, title=u"Delete Project",
+                                 ok_text=u"Delete Project", details=details):
                 return
-            ps.delete_project(pid)
+            ok = ps.delete_project(pid)
             self._ctx_cache.pop(pid, None)
             self._load_projects_tab()
+            self._set_status(u"Deleted project '{}'.".format(name) if ok else
+                             u"Could not delete project '{}': a file may be "
+                             u"open in another program.".format(name))
         except Exception as ex:
             logger.debug("project_delete_clicked error: {}".format(ex))
 
@@ -1245,6 +1766,112 @@ class LLMSettingWindow(T3WPFWindow):
             except Exception:
                 pass
         return d
+
+    # ── Projects: knowledge files (projects/<pid>/files) ────────────────────
+
+    _FILES_SHOWN = 200   # rows drawn; the rest are summarised in one line
+
+    def _render_project_files(self, pid):
+        """One row per document in the project's files/ folder: name, size,
+        and a Remove button. Types the index cannot read are flagged, so a
+        .dwg dropped into the folder never looks searchable. UI THREAD —
+        files/ is local %APPDATA%, never a network share."""
+        try:
+            from System.Windows.Controls import (Grid, ColumnDefinition,
+                                                 TextBlock)
+            from System.Windows.Documents import Run
+            from System.Windows import Thickness, GridLength
+            from config.project_store import ProjectStore
+
+            panel = self.project_files_panel
+            panel.Children.Clear()
+            files = ProjectStore().list_project_files(pid) if pid else []
+            if not files:
+                panel.Children.Add(self._empty_text(
+                    u"No files yet. Use Add Files to add PDF, Word, Excel, "
+                    u"Markdown or text documents."))
+                return
+            muted = self._res("T3.TextMuted")
+            for f in files[:self._FILES_SHOWN]:
+                row = self._row_border()
+                grid = Grid()
+                c0 = ColumnDefinition()
+                c0.Width = GridLength(1, System.Windows.GridUnitType.Star)
+                grid.ColumnDefinitions.Add(c0)
+                for _ in range(2):
+                    c = ColumnDefinition()
+                    c.Width = GridLength.Auto
+                    grid.ColumnDefinitions.Add(c)
+
+                name = TextBlock()
+                self._apply_style(name, "T3.Body")
+                name.TextTrimming = System.Windows.TextTrimming.CharacterEllipsis
+                name.VerticalAlignment = System.Windows.VerticalAlignment.Center
+                name.Inlines.Add(Run(f['rel']))
+                if not f.get('indexable'):
+                    note = Run(u"  · not searchable (type not indexed)")
+                    if muted is not None:
+                        note.Foreground = muted
+                    name.Inlines.Add(note)
+                name.ToolTip = u"{}\nModified {}".format(f['path'], f['modified'])
+                Grid.SetColumn(name, 0)
+                grid.Children.Add(name)
+
+                size = TextBlock()
+                self._apply_style(size, "T3.Mono")
+                size.Text = self._human_size(f.get('size'))
+                size.Margin = Thickness(8, 0, 8, 0)
+                size.VerticalAlignment = System.Windows.VerticalAlignment.Center
+                size.TextAlignment = System.Windows.TextAlignment.Right
+                Grid.SetColumn(size, 1)
+                grid.Children.Add(size)
+
+                rm = self._icon_button(_GLYPH_DELETE,
+                                       u"Remove this file from the project")
+
+                def _remove(s, ev, _f=f, _pid=pid):
+                    self._remove_project_file(_pid, _f)
+                rm.Click += _remove
+                Grid.SetColumn(rm, 2)
+                grid.Children.Add(rm)
+
+                row.Child = grid
+                panel.Children.Add(row)
+            extra = len(files) - self._FILES_SHOWN
+            if extra > 0:
+                t = TextBlock()
+                self._apply_style(t, "T3.Caption")
+                t.Text = u"+ {} more. Use Open Folder to see them all.".format(
+                    self._plural(extra, u"file"))
+                panel.Children.Add(t)
+        except Exception as ex:
+            logger.debug("_render_project_files error: {}".format(ex))
+
+    def _remove_project_file(self, pid, f):
+        """Delete one file from files/ after a P5 confirm, then re-index."""
+        try:
+            label = f.get('rel') or f.get('name') or u"this file"
+            if not self._confirm(
+                    u"Remove '{}' ({}) from this project?".format(
+                        label, self._human_size(f.get('size'))),
+                    title=u"Remove File", ok_text=u"Remove File",
+                    details=u"The file is deleted from the project's knowledge "
+                            u"folder and stops being cited once the index "
+                            u"refreshes. Linked folders are never touched."):
+                return
+            from config.project_store import ProjectStore
+            ps = ProjectStore()
+            if not ps.remove_project_file(pid, f.get('path')):
+                self._set_status(u"Could not remove '{}': it may be open in "
+                                 u"another program.".format(label))
+                return
+            self._set_status(u"Removed 1 file: {}".format(label))
+            self._render_project_files(pid)
+            self._refresh_project_context(pid, force=True)
+            if ps.get_active_project_id() == pid:
+                self._kick_knowledge_scan()
+        except Exception as ex:
+            logger.debug("_remove_project_file error: {}".format(ex))
 
     # ── Projects: CONTEXT block (counter line + linked-folder rows) ─────────
     #
@@ -1356,17 +1983,28 @@ class LLMSettingWindow(T3WPFWindow):
             dlg = OpenFileDialog()
             dlg.Multiselect = True
             dlg.Title = "Add documents to this project"
-            dlg.Filter = ("Documents|*.pdf;*.docx;*.txt;*.md;*.csv;*.xlsx|"
-                          "All files|*.*")
+            # Exactly the types the knowledge index reads (KnowledgeStore.
+            # INDEXABLE_EXTS) — the filter used to offer .csv, which nothing
+            # indexed.
+            dlg.Filter = ("Documents (PDF, Word, Excel, Markdown, text)|"
+                          "*.pdf;*.docx;*.xlsx;*.md;*.txt|All files|*.*")
             if _show_dialog_owned(self, dlg) != DialogResult.OK:
                 return
             import shutil
             dst = self._project_files_dir(pid)
+            copied, failed = 0, []
             for f in dlg.FileNames:
                 try:
                     shutil.copy2(f, os.path.join(dst, os.path.basename(f)))
+                    copied += 1
                 except Exception:
-                    pass
+                    failed.append(os.path.basename(f))
+            msg = u"Added {}.".format(self._plural(copied, u"file"))
+            if failed:
+                msg += u" Could not copy {}: {}".format(
+                    self._plural(len(failed), u"file"), u", ".join(failed[:3]))
+            self._set_status(msg)
+            self._render_project_files(pid)
             self._refresh_project_context(pid, force=True)
             # Editing the ACTIVE project → refresh its RAG index now;
             # other projects get indexed on activation.
@@ -1575,8 +2213,8 @@ class LLMSettingWindow(T3WPFWindow):
             clr.AddReference('System.Windows.Forms')
             from System.Windows.Forms import FolderBrowserDialog, DialogResult
             dlg = FolderBrowserDialog()
-            dlg.Description = ("Chon thu muc BEP / tieu chuan / tai lieu de "
-                               "lien ket vao project")
+            dlg.Description = ("Choose a folder of standards / BEP documents "
+                               "to link to this project")
             if _show_dialog_owned(self, dlg) != DialogResult.OK \
                     or not dlg.SelectedPath:
                 return
@@ -1790,83 +2428,13 @@ class LLMSettingWindow(T3WPFWindow):
     # ── Projects: scheduled daily prompts ────────────────────────────────────
 
     def _render_project_memory(self, pid):
-        """Remembered facts for this project, with a per-row forget button.
+        """Remembered facts for this project, with Edit / Delete per row.
 
         The chat window's project panel used to be the ONLY place these could
-        be managed; it is read-only now, so this is their home.
+        be managed; it is read-only now, so this is their home. The rows come
+        from the shared memory renderer (General shows the global scope).
         """
-        try:
-            from System.Windows.Controls import (Grid, ColumnDefinition,
-                                                 TextBlock)
-            from System.Windows import Thickness, GridLength, TextWrapping
-            from System.Windows.Input import Cursors
-            from Intelligence import assistant_memory as _am
-
-            panel = self.project_memory_panel
-            panel.Children.Clear()
-            facts = _am.list_facts(pid)
-            proj = [(i + 1, f) for i, (s, f) in enumerate(facts)
-                    if s == _am.PROJECT_SCOPE]
-            n_global = len(facts) - len(proj)
-
-            if not proj:
-                t = TextBlock()
-                t.Text = u"No facts remembered for this project yet."
-                t.FontSize = 11
-                t.Foreground = _MUTED
-                t.Margin = Thickness(1, 0, 0, 4)
-                panel.Children.Add(t)
-            for number, f in proj:
-                g = Grid()
-                g.Margin = Thickness(1, 2, 0, 2)
-                g.ColumnDefinitions.Add(ColumnDefinition())
-                c1 = ColumnDefinition()
-                c1.Width = GridLength.Auto
-                g.ColumnDefinitions.Add(c1)
-
-                lbl = TextBlock()
-                lbl.Text = f.get('text') or u''
-                lbl.FontSize = 12
-                lbl.Foreground = _brush(82, 82, 91)
-                lbl.TextWrapping = TextWrapping.Wrap
-                g.Children.Add(lbl)
-
-                x = TextBlock()
-                x.Text = _GLYPH_CANCEL
-                try:
-                    x.Style = self.FindResource("T3.Icon.Muted")
-                except Exception:
-                    x.FontFamily = System.Windows.Media.FontFamily(
-                        "Segoe MDL2 Assets")
-                    x.FontSize = 11
-                    x.Foreground = _MUTED
-                x.Cursor = Cursors.Hand
-                x.Margin = Thickness(10, 2, 2, 0)
-                x.ToolTip = u"Forget this fact"
-
-                def _forget(s, ev, _n=number, _pid=pid):
-                    try:
-                        from Intelligence import assistant_memory as _m
-                        _m.remove_fact(_n, _pid)
-                    except Exception as fex:
-                        logger.debug("forget fact error: {}".format(fex))
-                    self._render_project_memory(_pid)
-
-                x.MouseLeftButtonUp += _forget
-                Grid.SetColumn(x, 1)
-                g.Children.Add(x)
-                panel.Children.Add(g)
-
-            if n_global:
-                t = TextBlock()
-                t.Text = (u"+ {} global fact(s) apply to every project."
-                          .format(n_global))
-                t.FontSize = 10.5
-                t.Foreground = _MUTED
-                t.Margin = Thickness(1, 6, 0, 0)
-                panel.Children.Add(t)
-        except Exception as ex:
-            logger.debug("_render_project_memory error: {}".format(ex))
+        self._render_memory(_MEM_PROJECT, pid)
 
     def _render_project_sched(self, pid):
         """Rebuild the scheduled-prompt rows for the selected project."""
@@ -2182,7 +2750,8 @@ class LLMSettingWindow(T3WPFWindow):
             clr.AddReference('System.Windows.Forms')
             from System.Windows.Forms import FolderBrowserDialog, DialogResult
             dlg = FolderBrowserDialog()
-            dlg.Description = "Chon thu muc tai lieu (PDF/TXT/MD) de index"
+            dlg.Description = ("Choose a folder of documents (PDF, Word, "
+                               "Excel, Markdown, text) to index")
             if _show_dialog_owned(self, dlg) == DialogResult.OK \
                     and dlg.SelectedPath:
                 from config.settings import get_settings

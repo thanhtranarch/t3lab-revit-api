@@ -1120,7 +1120,6 @@ class ManaContainsWindow(T3WPFWindow):
         self.tab1_btn_find.Click += self._t1_find
         self.tab1_btn_set.Click += self._t1_set
         self.tab1_btn_sel.Click += self._t1_sel
-        self.tab1_btn_close.Click += self._close_chrome
         
         # ── INITIALIZE TAB 2 VARIABLES ──
         self.t2_spatial_type = ROOMS
@@ -1153,7 +1152,6 @@ class ManaContainsWindow(T3WPFWindow):
         self.tab2_btn_collect.Click += self._t2_on_collect
         self.tab2_btn_apply.Click += self._t2_on_apply
         self.tab2_btn_select.Click += self._t2_on_select
-        self.tab2_btn_close.Click += self._close_chrome
         
         # Load Initial Data
         self._t1_init_combo()

@@ -91,13 +91,6 @@ except Exception:
 GUI_DIR = os.path.dirname(__file__)
 XAML_FILE = os.path.join(GUI_DIR, 'Tools', 'ManaViews.xaml')
 
-try:
-    from GUI import RevitTheme as _theme
-except Exception:
-    try:
-        import RevitTheme as _theme
-    except Exception:
-        _theme = None
 
 from GUI.ProgressPauseMixin import ProgressPauseMixin
 from GUI.DataGridColumnFilter import ColumnFilterController
@@ -236,8 +229,6 @@ class ViewManagerWindow(T3WPFWindow):
         self.doc = revit.doc
         self.uidoc = revit.uidoc
 
-        self._adopt_host_font()
-        self._apply_theme()
         
         # Data collections
         self.all_views = []
@@ -274,7 +265,6 @@ class ViewManagerWindow(T3WPFWindow):
         self.views_rename_btn.Click += self._on_views_batch_rename
         self.views_dup_btn.Click += self._on_views_duplicate
         self.views_del_btn.Click += self._on_views_delete
-        self.views_close_btn.Click += self._on_close
         
         self.views_apply_btn.Click += self._on_views_apply
         self.views_grid.SelectionChanged += self._on_views_selection_changed
@@ -294,7 +284,6 @@ class ViewManagerWindow(T3WPFWindow):
         self.tmpl_batch_btn.Click += self._on_tmpl_batch_rename
         self.tmpl_dup_btn.Click += self._on_tmpl_duplicate
         self.tmpl_del_btn.Click += self._on_tmpl_delete
-        self.tmpl_close_btn.Click += self._on_close
         
         self.tmpl_apply_btn.Click += self._on_tmpl_apply
         self.tmpl_grid.SelectionChanged += self._on_tmpl_selection_changed
@@ -401,26 +390,6 @@ class ViewManagerWindow(T3WPFWindow):
         except Exception:
             pass
 
-    def _adopt_host_font(self):
-        if _theme is None:
-            return
-        family, size = _theme.host_font()
-        if family:
-            try:
-                self.FontFamily = family
-                if size and size > 0:
-                    self.FontSize = size
-            except Exception:
-                pass
-
-    def _apply_theme(self, theme=None):
-        if _theme is None:
-            return
-        try:
-            _theme.apply(self, theme)
-        except Exception:
-            pass
-
     # ── Chrome Event Handlers ────────────────────────────────────
     def _minimize(self, sender, e):
         self.WindowState = WindowState.Minimized
@@ -436,9 +405,6 @@ class ViewManagerWindow(T3WPFWindow):
     def _close_chrome(self, sender, e):
         self.Close()
         
-    def _on_close(self, sender, args):
-        self.Close()
-
     def _on_tab_changed(self, sender, e):
         """Toggle active Tab based on RadioButton selection"""
         if not hasattr(self, 'tab_control'):

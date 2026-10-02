@@ -263,7 +263,7 @@ class DimTextWindow(T3WPFWindow):
         for _n in ("txt_prefix", "txt_suffix", "txt_above", "txt_below", "txt_override",
                    "wrap_presets", "chk_leader", "rb_selection", "rb_view",
                    "chk_filter_enable", "sp_filter_config", "combo_combine",
-                   "sp_rules", "btn_clear_fields", "btn_cancel", "btn_apply", "lbl_status"):
+                   "sp_rules", "btn_clear_fields", "btn_apply", "lbl_status"):
             setattr(self, _n, self.FindName(_n))
 
     # ── window chrome ──────────────────────────────────────────────────────────
@@ -355,6 +355,17 @@ class DimTextWindow(T3WPFWindow):
 
 
 def show_dialog():
+    # Imported once per Revit session: re-read the active document so the
+    # window never works on the project that was open at first import.
+    global doc, uidoc
+    try:
+        uidoc = revit.uidoc
+    except Exception:
+        uidoc = None
+    try:
+        doc = revit.doc
+    except Exception:
+        doc = None
     DimTextWindow().ShowDialog()
 
 if __name__ == '__main__':

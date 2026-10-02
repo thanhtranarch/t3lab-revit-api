@@ -6,8 +6,8 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="Auto Join"
-        Width="780" Height="620"
-        MinWidth="640" MinHeight="480"
+        Width="900" Height="620"
+        MinWidth="760" MinHeight="500"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="True"
         Background="Transparent"
@@ -1719,7 +1719,7 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Title Bar -->
-                <RowDefinition Height="*"/>       <!-- Row 1: Zero-gap Content Area -->
+                <RowDefinition Height="*"/>       <!-- Row 1: Rules | Settings -->
                 <RowDefinition Height="48"/>      <!-- Row 2: Footer Bar -->
             </Grid.RowDefinitions>
 
@@ -1731,14 +1731,14 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,0"
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Image x:Name="logo_image" Height="28" Margin="0,0,12,0"
                                VerticalAlignment="Center"
                                RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Orientation="Vertical" VerticalAlignment="Center">
                             <TextBlock Text="Auto Join" Style="{StaticResource T3.Title}"/>
-                            <TextBlock Text="Batch join intersecting geometry elements" Style="{StaticResource T3.Subtitle}"/>
+                            <TextBlock Text="Join intersecting elements by category rules" Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -1760,91 +1760,81 @@
                 </Grid>
             </Border>
 
-            <!-- ══════════════════ ROW 1: ZERO-GAP BODY ══════════════════ -->
+            <!-- ══════════════════ ROW 1: BODY ══════════════════
+                 Left: build the rule list (pick two categories → Add Rule; table below).
+                 Right: how the rules run (scope, mode, join order, embedded protection, rule sets). -->
             <Grid Grid.Row="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/> <!-- Settings Section -->
-                    <RowDefinition Height="*"/>    <!-- Join Rules Section with DataGrid -->
-                    <RowDefinition Height="Auto"/> <!-- Action Row -->
-                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="300"/>
+                </Grid.ColumnDefinitions>
 
-                <!-- Section 1: Settings -->
-                <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1" Padding="16,12">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <Grid Grid.Row="0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Scope -->
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="SCOPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                <ComboBox x:Name="cb_scope" Style="{StaticResource T3.ComboBox}" Height="28" SelectedIndex="0">
-                                    <ComboBoxItem Content="Entire Project"/>
-                                    <ComboBoxItem Content="Active View"/>
-                                    <ComboBoxItem Content="Selected Elements"/>
-                                </ComboBox>
-                            </StackPanel>
-
-                            <!-- Mode -->
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="MODE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                <ComboBox x:Name="cb_mode" Style="{StaticResource T3.ComboBox}" Height="28" SelectedIndex="0">
-                                    <ComboBoxItem Content="Join"/>
-                                    <ComboBoxItem Content="Unjoin"/>
-                                </ComboBox>
-                            </StackPanel>
-                        </Grid>
-
-                        <CheckBox x:Name="chk_switch_order" Grid.Row="1" Style="{StaticResource T3.CheckBox}"
-                                  IsChecked="True" Margin="0,12,0,0"
-                                  Content="Switch join order — priority category cuts the other"/>
-                    </Grid>
-                </Border>
-
-                <!-- Section 2: Join Rules & DataGrid -->
-                <Grid Grid.Row="1">
+                <!-- ─── LEFT: rule builder + rule table ─── -->
+                <Grid Grid.Column="0">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="40"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Rules Toolbar -->
-                    <Border Grid.Row="0" Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1" Padding="16,0">
+                    <!-- Rule builder: CUTS › GETS CUT + Add Rule -->
+                    <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
+                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1" Padding="16,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="CUTS — KEEPS ITS SHAPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="cb_new_cuts" Style="{StaticResource T3.ComboBox}"
+                                          ToolTip="Category that cuts: it keeps its full shape where the two overlap"/>
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="1" Text="&#xE76C;" Style="{StaticResource T3.Icon.Muted}"
+                                       VerticalAlignment="Bottom" Margin="12,0,12,8"/>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="GETS CUT" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="cb_new_cut_by" Style="{StaticResource T3.ComboBox}"
+                                          ToolTip="Category that gets cut where the two overlap"/>
+                            </StackPanel>
+
+                            <Button x:Name="btn_add_rule" Grid.Column="3" Style="{StaticResource T3.Button.Secondary}"
+                                    VerticalAlignment="Bottom" Margin="12,0,0,0" Click="btn_add_rule_click"
+                                    ToolTip="Add this pair to the rule list">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE710;" Style="{StaticResource T3.Icon.Lead}"/>
+                                    <TextBlock Text="Add Rule" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- Rule list toolbar -->
+                    <Border Grid.Row="1" Background="{DynamicResource T3.Surface}"
+                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1" Padding="16,0">
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="JOIN RULES" Style="{StaticResource T3.Label}" Margin="0,0,12,0"/>
-                                <TextBlock x:Name="rule_count_text" Text="0 rules defined" Style="{StaticResource T3.Caption}"/>
+                                <TextBlock Text="JOIN RULES" Style="{StaticResource T3.Label}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="rule_count_text" Text="0 rule(s) defined" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                <Button x:Name="btn_add_rule" Style="{StaticResource T3.Button.Secondary}"
-                                        Height="28" Padding="12,0" Margin="0,0,8,0" Click="btn_add_rule_click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE710;" Style="{StaticResource T3.Icon.Lead}"/>
-                                        <TextBlock Text="Add" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="btn_switch_order" Style="{StaticResource T3.Button.Secondary}"
-                                        Height="28" Padding="12,0" Margin="0,0,8,0" Click="btn_switch_order_click"
-                                        ToolTip="Swap priority and join-with categories">
+                                <Button x:Name="btn_switch_order" Style="{StaticResource T3.Button.Ghost}" Margin="0,0,8,0"
+                                        Click="btn_switch_order_click" ToolTip="Swap the two categories of the selected rules">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE8AB;" Style="{StaticResource T3.Icon.Lead}"/>
                                         <TextBlock Text="Switch" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
-                                <Button x:Name="btn_remove_rule" Style="{StaticResource T3.Button.Danger}"
-                                        Height="28" Padding="12,0" Click="btn_remove_rule_click">
+                                <Button x:Name="btn_remove_rule" Style="{StaticResource T3.Button.Ghost}"
+                                        Click="btn_remove_rule_click" ToolTip="Remove the selected rules from the list">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE711;" Style="{StaticResource T3.Icon.Lead}"/>
+                                        <TextBlock Text="&#xE74D;" Style="{StaticResource T3.Icon.Lead}"/>
                                         <TextBlock Text="Remove" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
@@ -1852,126 +1842,184 @@
                         </Grid>
                     </Border>
 
-                    <!-- Rules DataGrid -->
-                    <Grid Grid.Row="1">
+                    <!-- Rule table -->
+                    <Grid Grid.Row="2">
                         <DataGrid x:Name="rules_grid"
                                   Style="{StaticResource T3.DataGrid}"
                                   BorderThickness="0"
                                   AutoGenerateColumns="False"
                                   CanUserAddRows="False"
                                   CanUserDeleteRows="False"
-                                  SelectionMode="Single"
+                                  CanUserSortColumns="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Extended"
                                   SelectionUnit="FullRow"
                                   HeadersVisibility="Column"
+                                  EnableRowVirtualization="True"
                                   HorizontalScrollBarVisibility="Disabled"
                                   VerticalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="#" Binding="{Binding Number}" Width="36" IsReadOnly="True"
-                                                    ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                <DataGridTextColumn Header="PRIORITY CATEGORY (CUTS)" Binding="{Binding PriorityName}" Width="*" IsReadOnly="True"
-                                                    ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                <DataGridTextColumn Header="→" Width="28" IsReadOnly="True"
-                                                    ElementStyle="{StaticResource T3.Cell.Muted}"/>
-                                <DataGridTextColumn Header="JOIN-WITH CATEGORY (CUT BY)" Binding="{Binding JoinWithName}" Width="240" IsReadOnly="True"
-                                                    ElementStyle="{StaticResource T3.Body.Secondary}"/>
+                                <DataGridTextColumn Header="#" Binding="{Binding Number}" Width="48"
+                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"
+                                                    ElementStyle="{StaticResource T3.Cell.Center}"/>
+                                <DataGridTextColumn Header="CUTS" Binding="{Binding PriorityName}" Width="*"/>
+                                <DataGridTemplateColumn Width="40" CanUserResize="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="&#xE76C;" Style="{StaticResource T3.Icon.Muted}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="GETS CUT" Binding="{Binding JoinWithName}" Width="220"/>
                             </DataGrid.Columns>
                         </DataGrid>
 
-                        <TextBlock x:Name="rules_grid_empty" Style="{StaticResource T3.Empty}"
-                                   Text="No join rules defined. Click 'Add' to specify categories."
+                        <TextBlock x:Name="rules_grid_empty" Style="{StaticResource T3.Empty}" IsHitTestVisible="False"
+                                   Text="No join rules yet.&#x0a;Pick the two categories above and click Add Rule."
                                    Visibility="Collapsed"/>
                     </Grid>
-
-                    <!-- Tip Line -->
-                    <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0" Padding="16,8">
-                        <TextBlock Style="{StaticResource T3.Caption}">
-                            <Run Text="Tip: " FontWeight="SemiBold" Foreground="{StaticResource T3.Ink}"/>
-                            <Run Text="Priority cuts the join-with category. Shift+Click the ribbon button to quick-join with defaults."/>
-                        </TextBlock>
-                    </Border>
                 </Grid>
 
-                <!-- Section 3: Action Strip -->
-                <Border Grid.Row="2" Background="{StaticResource T3.Surface}" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0" Padding="16,8">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                <!-- ─── RIGHT: run settings ─── -->
+                <Border Grid.Column="1" Background="{StaticResource T3.SurfaceSunken}"
+                        BorderBrush="{StaticResource T3.Border}" BorderThickness="1,0,0,0"
+                        Padding="0" ClipToBounds="True">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  Padding="16,16,12,16">
+                        <StackPanel>
+                            <TextBlock Text="SCOPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="cb_scope" Style="{StaticResource T3.ComboBox}" SelectedIndex="0" Margin="0,0,0,12">
+                                <ComboBoxItem Content="Entire Project"/>
+                                <ComboBoxItem Content="Active View"/>
+                                <ComboBoxItem Content="Selected Elements"/>
+                            </ComboBox>
 
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button x:Name="btn_save_rules" Style="{StaticResource T3.Button.Secondary}"
-                                    Height="28" Padding="12,0" Margin="0,0,8,0" Click="btn_save_rules_click">
+                            <TextBlock Text="MODE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="cb_mode" Style="{StaticResource T3.ComboBox}" SelectedIndex="0"
+                                      SelectionChanged="cb_mode_changed">
+                                <ComboBoxItem Content="Join"/>
+                                <ComboBoxItem Content="Unjoin"/>
+                            </ComboBox>
+
+                            <Separator Style="{StaticResource T3.Rule}" Margin="0,16"/>
+
+                            <TextBlock Text="JOIN ORDER" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                            <CheckBox x:Name="chk_switch_order" Style="{StaticResource T3.CheckBox}" IsChecked="True"
+                                      Content="Apply rule order"/>
+                            <TextBlock x:Name="txt_switch_order_note" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="24,4,0,12"
+                                       Text="The CUTS category cuts the other one. Off: Revit picks which element cuts."/>
+
+                            <CheckBox x:Name="chk_protect_embedded" Style="{StaticResource T3.CheckBox}" IsChecked="True"
+                                      Content="Keep embedded elements visible"/>
+                            <TextBlock x:Name="txt_protect_note" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="24,4,0,0"
+                                       Text="An element that sits fully inside another one (a beam in a slab, a column in a wall) always cuts it, so the join never hides it. Exact overlaps are not joined."/>
+
+                            <Separator Style="{StaticResource T3.Rule}" Margin="0,16"/>
+
+                            <TextBlock Text="RULE SET" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="btn_load_rules" Grid.Column="0" Style="{StaticResource T3.Button.Secondary}"
+                                        Click="btn_load_rules_click" ToolTip="Load a rule set from a .json file">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE8E5;" Style="{StaticResource T3.Icon.Lead}"/>
+                                        <TextBlock Text="Load" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="btn_save_rules" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}"
+                                        Click="btn_save_rules_click" ToolTip="Save this rule set to a .json file">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE74E;" Style="{StaticResource T3.Icon.Lead}"/>
+                                        <TextBlock Text="Save" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <Button x:Name="btn_reset_rules" Style="{StaticResource T3.Button.Ghost}" HorizontalAlignment="Left"
+                                    Click="btn_reset_rules_click" ToolTip="Replace the list with the default rules">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE74E;" Style="{StaticResource T3.Icon.Lead}"/>
-                                    <TextBlock Text="Save Rules" VerticalAlignment="Center"/>
+                                    <TextBlock Text="&#xE7A7;" Style="{StaticResource T3.Icon.Lead}"/>
+                                    <TextBlock Text="Reset to defaults" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="btn_load_rules" Style="{StaticResource T3.Button.Secondary}"
-                                    Height="28" Padding="12,0" Click="btn_load_rules_click">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE8E5;" Style="{StaticResource T3.Icon.Lead}"/>
-                                    <TextBlock Text="Load Rules" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
+
+                            <Border Style="{StaticResource T3.Callout}" Margin="0,16,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="&#xE946;" Style="{StaticResource T3.Callout.Icon}"/>
+                                    <TextBlock Grid.Column="1" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                               Text="Shift+Click the ribbon button to run the default rules on the whole project without opening this window."/>
+                                </Grid>
+                            </Border>
                         </StackPanel>
-
-                        <Button x:Name="btn_run" Grid.Column="2" Style="{StaticResource T3.Button.Primary}"
-                                Height="28" Padding="16,0" Click="btn_run_click" IsDefault="True">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE768;" Style="{StaticResource T3.Icon.Lead}"/>
-                                <TextBlock Text="Run Auto Join" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </Grid>
+                    </ScrollViewer>
                 </Border>
             </Grid>
 
-            <!-- ══════════════════ ROW 2: FOOTER BAR ══════════════════ -->
+            <!-- ══════════════════ ROW 2: FOOTER BAR ══════════════════
+                 Left: copyright | status. Right: progress (while running) + ONE primary.
+                 No Close button here — the title-bar X already closes the window. -->
             <Border Grid.Row="2" Style="{StaticResource T3.FooterBar}">
                 <Grid>
-                    <!-- Progress panel: bar + Pause + Stop (hidden when idle) -->
-                    <Grid x:Name="progress_panel" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-
-                        <ProgressBar x:Name="pb_run" Grid.Column="0" Style="{StaticResource T3.ProgressBar}"
-                                     Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center"/>
-
-                        <Button x:Name="btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}" Click="pause_resume_clicked">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon.Lead}"/>
-                                <TextBlock x:Name="btn_pause_label" Text="Pause" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-
-                        <Button x:Name="btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}" Click="stop_clicked">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon.Lead}"/>
-                                <TextBlock Text="Stop" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
+                        <TextBlock Grid.Column="0" Style="{StaticResource T3.Copyright}"/>
+                        <Border Grid.Column="1" Width="1" Height="16" Background="{StaticResource T3.Border}"
+                                Margin="12,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="status_text" Grid.Column="2" Text="Ready" Style="{StaticResource T3.Body.Secondary}"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                     </Grid>
 
-                    <!-- Default footer text -->
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Progress panel: bar + Pause + Stop (hidden when idle) -->
+                        <Grid x:Name="progress_panel" Visibility="Collapsed" VerticalAlignment="Center" Margin="0,0,12,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ProgressBar x:Name="pb_run" Grid.Column="0" Style="{StaticResource T3.ProgressBar}"
+                                         Minimum="0" Maximum="100" Value="0" VerticalAlignment="Center"/>
+                            <Button x:Name="btn_pause" Grid.Column="2" Style="{StaticResource T3.Button.Secondary}" Click="pause_resume_clicked">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="btn_pause_icon" Text="&#xE769;" Style="{StaticResource T3.Icon.Lead}"/>
+                                    <TextBlock x:Name="btn_pause_label" Text="Pause" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="btn_stop" Grid.Column="4" Style="{StaticResource T3.Button.Danger}" Click="stop_clicked">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE71A;" Style="{StaticResource T3.Icon.Lead}"/>
+                                    <TextBlock Text="Stop" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
 
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource T3.Copyright}"/>
-                            <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="12,0"/>
-                            <TextBlock x:Name="status_text" Text="Ready" Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Grid>
+                        <Button x:Name="btn_run" Style="{StaticResource T3.Button.Primary}"
+                                Click="btn_run_click" IsDefault="True">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE768;" Style="{StaticResource T3.Icon.Lead}"/>
+                                <TextBlock x:Name="btn_run_label" Text="Run Auto Join" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

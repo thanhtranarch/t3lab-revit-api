@@ -1843,10 +1843,11 @@
                         <RowDefinition Height="*"/>     <!-- C | D -->
                     </Grid.RowDefinitions>
 
-                    <!-- A · CAD SOURCE | LEVEL -->
+                    <!-- A · CAD SOURCE | LEVEL — same columns as C | D below, so the two
+                         combos line up with the options card and the layer card. -->
                     <Grid Grid.Row="0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="424"/>
                             <ColumnDefinition Width="16"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
@@ -2407,7 +2408,9 @@
                                         <TextBox x:Name="txt_layer_search" Grid.Column="0" Style="{StaticResource T3.Search}"
                                                  Tag="Search layers..." TextChanged="layer_search_changed"/>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
-                                            <Button x:Name="btn_ai_select" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
+                                            <!-- Select All / Clear removed 2026-10-02: the header checkbox
+                                                 of the table already ticks / unticks every layer shown. -->
+                                            <Button x:Name="btn_ai_select" Style="{StaticResource T3.Button.Secondary}"
                                                     Click="ai_select_clicked"
                                                     ToolTip="Tick the CAD layers that most likely hold this element type">
                                                 <StackPanel Orientation="Horizontal">
@@ -2415,10 +2418,6 @@
                                                     <TextBlock Text="AI Select" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
-                                            <Button x:Name="btn_layers_all" Content="Select All" Style="{StaticResource T3.Button.Secondary}"
-                                                    Margin="0,0,8,0" Click="layers_select_all_clicked" ToolTip="Tick every layer shown"/>
-                                            <Button x:Name="btn_layers_clear" Content="Clear" Style="{StaticResource T3.Button.Secondary}"
-                                                    Click="layers_clear_clicked" ToolTip="Untick every layer shown"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -2485,8 +2484,6 @@
                                    TextTrimming="CharacterEllipsis" MaxWidth="560" Text="Ready"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btn_close_bar" Content="Close" Style="{StaticResource T3.Button.Ghost}"
-                                Margin="0,0,8,0" Click="close_bar_clicked" ToolTip="Close without creating anything"/>
                         <Button x:Name="btn_refresh" Content="Rescan" Style="{StaticResource T3.Button.Secondary}"
                                 Margin="0,0,8,0" Click="refresh_clicked"
                                 ToolTip="Reload CAD files, levels, types and layers (F5)"/>

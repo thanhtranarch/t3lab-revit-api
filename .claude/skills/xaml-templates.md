@@ -107,7 +107,9 @@ chrome; màu bề mặt thật vẫn do outer Border lấy từ token `T3.*`.
 
 ## Footer (48px) — trạng thái trái · nút phải
 
-Thứ tự cố định: ghost huỷ → secondary → secondary → **MỘT** primary. Gap 8.
+Thứ tự cố định: secondary → secondary → **MỘT** primary. Gap 8.
+Không đặt nút Close / Cancel / Done chỉ để đóng cửa sổ — nút X title bar (`T3.WinClose`,
+`IsCancel="True"`) đã làm việc đó (luật 29). Ngoại lệ: Cancel/No của dialog trả lời (P5 bên dưới).
 
 ```xml
 <Border Style="{StaticResource T3.FooterBar}">
@@ -130,8 +132,6 @@ Thứ tự cố định: ghost huỷ → secondary → secondary → **MỘT** p
     </StackPanel>
 
     <StackPanel Grid.Column="1" Orientation="Horizontal">
-      <Button Content="Cancel" IsCancel="True"
-              Style="{StaticResource T3.Button.Ghost}" Margin="0,0,8,0"/>
       <Button Content="Preview" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
       <Button x:Name="btn_apply" Content="Rename 34 sheets" IsDefault="True"
               Style="{StaticResource T3.Button.Primary}"/>

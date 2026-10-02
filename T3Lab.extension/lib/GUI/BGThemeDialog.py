@@ -247,7 +247,6 @@ class BackgroundThemeWindow(T3WPFWindow):
         self.BtnEyedrop.Click += self._on_eyedrop
         self.BtnSavePreset.Click += self._on_save_preset
         self.BtnApply.Click += self._on_apply
-        self.BtnClose.Click += self._on_close
 
         self.SvCanvas.MouseLeftButtonDown += self._on_sv_down
         self.SvCanvas.MouseMove += self._on_sv_move
@@ -987,9 +986,6 @@ class BackgroundThemeWindow(T3WPFWindow):
                 self._sample_bmp.Dispose()
         except Exception:
             pass
-
-    def _on_close(self, sender, args):
-        self.Close()
 
 
 def show_bg_theme_dialog(config, presets, callbacks):

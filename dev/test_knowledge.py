@@ -247,7 +247,10 @@ def test_knowledge_store():
                     'Cửa thoát hiểm rộng tối thiểu 800 mm.'.encode('utf-8'))
         with open(os.path.join(src, 'notes.txt'), 'wb') as f:
             f.write(b'Handrail height for stairs is 900 mm from nosing.')
-        with open(os.path.join(src, 'skip.docx'), 'wb') as f:
+        # An unsupported type is skipped by scan(). This used to be
+        # skip.docx — .docx/.xlsx ARE indexed now (office_text), see
+        # test_office_text below.
+        with open(os.path.join(src, 'skip.dwg'), 'wb') as f:
             f.write(b'not indexable')
 
         store = KnowledgeStore(os.path.join(tmp, 'idx'), [src], 'test')
@@ -1481,6 +1484,211 @@ def test_project_store():
           get_active_store() is not store)
 
 
+# ─── office_text: .docx / .xlsx ───────────────────────────────────────────────
+
+_W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+_S_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+_R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+_PR_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
+
+
+def _zip_bytes(parts):
+    """A zip built in memory: {member name: xml text} -> bytes."""
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
+        for name, text in parts.items():
+            z.writestr(name, text.encode('utf-8'))
+    return buf.getvalue()
+
+
+def _docx_fixture():
+    body = (
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
+        '<w:r><w:t>File Naming</w:t></w:r></w:p>'
+        '<w:p><w:r><w:t xml:space="preserve">Chiều cao </w:t></w:r>'
+        '<w:r><w:t>lan can 1200</w:t></w:r><w:r><w:tab/><w:t>mm</w:t></w:r>'
+        '<w:del><w:r><w:delText>DELETED</w:delText></w:r></w:del></w:p>'
+        '<w:tbl>'
+        '<w:tr><w:tc><w:p><w:r><w:t>Code</w:t></w:r></w:p></w:tc>'
+        '<w:tc><w:p><w:r><w:t>Discipline</w:t></w:r></w:p></w:tc></w:tr>'
+        '<w:tr><w:tc><w:p><w:r><w:t>AR</w:t></w:r></w:p></w:tc>'
+        '<w:tc><w:p><w:r><w:t>Architecture</w:t></w:r></w:p>'
+        '<w:p><w:r><w:t>incl. interiors</w:t></w:r></w:p></w:tc></w:tr>'
+        '</w:tbl>'
+        '<w:p><w:r><w:t xml:space="preserve">Before </w:t></w:r><w:r>'
+        '<mc:AlternateContent><mc:Choice Requires="wps"><w:drawing>'
+        '<w:txbxContent><w:p><w:r><w:t>Boxed note</w:t></w:r></w:p>'
+        '</w:txbxContent></w:drawing></mc:Choice><mc:Fallback><w:pict>'
+        '<w:txbxContent><w:p><w:r><w:t>Boxed note</w:t></w:r></w:p>'
+        '</w:txbxContent></w:pict></mc:Fallback></mc:AlternateContent>'
+        '</w:r><w:r><w:t>after</w:t></w:r></w:p>')
+    doc = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+           '<w:document xmlns:w="{}" xmlns:mc="http://schemas.openxmlformats.'
+           'org/markup-compatibility/2006"><w:body>{}</w:body></w:document>'
+           ).format(_W_NS, body)
+    return _zip_bytes({'[Content_Types].xml': '<Types/>',
+                       'word/document.xml': doc})
+
+
+def _xlsx_fixture(with_rels=True):
+    parts = {
+        'xl/workbook.xml': (
+            '<workbook xmlns="{}" xmlns:r="{}"><sheets>'
+            '<sheet name="Rooms" sheetId="1" r:id="rId2"/>'
+            '<sheet name="Doors" sheetId="2" r:id="rId1"/>'
+            '<sheet name="Empty" sheetId="3" r:id="rId3"/>'
+            '</sheets></workbook>').format(_S_NS, _R_NS),
+        'xl/sharedStrings.xml': (
+            '<sst xmlns="{}"><si><t>Name</t></si><si><t>Area</t></si>'
+            '<si><r><t>Lob</t></r><r><t>by</t></r><rPh><t>PHONETIC</t></rPh></si>'
+            '<si><t>Phòng họp</t></si></sst>').format(_S_NS),
+        'xl/worksheets/sheet1.xml': (
+            '<worksheet xmlns="{}"><sheetData>'
+            '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+            '<row r="2"><c t="s"><v>2</v></c><c><v>42.0</v></c><c t="b"><v>1</v></c></row>'
+            '<row r="3"><c t="s"><v>3</v></c><c><v>18.5</v></c>'
+            '<c><f>SUM(B2:B3)</f><v>60.5</v></c></row>'
+            '<row r="4"/>'
+            '</sheetData></worksheet>').format(_S_NS),
+        'xl/worksheets/sheet2.xml': (
+            '<worksheet xmlns="{}"><sheetData><row>'
+            '<c t="inlineStr"><is><t>D-01</t></is></c><c><v>0.9</v></c>'
+            '</row></sheetData></worksheet>').format(_S_NS),
+        'xl/worksheets/sheet3.xml': (
+            '<worksheet xmlns="{}"><sheetData/></worksheet>').format(_S_NS),
+    }
+    if with_rels:
+        parts['xl/_rels/workbook.xml.rels'] = (
+            '<Relationships xmlns="{}">'
+            '<Relationship Id="rId1" Type="x" Target="worksheets/sheet2.xml"/>'
+            '<Relationship Id="rId2" Type="x" Target="/xl/worksheets/sheet1.xml"/>'
+            '<Relationship Id="rId3" Type="x" Target="worksheets/sheet3.xml"/>'
+            '</Relationships>').format(_PR_NS)
+    return _zip_bytes(parts)
+
+
+def test_office_text():
+    print('[office_text: docx / xlsx]')
+    import tempfile
+    from Intelligence.knowledge import office_text as O
+    from Intelligence.knowledge import knowledge_store as KS
+    from Intelligence.knowledge import context_digest as CD
+    from Intelligence.knowledge import pdf_cache as PC
+
+    tmp = tempfile.mkdtemp(prefix='t3lab_office_')
+
+    def put(name, data):
+        path = os.path.join(tmp, name)
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    # ── docx ──
+    docx = put('BEP.docx', _docx_fixture())
+    pages, why = O.extract_docx(docx)
+    text = pages[0][1] if pages else ''
+    check('docx: one text page 0, no reason', len(pages) == 1
+          and pages[0][0] == 0 and why == '', (pages, why))
+    check('docx: Heading 1 becomes a markdown heading',
+          text.startswith('# File Naming'), text[:40])
+    check('docx: runs joined, tab kept, Vietnamese intact',
+          'Chiều cao lan can 1200\tmm' in text, text)
+    check('docx: deleted (tracked) text excluded', 'DELETED' not in text)
+    check('docx: table rows as cell | cell',
+          'Code | Discipline' in text
+          and 'AR | Architecture incl. interiors' in text, text)
+    check('docx: text box read once (mc:Fallback skipped)',
+          text.count('Boxed note') == 1, text)
+    check('docx: paragraph around the text box keeps both halves',
+          'Before after' in text, text)
+
+    # ── xlsx ──
+    xlsx = put('Register.xlsx', _xlsx_fixture())
+    pages, why = O.extract_xlsx(xlsx)
+    text = pages[0][1] if pages else ''
+    check('xlsx: one text page, no reason', len(pages) == 1 and why == '',
+          (pages, why))
+    check('xlsx: sheets in WORKBOOK order with Sheet headers',
+          text.index('## Sheet: Rooms') < text.index('## Sheet: Doors'), text)
+    check('xlsx: shared + rich strings, phonetic runs dropped',
+          'Name | Area' in text and 'Lobby | 42 | TRUE' in text
+          and 'PHONETIC' not in text, text)
+    check('xlsx: Vietnamese shared string + numbers + cached formula value',
+          'Phòng họp | 18.5 | 60.5' in text, text)
+    check('xlsx: inline strings', 'D-01 | 0.9' in text, text)
+    check('xlsx: empty sheet has no header', 'Sheet: Empty' not in text, text)
+
+    no_rels = put('NoRels.xlsx', _xlsx_fixture(with_rels=False))
+    pages, why = O.extract_xlsx(no_rels)
+    check('xlsx without workbook rels falls back to sheetN parts',
+          pages and '## Sheet: Sheet1' in pages[0][1]
+          and 'D-01' in pages[0][1], (pages, why))
+
+    # ── failures say why ──
+    ole = put('Locked.docx', b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1 encrypted')
+    pages, why = O.extract_pages(ole)
+    check('password-protected / not-a-zip explained',
+          pages == [] and 'password' in why, why)
+    empty = put('Empty.xlsx', b'')
+    check('0-byte file explained', O.extract_pages(empty)[1].startswith('empty'))
+    nodoc = put('NoBody.docx', _zip_bytes({'word/other.xml': '<x/>'}))
+    check('docx without word/document.xml explained',
+          'not a Word document' in O.extract_pages(nodoc)[1])
+    check('other extensions unsupported',
+          O.extract_pages(os.path.join(tmp, 'a.dwg'))[1] == 'unsupported file type')
+
+    old_cap = O.MAX_OFFICE_BYTES
+    O.MAX_OFFICE_BYTES = 10
+    try:
+        check('size cap (same as the PDF cap) enforced',
+              'limit' in O.extract_pages(docx)[1])
+    finally:
+        O.MAX_OFFICE_BYTES = old_cap
+    check('size cap mirrors rag_processor.MAX_PDF_BYTES',
+          O.MAX_OFFICE_BYTES == 20 * 1024 * 1024, O.MAX_OFFICE_BYTES)
+    old_chars = O.MAX_OFFICE_CHARS
+    O.MAX_OFFICE_CHARS = 30
+    try:
+        pages, _ = O.extract_pages(xlsx)
+        check('character ceiling stops extraction',
+              pages and len(pages[0][1]) <= 30 + 2, pages)
+    finally:
+        O.MAX_OFFICE_CHARS = old_chars
+
+    # ── registered everywhere the knowledge stack lists extensions ──
+    for mod, label in ((KS, 'knowledge_store'), (CD, 'context_digest')):
+        check('{} indexes .docx and .xlsx'.format(label),
+              '.docx' in mod.INDEXABLE_EXTS and '.xlsx' in mod.INDEXABLE_EXTS)
+    pages, why = PC.get_pages(docx, use_cache=False)
+    check('pdf_cache routes .docx to office_text',
+          pages and 'File Naming' in pages[0][1], (pages, why))
+    pages, why = PC.get_pages(xlsx)
+    check('pdf_cache caches .xlsx', pages and 'D-01' in pages[0][1], why)
+    listed = [os.path.basename(p) for p in CD.iter_documents(tmp)]
+    check('context digest walks Word/Excel files',
+          'BEP.docx' in listed and 'Register.xlsx' in listed, listed)
+
+    # ── end to end: scan + search with citations ──
+    src = os.path.join(tmp, 'src')
+    os.makedirs(src)
+    with open(docx, 'rb') as f:
+        put(os.path.join('src', 'BEP.docx'), f.read())
+    with open(xlsx, 'rb') as f:
+        put(os.path.join('src', 'Register.xlsx'), f.read())
+    store = KS.KnowledgeStore(os.path.join(tmp, 'idx'), [src], 'office')
+    r = store.scan()
+    check('scan indexes both office files', r['added'] == 2, r)
+    hits = store.search('discipline architecture interiors', top_k=3)
+    check('docx passage retrievable', hits and hits[0]['file'] == 'BEP.docx',
+          hits and hits[0]['file'])
+    hits = store.search('Lobby area', top_k=3)
+    check('xlsx passage retrievable', hits and hits[0]['file'] == 'Register.xlsx',
+          hits and hits[0]['file'])
+    kinds = sorted(e.get('kind') for e in store._manifest['files'].values())
+    check('manifest kind per format', kinds == ['docx', 'xlsx'], kinds)
+
+
 # ─── main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -1502,6 +1710,7 @@ def main():
     test_rerank_diversity()
     test_knowledge_agent()
     test_project_store()
+    test_office_text()
     test_pdf_annots()
     test_sheet_matcher()
     test_comment_agent()

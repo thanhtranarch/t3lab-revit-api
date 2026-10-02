@@ -25,13 +25,6 @@ except Exception:
         except Exception:
             _WPFWindow = object
 
-try:
-    from GUI import RevitTheme as _theme
-except Exception:
-    try:
-        import RevitTheme as _theme
-    except Exception:
-        _theme = None
 
 _XAML = os.path.join(os.path.dirname(__file__), 'Tools', 'T3Dialog.xaml')
 
@@ -57,8 +50,6 @@ class T3Dialog(_WPFWindow):
             except Exception:
                 pass
 
-        self._adopt_host_font()
-        self._apply_theme()
 
         # Wire Title and Texts
         if hasattr(self, 'dlg_title') and self.dlg_title:
@@ -83,26 +74,6 @@ class T3Dialog(_WPFWindow):
             self.btn_cancel.Click += self._on_cancel
         if hasattr(self, 'btn_close_chrome') and self.btn_close_chrome:
             self.btn_close_chrome.Click += self._on_cancel
-
-    def _adopt_host_font(self):
-        if _theme is None:
-            return
-        try:
-            family, size = _theme.host_font()
-            if family:
-                self.FontFamily = family
-                if size and size > 0:
-                    self.FontSize = size
-        except Exception:
-            pass
-
-    def _apply_theme(self, theme=None):
-        if _theme is None:
-            return
-        try:
-            _theme.apply(self, theme)
-        except Exception:
-            pass
 
     def _configure_appearance(self, mode, ok_text, cancel_text, danger):
         # Configure buttons

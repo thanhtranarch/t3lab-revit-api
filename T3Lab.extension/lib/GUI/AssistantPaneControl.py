@@ -40,6 +40,14 @@ for _p in (_LIB_DIR, _EXT_DIR):
 # ─── Shared pane GUID (must match startup.py) ──────────────────────────────────
 ASSISTANT_PANE_GUID = Guid('7F3A9B2E-C4D1-4E8F-A6B5-1234567890AB')
 
+# ─── Narrowest the pane content will lay itself out at (DIP) ───────────────────
+# Below this Revit simply clips the right edge. It used to be 380, which is
+# wider than a typical dock: a pane 400px wide at 125% display scaling is only
+# 320 DIP, so the greeting, the composer hint, the project/mode row and the
+# copyright were all cut off on the right. The layout now adapts down to this
+# floor (T3LabAssistantWindow._apply_narrow_layout / _apply_compact_layout).
+PANE_MIN_WIDTH = 240
+
 
 # ─── Initial dock position ─────────────────────────────────────────────────────
 
@@ -156,9 +164,10 @@ class AssistantPaneProvider(IDockablePaneProvider):
                     content = win.Content
                     win.Content = None
 
-                    # Enforce minimum width on the hosted dockable pane root element
+                    # Floor for the hosted pane content. Kept low on purpose —
+                    # see PANE_MIN_WIDTH; the layout itself adapts above it.
                     try:
-                        content.MinWidth = 380
+                        content.MinWidth = PANE_MIN_WIDTH
                     except Exception:
                         pass
 

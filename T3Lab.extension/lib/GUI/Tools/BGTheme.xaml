@@ -1757,7 +1757,7 @@
                             <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                         <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}"
-                                Click="close_button_clicked" ToolTip="Close">
+                                Click="close_button_clicked" IsCancel="True" ToolTip="Close">
                             <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>
@@ -2139,9 +2139,6 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="BtnClose" Content="Close"
-                                Style="{StaticResource T3.Button.Secondary}"
-                                Click="close_button_clicked" IsCancel="True" Margin="0,0,8,0"/>
                         <Button x:Name="BtnApply" Content="Apply"
                                 Style="{StaticResource T3.Button.Primary}"
                                 IsDefault="True"/>

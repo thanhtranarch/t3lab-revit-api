@@ -298,10 +298,154 @@ def update_fact(old, new, scope=PROJECT_SCOPE, project_id=None):
     return add_fact(new_text, scope=scope, project_id=project_id)
 
 
+# ─── Scope API (one scope at a time — what a management UI needs) ─────────────
+#
+# The numbered API above works on the COMBINED view (global first, then the
+# project), which is right for `/memory forget 3` in chat but wrong for a UI
+# that shows each scope in its own list: "fact #2 of the project list" is not
+# combined #2 once any global fact exists. Everything below addresses ONE
+# bucket by a 0-based index into that bucket, and never touches the other.
+
+def _clean_fact_text(text):
+    """add_fact's normalisation: collapsed whitespace, clipped. ('' if too short)"""
+    text = u' '.join(u'{}'.format(text or u'').split())
+    if len(text) > MAX_FACT_CHARS:
+        text = text[:MAX_FACT_CHARS].rstrip()
+    return text if len(text) >= MIN_FACT_CHARS else u''
+
+
+def _bucket(data, scope, project_id, create=False):
+    """The list behind one scope, or None (project scope without a project)."""
+    if scope == GLOBAL_SCOPE:
+        return data['global']
+    if scope != PROJECT_SCOPE:
+        return None
+    key = _pid_key(project_id)
+    if not key:
+        return None
+    if create:
+        return data['projects'].setdefault(key, [])
+    return data['projects'].get(key)
+
+
+def list_scope_facts(scope, project_id=None):
+    """Facts of ONE scope: [{'index','text','created','updated'}].
+
+    `index` is 0-based within that scope and is what edit_fact_at /
+    delete_fact_at take. A project scope with no project id is empty.
+    """
+    data = _load()
+    bucket = _bucket(data, scope, project_id) or []
+    out = []
+    for i, f in enumerate(bucket):
+        if not isinstance(f, dict):
+            continue
+        out.append({'index': i,
+                    'text': f.get('text') or u'',
+                    'created': f.get('created') or u'',
+                    'updated': f.get('updated') or u''})
+    return out
+
+
+def count_scope(scope, project_id=None):
+    """Number of facts in one scope."""
+    return len(list_scope_facts(scope, project_id))
+
+
+def add_scope_fact(text, scope, project_id=None):
+    """Add a fact to exactly `scope`. Returns (ok, note).
+
+    Unlike add_fact, a project-scope save without a project id is REFUSED
+    instead of silently landing in global memory — in a UI the user picked
+    the list they typed into.
+    """
+    if scope not in (GLOBAL_SCOPE, PROJECT_SCOPE):
+        return False, u'Unknown memory scope.'
+    if scope == PROJECT_SCOPE and not _pid_key(project_id):
+        return False, u'Select a project first.'
+    return add_fact(text, scope=scope, project_id=project_id)
+
+
+def edit_fact_at(scope, index, new_text, project_id=None):
+    """Rewrite fact #index (0-based) of one scope in place. Returns (ok, note).
+
+    Refuses a degenerate text and a text that duplicates ANOTHER fact of the
+    same scope (case-insensitive) — the duplicate would be injected twice.
+    """
+    text = _clean_fact_text(new_text)
+    if not text:
+        return False, u'Nothing concrete to remember in that.'
+    try:
+        idx = int(index)
+    except (TypeError, ValueError):
+        return False, u'That fact no longer exists.'
+    with _LOCK:
+        data = _load()
+        bucket = _bucket(data, scope, project_id)
+        if bucket is None or idx < 0 or idx >= len(bucket):
+            return False, u'That fact no longer exists.'
+        low = text.lower()
+        for j, f in enumerate(bucket):
+            if j != idx and (f.get('text') or u'').lower() == low:
+                return False, u'That fact is already in memory.'
+        fact = bucket[idx]
+        if (fact.get('text') or u'') == text:
+            return True, u'No change.'
+        fact['text'] = text
+        fact['updated'] = datetime.now().strftime('%Y-%m-%d')
+        ok = _save(data)
+    if ok:
+        return True, u'Updated: {}'.format(text)
+    return False, u'Could not write the memory file.'
+
+
+def delete_fact_at(scope, index, project_id=None):
+    """Remove fact #index (0-based) of one scope. Returns (ok, removed_text)."""
+    try:
+        idx = int(index)
+    except (TypeError, ValueError):
+        return False, None
+    with _LOCK:
+        data = _load()
+        bucket = _bucket(data, scope, project_id)
+        if bucket is None or idx < 0 or idx >= len(bucket):
+            return False, None
+        fact = bucket.pop(idx)
+        ok = _save(data)
+    return ok, ((fact.get('text') if isinstance(fact, dict) else u'') or u'')
+
+
+def clear_scope(scope, project_id=None):
+    """Remove every fact of ONE scope. Returns how many were removed.
+
+    Clearing a project never touches global memory (the old
+    clear_facts(everything=True) behind `/memory clear` wiped both), and
+    clearing global never touches any project. A cleared project's key is
+    dropped from the file entirely, so a deleted project leaves nothing
+    behind.
+    """
+    with _LOCK:
+        data = _load()
+        if scope == GLOBAL_SCOPE:
+            n = len(data['global'])
+            data['global'] = []
+        elif scope == PROJECT_SCOPE and _pid_key(project_id):
+            key = _pid_key(project_id)
+            if key not in data['projects']:
+                return 0
+            n = len(data['projects'].pop(key) or [])
+        else:
+            return 0
+        if n or scope == PROJECT_SCOPE:
+            _save(data)
+    return n
+
+
 def clear_facts(project_id=None, everything=False):
     """Clear this project's facts (+ global too when everything=True).
 
-    Returns how many facts were removed.
+    Returns how many facts were removed. Prefer clear_scope(), which never
+    clears more than the one scope asked for.
     """
     with _LOCK:
         data = _load()
