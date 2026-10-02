@@ -999,6 +999,72 @@ class T3LabAIServer(object):
                 'description': 'Analyze model complexity with element counts by category and warnings summary',
                 'inputSchema': {'type': 'object', 'properties': {}, 'required': []}
             },
+            # ── Point cloud (Scan-to-BIM) — read-only, Revit main thread only ─
+            'list_point_clouds': {
+                'name': 'list_point_clouds',
+                'description': ('List the point clouds (ReCap .rcp/.rcs) in the active document: element id, '
+                                 'name, file path, bounding box in mm and size in m. Call this first, then '
+                                 'analyze_point_cloud or detect_point_cloud_elements with the id.'),
+                'inputSchema': {'type': 'object', 'properties': {}, 'required': []}
+            },
+            'analyze_point_cloud': {
+                'name': 'analyze_point_cloud',
+                'description': ('Sample a point cloud and summarize it: sampled extents, size and footprint '
+                                 'area; the horizontal planes in the scan (floor / ceiling / slab candidates, '
+                                 'elevation in mm); and a level check — for every project Level, the nearest '
+                                 'scan plane and the offset in mm (status "matches scan" within tolerance_mm). '
+                                 'Read-only. Use it for "do our levels match the scan?", floor-to-floor heights '
+                                 'and scan extents. Counts describe the sample, not the full scan.'),
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': {
+                        'point_cloud_id': {'type': 'integer',
+                                           'description': 'Element id from list_point_clouds. Optional when the document has exactly one point cloud.'},
+                        'max_points': {'type': 'integer',
+                                       'description': 'Sample size (default 20000, max 100000). Larger is slower, not much more accurate.'},
+                        'level_name': {'type': 'string',
+                                       'description': 'Analyze only the band from this Level up to the next Level (or +4 m).'},
+                        'region_mm': {'type': 'object',
+                                      'description': 'Analyze only this box in project coordinates: {"min": [x, y, z], "max": [x, y, z]} in mm.'},
+                        'tolerance_mm': {'type': 'number',
+                                         'description': 'Level-to-plane offset still reported as "matches scan" (default 25).'}
+                    },
+                    'required': []
+                }
+            },
+            'detect_point_cloud_elements': {
+                'name': 'detect_point_cloud_elements',
+                'description': ('Detect building elements in a point cloud (Scan-to-BIM) and return them as '
+                                 'proposed geometry in mm: walls (start/end, thickness, base Z), floors and '
+                                 'ceilings (outline, elevation), doors and windows (insertion point, size, host '
+                                 'wall), columns (centre, size, Z range), stairs and roof planes — each with its '
+                                 'level and a confidence %. Read-only: NOTHING is created. To model the results '
+                                 'call place_wall / create_* tools, or open the Point Cloud to Model tool. MEP '
+                                 '(ducts, pipes, equipment) is out of scope.'),
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': {
+                        'point_cloud_id': {'type': 'integer',
+                                           'description': 'Element id from list_point_clouds. Optional when the document has exactly one point cloud.'},
+                        'elements': {'type': 'array',
+                                     'items': {'type': 'string',
+                                               'enum': ['walls', 'floors', 'ceilings', 'doors', 'windows',
+                                                        'columns', 'stairs', 'roof']},
+                                     'description': 'Kinds to detect (default: all).'},
+                        'max_points': {'type': 'integer',
+                                       'description': 'Sample size (default 20000, max 100000).'},
+                        'level_name': {'type': 'string',
+                                       'description': 'Detect only between this Level and the next one (or +4 m).'},
+                        'region_mm': {'type': 'object',
+                                      'description': 'Detect only inside this box in project coordinates: {"min": [x, y, z], "max": [x, y, z]} in mm.'},
+                        'min_wall_length_mm': {'type': 'number',
+                                               'description': 'Shortest wall reported (default 500).'},
+                        'limit_per_type': {'type': 'integer',
+                                           'description': 'Most detections listed per kind, highest confidence first (default 100). counts always holds the full totals.'}
+                    },
+                    'required': []
+                }
+            },
             # ── Create tools ──────────────────────────────────────────────────
             'create_point_based_element': {
                 'name': 'create_point_based_element',
@@ -3082,6 +3148,11 @@ class T3LabAIServer(object):
         # down. Never let it fall back onto the HTTP worker thread. It opens
         # no transaction of its own.
         'check_bad_geometry',
+        # Same reason: PointCloudInstance.GetPoints runs inside the ReCap
+        # engine, and an off-thread or oversized query has hard-crashed Revit
+        # (AccessViolation in AdskRcPointCloudEngine.dll). Read-only — listed
+        # in Intelligence.tool_schema.READ_ONLY_TOOL_NAMES.
+        'analyze_point_cloud', 'detect_point_cloud_elements',
         'color_elements', 'tag_all_walls', 'tag_all_rooms', 'move_elements',
         'copy_elements', 'rotate_element', 'create_view', 'set_active_view',
         'rename_element', 'create_sheet', 'add_view_to_sheet', 'create_text_note',
@@ -3562,6 +3633,176 @@ class T3LabAIServer(object):
                 return self._execute_tool_in_context(tool_name, arguments)
             except Exception as e:
                 return {'error': str(e), 'tool': tool_name}
+
+    # ── Point cloud tools ──────────────────────────────────────────────────
+    # list_point_clouds / analyze_point_cloud / detect_point_cloud_elements.
+    # The analysis itself lives in Services/point_cloud_analysis.py — the same
+    # tiled extraction and detectors the Point Cloud to Model wizard runs. The
+    # two sampling tools are in _WRITE_TOOLS so they only ever run on Revit's
+    # main thread (GetPoints off-thread can take Revit down); none of the
+    # three opens a transaction.
+
+    def _point_cloud_tool(self, doc, tool_name, arguments):
+        from Autodesk.Revit.DB import (FilteredElementCollector, Level,
+                                       PointCloudInstance, XYZ)
+        from Snippets._compat import eid_value
+        from Services import point_cloud_analysis as pca
+
+        clouds = list(FilteredElementCollector(doc).OfClass(PointCloudInstance).ToElements())
+        if tool_name == 'list_point_clouds':
+            view = doc.ActiveView
+            return {'count': len(clouds),
+                    'point_clouds': [self._describe_point_cloud(doc, pc, view) for pc in clouds],
+                    'hint': ('No point cloud in this document — link one with Insert > Point Cloud.'
+                             if not clouds else None)}
+
+        pc, err = self._pick_point_cloud(clouds, arguments.get('point_cloud_id'), eid_value)
+        if err:
+            return err
+
+        levels = []
+        for lv in FilteredElementCollector(doc).OfClass(Level).ToElements():
+            try:
+                elev = lv.ProjectElevation    # internal origin, like the points
+            except Exception:
+                elev = lv.Elevation
+            levels.append((lv.Name, elev))
+
+        region, err = self._point_cloud_region(pc, arguments, levels)
+        if err:
+            return err
+        budget = pca.clamp_point_budget(arguments.get('max_points'))
+        if region is None:
+            pts = pca.extract_full_cloud(pc, budget)
+        else:
+            (x0, y0, z0), (x1, y1, z1) = region
+            center = XYZ((x0 + x1) / 2.0, (y0 + y1) / 2.0, (z0 + z1) / 2.0)
+            pts = pca.extract_full_cloud_from_region(
+                pc, center, abs(x1 - x0) / 2.0, abs(y1 - y0) / 2.0,
+                abs(z1 - z0) / 2.0, budget)
+        source = {'point_cloud_id': eid_value(pc.Id), 'name': pc.Name,
+                  'region_mm': (None if region is None else
+                                {'min': [pca._mm(v) for v in region[0]],
+                                 'max': [pca._mm(v) for v in region[1]]}),
+                  'requested_points': budget}
+        if not pts:
+            return {'error': ('No points came back from the point cloud. Check that it is '
+                              'loaded and visible, and that region_mm / level_name overlaps it.'),
+                    'source': source, 'tool': tool_name}
+
+        if tool_name == 'analyze_point_cloud':
+            tol = arguments.get('tolerance_mm')
+            out = pca.analyze_points(pts, levels=levels,
+                                     tolerance_mm=25.0 if tol is None else float(tol))
+            out['source'] = source
+            return out
+
+        elements = arguments.get('elements') or list(pca.DETECTABLE)
+        unknown = [e for e in elements if e not in pca.DETECTABLE]
+        if unknown:
+            return {'error': 'Unknown element kinds: {}.'.format(', '.join(unknown)),
+                    'accepted': list(pca.DETECTABLE), 'tool': tool_name}
+        analyzer = pca.PointCloudAnalyzer(pts, doc=doc)
+        results = analyzer.run(pca.detection_settings(
+            elements, arguments.get('min_wall_length_mm')))
+        out = pca.summarize_detections(results, elements,
+                                       arguments.get('limit_per_type') or 100)
+        out['sampled_points'] = len(pts)
+        out['source'] = source
+        out['note'] = ('Proposed geometry only — nothing was created. Coordinates are '
+                       'project internal coordinates in mm (what place_wall / create_* expect '
+                       'after converting units). Confidence is the detector\'s own estimate; '
+                       'check low-confidence items against the scan before modelling them.')
+        return out
+
+    def _describe_point_cloud(self, doc, pc, view):
+        from Snippets._compat import eid_value
+        from Services.point_cloud_analysis import _mm
+        info = {'id': eid_value(pc.Id), 'name': pc.Name}
+        try:
+            ptype = doc.GetElement(pc.GetTypeId())
+            info['type_name'] = ptype.Name if ptype is not None else None
+        except Exception:
+            info['type_name'] = None
+        try:
+            from Autodesk.Revit.DB import ExternalFileUtils, ModelPathUtils
+            ref = ExternalFileUtils.GetExternalFileReference(doc, pc.GetTypeId())
+            info['path'] = ModelPathUtils.ConvertModelPathToUserVisiblePath(ref.GetAbsolutePath())
+            info['status'] = str(ref.GetLinkedFileStatus())
+        except Exception:
+            info['path'] = None
+        try:
+            bb = pc.get_BoundingBox(None)
+            lo = [bb.Min.X, bb.Min.Y, bb.Min.Z]
+            hi = [bb.Max.X, bb.Max.Y, bb.Max.Z]
+            info['bounding_box_mm'] = {'min': [_mm(v) for v in lo], 'max': [_mm(v) for v in hi]}
+            info['size_m'] = [round((hi[i] - lo[i]) * 0.3048, 2) for i in range(3)]
+        except Exception:
+            info['bounding_box_mm'] = None
+        try:
+            info['pinned'] = bool(pc.Pinned)
+        except Exception:
+            pass
+        try:
+            info['hidden_in_active_view'] = bool(pc.IsHidden(view)) if view is not None else None
+        except Exception:
+            pass
+        try:
+            scans = list(pc.GetScans())
+            info['scan_count'] = len(scans)
+        except Exception:
+            pass
+        return info
+
+    def _pick_point_cloud(self, clouds, wanted_id, eid_value):
+        """The PointCloudInstance to analyze, or (None, error dict)."""
+        if not clouds:
+            return None, {'error': ('There is no point cloud in the active document. '
+                                    'Link one with Insert > Point Cloud, then retry.')}
+        if wanted_id is None:
+            if len(clouds) == 1:
+                return clouds[0], None
+            return None, {'error': ('This document has {} point clouds — pass point_cloud_id.'
+                                    .format(len(clouds))),
+                          'point_clouds': [{'id': eid_value(c.Id), 'name': c.Name} for c in clouds]}
+        for c in clouds:
+            if eid_value(c.Id) == int(wanted_id):
+                return c, None
+        return None, {'error': 'No point cloud with id {}.'.format(wanted_id),
+                      'point_clouds': [{'id': eid_value(c.Id), 'name': c.Name} for c in clouds]}
+
+    def _point_cloud_region(self, pc, arguments, levels):
+        """Optional sub-box in feet: ((x0, y0, z0), (x1, y1, z1)) or None.
+
+        region_mm wins; level_name gives the cloud's XY extent between that
+        Level and the next one up (or +4 m above the top Level).
+        """
+        region = arguments.get('region_mm')
+        if region:
+            try:
+                lo = [float(v) / 304.8 for v in region['min']]
+                hi = [float(v) / 304.8 for v in region['max']]
+                assert len(lo) == 3 and len(hi) == 3
+            except Exception:
+                return None, {'error': ('region_mm must be {"min": [x, y, z], "max": [x, y, z]} '
+                                        'in millimetres.')}
+            return (tuple(min(a, b) for a, b in zip(lo, hi)),
+                    tuple(max(a, b) for a, b in zip(lo, hi))), None
+        name = arguments.get('level_name')
+        if not name:
+            return None, None
+        ordered = sorted(levels, key=lambda lv: lv[1])
+        idx = next((i for i, lv in enumerate(ordered)
+                    if lv[0].strip().lower() == str(name).strip().lower()), None)
+        if idx is None:
+            return None, {'error': 'No Level named "{}".'.format(name),
+                          'levels': [lv[0] for lv in ordered]}
+        z0 = ordered[idx][1]
+        z1 = ordered[idx + 1][1] if idx + 1 < len(ordered) else z0 + 4000.0 / 304.8
+        bb = pc.get_BoundingBox(None)
+        if bb is None:
+            return None, {'error': 'The point cloud has no bounding box (is it loaded?).'}
+        return ((bb.Min.X, bb.Min.Y, z0), (bb.Max.X, bb.Max.Y, z1)), None
 
     # ── Shared tool helpers ────────────────────────────────────────────────
 
@@ -5585,6 +5826,18 @@ class T3LabAIServer(object):
                 'total_views': total_views,
                 'project': doc.ProjectInformation.Name,
             }
+
+        # ── point cloud tools (Services/point_cloud_analysis.py) ────────────
+        # One branch per tool: dev/test_tool_registry.py maps every registered
+        # tool to its own `elif tool_name == ...` line.
+        elif tool_name == 'list_point_clouds':
+            return self._point_cloud_tool(doc, tool_name, arguments)
+
+        elif tool_name == 'analyze_point_cloud':
+            return self._point_cloud_tool(doc, tool_name, arguments)
+
+        elif tool_name == 'detect_point_cloud_elements':
+            return self._point_cloud_tool(doc, tool_name, arguments)
 
         # ── create_point_based_element ───────────────────────────────────────
         elif tool_name == 'create_point_based_element':
