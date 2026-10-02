@@ -1,6 +1,6 @@
 # Rebar Toolkit cho người dùng chuyển từ Tekla — Phương án xây dựng
 
-> Ngày lập: 2026-10-02 · Sửa lần 2 cùng ngày theo hai ràng buộc của chủ extension:
+> Ngày lập: 2026-10-02 · Sửa lần 3 cùng ngày theo ba ràng buộc của chủ extension:
 > **(1) không tool nào trùng / lặp chức năng Revit đã có sẵn; (2) Revit đang dùng là 2027;**
 > **(3) người Tekla sang không bị bỡ ngỡ và có đủ chức năng họ cần — hoặc một cách làm tối ưu hơn nhưng gần gũi.**
 > Trạng thái: **ĐỀ XUẤT — chưa có dòng code nào**
