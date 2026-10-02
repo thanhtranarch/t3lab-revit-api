@@ -515,6 +515,7 @@ class MCPService(object):
 
         ok, err = MCPService.start_server()
         ok, err = MCPService.stop_server()
+        on, err = MCPService.set_auto_start(False)
 
         ok, err = MCPService.start_watcher()
         ok, err = MCPService.stop_watcher()
@@ -664,6 +665,41 @@ class MCPService(object):
         else:
             ok, err = MCPService.start_server(port=current_port)
             return ('running' if ok else 'stopped'), err
+
+    # ── Auto-start (hooks/doc-opened.py · hooks/doc-created.py) ───────────────
+
+    @staticmethod
+    def auto_start_enabled():
+        """
+        True unless "auto_start_mcp" is explicitly false in mcp_paths.json —
+        the same rule the document hooks apply (absent = on).
+        """
+        try:
+            value = _get_paths_module().load_settings().get('auto_start_mcp')
+        except Exception:
+            return True
+        return value is None or bool(value)
+
+    @staticmethod
+    def set_auto_start(on):
+        """
+        Persist the auto-start choice read by the document hooks.
+
+        Returns:
+            (state: bool, error_message: str|None) — state is what the file
+            holds afterwards, so a failed write reports the old value.
+        """
+        want = bool(on)
+        try:
+            _get_paths_module().set_setting('auto_start_mcp', want)
+        except Exception as ex:
+            return MCPService.auto_start_enabled(), str(ex)
+        # save_settings() is best-effort and swallows write errors — read the
+        # file back so a locked/read-only settings file is reported, not hidden.
+        state = MCPService.auto_start_enabled()
+        if state != want:
+            return state, 'Could not save the setting to mcp_paths.json'
+        return state, None
 
     # ── Open documents ─────────────────────────────────────────────────────────
 
