@@ -67,6 +67,13 @@ Chain: `script.py` (36 loc) → `lib/GUI/ManaAnnoDialog.py` (1416 loc) → `Mana
 
 _(ghi lỗi mới tại đây)_
 
+- **2026-10-02 — AutoDimension v2.2.2: còn 2 warning "Chain dim failed: Invalid number of references"** (user chạy lại sau v2.2.1). 2 warning = đúng 1 chuỗi hỏng × "Mirror strings to both sides" (bật mặc định). Không có journal nên không biết chuỗi nào → sửa mọi nguồn ref sai hướng còn lại + làm chuỗi tự cứu (`AutoDimensionDialog.py`):
+  1. `PARALLEL_TOL` (~0.1°) thay `AXIS_TOLERANCE = 0.1` (~5.7°): tường lệch vài độ, grid xiên/cong (`_separate_grids`), family instance xoay lệch trục (`_instance_axis_aligned`) bị loại khỏi chuỗi X/Y thay vì làm Revit từ chối cả chuỗi.
+  2. `_col_ref_from_geom`: đọc face bằng `GetSymbolGeometry()` + transform normal — tài liệu Revit ghi rõ reference từ `GetInstanceGeometry()` là bản copy, **không dùng được cho dimension**. Ngưỡng hướng 0.7 → `PARALLEL_TOL`.
+  3. Facade (Phase 6): chỉ lấy mặt của tường chạy CẮT ngang chuỗi; tường chạy dọc mặt đứng có mặt vuông góc hướng đo → trước đây làm hỏng cả chuỗi facade.
+  4. `_dimension_string` + `_salvage_dimension`: Revit vẫn từ chối → dựng lại chuỗi tham lam, giữ mọi ref Revit nhận, log 1 dòng tên + ID element bị loại (không stack trace, không lặp ở chuỗi mirror). Áp cho cả chuỗi section/elevation.
+  - Verify: `ast.parse` OK, audit_tools/compat/cpython/wiring xanh, test mock salvage (ref xấu giữa/đầu chuỗi, hết seed, chỉ 1 ref tốt) đúng. **Chưa smoke test Revit** — chạy lại đúng model cũ: kỳ vọng 0 warning; nếu còn, warning giờ ghi rõ element ID để chọn bằng Select by ID.
+
 - **2026-07-04 — AutoDimension v2.2.1: sửa "Chain dim failed: Invalid number of references"** (user báo 6 warning khi chạy thật). Nguyên nhân: `NewDimension` loại các reference có mặt phẳng không song song hướng đo rồi còn <2 ref. Code cũ dùng `FamilyInstanceReferenceType.Left/Right/Front/Back` **cứng theo trục world**, nhưng đây là hướng *cục bộ của family* — cột xoay 90°, cửa/cửa sổ trong tường chạy dọc, lift xoay → ref quay sang trục vuông góc và bị Revit từ chối. Đã sửa (`AutoDimensionDialog.py`):
   1. Thêm `_hand_matches_axis()` + `_axis_ref_types()`: chọn cặp Left/Right vs Front/Back theo `HandOrientation` thật của instance — áp dụng cho cột (Phase 2 cả 2 chế độ), cửa/cửa sổ (Phase 3 cả 2 chế độ), lift (Phase 5), facade (Phase 6).
   2. Phase 3/6: cửa có bề rộng chạy dọc bị **loại khỏi chuỗi X** (thuộc chuỗi Y) thay vì nhét ref sai hướng; chuỗi Y đo bề rộng cửa bằng Left/Right (jamb) thay vì Front/Back (mặt tường) như trước.

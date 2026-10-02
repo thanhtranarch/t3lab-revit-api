@@ -858,9 +858,14 @@ class ReportGenerator(object):
 # ═════════════════════════════════════════════════════════════════════════════
 
 import uuid
+# The pushbutton script importlib.reload()s this module on every click; a
+# fixed __namespace__ would define the same .NET type twice and raise
+# "Duplicate type name within an assembly" (rule S15).
+_NS_SUFFIX = uuid.uuid4().hex[:8]
+
 
 class _FloorFilter(ISelectionFilter):
-    __namespace__ = "T3Lab.TileLayout"
+    __namespace__ = "T3Lab.TileLayout_" + _NS_SUFFIX
     def AllowElement(self, e):
         return (e.Category is not None and
                 eid_value(e.Category.Id) == int(BuiltInCategory.OST_Floors))

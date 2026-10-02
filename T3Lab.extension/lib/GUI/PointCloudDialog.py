@@ -144,8 +144,13 @@ def mm_to_ft(mm):
 import uuid
 from Snippets._compat import disposing
 
+# The pushbutton script importlib.reload()s this module on every click; a
+# fixed __namespace__ would define the same .NET type twice and raise
+# "Duplicate type name within an assembly" (rule S15).
+_NS_SUFFIX = uuid.uuid4().hex[:8]
+
 class PointCloudSelectionFilter(ISelectionFilter):
-    __namespace__ = "T3Lab.PointCloud"
+    __namespace__ = "T3Lab.PointCloud_" + _NS_SUFFIX
     def AllowElement(self, element):
         return isinstance(element, PointCloudInstance)
 
@@ -1295,7 +1300,7 @@ class PointCloudAnalyzer(object):
 # ── Section 6: ElementBuilder ─────────────────────────────────────────────────
 
 class WarningSwallower(IFailuresPreprocessor):
-    __namespace__ = "T3Lab.PointCloud_Warning"
+    __namespace__ = "T3Lab.PointCloud_Warning_" + _NS_SUFFIX
     """
     Suppress Revit's modal warning dialogs during batch creation.
 

@@ -47,8 +47,15 @@ logger = script.get_logger()
 REVIT_VERSION = get_revit_version()
 
 
+import uuid
+# The pushbutton script importlib.reload()s this module on every click; a
+# fixed __namespace__ would define the same .NET type twice and raise
+# "Duplicate type name within an assembly" (rule S15).
+_NS_SUFFIX = uuid.uuid4().hex[:8]
+
+
 class FloorsCreationWarningSwallower(IFailuresPreprocessor):
-    __namespace__ = "T3Lab.RoomToFloor"
+    __namespace__ = "T3Lab.RoomToFloor_" + _NS_SUFFIX
 
     def PreprocessFailures(self, failuresAccessor):
         failList = failuresAccessor.GetFailureMessages()

@@ -22,9 +22,11 @@ from System import TimeSpan
 from System.Windows import WindowState, Visibility as WinVis, Clipboard
 from System.Windows.Controls import DataGridComboBoxColumn, DataGridLength
 from System.Windows.Data import Binding, BindingMode, UpdateSourceTrigger
-from System.Windows.Media import Color as MediaColor, Colors, SolidColorBrush
+# Int32Collection lives in System.Windows.Media, not Media3D — importing it
+# from Media3D raised ImportError and FamiGen never opened.
+from System.Windows.Media import Color as MediaColor, Colors, Int32Collection, SolidColorBrush
 from System.Windows.Media.Media3D import (
-    AmbientLight, DiffuseMaterial, DirectionalLight, GeometryModel3D, Int32Collection,
+    AmbientLight, DiffuseMaterial, DirectionalLight, GeometryModel3D,
     MeshGeometry3D, Model3DGroup, ModelVisual3D, PerspectiveCamera, Point3D,
     Point3DCollection, Vector3D,
 )

@@ -39,8 +39,15 @@ except Exception:
     DB = None
 
 
+import uuid
+# The pushbutton script importlib.reload()s this module on every click; a
+# fixed __namespace__ would define the same .NET type twice and raise
+# "Duplicate type name within an assembly" (rule S15).
+_NS_SUFFIX = uuid.uuid4().hex[:8]
+
+
 class WarningSwallower(IFailuresPreprocessor if DB else object):
-    __namespace__ = "T3Lab.WallAdjustBase_Failures"
+    __namespace__ = "T3Lab.WallAdjustBase_Failures_" + _NS_SUFFIX
 
     def PreprocessFailures(self, fa):
         for f in fa.GetFailureMessages():
@@ -50,7 +57,7 @@ class WarningSwallower(IFailuresPreprocessor if DB else object):
 
 
 class ElementSelectionFilter(ISelectionFilter if DB else object):
-    __namespace__ = "T3Lab.WallAdjustBase_Filter"
+    __namespace__ = "T3Lab.WallAdjustBase_Filter_" + _NS_SUFFIX
 
     def AllowElement(self, elem):
         if isinstance(elem, (Wall, Floor)):
