@@ -5,5 +5,5 @@ description: |
   Manual Config: copy the MCP entry for any other AI app
   Advanced: auto-start, port, file task watcher, teaching capture
   Enables Claude AI (and other MCP clients) to interact directly with Revit
-author: "Tran Tien Thanh & Dang Quoc Truong"
+author: "Tran Tien Thanh"
 version: "1.1.0"

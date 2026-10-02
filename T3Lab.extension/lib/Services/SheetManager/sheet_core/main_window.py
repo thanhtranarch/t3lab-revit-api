@@ -3,7 +3,7 @@
 Sheet Manager - Main Window
 CLEANED - Sheet List Only
 
-Copyright © Dang Quoc Truong (DQT)
+Copyright © T3Lab
 """
 
 import clr
@@ -78,7 +78,7 @@ class MainWindow(Window):
     
     def _build_ui(self):
         """Build the main window UI"""
-        self.Title = "Sheet Manager - Copyright © Dang Quoc Truong (DQT)"
+        self.Title = "Sheet Manager - Copyright © T3Lab"
         self.Width = Config.MAIN_WINDOW_WIDTH
         self.Height = Config.MAIN_WINDOW_HEIGHT
         self.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen

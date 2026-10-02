@@ -64,7 +64,7 @@ def calculate_viewtemplate_usage(doc, template_items):
 
 def rename_template(doc, template, new_name):
     """Rename a single view template within a transaction"""
-    t = DB.Transaction(doc, "DQT - Rename View Template")
+    t = DB.Transaction(doc, "T3Lab - Rename View Template")
     t.Start()
     try:
         template.Name = new_name
@@ -79,7 +79,7 @@ def duplicate_templates(doc, templates):
     """Duplicate multiple view templates in a single transaction.
     templates is a list of view template elements.
     """
-    t = DB.Transaction(doc, "DQT - Duplicate View Templates")
+    t = DB.Transaction(doc, "T3Lab - Duplicate View Templates")
     t.Start()
     success_count = 0
     try:
@@ -102,7 +102,7 @@ def delete_templates(doc, templates):
     """Delete multiple view templates in a single transaction.
     templates is a list of view template elements.
     """
-    t = DB.Transaction(doc, "DQT - Delete View Templates")
+    t = DB.Transaction(doc, "T3Lab - Delete View Templates")
     t.Start()
     success_count = 0
     error_count = 0

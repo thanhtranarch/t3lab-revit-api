@@ -5,7 +5,7 @@ Manage CAD imports and CAD links in the current Revit project.
 List, rename, and delete DWG imports and links directly from a single interface.
 """
 
-__author__  = "Tran Tien Thanh & Dang Quoc Truong"
+__author__  = "Tran Tien Thanh"
 __title__   = "DWG\nManager"
 __version__ = "1.2.0"
 

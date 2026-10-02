@@ -5,5 +5,5 @@ description: |
   Find and replace, add a prefix or suffix, and change case of family and type names
   Review every staged change in the grid, then apply it in one undoable step
   Family Loader: load new families from a local folder directly into the project
-author: "Tran Tien Thanh & Dang Quoc Truong"
+author: "Tran Tien Thanh"
 version: "1.0.0"

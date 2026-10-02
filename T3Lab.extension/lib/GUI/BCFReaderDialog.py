@@ -4,6 +4,7 @@
 import os
 import sys
 import re
+import tempfile
 import clr
 import traceback
 
@@ -71,7 +72,8 @@ except Exception:
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-OUTPUT_DIR = r"C:\Temp\DQT_Purge"
+# Default export folder: the user's temp dir, not a hardcoded C:\Temp path.
+OUTPUT_DIR = os.path.join(tempfile.gettempdir(), "T3Lab_BCF")
 
 COLOR_HEADER_BG   = "#18181B"
 COLOR_HEADER_FG   = "#FFFFFF"
@@ -529,8 +531,9 @@ class BCFReader(object):
             if key in joined:
                 detected = key
                 break
-        # Resolved flag (user-marked via DQT)
-        if "RESOLVED" in joined or "DQT_RESOLVED" in joined:
+        # Resolved flag (user-marked in T3Lab). "RESOLVED" also matches the
+        # T3LAB_RESOLVED label and the legacy DQT_RESOLVED one in older files.
+        if "RESOLVED" in joined:
             issue.resolved = True
 
         if detected == "OTHER":
@@ -1848,7 +1851,7 @@ class BCFManagerWindow(WPFWindow):
         return None, None
 
     def _select_in_host(self, element):
-        tx = Transaction(doc, "DQT - BCF Select Element")
+        tx = Transaction(doc, "T3Lab - BCF Select Element")
         try:
             tx.Start()
             opts = tx.GetFailureHandlingOptions()
@@ -2023,7 +2026,7 @@ class BCFManagerWindow(WPFWindow):
             bbox.Max = XYZ(cx + pad, cy + pad, cz + pad)
             source = "position cube"
 
-        tx = Transaction(doc, "DQT - BCF Apply Section Box")
+        tx = Transaction(doc, "T3Lab - BCF Apply Section Box")
         try:
             tx.Start()
             opts = tx.GetFailureHandlingOptions()
@@ -2150,7 +2153,7 @@ class BCFManagerWindow(WPFWindow):
                 "Element ID {} not found.".format(eid_int))
             return
 
-        tx = Transaction(doc, "DQT - BCF Isolate Element")
+        tx = Transaction(doc, "T3Lab - BCF Isolate Element")
         try:
             tx.Start()
             opts = tx.GetFailureHandlingOptions()
@@ -2563,7 +2566,7 @@ class BCFManagerWindow(WPFWindow):
         out.append("<!DOCTYPE html><html><head><meta charset='utf-8'>")
         out.append("<title>BCF Report - " + self._html_esc(file_name) + "</title>")
         out.append("<style>" + css + "</style></head><body>")
-        out.append("<h1>DQT BCF Reader - Issue Report</h1>")
+        out.append("<h1>T3Lab BCF Reader - Issue Report</h1>")
         out.append("<div class='meta'>")
         if proj_name:
             out.append("<b>Project:</b> " + self._html_esc(proj_name) + " &nbsp;|&nbsp; ")
@@ -2625,7 +2628,7 @@ class BCFManagerWindow(WPFWindow):
                 out.append("<div class='desc'>" + self._html_esc(issue.description) + "</div>")
             out.append("</div></div>")
 
-        out.append("<div class='footer'>DQT BCF Reader - Dang Quoc Truong &copy; 2025</div>")
+        out.append("<div class='footer'>T3Lab BCF Reader &copy; 2025</div>")
         out.append("</body></html>")
         return "\n".join(out)
 
@@ -2762,22 +2765,22 @@ class BCFManagerWindow(WPFWindow):
             stream.Dispose()
 
     def _rewrite_markup_labels(self, xml_text, resolved):
-        """Add or remove <Labels>DQT_RESOLVED</Labels> in markup.bcf XML."""
-        # Remove any existing DQT_RESOLVED labels
+        """Add or remove <Labels>T3LAB_RESOLVED</Labels> in markup.bcf XML."""
+        # Remove any existing resolved label (T3LAB_RESOLVED, legacy DQT_RESOLVED)
         xml_text = re.sub(
-            r'\s*<Labels>\s*DQT_RESOLVED\s*</Labels>', '', xml_text,
+            r'\s*<Labels>\s*(?:T3LAB|DQT)_RESOLVED\s*</Labels>', '', xml_text,
             flags=re.IGNORECASE)
         xml_text = re.sub(
             r'\s*<Labels>\s*RESOLVED\s*</Labels>', '', xml_text,
             flags=re.IGNORECASE)
 
         if resolved:
-            # Insert <Labels>DQT_RESOLVED</Labels> just before </Topic>
+            # Insert <Labels>T3LAB_RESOLVED</Labels> just before </Topic>
             m = re.search(r'</Topic>', xml_text)
             if m:
                 insert_pos = m.start()
                 xml_text = (xml_text[:insert_pos]
-                    + "  <Labels>DQT_RESOLVED</Labels>\n"
+                    + "  <Labels>T3LAB_RESOLVED</Labels>\n"
                     + xml_text[insert_pos:])
         return xml_text
 
@@ -2802,14 +2805,14 @@ class BCFManagerWindow(WPFWindow):
 
         # ---- Step 1: Update Labels (resolved flag) ----
         if topic_node is not None:
-            # Remove any existing DQT_RESOLVED / RESOLVED label nodes
+            # Remove any existing resolved label node (current, legacy DQT_, bare)
             labels_to_remove = []
             for child in topic_node.ChildNodes:
                 if child.NodeType != System.Xml.XmlNodeType.Element:
                     continue
                 if child.LocalName.lower() == "labels":
                     txt = (child.InnerText or "").strip().upper()
-                    if txt in ("DQT_RESOLVED", "RESOLVED"):
+                    if txt in ("T3LAB_RESOLVED", "DQT_RESOLVED", "RESOLVED"):
                         labels_to_remove.append(child)
             for lbl in labels_to_remove:
                 topic_node.RemoveChild(lbl)
@@ -2822,7 +2825,7 @@ class BCFManagerWindow(WPFWindow):
                                                  "Labels", ns)
                 else:
                     new_label = xd.CreateElement("Labels")
-                new_label.InnerText = "DQT_RESOLVED"
+                new_label.InnerText = "T3LAB_RESOLVED"
                 topic_node.AppendChild(new_label)
 
         # ---- Step 2: Rewrite Comments ----

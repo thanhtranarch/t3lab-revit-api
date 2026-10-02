@@ -8,6 +8,6 @@ description: |
   applied to the active 3D view or every 3D view in the project.
   Revit UI Theme: Light/Dark UI and canvas theme via UIThemeManager (2024+).
   SHIFT+Click quick-cycles Black → Gray → White like the classic tool.
-  Dang Quoc Truong - DQT (c) 2026
-author: "Dang Quoc Truong"
+  T3Lab (c) 2026
+author: "T3Lab"
 version: "2.0.0"

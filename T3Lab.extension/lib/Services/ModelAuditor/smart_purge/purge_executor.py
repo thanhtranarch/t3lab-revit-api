@@ -2,10 +2,10 @@
 """
 Purge Executor
 Handles actual deletion of unused elements with transaction support
-Copyright (c) 2025 Dang Quoc Truong (DQT)
+Copyright (c) 2025 T3Lab
 """
 
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 
 from Autodesk.Revit.DB import Transaction, TransactionGroup, TransactionStatus, ElementId
 from System.Collections.Generic import List

@@ -5,16 +5,16 @@ Color scheme and settings
 
 Compatible with Revit 2024, 2025, 2026, 2027
 
-Copyright (c) 2025 Dang Quoc Truong (DQT)
+Copyright (c) 2025 T3Lab
 """
 
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 
 
 class Colors:
-    """DQT Brand Color Scheme"""
+    """T3Lab Brand Color Scheme"""
     
-    # Primary colors (DQT Branding)
+    # Primary colors (T3Lab Branding)
     HEADER = "#0F172A"           # Gold header background
     BACKGROUND = "#F8FAFC"       # Light cream background
     BORDER = "#CBD5E1"           # Gold border
@@ -71,5 +71,5 @@ class Settings:
     # Application info
     APP_NAME = "Smart Purge"
     APP_VERSION = "2.0.1"
-    AUTHOR = "Dang Quoc Truong (DQT)"
-    COPYRIGHT = "Copyright (c) 2025 Dang Quoc Truong (DQT)"
+    AUTHOR = "T3Lab"
+    COPYRIGHT = "Copyright (c) 2025 T3Lab"

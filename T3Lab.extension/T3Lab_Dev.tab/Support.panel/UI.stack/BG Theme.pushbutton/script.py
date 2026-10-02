@@ -1,7 +1,7 @@
 #! python3
 # -*- coding: utf-8 -*-
 """
-DQT - Background Theme (Theme Studio)
+T3Lab - Background Theme (Theme Studio)
 Full control over the Revit canvas appearance from one themed window:
 
 * Model Background  — HSV colour picker (SV square + hue bar), RGB sliders,
@@ -15,14 +15,14 @@ Full control over the Revit canvas appearance from one themed window:
 
 SHIFT+Click quick-cycles Black -> Gray -> White like the classic tool.
 
-Dang Quoc Truong - DQT (c) 2026
+T3Lab (c) 2026
 """
 
 __title__     = "Background\nTheme"
-__author__    = "Dang Quoc Truong (DQT)"
+__author__    = "T3Lab"
 __version__   = "2.0.0"
-__copyright__ = "Copyright (c) 2026 by Dang Quoc Truong (DQT)"
-__doc__       = """DQT - Background Theme (Theme Studio)
+__copyright__ = "Copyright (c) 2026 by T3Lab"
+__doc__       = """T3Lab - Background Theme (Theme Studio)
 
 Open a 3-tab theme studio:
 Model Background (HSV picker + eyedropper + presets + recents),

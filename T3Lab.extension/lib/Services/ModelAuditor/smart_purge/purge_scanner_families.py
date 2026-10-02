@@ -3,10 +3,10 @@
 Families Scanners (Phase 5)
 Scanners for families: detail components, unused families, unused family types, annotation families, profile families
 
-Copyright (c) 2025 Dang Quoc Truong (DQT)
+Copyright (c) 2025 T3Lab
 """
 
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 
 from Autodesk.Revit.DB import (
     FilteredElementCollector,

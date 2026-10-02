@@ -786,7 +786,7 @@ def create_views_from_defs(doc, view_defs):
         if v.IsTemplate:
             templates[v.Name] = v.Id
     
-    t = Transaction(doc, "DQT - Create Views from Excel")
+    t = Transaction(doc, "T3Lab - Create Views from Excel")
     t.Start()
     
     created = 0
@@ -1049,7 +1049,7 @@ def write_xlsx(filepath, headers, rows, hidden_cols=None, header_colors=None):
         s = s.replace("'", "&apos;")
         return s
     
-    default_header_color = "0F172A"  # DQT Gold
+    default_header_color = "0F172A"  # T3Lab header colour
     fill_colors = [default_header_color]
     for ci, color in sorted(header_colors.items()):
         if color not in fill_colors:

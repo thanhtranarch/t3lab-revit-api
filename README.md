@@ -25,7 +25,7 @@ Three layers form a self-sustaining ecosystem for architectural intelligence:
 
 ## Ribbon: T3Lab Tab
 
-The tab exposes **7 panels**. Buttons marked *(DQT)* were developed in collaboration with Dang Quoc Truong.
+The tab exposes **7 panels**.
 
 ### Standard
 
@@ -38,9 +38,9 @@ The tab exposes **7 panels**. Buttons marked *(DQT)* were developed in collabora
 
 | Tool | Description |
 |------|-------------|
-| **Mana Anno** | Unified Find / Remove / Rename manager for Dimensions and Text Notes. *(DQT)* |
+| **Mana Anno** | Unified Find / Remove / Rename manager for Dimensions and Text Notes. |
 | **Auto Dimension** | Automatic dimension chains for walls, columns, doors, lifts and grids in the active or a chosen view. |
-| **Mana DWG** | CAD import and CAD link manager — list, rename and delete DWG imports/links. *(DQT)* |
+| **Mana DWG** | CAD import and CAD link manager — list, rename and delete DWG imports/links. |
 | **Mana Select** | Consolidated selection manager: Quick Select by parameter/text, Select Similar by type/family/category, and linked-element selection. |
 
 ### Modeling & Datum
@@ -50,9 +50,9 @@ The tab exposes **7 panels**. Buttons marked *(DQT)* were developed in collabora
 | **CAD to BIM** (pulldown) | **CAD to Elements** (map DWG layers → Walls / Floors / Beams), **Point Cloud to Model** (Scan-to-BIM wizard detecting walls, floors, ceilings, doors, windows, columns, stairs, roofs), **Room To Floor**, **Door Threshold**, **Image to Drafting**, **Text to Element**. |
 | **Property Line** | Type any address worldwide and draw its property boundary: OpenStreetMap everywhere (no API key), LightBox cadastral parcels for US addresses. |
 | **Tile Layout** | 3-step wizard: extract floor boundaries, pick a tile pattern per floor, generate and place a tiled layout. |
-| **Element Adjust** (pulldown) | **Auto Join** (rule-based joining, Shift+Click for defaults) *(DQT)*, **Split Elements** at levels, **Wall Cut Profile** from linked-model intersections, **Auto Adj Base Offset**. |
+| **Element Adjust** (pulldown) | **Auto Join** (rule-based joining, Shift+Click for defaults), **Split Elements** at levels, **Wall Cut Profile** from linked-model intersections, **Auto Adj Base Offset**. |
 | **FamiGen** | Family generator — from CAD blocks (DWG → .rfa), from a JSON schema, or from built-in batch presets. |
-| **Mana Fami** | Family manager — browse by category, search/filter, and load families from disk. *(DQT)* |
+| **Mana Fami** | Family manager — browse by category, search/filter, and load families from disk. |
 
 ### Views & Sheets
 

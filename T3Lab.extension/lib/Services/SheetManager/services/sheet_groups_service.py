@@ -3,7 +3,7 @@
 Sheet Manager - Custom Sheet Groups Service
 Manage custom sheet groups with JSON persistence
 
-Copyright © Dang Quoc Truong (DQT)
+Copyright © T3Lab
 """
 
 import json

@@ -5,6 +5,6 @@ description: |
   fixed-JSON tool, this reads every live ribbon tab, lets you edit each short
   name inline (double-click), toggle Short/Full for all tabs, persists your own
   mappings, and needs no external Snippets dependency or per-language files.
-  Dang Quoc Truong - DQT (c) 2026
-author: "Dang Quoc Truong"
+  T3Lab (c) 2026
+author: "T3Lab"
 version: "1.0.0"

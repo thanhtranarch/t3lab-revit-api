@@ -1101,7 +1101,7 @@
             <StackPanel Grid.Column="0" Orientation="Vertical" Margin="22,0,0,0" VerticalAlignment="Center"
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <TextBlock Text="View Template Manager" FontSize="15" FontWeight="Bold" Foreground="#18181B"/>
-                <TextBlock Text="by Dang Quoc Truong (DQT) | Revit 2024-2026" FontSize="12.5" Foreground="#71717A" Margin="0,2,0,0"/>
+                <TextBlock Text="by T3Lab | Revit 2024-2026" FontSize="12.5" Foreground="#71717A" Margin="0,2,0,0"/>
             </StackPanel>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0"

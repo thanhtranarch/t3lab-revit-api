@@ -3,14 +3,14 @@
 Sheet Manager - Configuration
 Colors, constants, and settings
 
-Copyright © Dang Quoc Truong (DQT)
+Copyright © T3Lab
 """
 
 
 class Config(object):
     """Configuration constants"""
     
-    # Colors (DQT Brand)
+    # Colors (T3Lab Brand)
     PRIMARY_COLOR = "#0F172A"      # Golden
     BACKGROUND_COLOR = "#F8FAFC"   # Light cream
     

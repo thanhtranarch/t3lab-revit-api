@@ -3,10 +3,10 @@
 Views & Sheets Scanners (Phase 4)
 Scanners for views and sheets: empty sheets, unused schedules, legend views, temp/working views
 
-Copyright (c) 2025 Dang Quoc Truong (DQT)
+Copyright (c) 2025 T3Lab
 """
 
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 
 from Autodesk.Revit.DB import (
     FilteredElementCollector,

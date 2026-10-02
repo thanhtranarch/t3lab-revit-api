@@ -2,7 +2,7 @@
 """
 Sheet Manager - Excel Import/Export Service
 
-Copyright © Dang Quoc Truong (DQT)
+Copyright © T3Lab
 """
 
 import os

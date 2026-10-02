@@ -3,7 +3,7 @@
 Revit Utilities - Helper functions for Revit API compatibility
 Compatible with Revit 2024, 2025, 2026, 2027
 
-Copyright (c) 2025 Dang Quoc Truong (DQT)
+Copyright (c) 2025 T3Lab
 
 IMPORTANT COMPATIBILITY NOTES:
 - Revit 2024/2025: ElementId.IntegerValue works
@@ -11,7 +11,7 @@ IMPORTANT COMPATIBILITY NOTES:
 - This module provides helper functions that work across all versions
 """
 
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 
 
 def get_element_id_value(element_id):

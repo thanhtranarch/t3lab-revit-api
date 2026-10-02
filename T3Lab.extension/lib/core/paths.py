@@ -33,6 +33,37 @@ def settings_dir():
     return d
 
 
+def user_data_path(*parts, **kwargs):
+    """Path of a per-user T3Lab data file under %APPDATA%\\T3LabAI.
+
+    Tools keep their state HERE, never inside the extension folder: the clone
+    is updated by git and shared, and state written next to the scripts was
+    committed to the public repo (client names, machine paths — 2026-10-02).
+
+    legacy=[old paths]: when the new file does not exist yet, the first old
+    file that does is copied over once, so moving a writer never loses the
+    user's settings. The old file is left untouched.
+    """
+    legacy = kwargs.get('legacy') or ()
+    path = os.path.join(settings_dir(), *parts)
+    folder = os.path.dirname(path)
+    try:
+        if not os.path.isdir(folder):
+            os.makedirs(folder)
+    except OSError:
+        pass
+    if not os.path.exists(path):
+        for old in legacy:
+            if old and os.path.isfile(old):
+                try:
+                    import shutil
+                    shutil.copyfile(old, path)
+                    break
+                except Exception:
+                    pass
+    return path
+
+
 def settings_file():
     """Path to the shared path-settings JSON file."""
     return os.path.join(settings_dir(), 'mcp_paths.json')

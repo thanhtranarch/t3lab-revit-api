@@ -5,5 +5,5 @@ description: |
   Rename views in bulk using naming rules and patterns
   Update view templates across multiple views at once
   Remove unused views and manage view duplicates
-author: "Tran Tien Thanh & Dang Quoc Truong"
+author: "Tran Tien Thanh"
 version: "1.0.0"

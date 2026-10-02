@@ -57,3 +57,10 @@ tools/train/out/
 # %APPDATA%\T3LabAI\model_auditor\history. The old in-extension folder must
 # never be committed again (it exposed client project names, 2026-10-02).
 T3Lab.extension/lib/GUI/Resources/ModelAuditorHistory/
+
+# Per-user tool state lives in %APPDATA%\T3LabAI (core.paths.user_data_path).
+# Legacy copies that older builds wrote next to the scripts must not be
+# committed again.
+**/dqt_bg_config.json
+**/dqt_ribbon_*.json
+**/.ribbon-*.tmp

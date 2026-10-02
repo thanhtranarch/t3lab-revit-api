@@ -961,7 +961,10 @@ class DefineValueDialog(T3WPFWindow):
 
 # SetParamDialog (for Tab 1 Set Parameter Value Dialog)
 class SetParamDialog(T3WPFWindow):
-    _DEFAULT_PARAMS = ("DQT_Contain_SpatialID", "IFC-SG_RoomNumber", "Comments", "Mark")
+    # T3Lab_* first; the legacy DQT_* name stays so models that already carry
+    # it keep their default.
+    _DEFAULT_PARAMS = ("T3Lab_Contain_SpatialID", "DQT_Contain_SpatialID",
+                       "IFC-SG_RoomNumber", "Comments", "Mark")
 
     def __init__(self, selected_groups, spatial_type, define_params, define_separator):
         T3WPFWindow.__init__(self, SETPARAM_XAML)
@@ -1652,7 +1655,7 @@ class ManaContainsWindow(T3WPFWindow):
                 self.tab2_cmb_target_param.Items.Add(item)
             
             # Select default if exists
-            defaults = ["DQT_Room_Elements", "Comments", "Description"]
+            defaults = ["T3Lab_Room_Elements", "DQT_Room_Elements", "Comments", "Description"]
             for d in defaults:
                 if d in params:
                     self.tab2_cmb_target_param.Text = d

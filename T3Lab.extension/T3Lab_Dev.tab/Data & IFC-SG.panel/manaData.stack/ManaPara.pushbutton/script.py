@@ -1,7 +1,7 @@
 #! python3
 # -*- coding: utf-8 -*-
 __title__ = "Parameter\nManager"
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 __doc__ = "Parameter Manager — Transfer, Text-to-Element, and Values-to-Region tools."
 
 import os, sys

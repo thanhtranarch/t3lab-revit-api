@@ -2,10 +2,10 @@
 """
 Element Type Scanners (Phase 2)
 Scanners for Wall, Floor, and Roof types
-Copyright (c) 2025 Dang Quoc Truong (DQT)
+Copyright (c) 2025 T3Lab
 """
 
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 
 from Autodesk.Revit.DB import (
     FilteredElementCollector,

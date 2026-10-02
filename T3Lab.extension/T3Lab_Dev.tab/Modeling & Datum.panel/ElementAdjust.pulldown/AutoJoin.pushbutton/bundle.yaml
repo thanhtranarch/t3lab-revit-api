@@ -1,7 +1,7 @@
 title: "Auto\nJoin"
-tooltip: "Automatically join intersecting elements by category rules (Collab with DQT)"
+tooltip: "Automatically join intersecting elements by category rules"
 description: |
   Click       : Open Auto Join Manager
   Shift+Click : Quick join with default rules (Walls vs Floors/Columns)
-author: "Tran Tien Thanh & Dang Quoc Truong"
+author: "Tran Tien Thanh"
 version: "1.1.0"

@@ -1,7 +1,7 @@
 #! python3
 # -*- coding: utf-8 -*-
 __title__ = "CAD to\nElements"
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 __doc__ = "CAD to Elements — Convert CAD linework into walls, floors, ceilings, rooms, columns, beams, grids, lines or MEP runs."
 
 import os, sys

@@ -3,13 +3,13 @@
 """
 Extension Tab Manager
 Manage visibility of Extension/Add-in tabs in Revit
-Copyright (c) 2025 by Dang Quoc Truong (DQT)
+Copyright (c) 2025 by T3Lab
 """
 
 __title__ = "Tab\nManager"
-__author__ = "Dang Quoc Truong (DQT)"
+__author__ = "T3Lab"
 __version__ = "1.0.0"
-__copyright__ = "Copyright (c) 2025 by Dang Quoc Truong (DQT)"
+__copyright__ = "Copyright (c) 2025 by T3Lab"
 tool_name = "Extension Tab Manager"
 
 import os
@@ -38,57 +38,12 @@ except Exception:
 # System library
 from pyrevit.forms import alert
 from pyrevit.api import AdWindows
-import codecs
-from System import DateTime
 
-from Snippets._host import get_revit_version
 
 try:
     app = __revit__.Application
 except Exception:
     app = None
-
-date = DateTime.Now.ToString("yyMMdd")
-revit_version = get_revit_version() or 2024
-userName = getattr(app, "Username", None) or os.environ.get("USERNAME", "User")
-
-def TempMemory(tool_name, bool):
-    output = []
-
-    # main dir
-    _appdata = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or os.path.expanduser("~")
-    memory_folder = os.path.join(_appdata, "T3Lab", "Cache")
-    memory_clear_folder = os.path.join(memory_folder, userName)
-
-    # temp folder
-    memory_need_clear_folder = os.path.join(memory_clear_folder, "Temp")
-    output.append(memory_need_clear_folder)  # output 0
-    memory_file_folder = os.path.join(memory_need_clear_folder, tool_name, date)
-    output.append(memory_file_folder)  # output 1
-    try:
-        os.makedirs(memory_file_folder)
-    except:
-        pass
-    memory_file_name = userName + "_" + tool_name + ".txt"
-    memory_file_path = os.path.join(memory_file_folder, memory_file_name)
-    output.append(memory_file_path)  # output 2
-
-    # not delete folder
-    memory_not_clear_folder = os.path.join(memory_clear_folder, "Not Delete")
-    output.append(memory_not_clear_folder)  # output 3
-    memory_data_folder = os.path.join(memory_not_clear_folder, tool_name)
-    output.append(memory_data_folder)  # output 4
-    try:
-        os.makedirs(memory_data_folder)
-    except:
-        pass
-    if bool is True:
-        memory_data_name = userName + "_" + tool_name + "_" + str(revit_version) + ".txt"
-    else:
-        memory_data_name = userName + "_" + tool_name + ".txt"
-    memory_data_path = os.path.join(memory_data_folder, memory_data_name)
-    output.append(memory_data_path)  # output 5
-    return output
 
 class MyOption(object):
     def __init__(self, item, state=False):
@@ -158,21 +113,13 @@ def main_task():
             if i not in selectedTabNameLst:
                 hideTabNameLst.append(i)
 
-        memory_data_path = TempMemory(tool_name, True)[5]
-
+        # Hide / show straight away. The old code wrote a hidden-tab list (and a
+        # dated folder per day) under %LOCALAPPDATA%\T3Lab\Cache that nothing
+        # ever read back, and the hiding ran inside that file write — a failed
+        # write left every tab as it was.
         try:
-            with codecs.open(memory_data_path, "w", encoding="utf-8") as textfile:
-                textfile.write("# Extension Tab Manager\n")
-                textfile.write("# Copyright (c) 2025 by Dang Quoc Truong (DQT)\n")
-                textfile.write("# Hidden Tabs:\n")
-                
-                for tab in extensionTabLst:
-                    if tab.Title in hideTabNameLst:
-                        tab.IsVisible = False
-                        textfile.write(tab.Title)
-                        textfile.write("\n")
-                    else:
-                        tab.IsVisible = True
+            for tab in extensionTabLst:
+                tab.IsVisible = tab.Title not in hideTabNameLst
         except Exception as e:
             alert("Error: {}".format(str(e)), title="Error")
 

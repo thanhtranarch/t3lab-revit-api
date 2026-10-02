@@ -2,7 +2,7 @@
 """
 Sheet Manager - Import Excel Dialog
 
-Copyright (c) Dang Quoc Truong (DQT)
+Copyright (c) T3Lab
 """
 
 from System.Windows import Window, MessageBox, MessageBoxButton, MessageBoxImage, Thickness, GridLength

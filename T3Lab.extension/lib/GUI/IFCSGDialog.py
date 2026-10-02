@@ -1641,7 +1641,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
         fail = 0
         debug_lines = []
 
-        t = Transaction(self.doc, "DQT - Set IFC-SG Subtypes")
+        t = Transaction(self.doc, "T3Lab - Set IFC-SG Subtypes")
         t.Start()
         try:
             for row in rows:
@@ -1776,7 +1776,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
         total_ok = 0
         total_fail = 0
 
-        t = Transaction(self.doc, "DQT - Auto-Assign IFC-SG Subtypes")
+        t = Transaction(self.doc, "T3Lab - Auto-Assign IFC-SG Subtypes")
         t.Start()
         try:
             for comp_name, rows, entity, subtype_str, is_ud in auto_plan:

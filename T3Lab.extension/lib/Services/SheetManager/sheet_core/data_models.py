@@ -3,7 +3,7 @@
 Sheet Manager - Data Models
 FIXED - Use direct Revit properties
 
-Copyright © Dang Quoc Truong (DQT)
+Copyright © T3Lab
 """
 
 
