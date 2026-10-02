@@ -1115,6 +1115,16 @@ class IFCSGSuiteWindow(T3WPFWindow):
         self.btnRunCheck = self.FindName("btnRunCheck")
         self.btnExportExcel = self.FindName("btnExportExcel")
 
+        # Shared page shell (IFCSG.xaml): footer status dot, count strips and the
+        # results empty state. All optional — every use below is None-guarded.
+        self.status_dot = self.FindName("status_dot")
+        self._dot_kind = "idle"
+        self.txtTypesCount = self.FindName("txtTypesCount")
+        self.dgTypes_empty = self.FindName("dgTypes_empty")
+        self.txtTreeCount = self.FindName("txtTreeCount")
+        self.txtResultsCount = self.FindName("txtResultsCount")
+        self.spResults_empty = self.FindName("spResults_empty")
+
         # Event Handlers for Tab 2
         self.btnImportXML.Click += self._on_import_xml
         self.btnImportExcel.Click += self._on_import_excel
@@ -1162,7 +1172,20 @@ class IFCSGSuiteWindow(T3WPFWindow):
                     os.makedirs(d)
                 except:
                     pass
+        # The Checker's own opening status; _on_config_changed overwrites it
+        # when a saved config loads (or fails to).
+        self.txtStatus.Text = "Import an XML or Excel config to start"
         self._load_saved_configs()
+
+        # One footer, two pages: remember each page's status line so the
+        # Checker's "Config loaded…" does not show on the Assigner at open.
+        self._current_page = 0
+        self._page_status = {
+            0: ("Load a mapping Excel to start", "idle"),
+            1: (self.txtStatus.Text, self._dot_kind),
+        }
+        self.txtStatus.Text = self._page_status[0][0]
+        self._set_status_dot(self._page_status[0][1])
 
         # Force initial tab content to render: btn_tab_assigner.IsChecked was already
         # True when the XAML was parsed, so its Checked event fired before the
@@ -1188,9 +1211,40 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
     def _on_tab_changed(self, sender, e):
         if self.btn_tab_assigner.IsChecked:
-            self.main_tab_control.SelectedIndex = 0
+            new_page = 0
         elif self.btn_tab_checker.IsChecked:
-            self.main_tab_control.SelectedIndex = 1
+            new_page = 1
+        else:
+            return
+        # Save the page we leave, restore the page we enter (status text + dot).
+        old_page = getattr(self, "_current_page", None)
+        pages = getattr(self, "_page_status", None)
+        if pages is not None and old_page is not None and old_page != new_page:
+            pages[old_page] = (self.txtStatus.Text, self._dot_kind)
+            text, kind = pages.get(new_page, ("Ready", "idle"))
+            self.txtStatus.Text = text
+            self._set_status_dot(kind)
+        self._current_page = new_page
+        self.main_tab_control.SelectedIndex = new_page
+
+    # Footer status dot: colour always sits next to the status sentence, never alone.
+    _DOT_KEYS = {
+        "idle": "T3.TextDisabled",
+        "running": "T3.Progress.Fill",
+        "ok": "T3.Success.Accent",
+        "warning": "T3.Warning.Accent",
+        "error": "T3.Danger.Accent",
+    }
+
+    def _set_status_dot(self, kind):
+        self._dot_kind = kind
+        dot = getattr(self, "status_dot", None)
+        if dot is None:
+            return
+        try:
+            dot.Fill = self.FindResource(self._DOT_KEYS.get(kind, "T3.TextDisabled"))
+        except Exception:
+            pass
 
     # ==============================================================================
     # Tab 1: Subtype Assigner Logic
@@ -1255,6 +1309,21 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
         self.dgTypes.ItemsSource = dt.DefaultView
 
+        # Count strip + empty-state wording (the overlay itself follows HasItems in XAML)
+        n = len(rows)
+        if self.dgTypes_empty is not None and self.current_comp:
+            self.dgTypes_empty.Text = ("No Revit types in this model belong to "
+                                       "this component's Revit categories.")
+        if self.txtTypesCount is not None:
+            if not self.current_comp:
+                self.txtTypesCount.Text = "Ctrl+Click or Shift+Click to select several types"
+            elif not n:
+                self.txtTypesCount.Text = "0 types"
+            else:
+                assigned = len([r for r in rows if r.Status == "OK"])
+                self.txtTypesCount.Text = "{} type{} | {} assigned | Ctrl+Click or Shift+Click to select several".format(
+                    n, "" if n == 1 else "s", assigned)
+
     def _on_load_excel(self, sender, args):
         dlg = OpenFileDialog()
         dlg.Title = "Select IFC-SG Industry Mapping Excel"
@@ -1262,12 +1331,15 @@ class IFCSGSuiteWindow(T3WPFWindow):
         if dlg.ShowDialog() != WFDialogResult.OK:
             return
 
+        # txtHeader is the MAPPING line of the toolbar: on a failed load it goes
+        # back to whatever mapping is still in use ("No mapping loaded" at first).
+        prev_header = self.txtHeader.Text
         self.txtHeader.Text = "Reading Excel headers..."
         self.UpdateLayout()
 
         mapping = load_mapping_with_dialog(dlg.FileName)
         if not mapping:
-            self.txtHeader.Text = "Load Industry Mapping Excel to start"
+            self.txtHeader.Text = prev_header
             return
 
         self.mapping = mapping
@@ -1275,6 +1347,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
         fname = System.IO.Path.GetFileName(dlg.FileName)
         self.txtHeader.Text = "Loaded: {} ({} components)".format(fname, len(mapping))
         self._populate_component_list()
+        self.txtStatus.Text = "{} components loaded. Select one to list its Revit types.".format(len(mapping))
 
     def _populate_component_list(self):
         self._comp_names = []
@@ -1776,17 +1849,31 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
     def _on_config_changed(self, sender, args):
         sel = self.cmbConfig.SelectedItem
-        if sel:
-            path = os.path.join(self.configs_dir, str(sel) + ".json")
-            try:
-                self.config = ParamCheckConfig.from_json(path)
-                self._refresh_tree()
-                self._update_config_stats()
-                self.btnRunCheck.IsEnabled = True
-                self.txtStatus.Text = "Config loaded: {} ({})".format(
-                    self.config.name, self.config.source)
-            except Exception as e:
-                self.txtStatus.Text = "Error loading config: {}".format(str(e))
+        if not sel:
+            # Nothing selected (last config deleted): nothing left to run.
+            self._clear_config()
+            return
+        path = os.path.join(self.configs_dir, str(sel) + ".json")
+        try:
+            self.config = ParamCheckConfig.from_json(path)
+            self._refresh_tree()
+            self._update_config_stats()
+            self._update_action_states()
+            self.txtStatus.Text = "Config loaded: {} ({})".format(
+                self.config.name, self.config.source)
+            self._set_status_dot("idle")
+        except Exception as e:
+            # Don't keep running the previous config under this one's name.
+            self._clear_config()
+            self.txtStatus.Text = "Error loading config: {}".format(str(e))
+            self._set_status_dot("error")
+
+    def _clear_config(self):
+        """No usable config: Run Check off, tree and config KPIs empty."""
+        self.config = None
+        self._update_action_states()
+        self._refresh_tree()
+        self._update_config_stats()
 
     def _on_import_xml(self, sender, args):
         dlg = OpenFileDialog()
@@ -1851,9 +1938,12 @@ class IFCSGSuiteWindow(T3WPFWindow):
         sel = self.cmbConfig.SelectedItem
         if not sel:
             return
+        # Destructive: the safe answer (No) is the default, so Enter cancels.
         result = WPFMessageBox.Show(
-            "Delete config '{}'?".format(sel),
-            "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+            "Delete config '{}'?\n\nThis removes {}.json from the configs folder "
+            "and cannot be undone.".format(sel, sel),
+            "Delete Config", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+            MessageBoxResult.No)
         if result == MessageBoxResult.Yes:
             path = os.path.join(self.configs_dir, str(sel) + ".json")
             if os.path.exists(path):
@@ -1862,9 +1952,16 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
     def _refresh_tree(self):
         self.tvCategories.Items.Clear()
+        if self.txtTreeCount is not None:
+            if self.config:
+                d, c, _p = self.config.get_total_stats()
+                self.txtTreeCount.Text = "{} discipline{}, {} categor{}".format(
+                    d, "" if d == 1 else "s", c, "y" if c == 1 else "ies")
+            else:
+                self.txtTreeCount.Text = "0 categories"
         if not self.config:
             return
-        
+
         for disc_name, disc_data in self.config.disciplines.items():
             disc_item = TreeViewItem()
             disc_item.IsExpanded = True
@@ -1943,17 +2040,37 @@ class IFCSGSuiteWindow(T3WPFWindow):
             d, c, p = self.config.get_total_stats()
             self.txtTotalParams.Text = str(p)
             self.txtCategories.Text = str(c)
+        else:
+            self.txtTotalParams.Text = "0"
+            self.txtCategories.Text = "0"
+
+    def _update_action_states(self):
+        """Run Check needs a config; Export needs results and the config behind them."""
+        has_config = self.config is not None
+        if self.btnRunCheck is not None:
+            self.btnRunCheck.IsEnabled = has_config
+        if self.btnExportExcel is not None:
+            self.btnExportExcel.IsEnabled = has_config and bool(self.all_results)
 
     def _on_run_check(self, sender, args):
         if not self.config:
+            self.txtStatus.Text = "Choose or import a configuration first"
             return
+        cfg = self.config
 
         self.txtStatus.Text = "Running IFC-SG parameter checks..."
+        self._set_status_dot("running")
         self.Cursor = System.Windows.Input.Cursors.Wait
         self.UpdateLayout()
 
-        # Show progress bar + Pause/Stop; disable Run/Export while running
-        self.begin_progress(100, disable=[self.btnRunCheck, self.btnExportExcel])
+        # Show progress bar + Pause/Stop. _do_events pumps input during the run, so
+        # also lock the page rail and the config controls: switching page or config
+        # mid-run would leave the footer, tree and results out of step.
+        busy = [self.btnRunCheck, self.btnExportExcel,
+                self.btn_tab_assigner, self.btn_tab_checker,
+                self.cmbConfig, self.btnSaveConfig, self.btnDeleteConfig,
+                self.btnImportXML, self.btnImportExcel]
+        self.begin_progress(100, disable=[c for c in busy if c is not None])
 
         def progress_cb(current, total):
             pct = int(float(current) / float(total) * 100) if total > 0 else 0
@@ -1961,7 +2078,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
         try:
             self.results = self.checker.run_check(
-                self.config,
+                cfg,
                 progress_callback=progress_cb,
                 cancel_check=lambda: self.is_cancelled)
             self.all_results = list(self.results)
@@ -1976,28 +2093,36 @@ class IFCSGSuiteWindow(T3WPFWindow):
             self.txtWarning.Text = str(warning)
             self.txtNoElem.Text = str(no_elem)
 
+            # A re-run shows everything again: reset the chip with the filter
             self._current_filter = "all"
+            if self.btnFilterAll is not None:
+                self.btnFilterAll.IsChecked = True
             self._render_results(self.results)
 
-            self.btnExportExcel.IsEnabled = True
             self.btnSelectAllFailed.IsEnabled = True
-            self.txtResultHeader.Text = "Check Results ({} checks)".format(len(self.results))
+            self.txtResultHeader.Text = "Check results: {} ({} checks)".format(
+                cfg.name, len(self.results))
 
             # Read cancel flag BEFORE end_progress() resets it
             cancelled = self.is_cancelled
             if cancelled:
                 self.txtStatus.Text = "Cancelled — partial results: {} checks".format(len(self.results))
+                self._set_status_dot("warning")
             else:
                 self.txtStatus.Text = "Done: {} passed, {} failed, {} partial, {} no elements".format(
                     passed, failed, warning, no_elem)
+                self._set_status_dot("ok")
 
         except Exception as e:
             self.txtStatus.Text = "Error: {}".format(str(e))
+            self._set_status_dot("error")
             WPFMessageBox.Show("Error:\n{}".format(traceback.format_exc()),
                                "Error", MessageBoxButton.OK, MessageBoxImage.Error)
         finally:
             self.end_progress()
             self.Cursor = System.Windows.Input.Cursors.Arrow
+            # end_progress re-enabled what it disabled; now keep only what can work
+            self._update_action_states()
 
     def _apply_filter(self, filter_type):
         self._current_filter = filter_type
@@ -2333,6 +2458,31 @@ class IFCSGSuiteWindow(T3WPFWindow):
             
             row_border.Child = row_grid
             self.spResults.Children.Add(row_border)
+
+        self._update_results_state(len(results))
+
+    def _update_results_state(self, shown):
+        """Results empty state + count strip. spResults is a StackPanel (no HasItems),
+        so its overlay is toggled here rather than by a DataTrigger."""
+        total = len(self.all_results or [])
+        if self.spResults_empty is not None:
+            if shown:
+                self.spResults_empty.Visibility = Visibility.Collapsed
+            else:
+                if self.results is None:
+                    msg = "No results yet. Choose a configuration and click Run Check."
+                elif not total:
+                    msg = ("The check returned no results.\n"
+                           "Enable at least one category in the tree, then run it again.")
+                else:
+                    msg = "No checks match this filter."
+                self.spResults_empty.Text = msg
+                self.spResults_empty.Visibility = Visibility.Visible
+        if self.txtResultsCount is not None:
+            if shown == total:
+                self.txtResultsCount.Text = "{} check{}".format(total, "" if total == 1 else "s")
+            else:
+                self.txtResultsCount.Text = "Showing {} of {} checks".format(shown, total)
 
     def _on_select_btn_click(self, sender, args):
         ids = sender.Tag

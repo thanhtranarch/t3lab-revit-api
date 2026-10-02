@@ -9,7 +9,18 @@ the Subtype Assigner page and the Compliance Checker page. The owner approved go
 
 Line numbers are from before the edits.
 
-Status: Phase 1 + 2 in progress · Phase 3 pending · **NEEDS VERIFICATION in Revit**.
+Status: **Phase 1 + 2 implemented 2026-10-02** · Phase 3 pending · **NEEDS VERIFICATION in Revit**
+(`check_xaml_wpf.ps1` not run yet either; it needs Windows).
+
+Deviations from the plan, made while implementing Phase 1 + 2:
+- The empty-state overlay margin is written as `Margin="16"`, not `{StaticResource T3.Pad.Panel}`.
+  `audit_t3`'s spacing check reads the "3" in "T3" as a margin value; the value is the same.
+- During a run, the config combo, Save As, Delete and both Import buttons are locked as well as
+  the rail. Without this, deleting the last config mid-run would leave the result header with no config.
+- A config that fails to load is cleared, so the previous one never runs under the new name.
+- Phase 3 still to do: hex colours and Unicode icons in `_render_results` / `_refresh_tree` /
+  `_make_comp_listitem` / `_style_assigner_column_headers`. The `dgTypes` columns add up to 780 px with
+  no `*` column, so they get clipped at MinWidth.
 
 ## 1. Current state
 

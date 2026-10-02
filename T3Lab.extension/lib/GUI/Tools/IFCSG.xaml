@@ -4,7 +4,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="IFC-SG Suite"
         Width="1250" Height="820"
-        MinWidth="900" MinHeight="650"
+        MinWidth="1000" MinHeight="650"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -1677,7 +1677,7 @@
 
     <!-- ═══ Outer Window Border (Zero-Gap Grid) ═══ -->
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
-            Background="{StaticResource T3.Surface}" CornerRadius="12" ClipToBounds="True">
+            Background="{StaticResource T3.Surface}" CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title Bar -->
@@ -1753,7 +1753,7 @@
                     <RadioButton x:Name="btn_tab_assigner" Grid.Row="0"
                                  GroupName="IFCSGNav" IsChecked="True"
                                  Style="{StaticResource T3.Rail.Tile}"
-                                 ToolTip="Subtype Assigner"
+                                 ToolTip="IFC-SG Subtype Assigner"
                                  HorizontalAlignment="Center" Margin="0,0,0,8">
                         <Path Data="M4 5 h16 M4 12 h16 M4 19 h10 M18 16 l3 3 -3 3"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
@@ -1766,7 +1766,7 @@
                     <RadioButton x:Name="btn_tab_checker" Grid.Row="1"
                                  GroupName="IFCSGNav" IsChecked="False"
                                  Style="{StaticResource T3.Rail.Tile}"
-                                 ToolTip="Compliance Checker"
+                                 ToolTip="IFC-SG Compliance Checker"
                                  HorizontalAlignment="Center" Margin="0,0,0,8">
                         <Path Data="M9 11 l3 3 7 -7 M20 12 v6 a2 2 0 0 1 -2 2 H6 a2 2 0 0 1 -2 -2 V6 a2 2 0 0 1 2 -2 h9"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
@@ -1777,8 +1777,14 @@
                 </Grid>
             </Border>
 
-                <!-- ══════════════════ COL 1: MAIN WORKSPACE ══════════════════ -->
-                <!-- ══════════════════ ROW 1: WORKSPACE TABS ══════════════════ -->
+                <!-- ══════════════════ COL 1: MAIN WORKSPACE ══════════════════
+                     Both pages share one shell (docs/ui-governance/PLAN-2026-10-02-IFCSG-CONSISTENCY.md §2):
+                       Row 0  header band   T3.TitleBar 48 · Title · rule · Subtitle | "bring data in" actions
+                       Row 1  toolbar       Surface · UPPERCASE T3.Label above each control group
+                       Row 2  KPI strip     Sunken (Checker only; empty on the Assigner)
+                       Row 3  split body    one 4-row grid [320 | 1 | *] so the pane strips line up
+                                            r0 pane header · r1 pane toolbar · r2 content + empty overlay · r3 count strip
+                     The page actions live in the global footer (footer_actions_*), switched per page. -->
                 <TabControl x:Name="main_tab_control" Grid.Column="1"
                             Margin="0" Background="Transparent" BorderThickness="0">
                     <TabControl.ItemContainerStyle>
@@ -1789,13 +1795,38 @@
                     <TabItem>
                         <Grid Background="{StaticResource T3.Surface}">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- Top Action Bar -->
-                                <RowDefinition Height="*"/>    <!-- Main Split Work Area -->
-                                <RowDefinition Height="40"/>   <!-- Tab 1 Sub-bar Options -->
+                                <RowDefinition Height="48"/>   <!-- Row 0: Page header band -->
+                                <RowDefinition Height="Auto"/> <!-- Row 1: Toolbar (MAPPING · WRITE OPTIONS) -->
+                                <RowDefinition Height="Auto"/> <!-- Row 2: KPI strip — not used on this page -->
+                                <RowDefinition Height="*"/>    <!-- Row 3: Split body -->
                             </Grid.RowDefinitions>
 
-                            <!-- Top Action Bar -->
-                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
+                            <!-- Row 0: Page header band -->
+                            <Border Grid.Row="0" Style="{StaticResource T3.TitleBar}" Padding="16,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="IFC-SG Subtype Assigner"
+                                               Style="{StaticResource T3.Title}" VerticalAlignment="Center"/>
+                                    <Border Grid.Column="1" Width="1" Height="16" Margin="12,0"
+                                            Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Style="{StaticResource T3.Subtitle}"
+                                               Text="Map Revit families &amp; types to buildingSMART Singapore IFC parameters"/>
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
+                                                Margin="16,0,0,0">
+                                        <Button x:Name="btnLoadExcel" Content="Load Custom Excel..."
+                                                Style="{StaticResource T3.Button.Secondary}"
+                                                ToolTip="Load an IFC-SG industry mapping Excel"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Row 1: Toolbar — MAPPING (left) · WRITE OPTIONS (right) -->
+                            <Border Grid.Row="1" Background="{StaticResource T3.Surface}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
                                     Padding="16,8">
                                 <Grid>
@@ -1803,162 +1834,178 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock x:Name="txtHeader" Text="IFC-SG Subtype Assigner" Style="{StaticResource T3.Title}" VerticalAlignment="Center"/>
-                                        <Border Width="1" Height="16" Background="{StaticResource T3.Border}" Margin="12,0"/>
-                                        <TextBlock Text="Map Revit families &amp; types to buildingSMART Singapore IFC parameters"
-                                                   Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="MAPPING" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <Grid Height="{StaticResource T3.H.Action}">
+                                            <!-- Python writes "Loaded: <file> (n components)" here -->
+                                            <TextBlock x:Name="txtHeader" Text="No mapping loaded"
+                                                       Style="{StaticResource T3.Body.Secondary}"/>
+                                        </Grid>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button x:Name="btnLoadExcel" Content="Load Custom Excel..."
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <Button x:Name="btnAutoAssign" Content="Auto Assign All"
-                                                Style="{StaticResource T3.Button.Secondary}"/>
+                                    <StackPanel Grid.Column="1" Margin="24,0,0,0">
+                                        <TextBlock Text="WRITE OPTIONS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal" Height="{StaticResource T3.H.Action}">
+                                            <CheckBox x:Name="chkApplyType" Style="{StaticResource T3.CheckBox}"
+                                                      Content="Apply to Type" IsChecked="True"
+                                                      VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                            <CheckBox x:Name="chkApplyEntity" Style="{StaticResource T3.CheckBox}"
+                                                      Content="Also set IFC Entity" IsChecked="True"
+                                                      VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                            <CheckBox x:Name="chkSetObjectType" Style="{StaticResource T3.CheckBox}"
+                                                      Content="Set ObjectType for USERDEFINED" IsChecked="True"
+                                                      VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Grid>
                             </Border>
 
-                            <!-- Main Split Area (Left List, Right Detail & DataGrid) -->
-                            <Grid Grid.Row="1">
+                            <!-- Row 2: KPI strip — intentionally empty on the Assigner -->
+
+                            <!-- Row 3: Split body — Components | Types -->
+                            <Grid Grid.Row="3">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="340" MinWidth="260"/>
+                                    <ColumnDefinition Width="320" MinWidth="260"/>
                                     <ColumnDefinition Width="1"/>
                                     <ColumnDefinition Width="*" MinWidth="450"/>
                                 </Grid.ColumnDefinitions>
-
-                                <!-- Left: Components Browser -->
-                                <Grid Grid.Column="0" Background="{StaticResource T3.Surface}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/> <!-- Search Box -->
-                                        <RowDefinition Height="*"/>    <!-- Component List -->
-                                        <RowDefinition Height="Auto"/> <!-- Summary Bar -->
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Search / Filter -->
-                                    <Border Grid.Row="0" Padding="12,8"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1">
-                                        <TextBox x:Name="txtFilter" Style="{StaticResource T3.Search}"
-                                                 Tag="Filter components, IFC entity..."/>
-                                    </Border>
-
-                                    <!-- Component List -->
-                                    <Grid Grid.Row="1">
-                                        <ListBox x:Name="lstComponents" Style="{StaticResource T3.ListBox}"
-                                                 BorderThickness="0"/>
-                                        <TextBlock x:Name="lstComponents_empty" Style="{StaticResource T3.Empty}"
-                                                   Text="No components found." Margin="16"
-                                                   Visibility="Collapsed"/>
-                                    </Grid>
-
-                                    <!-- Summary Status -->
-                                    <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                            Padding="12,8">
-                                        <TextBlock x:Name="txtSummary" Text="0 components loaded"
-                                                   Style="{StaticResource T3.Caption}"/>
-                                    </Border>
-                                </Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/> <!-- r0: pane header -->
+                                    <RowDefinition Height="Auto"/> <!-- r1: pane toolbar -->
+                                    <RowDefinition Height="*"/>    <!-- r2: content -->
+                                    <RowDefinition Height="Auto"/> <!-- r3: count strip -->
+                                </Grid.RowDefinitions>
 
                                 <!-- Divider -->
-                                <Border Grid.Column="1" Background="{StaticResource T3.Border}"/>
+                                <Border Grid.Column="1" Grid.RowSpan="4" Background="{StaticResource T3.Border}"/>
 
-                                <!-- Right: Detail, Subtype assignment & Types DataGrid -->
-                                <Grid Grid.Column="2" Background="{StaticResource T3.Surface}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/> <!-- Header Info Card -->
-                                        <RowDefinition Height="Auto"/> <!-- Subtype Combo & Actions -->
-                                        <RowDefinition Height="*"/>    <!-- Types DataGrid -->
-                                    </Grid.RowDefinitions>
+                                <!-- Left r0: pane header -->
+                                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource T3.ListHeader}">
+                                    <TextBlock Text="COMPONENTS" Style="{StaticResource T3.ListHeader.Label}"/>
+                                </Border>
 
-                                    <!-- Component Info Bar -->
-                                    <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="16,12">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-                                            <Grid Grid.Row="0">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock x:Name="txtCompName" Text="Select a component from the list"
-                                                           Style="{StaticResource T3.Title}"/>
-                                                <TextBlock x:Name="txtAgencies" Grid.Column="1" Text=""
-                                                           Style="{StaticResource T3.Caption}"/>
-                                            </Grid>
-                                            <TextBlock x:Name="txtCompInfo" Grid.Row="1" Text=""
-                                                       Style="{StaticResource T3.Caption}" Margin="0,4,0,0"/>
+                                <!-- Left r1: pane toolbar -->
+                                <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource T3.Surface}"
+                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                                        Padding="16,8">
+                                    <StackPanel>
+                                        <TextBlock Text="FILTER" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <Grid Height="{StaticResource T3.H.Action}">
+                                            <TextBox x:Name="txtFilter" Style="{StaticResource T3.Search}"
+                                                     Tag="Filter components, IFC entity..."
+                                                     VerticalAlignment="Center"/>
                                         </Grid>
-                                    </Border>
+                                    </StackPanel>
+                                </Border>
 
-                                    <!-- Subtype Assignment Form -->
-                                    <Border Grid.Row="1" Background="{StaticResource T3.Surface}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="16,12">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Target Subtype:" Style="{StaticResource T3.Label}"
-                                                       VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <ComboBox x:Name="cmbSubtype" Grid.Column="1"
-                                                      Style="{StaticResource T3.ComboBox}"
-                                                      ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                                                      Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                                <Button x:Name="btn_ai_auto_match"
-                                                        Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0" Padding="12,0"
-                                                        ToolTip="Predict the IFC-SG subtype of the selected types from their names">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
-                                                        <TextBlock Text="AI Predict" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </Button>
-                                                <Button x:Name="btnApply" Content="Apply Selected"
-                                                        Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                                <Button x:Name="btnApplyAll" Content="Apply to All"
-                                                        Style="{StaticResource T3.Button.Secondary}"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- Types DataGrid with Empty State -->
-                                    <Grid Grid.Row="2">
-                                        <DataGrid x:Name="dgTypes" Style="{StaticResource T3.DataGrid}"
-                                                  BorderThickness="0"/>
-                                        <TextBlock x:Name="dgTypes_empty" Style="{StaticResource T3.Empty}"
-                                                   Text="No Revit types found for this component category."
-                                                   Margin="16" Visibility="Collapsed"/>
+                                <!-- Left r2: component list + empty overlay -->
+                                <Grid Grid.Row="2" Grid.Column="0">
+                                    <ListBox x:Name="lstComponents" Style="{StaticResource T3.ListBox}"
+                                             ItemContainerStyle="{StaticResource T3.ListBoxItem.Multiline}"
+                                             BorderThickness="0"/>
+                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1" Margin="16">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasItems, ElementName=lstComponents}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="lstComponents_empty" Style="{StaticResource T3.Empty}"
+                                                   Text="No components to show.&#x0a;Load a mapping Excel, or clear the filter."/>
                                     </Grid>
                                 </Grid>
-                            </Grid>
 
-                            <!-- Bottom Sub-bar Options -->
-                            <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
-                                    Padding="16,8">
-                                <Grid VerticalAlignment="Center">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="Hold Ctrl+Click to select multiple types in grid"
-                                               Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <CheckBox x:Name="chkApplyType" Style="{StaticResource T3.CheckBox}"
-                                                  Content="Apply to Type" IsChecked="True" Margin="0,0,16,0"/>
-                                        <CheckBox x:Name="chkApplyEntity" Style="{StaticResource T3.CheckBox}"
-                                                  Content="Also set IFC Entity" IsChecked="True" Margin="0,0,16,0"/>
-                                        <CheckBox x:Name="chkSetObjectType" Style="{StaticResource T3.CheckBox}"
-                                                  Content="Set ObjectType for USERDEFINED" IsChecked="True"/>
+                                <!-- Left r3: count strip -->
+                                <Border Grid.Row="3" Grid.Column="0" Style="{StaticResource T3.ListHeader}"
+                                        BorderThickness="0,1,0,0">
+                                    <TextBlock x:Name="txtSummary" Text="0 components loaded"
+                                               Style="{StaticResource T3.Caption}" TextTrimming="CharacterEllipsis"/>
+                                </Border>
+
+                                <!-- Right r0: pane header — selected component -->
+                                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource T3.ListHeader}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="txtCompName" Grid.Column="0" Text="No component selected"
+                                                   Style="{StaticResource T3.BodyStrong}"/>
+                                        <TextBlock x:Name="txtCompInfo" Grid.Column="1" Text=""
+                                                   Style="{StaticResource T3.Caption}" Margin="12,0,0,0"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock x:Name="txtAgencies" Grid.Column="2" Text=""
+                                                   Style="{StaticResource T3.Caption}" Margin="12,0,0,0"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Right r1: pane toolbar — TARGET SUBTYPE -->
+                                <Border Grid.Row="1" Grid.Column="2" Background="{StaticResource T3.Surface}"
+                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                                        Padding="16,8">
+                                    <StackPanel>
+                                        <TextBlock Text="TARGET SUBTYPE" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                        <Grid Height="{StaticResource T3.H.Action}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" MinWidth="160"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="cmbSubtype" Grid.Column="0"
+                                                      Style="{StaticResource T3.ComboBox}"
+                                                      ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
+                                                      VerticalAlignment="Center"/>
+                                            <Button x:Name="btn_ai_auto_match" Grid.Column="1" Margin="8,0,0,0"
+                                                    Style="{StaticResource T3.Button.Secondary}"
+                                                    ToolTip="Predict the IFC-SG subtype of the selected types from their names">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xEA80;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                    <TextBlock Text="AI Predict" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="btnApply" Grid.Column="2" Content="Apply to Selected"
+                                                    Style="{StaticResource T3.Button.Secondary}" Margin="8,0,0,0"
+                                                    ToolTip="Write the target subtype to the types selected in the grid"/>
+                                            <Button x:Name="btnApplyAll" Grid.Column="3" Content="Apply to All"
+                                                    Style="{StaticResource T3.Button.Secondary}" Margin="8,0,0,0"
+                                                    ToolTip="Write the target subtype to every type listed in the grid"/>
+                                        </Grid>
                                     </StackPanel>
+                                </Border>
+
+                                <!-- Right r2: types grid + empty overlay -->
+                                <Grid Grid.Row="2" Grid.Column="2">
+                                    <DataGrid x:Name="dgTypes" Style="{StaticResource T3.DataGrid}"
+                                              BorderThickness="0"/>
+                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1" Margin="16">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasItems, ElementName=dgTypes}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="dgTypes_empty" Style="{StaticResource T3.Empty}"
+                                                   Text="Select a component on the left to list its Revit types."/>
+                                    </Grid>
                                 </Grid>
-                            </Border>
+
+                                <!-- Right r3: count strip -->
+                                <Border Grid.Row="3" Grid.Column="2" Style="{StaticResource T3.ListHeader}"
+                                        BorderThickness="0,1,0,0">
+                                    <TextBlock x:Name="txtTypesCount"
+                                               Text="Ctrl+Click or Shift+Click to select several types"
+                                               Style="{StaticResource T3.Caption}" TextTrimming="CharacterEllipsis"/>
+                                </Border>
+                            </Grid>
                         </Grid>
                     </TabItem>
 
@@ -1966,46 +2013,67 @@
                     <TabItem>
                         <Grid Background="{StaticResource T3.Surface}">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- Config Selection Bar -->
-                                <RowDefinition Height="Auto"/> <!-- Summary Metrics Strip -->
-                                <RowDefinition Height="*"/>    <!-- Main Content (Tree + Results) -->
+                                <RowDefinition Height="48"/>   <!-- Row 0: Page header band -->
+                                <RowDefinition Height="Auto"/> <!-- Row 1: Toolbar (CONFIGURATION) -->
+                                <RowDefinition Height="Auto"/> <!-- Row 2: KPI strip -->
+                                <RowDefinition Height="*"/>    <!-- Row 3: Split body (Tree + Results) -->
                             </Grid.RowDefinitions>
 
-                            <!-- Row 0: Config Selection Toolbar -->
-                            <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                    Padding="16,8">
+                            <!-- Row 0: Page header band -->
+                            <Border Grid.Row="0" Style="{StaticResource T3.TitleBar}" Padding="16,0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="260"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="Configuration:" Style="{StaticResource T3.Label}"
-                                               VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <ComboBox x:Name="cmbConfig" Grid.Column="1"
-                                              Style="{StaticResource T3.ComboBox}"
-                                              ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
-                                              Margin="0,0,8,0"/>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Button x:Name="btnSaveConfig" Content="Save"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <Button x:Name="btnDeleteConfig" Content="Delete"
-                                                Style="{StaticResource T3.Button.Danger}"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Grid.Column="0" Text="IFC-SG Compliance Checker"
+                                               Style="{StaticResource T3.Title}" VerticalAlignment="Center"/>
+                                    <Border Grid.Column="1" Width="1" Height="16" Margin="12,0"
+                                            Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Style="{StaticResource T3.Subtitle}"
+                                               Text="Check model parameters against an IFC-SG validation config"/>
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center"
+                                                Margin="16,0,0,0">
                                         <Button x:Name="btnImportXML" Content="Import XML..."
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
+                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
+                                                ToolTip="Import an Autodesk Model Checker XML as a configuration"/>
                                         <Button x:Name="btnImportExcel" Content="Import Excel..."
-                                                Style="{StaticResource T3.Button.Secondary}"/>
+                                                Style="{StaticResource T3.Button.Secondary}"
+                                                ToolTip="Import an Excel parameter mapping as a configuration"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
 
-                            <!-- Row 1: Summary Metric Cards Strip (Zero-Gap Flush) -->
+                            <!-- Row 1: Toolbar — CONFIGURATION -->
                             <Border Grid.Row="1" Background="{StaticResource T3.Surface}"
+                                    BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                                    Padding="16,8">
+                                <StackPanel HorizontalAlignment="Left">
+                                    <TextBlock Text="CONFIGURATION" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal" Height="{StaticResource T3.H.Action}">
+                                        <ComboBox x:Name="cmbConfig" Width="260"
+                                                  Style="{StaticResource T3.ComboBox}"
+                                                  ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
+                                                  VerticalAlignment="Center"/>
+                                        <Button x:Name="btnSaveConfig" Content="Save As..."
+                                                Style="{StaticResource T3.Button.Secondary}" Margin="8,0,0,0"
+                                                ToolTip="Save this configuration, with its enabled categories, to a new file"/>
+                                        <Button x:Name="btnDeleteConfig"
+                                                Style="{StaticResource T3.Button.Ghost}" Margin="8,0,0,0"
+                                                ToolTip="Delete the selected configuration file">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE74D;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="Delete" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Row 2: KPI strip — Caption + Display tiles, 1px rules -->
+                            <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
                                     Padding="16,12">
                                 <Grid>
@@ -2023,181 +2091,180 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Card 1: Parameters -->
                                     <StackPanel Grid.Column="0">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                                            <Ellipse Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.Text}"/>
-                                            <TextBlock Text="PARAMETERS" Style="{StaticResource T3.Caption}"/>
-                                        </StackPanel>
+                                        <TextBlock Text="PARAMETERS" Style="{StaticResource T3.Caption}"/>
                                         <TextBlock x:Name="txtTotalParams" Text="0" Style="{StaticResource T3.Display}"/>
                                     </StackPanel>
 
                                     <Border Grid.Column="1" Background="{StaticResource T3.Border}" Margin="0,4"/>
 
-                                    <!-- Card 2: Categories -->
                                     <StackPanel Grid.Column="2" Margin="16,0,0,0">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                                            <Ellipse Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.Ink}"/>
-                                            <TextBlock Text="CATEGORIES" Style="{StaticResource T3.Caption}"/>
-                                        </StackPanel>
+                                        <TextBlock Text="CATEGORIES" Style="{StaticResource T3.Caption}"/>
                                         <TextBlock x:Name="txtCategories" Text="0" Style="{StaticResource T3.Display}"/>
                                     </StackPanel>
 
                                     <Border Grid.Column="3" Background="{StaticResource T3.Border}" Margin="0,4"/>
 
-                                    <!-- Card 3: Passed -->
                                     <StackPanel Grid.Column="4" Margin="16,0,0,0">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                                            <Ellipse Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.Success.Accent}"/>
-                                            <TextBlock Text="PASSED" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Success.Text}"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="txtPassed" Text="0" Style="{StaticResource T3.Display}" Foreground="{StaticResource T3.Success.Text}"/>
+                                        <TextBlock Text="PASSED" Style="{StaticResource T3.Caption}"
+                                                   Foreground="{StaticResource T3.Success.Text}"/>
+                                        <TextBlock x:Name="txtPassed" Text="0" Style="{StaticResource T3.Display}"
+                                                   Foreground="{StaticResource T3.Success.Text}"/>
                                     </StackPanel>
 
                                     <Border Grid.Column="5" Background="{StaticResource T3.Border}" Margin="0,4"/>
 
-                                    <!-- Card 4: Failed -->
                                     <StackPanel Grid.Column="6" Margin="16,0,0,0">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                                            <Ellipse Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.Danger.Accent}"/>
-                                            <TextBlock Text="FAILED" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Danger.Text}"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="txtFailed" Text="0" Style="{StaticResource T3.Display}" Foreground="{StaticResource T3.Danger.Text}"/>
+                                        <TextBlock Text="FAILED" Style="{StaticResource T3.Caption}"
+                                                   Foreground="{StaticResource T3.Danger.Text}"/>
+                                        <TextBlock x:Name="txtFailed" Text="0" Style="{StaticResource T3.Display}"
+                                                   Foreground="{StaticResource T3.Danger.Text}"/>
                                     </StackPanel>
 
                                     <Border Grid.Column="7" Background="{StaticResource T3.Border}" Margin="0,4"/>
 
-                                    <!-- Card 5: Partial Warning -->
                                     <StackPanel Grid.Column="8" Margin="16,0,0,0">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                                            <Ellipse Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.Warning.Accent}"/>
-                                            <TextBlock Text="PARTIAL" Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Warning.Text}"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="txtWarning" Text="0" Style="{StaticResource T3.Display}" Foreground="{StaticResource T3.Warning.Text}"/>
+                                        <TextBlock Text="PARTIAL" Style="{StaticResource T3.Caption}"
+                                                   Foreground="{StaticResource T3.Warning.Text}"/>
+                                        <TextBlock x:Name="txtWarning" Text="0" Style="{StaticResource T3.Display}"
+                                                   Foreground="{StaticResource T3.Warning.Text}"/>
                                     </StackPanel>
 
                                     <Border Grid.Column="9" Background="{StaticResource T3.Border}" Margin="0,4"/>
 
-                                    <!-- Card 6: No Element -->
                                     <StackPanel Grid.Column="10" Margin="16,0,0,0">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                                            <Ellipse Style="{StaticResource T3.Dot}" Fill="{StaticResource T3.TextMuted}"/>
-                                            <TextBlock Text="NO ELEM" Style="{StaticResource T3.Caption}"/>
-                                        </StackPanel>
-                                        <TextBlock x:Name="txtNoElem" Text="0" Style="{StaticResource T3.Display}" Foreground="{StaticResource T3.TextMuted}"/>
+                                        <TextBlock Text="NO ELEMENTS" Style="{StaticResource T3.Caption}"/>
+                                        <TextBlock x:Name="txtNoElem" Text="0" Style="{StaticResource T3.Display}"
+                                                   Foreground="{StaticResource T3.TextMuted}"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
 
-                            <!-- Row 2: TreeView & Results Split -->
-                            <Grid Grid.Row="2">
+                            <!-- Row 3: Split body — Disciplines/Categories | Results -->
+                            <Grid Grid.Row="3">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" MinWidth="220"/>
+                                    <ColumnDefinition Width="320" MinWidth="260"/>
                                     <ColumnDefinition Width="1"/>
                                     <ColumnDefinition Width="*" MinWidth="450"/>
                                 </Grid.ColumnDefinitions>
-
-                                <!-- Left: Categories TreeView -->
-                                <Grid Grid.Column="0" Background="{StaticResource T3.Surface}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/> <!-- Tree Header & Toolbar -->
-                                        <RowDefinition Height="*"/>    <!-- TreeView -->
-                                    </Grid.RowDefinitions>
-
-                                    <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="12,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Disciplines / Categories" Style="{StaticResource T3.Label}"
-                                                       VerticalAlignment="Center"/>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Button x:Name="btnExpandAll" Content="Expand"
-                                                        Style="{StaticResource T3.Button.Secondary}" Margin="0,0,4,0"/>
-                                                <Button x:Name="btnCollapseAll" Content="Collapse"
-                                                        Style="{StaticResource T3.Button.Secondary}"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-
-                                    <TreeView x:Name="tvCategories" Grid.Row="1"
-                                              BorderThickness="0" Background="Transparent" Padding="4"/>
-                                </Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/> <!-- r0: pane header -->
+                                    <RowDefinition Height="Auto"/> <!-- r1: pane toolbar -->
+                                    <RowDefinition Height="*"/>    <!-- r2: content -->
+                                    <RowDefinition Height="Auto"/> <!-- r3: count strip -->
+                                </Grid.RowDefinitions>
 
                                 <!-- Divider -->
-                                <Border Grid.Column="1" Background="{StaticResource T3.Border}"/>
+                                <Border Grid.Column="1" Grid.RowSpan="4" Background="{StaticResource T3.Border}"/>
 
-                                <!-- Right: Results View -->
-                                <Grid Grid.Column="2" Background="{StaticResource T3.Surface}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/> <!-- Result Filter Toolbar -->
-                                        <RowDefinition Height="*"/>    <!-- Results Items Scroll -->
-                                    </Grid.RowDefinitions>
+                                <!-- Left r0: pane header -->
+                                <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource T3.ListHeader}">
+                                    <TextBlock Text="DISCIPLINES / CATEGORIES" Style="{StaticResource T3.ListHeader.Label}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </Border>
 
-                                    <!-- Filter Toolbar -->
-                                    <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="16,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="220"/>
-                                            </Grid.ColumnDefinitions>
+                                <!-- Left r1: pane toolbar -->
+                                <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource T3.Surface}"
+                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                                        Padding="16,8">
+                                    <StackPanel Orientation="Horizontal" Height="{StaticResource T3.H.Action}">
+                                        <Button x:Name="btnExpandAll" Content="Expand All"
+                                                Style="{StaticResource T3.Button.Ghost}"/>
+                                        <Button x:Name="btnCollapseAll" Content="Collapse All"
+                                                Style="{StaticResource T3.Button.Ghost}" Margin="8,0,0,0"/>
+                                    </StackPanel>
+                                </Border>
 
-                                            <TextBlock Grid.Column="0" Text="Filter:" Style="{StaticResource T3.Label}"
-                                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                            <Button Grid.Column="1" x:Name="btnFilterAll" Content="All"
-                                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,4,0"/>
-                                            <Button Grid.Column="2" x:Name="btnFilterFail" Content="Failed"
-                                                    Style="{StaticResource T3.Button.Danger}" Margin="0,0,4,0"/>
-                                            <Button Grid.Column="3" x:Name="btnFilterWarn" Content="Partial"
-                                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,4,0"/>
-                                            <Button Grid.Column="4" x:Name="btnFilterPass" Content="Passed"
-                                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                            <Button Grid.Column="5" x:Name="btnSelectAllFailed" Content="Select All Failed"
-                                                    Style="{StaticResource T3.Button.Danger}" IsEnabled="False"/>
-
-                                            <TextBox Grid.Column="7" x:Name="txtSearch"
-                                                     Style="{StaticResource T3.Search}"
-                                                     Tag="Search parameters..."/>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- Results Scrollable List -->
-                                    <Grid Grid.Row="1">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                        </Grid.RowDefinitions>
-
-                                        <Border Grid.Row="0" Padding="16,8"
-                                                BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                                Background="{StaticResource T3.Surface}">
-                                            <TextBlock x:Name="txtResultHeader" Text="Load a config and click Run Check"
-                                                       Style="{StaticResource T3.Title}"/>
-                                        </Border>
-
-                                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                                                      HorizontalScrollBarVisibility="Disabled" Padding="12">
-                                            <StackPanel x:Name="spResults"/>
-                                        </ScrollViewer>
+                                <!-- Left r2: category tree + empty overlay -->
+                                <Grid Grid.Row="2" Grid.Column="0">
+                                    <!-- Python adds TreeViewItem() objects straight into .Items, so they are
+                                         their own containers; the implicit style below reaches them (and their
+                                         nested children) where ItemContainerStyle does not. -->
+                                    <TreeView x:Name="tvCategories" Style="{StaticResource T3.TreeView}">
+                                        <TreeView.Resources>
+                                            <Style TargetType="TreeViewItem" BasedOn="{StaticResource T3.TreeViewItem}"/>
+                                        </TreeView.Resources>
+                                    </TreeView>
+                                    <Grid IsHitTestVisible="False" Panel.ZIndex="1" Margin="16">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasItems, ElementName=tvCategories}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <TextBlock x:Name="tvCategories_empty" Style="{StaticResource T3.Empty}"
+                                                   Text="No configuration loaded.&#x0a;Import an XML or Excel config to list disciplines and categories."/>
                                     </Grid>
                                 </Grid>
+
+                                <!-- Left r3: count strip -->
+                                <Border Grid.Row="3" Grid.Column="0" Style="{StaticResource T3.ListHeader}"
+                                        BorderThickness="0,1,0,0">
+                                    <TextBlock x:Name="txtTreeCount" Text="0 categories"
+                                               Style="{StaticResource T3.Caption}" TextTrimming="CharacterEllipsis"/>
+                                </Border>
+
+                                <!-- Right r0: pane header -->
+                                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource T3.ListHeader}">
+                                    <TextBlock x:Name="txtResultHeader" Text="Check results"
+                                               Style="{StaticResource T3.BodyStrong}"/>
+                                </Border>
+
+                                <!-- Right r1: pane toolbar — filter chips · Select All Failed · search -->
+                                <Border Grid.Row="1" Grid.Column="2" Background="{StaticResource T3.Surface}"
+                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                                        Padding="16,8">
+                                    <Grid Height="{StaticResource T3.H.Action}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*" MinWidth="160"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <RadioButton x:Name="btnFilterAll" Content="All" GroupName="ifcsg_result_filter"
+                                                         Style="{StaticResource T3.Chip}" IsChecked="True"/>
+                                            <RadioButton x:Name="btnFilterFail" Content="Failed" GroupName="ifcsg_result_filter"
+                                                         Style="{StaticResource T3.Chip}"/>
+                                            <RadioButton x:Name="btnFilterWarn" Content="Partial" GroupName="ifcsg_result_filter"
+                                                         Style="{StaticResource T3.Chip}"/>
+                                            <RadioButton x:Name="btnFilterPass" Content="Passed" GroupName="ifcsg_result_filter"
+                                                         Style="{StaticResource T3.Chip}" Margin="0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" x:Name="btnSelectAllFailed" Content="Select All Failed"
+                                                Style="{StaticResource T3.Button.Secondary}" Margin="8,0,0,0"
+                                                IsEnabled="False"
+                                                ToolTip="Select every failed or partial element in Revit"/>
+                                        <TextBox Grid.Column="2" x:Name="txtSearch" Margin="16,0,0,0"
+                                                 Style="{StaticResource T3.Search}"
+                                                 Tag="Search parameters..." VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Right r2: results + empty overlay (toggled from Python: spResults is a StackPanel) -->
+                                <Grid Grid.Row="2" Grid.Column="2">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled" Padding="16,8,12,8">
+                                        <StackPanel x:Name="spResults"/>
+                                    </ScrollViewer>
+                                    <TextBlock x:Name="spResults_empty" Style="{StaticResource T3.Empty}"
+                                               IsHitTestVisible="False" Panel.ZIndex="1" Margin="16"
+                                               Text="No results yet. Choose a configuration and click Run Check."/>
+                                </Grid>
+
+                                <!-- Right r3: count strip -->
+                                <Border Grid.Row="3" Grid.Column="2" Style="{StaticResource T3.ListHeader}"
+                                        BorderThickness="0,1,0,0">
+                                    <TextBlock x:Name="txtResultsCount" Text="0 checks"
+                                               Style="{StaticResource T3.Caption}" TextTrimming="CharacterEllipsis"/>
+                                </Border>
                             </Grid>
                         </Grid>
                     </TabItem>
                 </TabControl>
-
-                <!-- ══════════════════ ROW 2: UNIFIED FOOTER BAR ══════════════════ -->
             </Grid>
 
             <!-- ══════════════════ ROW 2: UNIFIED FOOTER BAR ══════════════════ -->
@@ -2208,16 +2275,18 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Copyright + Status -->
+                    <!-- Left: Copyright · rule · status dot · status (text kept per page by Python) -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource T3.Copyright}"/>
                         <Border Width="1" Height="16" Margin="12,0"
                                 Background="{StaticResource T3.Border}" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="txtStatus" Text="Ready"
+                        <Ellipse x:Name="status_dot" Style="{StaticResource T3.Dot}"
+                                 Fill="{StaticResource T3.TextDisabled}"/>
+                        <TextBlock x:Name="txtStatus" Text="Load a mapping Excel to start"
                                    Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- Right: Progress + Action Buttons -->
+                    <!-- Right: Progress + the action group of the visible page -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <StackPanel x:Name="ifc_progress_panel"
                                     Orientation="Horizontal" VerticalAlignment="Center"
@@ -2236,10 +2305,44 @@
                                     Style="{StaticResource T3.Button.Danger}"/>
                         </StackPanel>
 
-                        <Button x:Name="btnExportExcel" Content="Export Results..."
-                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                        <Button x:Name="btnRunCheck" Content="Run Check"
-                                Style="{StaticResource T3.Button.Primary}" IsDefault="True"/>
+                        <!-- Assigner actions: visible only while page 0 is shown -->
+                        <StackPanel x:Name="footer_actions_assigner" Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedIndex, ElementName=main_tab_control}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <Button x:Name="btnAutoAssign" Content="Auto Assign All"
+                                    Style="{StaticResource T3.Button.Secondary}"
+                                    ToolTip="Give every unassigned type its component's first IFC entity and subtype"/>
+                        </StackPanel>
+
+                        <!-- Checker actions: visible only while page 1 is shown. Run Check is the file's
+                             only Primary and the IsDefault button; collapsed on the Assigner, so Enter
+                             there runs nothing. Both stay disabled until they can work (Python). -->
+                        <StackPanel x:Name="footer_actions_checker" Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedIndex, ElementName=main_tab_control}" Value="1">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <Button x:Name="btnExportExcel" Content="Export Results..."
+                                    Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
+                                    IsEnabled="False"/>
+                            <Button x:Name="btnRunCheck" Content="Run Check"
+                                    Style="{StaticResource T3.Button.Primary}" IsDefault="True"
+                                    IsEnabled="False"/>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </Border>
