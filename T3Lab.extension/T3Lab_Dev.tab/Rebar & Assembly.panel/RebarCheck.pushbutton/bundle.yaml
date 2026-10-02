@@ -1,0 +1,9 @@
+title: "Rebar\nCheck"
+tooltip: "Find rebar without a valid host, rebar missing from its assembly, assemblies without drawings, duplicate numbers and bars outside their host - data checks Revit does not run (Tekla: model checks)"
+description: |
+  Checks: no valid host, not in assembly, no drawing, duplicate number, outside host, no partition, shape unknown
+  Fix: sync loose rebar into its assembly in one undo step, or hand bars to Cast Unit Manager to assign a partition
+  Review: select the offending elements in Revit or isolate them in the active view
+  Read-only scan: nothing changes until you press Fix
+author: "Tran Tien Thanh"
+version: "1.0.0"
