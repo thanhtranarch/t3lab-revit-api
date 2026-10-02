@@ -3,7 +3,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- ba be day net khac nhau -->
   <rect x="3.5" y="5.5" width="25" height="21" fill="#EDEDED" stroke="#EDEDED" stroke-width="1"/>
-  <rect x="6" y="9" width="20" height="1" fill="#A8A8A8"/>
-  <rect x="6" y="13" width="20" height="2" fill="#FFFFFF"/>
-  <rect x="6" y="18" width="20" height="3" fill="#FFC14D"/>
+  <rect x="8" y="10" width="16" height="1" fill="#A8A8A8"/>
+  <rect x="8" y="14" width="16" height="2" fill="#FFFFFF"/>
+  <rect x="8" y="19" width="16" height="3" fill="#FFC14D"/>
 </svg>

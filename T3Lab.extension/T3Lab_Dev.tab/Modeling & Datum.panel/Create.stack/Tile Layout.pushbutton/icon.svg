@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- tier B - cac view xep luoi tren sheet -->
+  <!-- tier B - cac view xep luoi tren sheet, o tiep theo dang dat -->
   <rect x="2.5" y="4.5" width="27" height="23" fill="#F3F3F3" stroke="#000000" stroke-width="1"/>
-  <rect x="5" y="7" width="10" height="8" fill="#858585"/>
-  <rect x="18" y="7" width="9" height="8" fill="#858585"/>
-  <rect x="5" y="18" width="22" height="7" fill="#E07B00"/>
+  <rect x="6" y="8" width="8" height="6" fill="#858585"/>
+  <rect x="18" y="8" width="8" height="6" fill="#858585"/>
+  <rect x="6" y="18" width="8" height="6" fill="#E07B00"/>
 </svg>
