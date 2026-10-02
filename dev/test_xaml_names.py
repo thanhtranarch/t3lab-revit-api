@@ -25,7 +25,9 @@ REQUIRED = {
                       'dim_checked_count', 'txt_checked_count',
                       # staged renames: Apply buttons, grids, mode chips
                       'btn_dim_apply', 'btn_txt_apply', 'dg_dim', 'dg_txt',
-                      'rb_dim_inst', 'rb_dim_type', 'rb_notes', 'rb_types'],
+                      'rb_dim_inst', 'rb_dim_type', 'rb_notes', 'rb_types',
+                      # labels written from the project's units at open
+                      'btn_dim_rename_all', 'btn_txt_rename_all', 'lbl_dimtext_filter'],
     'DimText.xaml': ['chk_leader', 'rb_view', 'chk_filter_enable',
                      'sp_filter_config', 'combo_combine', 'sp_rules', 'lbl_status'],
     'ContainsDefineValue.xaml': ['avail_list', 'selected_list', 'txt_sep',

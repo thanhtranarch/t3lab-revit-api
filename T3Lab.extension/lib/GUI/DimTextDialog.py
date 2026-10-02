@@ -30,6 +30,7 @@ from System.Windows.Controls import Orientation as WPFOrientation
 from Autodesk.Revit.DB import Dimension, FilteredElementCollector, Transaction
 from pyrevit import revit, forms, script
 from GUI.WPF_Base import T3WPFWindow
+from Snippets._units import project_length_unit
 
 # ── VARIABLES ─────────────────────────────────────────────────────────────────
 # `revit.doc` / `revit.uidoc` RAISE AttributeError (not return None) when no
@@ -44,6 +45,10 @@ try:
     doc = revit.doc
 except Exception:
     doc = None
+# Length unit of the project: segment-length rules are typed and labelled in
+# it. Re-read with the document per launch (show_dialog here, and
+# ManaAnnoDialog._refresh_active_document for the Dim Text page).
+unit = project_length_unit(doc)
 logger = script.get_logger()
 
 XAML_PATH = os.path.join(os.path.dirname(__file__), "Tools", "DimText.xaml")
@@ -67,17 +72,19 @@ _TWO_VALUE_OPS = {"between"}
 
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
-def _feet_to_mm(value):
-    if value is None:
-        return None
-    return float(value) * 304.8
+def _length_of(item):
+    """Value of a Dimension / DimensionSegment (Nullable<double>, internal
+    feet) as a Python float, or None when it has no value."""
+    value = item.Value
+    return None if value is None else float(value)
 
 
 def _set_dim_text(dim, prefix, suffix, above, below, override, filter_fn=None):
-    """Apply text overrides, optionally filtered by segment length (mm)."""
+    """Apply text overrides, optionally only to the segments whose length
+    passes `filter_fn` (internal feet, as Revit reports Value)."""
     if dim.HasOneSegment():
-        length_mm = _feet_to_mm(dim.Value)
-        if filter_fn is None or (length_mm is not None and filter_fn(length_mm)):
+        length = _length_of(dim)
+        if filter_fn is None or (length is not None and filter_fn(length)):
             dim.Prefix        = prefix
             dim.Suffix        = suffix
             dim.Above         = above
@@ -85,8 +92,8 @@ def _set_dim_text(dim, prefix, suffix, above, below, override, filter_fn=None):
             dim.ValueOverride = override
     else:
         for seg in dim.Segments:
-            length_mm = _feet_to_mm(seg.Value)
-            if filter_fn is None or (length_mm is not None and filter_fn(length_mm)):
+            length = _length_of(seg)
+            if filter_fn is None or (length is not None and filter_fn(length)):
                 seg.Prefix        = prefix
                 seg.Suffix        = suffix
                 seg.Above         = above
@@ -127,12 +134,26 @@ def _t3_style(host, key):
         return None
 
 
-def create_rule_row(host, on_remove):
+def _length_unit(length_unit=None):
+    """The unit rule values are in: the caller's, else this launch's project unit."""
+    return length_unit if length_unit is not None else unit
+
+
+def _value_tooltip(length_unit):
+    """Tooltip of a rule value box: the unit a bare number is in, and that a
+    typed unit always wins."""
+    return (u"Length in {}. A typed unit wins: 1200 mm, 1.2 m, 3'-6\" "
+            u"or 42\".").format(length_unit.tag)
+
+
+def create_rule_row(host, on_remove, length_unit=None):
     """Một dòng rule lọc theo chiều dài: toán tử · giá trị · (and giá trị) · Remove.
 
     Mọi màu / font / cỡ lấy từ style T3 của `host` — không hardcode.
-    `on_remove(rd)` được gọi khi bấm Remove.
+    `on_remove(rd)` được gọi khi bấm Remove. Nhãn đơn vị cạnh ô giá trị là đơn
+    vị chiều dài của project (`length_unit`, mặc định: unit của lần mở này).
     """
+    length_unit = _length_unit(length_unit)
     rd = {}
     row = StackPanel()
     row.Orientation = WPFOrientation.Horizontal
@@ -154,8 +175,9 @@ def create_rule_row(host, on_remove):
     def _value_box():
         box = TextBox()
         box.Style = _t3_style(host, "T3.TextBox.Mono")
-        box.Width = 72
+        box.Width = 96                     # fits 12' - 6 1/2" in a ft-in project
         box.Margin = Thickness(0, 0, 4, 0)
+        box.ToolTip = _value_tooltip(length_unit)
         return box
 
     def _caption(text):
@@ -167,11 +189,11 @@ def create_rule_row(host, on_remove):
         return lbl
 
     rd["txt1"] = _value_box()
-    rd["lbl_mm"] = _caption("mm")
+    rd["lbl_unit"] = _caption(length_unit.tag)
     rd["lbl_and"] = _caption("and")
     rd["txt2"] = _value_box()
-    rd["lbl_mm2"] = _caption("mm")
-    for key in ("txt1", "lbl_mm", "lbl_and", "txt2", "lbl_mm2"):
+    rd["lbl_unit2"] = _caption(length_unit.tag)
+    for key in ("txt1", "lbl_unit", "lbl_and", "txt2", "lbl_unit2"):
         row.Children.Add(rd[key])
 
     btn = Button()
@@ -186,47 +208,59 @@ def create_rule_row(host, on_remove):
         op = sel.Content if sel is not None else ""
         v1 = Visibility.Collapsed if op in _NO_VALUE_OPS else Visibility.Visible
         v2 = Visibility.Visible if op in _TWO_VALUE_OPS else Visibility.Collapsed
-        rd["txt1"].Visibility = rd["lbl_mm"].Visibility = v1
-        rd["lbl_and"].Visibility = rd["txt2"].Visibility = rd["lbl_mm2"].Visibility = v2
+        rd["txt1"].Visibility = rd["lbl_unit"].Visibility = v1
+        rd["lbl_and"].Visibility = rd["txt2"].Visibility = rd["lbl_unit2"].Visibility = v2
 
     combo.SelectionChanged += _sync
     _sync()
     return rd
 
 
-def _to_float(text):
+def _rule_length(box, length_unit, number):
+    """A rule value box → internal feet. A bare number is in the project unit,
+    a typed unit wins ("1200 mm", "3'-6\""). Not a length → ValueError that
+    names the rule, so the caller shows it and changes nothing."""
     try:
-        return float((text or "").strip() or "0")
-    except ValueError:
-        return 0.0
+        return length_unit.parse(box.Text)
+    except ValueError as error:
+        raise ValueError(u"Length rule {}: {}".format(number, error))
 
 
-def build_filter_fn(rules, use_and):
-    """Hàm lọc theo chiều dài segment (mm) từ danh sách rule; None nếu không có rule."""
+def build_filter_fn(rules, use_and, length_unit=None):
+    """Hàm lọc theo chiều dài segment từ danh sách rule; None nếu không có rule.
+
+    Giá trị gõ theo đơn vị chiều dài của project (`length_unit`); hàm lọc nhận
+    chiều dài nội bộ của Revit (feet). "equals" = đọc ra giống nhau trong đơn vị
+    project (mm: ±0.5 mm, ft-in: ±1/16"). Giá trị không phải chiều dài →
+    ValueError (nêu số thứ tự rule) — người gọi báo lỗi, không ghi gì.
+    """
+    length_unit = _length_unit(length_unit)
     parsed = []
-    for rd in rules:
+    for number, rd in enumerate(rules, 1):
         sel = rd["combo"].SelectedItem
         if sel is None:
             continue
         op = sel.Content
-        v1 = 0.0 if op in _NO_VALUE_OPS else _to_float(rd["txt1"].Text)
-        v2 = _to_float(rd["txt2"].Text) if op in _TWO_VALUE_OPS else 0.0
-        parsed.append((op, v1, v2))
+        v1 = None if op in _NO_VALUE_OPS else _rule_length(rd["txt1"], length_unit, number)
+        v2 = _rule_length(rd["txt2"], length_unit, number) if op in _TWO_VALUE_OPS else None
+        shown = length_unit.text(v1) if v1 is not None else None
+        parsed.append((op, v1, v2, shown))
     if not parsed:
         return None
 
-    def filter_fn(length_mm):
-        if length_mm is None:
+    def filter_fn(length):
+        """`length` in internal feet (Dimension / DimensionSegment .Value)."""
+        if length is None:
             return False
         results = []
-        for op, v1, v2 in parsed:
-            if   op == "equals":                      results.append(abs(length_mm - v1) < 0.5)
-            elif op == "does not equal":              results.append(abs(length_mm - v1) >= 0.5)
-            elif op == "is greater than":             results.append(length_mm >  v1)
-            elif op == "is greater than or equal to": results.append(length_mm >= v1)
-            elif op == "is less than":                results.append(length_mm <  v1)
-            elif op == "is less than or equal to":    results.append(length_mm <= v1)
-            elif op == "between":                     results.append(min(v1, v2) <= length_mm <= max(v1, v2))
+        for op, v1, v2, shown in parsed:
+            if   op == "equals":                      results.append(length_unit.text(length) == shown)
+            elif op == "does not equal":              results.append(length_unit.text(length) != shown)
+            elif op == "is greater than":             results.append(length >  v1)
+            elif op == "is greater than or equal to": results.append(length >= v1)
+            elif op == "is less than":                results.append(length <  v1)
+            elif op == "is less than or equal to":    results.append(length <= v1)
+            elif op == "between":                     results.append(min(v1, v2) <= length <= max(v1, v2))
             elif op == "has a value":                 results.append(True)
             elif op == "has no value":                results.append(False)
         if not results:
@@ -257,7 +291,8 @@ class DimTextWindow(T3WPFWindow):
 
     def __init__(self):
         T3WPFWindow.__init__(self, XAML_PATH)
-        self._rules = []  # list of dicts: {panel, combo, txt1, txt2, lbl_and, lbl_mm2}
+        self._unit = unit  # project length unit, re-read by show_dialog per launch
+        self._rules = []  # list of dicts: {panel, combo, txt1, txt2, lbl_unit, lbl_and, lbl_unit2}
         # Pre-cache all named controls immediately so they remain accessible after
         # the content grid is detached from this Window and embedded into a parent.
         for _n in ("txt_prefix", "txt_suffix", "txt_above", "txt_below", "txt_override",
@@ -305,7 +340,7 @@ class DimTextWindow(T3WPFWindow):
         self.sp_rules.Children.Add(rd["panel"])
 
     def _create_rule_row(self):
-        return create_rule_row(self, self._remove_rule)
+        return create_rule_row(self, self._remove_rule, self._unit)
 
     def _remove_rule(self, rd):
         self.sp_rules.Children.Remove(rd["panel"])
@@ -315,7 +350,8 @@ class DimTextWindow(T3WPFWindow):
     def _build_filter_fn(self):
         if not self.chk_filter_enable.IsChecked or not self._rules:
             return None
-        return build_filter_fn(self._rules, self.combo_combine.SelectedIndex == 0)
+        return build_filter_fn(self._rules, self.combo_combine.SelectedIndex == 0,
+                               self._unit)
 
     # ── apply ──────────────────────────────────────────────────────────────────
     def apply_clicked(self, sender, args):
@@ -325,7 +361,11 @@ class DimTextWindow(T3WPFWindow):
         below    = self.txt_below.Text.strip()
         override = self.txt_override.Text.strip()
         leader_off = bool(self.chk_leader.IsChecked)
-        filter_fn  = self._build_filter_fn()
+        try:
+            filter_fn = self._build_filter_fn()
+        except ValueError as ex:
+            self.lbl_status.Text = u"{} Nothing was changed.".format(ex)
+            return
 
         if self.rb_view.IsChecked:
             dims = _get_dims_in_view()
@@ -356,8 +396,9 @@ class DimTextWindow(T3WPFWindow):
 
 def show_dialog():
     # Imported once per Revit session: re-read the active document so the
-    # window never works on the project that was open at first import.
-    global doc, uidoc
+    # window never works on the project that was open at first import. The
+    # length unit belongs to the document, so it is re-read with it.
+    global doc, uidoc, unit
     try:
         uidoc = revit.uidoc
     except Exception:
@@ -366,6 +407,7 @@ def show_dialog():
         doc = revit.doc
     except Exception:
         doc = None
+    unit = project_length_unit(doc)
     DimTextWindow().ShowDialog()
 
 if __name__ == '__main__':

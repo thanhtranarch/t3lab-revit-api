@@ -1966,7 +1966,7 @@
                                                     </DataGridTextColumn>
                                                     <DataGridTextColumn Header="VIEW" Binding="{Binding View}" Width="200" IsReadOnly="True"
                                                                         ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                                    <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="72" IsReadOnly="True" Visibility="Collapsed"
+                                                    <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="88" IsReadOnly="True" Visibility="Collapsed"
                                                                         HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"
                                                                         ElementStyle="{StaticResource T3.Cell.Center}"/>
                                                     <DataGridTextColumn Header="FONT" Binding="{Binding Font}" Width="100" IsReadOnly="True" Visibility="Collapsed"
@@ -2014,9 +2014,9 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
                                             <TextBlock Text="AUTO-RENAME TYPES" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                            <Button Style="{StaticResource T3.Button.Secondary}" HorizontalAlignment="Left"
+                                            <Button x:Name="btn_dim_rename_all" Style="{StaticResource T3.Button.Secondary}" HorizontalAlignment="Left"
                                                     Click="dim_rename_all"
-                                                    ToolTip="Rename every dimension type from its settings: [discipline]_DIM_[size]_[font]_[width]_[background]_[color]_[center]_[prefix]_[elevation]_[rounding]. Empty parts are left out.">
+                                                    ToolTip="Rename every dimension type from its settings: [discipline]_DIM_[size]_[font]_[width]_[background]_[color]_[center]_[prefix]_[elevation]_[rounding]. [size] is the text size in mm, e.g. 2.50mm. Empty parts are left out.">
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="&#xE8AC;" Style="{StaticResource T3.Icon.Lead}"/>
                                                     <TextBlock Text="Rename All" VerticalAlignment="Center"/>
@@ -2192,7 +2192,7 @@
                                                                         ElementStyle="{StaticResource T3.Body.Secondary}"/>
                                                     <DataGridTextColumn Header="VIEW" Binding="{Binding View}" Width="160" IsReadOnly="True"
                                                                         ElementStyle="{StaticResource T3.Body.Secondary}"/>
-                                                    <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="72" IsReadOnly="True" Visibility="Collapsed"
+                                                    <DataGridTextColumn Header="SIZE" Binding="{Binding Size}" Width="88" IsReadOnly="True" Visibility="Collapsed"
                                                                         HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}"
                                                                         ElementStyle="{StaticResource T3.Cell.Center}"/>
                                                     <DataGridTextColumn Header="FONT" Binding="{Binding Font}" Width="100" IsReadOnly="True" Visibility="Collapsed"
@@ -2240,9 +2240,9 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
                                             <TextBlock Text="AUTO-RENAME TYPES" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                                            <Button Style="{StaticResource T3.Button.Secondary}" HorizontalAlignment="Left"
+                                            <Button x:Name="btn_txt_rename_all" Style="{StaticResource T3.Button.Secondary}" HorizontalAlignment="Left"
                                                     Click="txt_rename_all"
-                                                    ToolTip="Rename every text note type from its settings: [discipline]_TXT_[size]_[font]_[width]_[background]_[color]_[border]_[B/U/I]. Empty parts are left out.">
+                                                    ToolTip="Rename every text note type from its settings: [discipline]_TXT_[size]_[font]_[width]_[background]_[color]_[border]_[B/U/I]. [size] is the text size in mm, e.g. 2.50mm. Empty parts are left out.">
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="&#xE8AC;" Style="{StaticResource T3.Icon.Lead}"/>
                                                     <TextBlock Text="Rename All" VerticalAlignment="Center"/>
@@ -2464,7 +2464,7 @@
 
                                                 <Separator Style="{StaticResource T3.Rule}" Margin="0,16"/>
 
-                                                <TextBlock Text="FILTER BY SEGMENT LENGTH" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
+                                                <TextBlock x:Name="lbl_dimtext_filter" Text="FILTER BY SEGMENT LENGTH" Style="{StaticResource T3.Label}" Margin="0,0,0,8"/>
                                                 <CheckBox x:Name="chk_filter_enable" Content="Only change segments whose length matches the rules"
                                                           Style="{StaticResource T3.CheckBox}"
                                                           Checked="dimtext_filter_toggle" Unchecked="dimtext_filter_toggle"/>

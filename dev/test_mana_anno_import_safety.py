@@ -804,5 +804,423 @@ class ManaAnnoStagingSource(unittest.TestCase):
         self.assertIn("_stage_edit(store", source)
         self.assertIn("self._sync_apply(PAGE_TXT)", source)
 
+
+# ── Project units (2026-10-02) ────────────────────────────────────────────
+# Lengths follow the project: segment lengths on the Dim Text page are typed
+# and labelled in the project's length unit; text sizes are measured on paper,
+# so they are mm in a metric project and inches in an imperial one
+# (Snippets._units.paper_unit). Everything goes through Snippets/_units.py.
+
+DIM_TEXT = os.path.join(GUI_DIR, "DimTextDialog.py")
+
+
+def _units_module():
+    sys.path.insert(0, LIB_DIR)
+    try:
+        from Snippets import _units
+        from GUI.GridPendingEdits import column_key
+    finally:
+        sys.path.remove(LIB_DIR)
+    return _units, column_key
+
+
+U, _COLUMN_KEY = _units_module()
+MM = U.LengthUnit("millimeters")
+METERS = U.LengthUnit("meters")
+FTIN = U.LengthUnit("feetFractionalInches")
+IN = 1.0 / 12.0                                     # one inch in internal feet
+
+
+def _exec_from(path, names=(), funcs=(), cls=None, methods=(), extra=None):
+    """Chosen module assignments / functions / class methods of `path`,
+    exec'd with `extra` fakes for the WPF / Revit names they use."""
+    tree = ast.parse(_read(path), filename=path)
+    body = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and _assign_names(node) & set(names):
+            body.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in funcs:
+            body.append(node)
+        elif isinstance(node, ast.ClassDef) and node.name == cls:
+            node.bases = []
+            node.body = [m for m in node.body
+                         if isinstance(m, ast.FunctionDef) and m.name in methods]
+            body.append(node)
+    scope = {"paper_unit": U.paper_unit, "project_length_unit": U.project_length_unit,
+             "MM_PER_FT": U.MM_PER_FT, "column_key": _COLUMN_KEY}
+    scope.update(extra or {})
+    exec(compile(ast.Module(body=body, type_ignores=[]), path, "exec"), scope)
+    return scope
+
+
+class _BIP(object):
+    """BuiltInParameter stand-in: every member is its own name."""
+
+    def __getattr__(self, name):
+        return name
+
+
+class _Param(object):
+    def __init__(self, double=0.0, string="", integer=0, value_string=""):
+        self._d, self._s, self._i, self._v = double, string, integer, value_string
+
+    def AsDouble(self):
+        return self._d
+
+    def AsString(self):
+        return self._s
+
+    def AsInteger(self):
+        return self._i
+
+    def AsValueString(self):
+        return self._v
+
+
+class _AnnoType(object):
+    """DimensionType / TextNoteType stand-in (no GetUnitsFormatOptions)."""
+
+    def __init__(self, params):
+        self._params = params
+
+    def get_Parameter(self, bip):
+        return self._params.get(bip)
+
+
+def _legacy_size(feet):
+    """The size text Rename All wrote before units were read (metric names)."""
+    return "{:.2f}mm".format(round(feet * 304.8, 2))
+
+
+NAMING_NAMES = ("NAMING_TEMPLATES", "_DIM_COLORS", "_TXT_COLORS", "_INCH_GRID",
+                "_FIELD_TOKENS", "_TYPE_INDICATORS", "_RENAME_NOUNS",
+                "_EXAMPLE_TEXT_SIZE", "_PAPER_SIZE_COLUMNS")
+NAMING_FUNCS = ("_rgb", "_sanitize", "_param_text", "_paper_size", "_size_name",
+                "_size_cell", "_rename_tooltip", "_dim_name", "_txt_name")
+
+
+class ManaAnnoTextSizeUnits(unittest.TestCase):
+    """Text sizes (SIZE column, Rename All names) are in the paper unit."""
+
+    def setUp(self):
+        import math
+        self.s = _exec_from(MANA_ANNO, NAMING_NAMES, NAMING_FUNCS,
+                            extra={"math": math, "re": re, "BuiltInParameter": _BIP(),
+                                   "ElementId": SimpleNamespace(InvalidElementId=None)})
+
+    def test_metric_names_are_exactly_what_rename_all_always_wrote(self):
+        """A metric project keeps its names: no type is renamed differently,
+        including sizes on a half-hundredth (1.875 mm) where a reciprocal
+        conversion would land one bit off."""
+        size = self.s["_paper_size"]
+        sizes_mm = [i / 1000.0 for i in range(1, 20001)]
+        sizes_in = [n / float(d) for d in (8, 16, 32, 64) for n in range(1, 2 * d)]
+        feet = [mm / 304.8 for mm in sizes_mm] + [inch * IN for inch in sizes_in]
+        for paper in (None, MM, METERS, U.paper_unit(METERS)):
+            for value in feet[::7] + [1.875 / 304.8, 2.495 / 304.8]:
+                self.assertEqual("".join(size(value, paper)), _legacy_size(value))
+
+    def test_imperial_sizes_are_fractional_inches(self):
+        size = self.s["_size_name"]
+        cases = {3.0 / 32: '3/32"', 1.0 / 8: '1/8"', 3.0 / 16: '3/16"', 1.0 / 4: '1/4"',
+                 5.0 / 64: '5/64"', 1.0: '1"', 1.25: '1 1/4"'}
+        for inches, text in cases.items():
+            self.assertEqual(size(_Param(inches * IN), FTIN), text)
+            self.assertEqual(size(_Param(inches * IN), U.paper_unit(FTIN)), text)
+        # A metric size in an imperial project is not passed off as 3/32"
+        self.assertEqual(size(_Param(2.5 / 304.8), FTIN), '0.098"')
+
+    def test_size_column_holds_the_number_and_the_header_the_unit(self):
+        cell = self.s["_size_cell"]
+        self.assertEqual(cell(_Param(2.5 / 304.8), MM), "2.50")
+        self.assertEqual(cell(_Param(3.0 / 32 * IN), FTIN), "3/32")
+
+    def text_type(self, size_feet):
+        return _AnnoType({"TEXT_SIZE": _Param(size_feet), "TEXT_FONT": _Param(string="Arial"),
+                          "TEXT_BACKGROUND": _Param(integer=1),
+                          "TEXT_WIDTH_SCALE": _Param(1.0), "LINE_COLOR": _Param(integer=0)})
+
+    def dim_type(self, size_feet):
+        return _AnnoType({"TEXT_SIZE": _Param(size_feet), "TEXT_FONT": _Param(string="Arial"),
+                          "TEXT_WIDTH_SCALE": _Param(0.8),
+                          "DIM_TEXT_BACKGROUND": _Param(value_string="Opaque"),
+                          "LINE_COLOR": _Param(integer=0)})
+
+    def test_type_names_per_unit_system(self):
+        txt, dim = self.s["_txt_name"], self.s["_dim_name"]
+        metric = 2.5 / 304.8
+        imperial = 3.0 / 32 * IN
+        self.assertEqual(txt(self.text_type(metric), "Old", MM), "ARC_TXT_2.50mm_Arial_1_Transparent")
+        self.assertEqual(txt(self.text_type(metric), "Old"), "ARC_TXT_2.50mm_Arial_1_Transparent")
+        self.assertEqual(txt(self.text_type(imperial), "STR old", U.paper_unit(FTIN)),
+                         'STR_TXT_3/32"_Arial_1_Transparent')
+        self.assertEqual(dim(self.dim_type(metric), "Old", MM), "ARC_DIM_2.50mm_Arial_0.8_Opaque")
+        self.assertEqual(dim(self.dim_type(imperial), "Old", FTIN),
+                         'ARC_DIM_3/32"_Arial_0.8_Opaque')
+
+    def test_size_name_has_no_character_revit_refuses_in_a_name(self):
+        for paper in (MM, FTIN):
+            for inches in (3.0 / 32, 1.25, 0.0984):
+                name = self.s["_size_name"](_Param(inches * IN), paper)
+                self.assertFalse(set(name) & set('\\:{}[]|;<>?`~'), name)
+
+    def test_rename_tooltip_follows_the_template_and_the_unit(self):
+        tip = self.s["_rename_tooltip"]
+        for kind, indicator in (("Dimension", "_DIM_"), ("TextNote", "_TXT_")):
+            metric, imperial = tip(kind, MM), tip(kind, U.paper_unit(FTIN))
+            self.assertIn(indicator, metric)
+            self.assertIn("text size in mm, e.g. 2.50mm", metric)
+            self.assertIn('text size in inches, e.g. 3/32"', imperial)
+            fields = self.s["NAMING_TEMPLATES"][kind]["Fields"]
+            self.assertEqual(metric.split(": ", 1)[1].split(". ")[0].count("_"), len(fields) - 1)
+
+    def test_xaml_tooltip_is_the_metric_runtime_text(self):
+        """The XAML default (shown before Python runs) is the metric tooltip."""
+        xaml = _read(MANA_ANNO_XAML)
+        for name, kind in (("btn_dim_rename_all", "Dimension"), ("btn_txt_rename_all", "TextNote")):
+            tag = re.search(r'<Button x:Name="%s"[^>]*>' % name, xaml).group(0)
+            self.assertIn('ToolTip="%s"' % self.s["_rename_tooltip"](kind, MM), tag)
+
+
+class _Columns(object):
+    def __init__(self, *paths):
+        self.Columns = [SimpleNamespace(Binding=SimpleNamespace(Path=SimpleNamespace(Path=p)),
+                                        SortMemberPath=p, Header=p.upper()) for p in paths]
+
+
+class ManaAnnoUnitLabels(unittest.TestCase):
+    """Every label that names a unit is written from the unit of the launch."""
+
+    def window(self, length_unit):
+        s = _exec_from(MANA_ANNO, NAMING_NAMES, NAMING_FUNCS, "AnnotationManagerWindow",
+                       ("_apply_units",), extra={"math": __import__("math")})
+        win = s["AnnotationManagerWindow"].__new__(s["AnnotationManagerWindow"])
+        win._unit, win._paper = length_unit, U.paper_unit(length_unit)
+        win.dg_dim, win.dg_txt = _Columns("Name", "Size", "Font"), _Columns("Name", "Size")
+        win.btn_dim_rename_all = SimpleNamespace(ToolTip="")
+        win.btn_txt_rename_all = SimpleNamespace(ToolTip="")
+        win.lbl_dimtext_filter = SimpleNamespace(Text="")
+        win._apply_units()
+        return win
+
+    def test_metric_project(self):
+        win = self.window(MM)
+        self.assertEqual([c.Header for c in win.dg_dim.Columns], ["NAME", "SIZE (MM)", "FONT"])
+        self.assertEqual(win.dg_txt.Columns[1].Header, "SIZE (MM)")
+        self.assertEqual(win.lbl_dimtext_filter.Text, "FILTER BY SEGMENT LENGTH (MM)")
+        self.assertIn("e.g. 2.50mm", win.btn_txt_rename_all.ToolTip)
+
+    def test_meters_project_keeps_text_sizes_in_mm(self):
+        win = self.window(METERS)
+        self.assertEqual(win.dg_dim.Columns[1].Header, "SIZE (MM)")
+        self.assertEqual(win.lbl_dimtext_filter.Text, "FILTER BY SEGMENT LENGTH (M)")
+
+    def test_imperial_project(self):
+        win = self.window(FTIN)
+        self.assertEqual(win.dg_dim.Columns[1].Header, "SIZE (IN)")
+        self.assertEqual(win.dg_txt.Columns[1].Header, "SIZE (IN)")
+        self.assertEqual(win.lbl_dimtext_filter.Text, "FILTER BY SEGMENT LENGTH (FT-IN)")
+        self.assertIn('e.g. 3/32"', win.btn_dim_rename_all.ToolTip)
+
+    def test_runtime_labels_have_names_in_the_xaml(self):
+        names = set(re.findall(r'x:Name="([^"]+)"', _read(MANA_ANNO_XAML)))
+        for name in ("btn_dim_rename_all", "btn_txt_rename_all", "lbl_dimtext_filter"):
+            self.assertIn(name, names)
+        source = ast.unparse(ast.parse(_read(MANA_ANNO)))
+        for name in ("btn_dim_rename_all", "btn_txt_rename_all", "lbl_dimtext_filter"):
+            self.assertIn("'%s'" % name, source)
+
+    def test_size_column_is_found_by_binding_path(self):
+        source = _read(MANA_ANNO)
+        self.assertIn('_PAPER_SIZE_COLUMNS = {"Size": "SIZE"}', source)
+        body = ast.unparse(next(n for n in ast.walk(ast.parse(source))
+                                if isinstance(n, ast.FunctionDef) and n.name == "_apply_units"))
+        self.assertIn("column_key(col)", body)
+
+
+class ManaAnnoUnitPerLaunch(unittest.TestCase):
+    """The unit belongs to the document, so it is re-read on every launch."""
+
+    def test_refresh_reads_the_unit_of_each_launchs_document(self):
+        docs = iter([SimpleNamespace(unit=MM), SimpleNamespace(unit=FTIN)])
+        revit = SimpleNamespace()
+        dim_text = SimpleNamespace()
+        s = _exec_from(MANA_ANNO, ("unit",), ("_refresh_active_document",), extra={
+            "doc": None, "uidoc": None,
+            "revit": revit, "DimTextDialog": dim_text,
+            "resolve_doc": lambda candidate: SimpleNamespace(doc=next(docs)),
+            "resolve_uidoc": lambda candidate: object(),
+            "project_length_unit": lambda d: d.unit if d is not None else MM,
+        })
+        s["_refresh_active_document"]()
+        self.assertEqual((s["unit"].tag, dim_text.unit.tag), ("mm", "mm"))
+        s["_refresh_active_document"]()                 # another project, same session
+        self.assertEqual((s["unit"].tag, dim_text.unit.tag), ("ft-in", "ft-in"))
+        self.assertIs(dim_text.doc, s["doc"])
+
+    def test_window_takes_the_unit_before_anything_is_shown(self):
+        tree = ast.parse(_read(MANA_ANNO))
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef)
+                   and n.name == "AnnotationManagerWindow")
+        init = ast.unparse(next(m for m in cls.body if isinstance(m, ast.FunctionDef)
+                                and m.name == "__init__"))
+        first_fill = min(init.index(x) for x in ("self._apply_units()", "self._load_all_dims",
+                                                 "self._refresh_dim_cache"))
+        self.assertLess(init.index("self._unit = unit"), first_fill)
+        self.assertLess(init.index("self._paper = paper_unit(unit)"), first_fill)
+        self.assertLess(init.index("self._apply_units()"), init.index("self._load_all_dims"))
+
+    def test_dim_text_window_rereads_the_unit_with_the_document(self):
+        show = ast.unparse(next(n for n in ast.parse(_read(DIM_TEXT)).body
+                                if isinstance(n, ast.FunctionDef) and n.name == "show_dialog"))
+        self.assertIn("global doc, uidoc, unit", show)
+        self.assertLess(show.index("revit.doc"), show.index("unit = project_length_unit(doc)"))
+        self.assertLess(show.index("unit = project_length_unit(doc)"), show.index("DimTextWindow()"))
+
+    def test_no_hand_conversion_left_in_the_ui_code(self):
+        """Displayed and typed lengths go through Snippets/_units.py."""
+        for path in (MANA_ANNO, DIM_TEXT):
+            literals = [n.lineno for n in ast.walk(ast.parse(_read(path)))
+                        if isinstance(n, ast.Constant) and n.value in (304.8, 25.4, 0.3048)]
+            self.assertEqual(literals, [], path)
+
+
+class _Event(list):
+    def __iadd__(self, handler):
+        self.append(handler)
+        return self
+
+
+class _Children(list):
+    def Add(self, item):
+        self.append(item)
+
+    def Remove(self, item):
+        self.remove(item)
+
+
+class _Control(object):
+    """Any WPF control the rule row builds (StackPanel, ComboBox, TextBox ...)."""
+
+    def __init__(self):
+        self.Children, self.Items = _Children(), _Children()
+        self.SelectionChanged, self.Click = _Event(), _Event()
+        self.SelectedIndex, self.Text, self.ToolTip = -1, "", None
+        self.Visibility = "Visible"
+
+    @property
+    def SelectedItem(self):
+        return self.Items[self.SelectedIndex] if 0 <= self.SelectedIndex < len(self.Items) else None
+
+
+def _dim_text_scope(project_unit=MM):
+    wpf = {name: _Control for name in ("StackPanel", "ComboBox", "ComboBoxItem", "TextBox",
+                                       "Button", "TextBlock")}
+    wpf.update({"Thickness": lambda *a: a,
+                "WPFOrientation": SimpleNamespace(Horizontal="Horizontal"),
+                "Visibility": SimpleNamespace(Visible="Visible", Collapsed="Collapsed"),
+                "VerticalAlignment": SimpleNamespace(Center="Center"),
+                "unit": project_unit})
+    return _exec_from(DIM_TEXT, ("_OPERATORS", "_NO_VALUE_OPS", "_TWO_VALUE_OPS"),
+                      ("_length_unit", "_value_tooltip", "_t3_style", "create_rule_row",
+                       "_rule_length", "build_filter_fn", "_length_of", "_set_dim_text"),
+                      extra=wpf)
+
+
+def _rule(s, op, first="", second="", length_unit=None):
+    rd = s["create_rule_row"](SimpleNamespace(TryFindResource=lambda key: key),
+                              lambda rd: None, length_unit)
+    rd["combo"].SelectedIndex = s["_OPERATORS"].index(op)
+    rd["txt1"].Text, rd["txt2"].Text = first, second
+    return rd
+
+
+class DimTextLengthRules(unittest.TestCase):
+    """Segment-length rules are typed in the project unit and parsed by the helper."""
+
+    def test_rule_row_labels_carry_the_project_unit(self):
+        s = _dim_text_scope()
+        for length_unit, tag in ((MM, "mm"), (METERS, "m"), (FTIN, "ft-in")):
+            rd = _rule(s, "between", length_unit=length_unit)
+            self.assertEqual((rd["lbl_unit"].Text, rd["lbl_unit2"].Text), (tag, tag))
+            self.assertIn("Length in {}.".format(tag), rd["txt1"].ToolTip)
+        # no unit passed → the unit of this launch (DimTextDialog.unit)
+        self.assertEqual(_rule(_dim_text_scope(FTIN), "equals")["lbl_unit"].Text, "ft-in")
+
+    def test_imperial_values_are_feet_and_inches(self):
+        s = _dim_text_scope()
+        keep = s["build_filter_fn"]([_rule(s, "equals", "3'-6\"")], True, FTIN)
+        self.assertTrue(keep(3.5))
+        self.assertTrue(keep(3.5 + 1.0 / 32 * IN))       # still reads 3' - 6"
+        self.assertFalse(keep(3.5 + 0.25 * IN))
+        bare = s["build_filter_fn"]([_rule(s, "is greater than", "6")], True, FTIN)
+        self.assertTrue(bare(6.1))                        # a bare 6 is 6 ft here
+        self.assertFalse(bare(5.9))
+
+    def test_metric_keeps_half_a_millimetre_for_equals(self):
+        s = _dim_text_scope()
+        keep = s["build_filter_fn"]([_rule(s, "equals", "2800")], True, MM)
+        self.assertTrue(keep(2800.4 / 304.8))
+        self.assertFalse(keep(2800.6 / 304.8))
+        meters = s["build_filter_fn"]([_rule(s, "is less than", "1,2")], True, METERS)
+        self.assertTrue(meters(1199.0 / 304.8))
+        self.assertFalse(meters(1201.0 / 304.8))
+
+    def test_a_typed_unit_wins_in_any_project(self):
+        s = _dim_text_scope()
+        rule = s["build_filter_fn"]([_rule(s, "between", "1200 mm", "4'")], True, FTIN)
+        self.assertTrue(rule(1210.0 / 304.8))            # 3' - 11 5/8"
+        self.assertFalse(rule(1190.0 / 304.8))
+        self.assertFalse(rule(4.2))
+
+    def test_not_a_length_names_the_rule_and_the_unit(self):
+        s = _dim_text_scope()
+        rules = [_rule(s, "has a value"), _rule(s, "equals", "abc")]
+        with self.assertRaises(ValueError) as ctx:
+            s["build_filter_fn"](rules, True, FTIN)
+        self.assertIn("Length rule 2", str(ctx.exception))
+        self.assertIn("ft-in", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:           # blank used to count as 0
+            s["build_filter_fn"]([_rule(s, "between", "100", "")], True, MM)
+        self.assertIn("Length rule 1: Enter a length.", str(ctx.exception))
+
+    def test_segments_are_filtered_on_revits_own_length(self):
+        s = _dim_text_scope()
+        keep = s["build_filter_fn"]([_rule(s, "equals", "3'-6\"")], True, FTIN)
+        short = SimpleNamespace(Value=3.5, Prefix="")
+        other = SimpleNamespace(Value=2.0, Prefix="")
+        dim = SimpleNamespace(HasOneSegment=lambda: False, Segments=[short, other])
+        s["_set_dim_text"](dim, "P", "", "", "", "", keep)
+        self.assertEqual((short.Prefix, other.Prefix), ("P", ""))
+
+    def test_bad_value_shows_on_the_dim_text_status_and_writes_nothing(self):
+        dims = _dim_text_scope()
+        applied = []
+        s = _staging_scope({"DimTextDialog": SimpleNamespace(
+            build_filter_fn=dims["build_filter_fn"],
+            apply_dim_text=lambda *a: applied.append(a))},
+            methods={"dimtext_apply", "_dimtext_build_filter_fn", "_status", "_paint_status"})
+        win = s["AnnotationManagerWindow"].__new__(s["AnnotationManagerWindow"])
+        win.status = SimpleNamespace(Text="", ToolTip="")
+        win.status_dot = SimpleNamespace(Fill=None)
+        win.FindResource = lambda key: key
+        win._page = s["PAGE_DIMTEXT"]
+        win._page_status = {}
+        win._unit = FTIN
+        for name in ("txt_prefix", "txt_suffix", "txt_above", "txt_below", "txt_override"):
+            setattr(win, name, SimpleNamespace(Text="X"))
+        win.chk_leader = win.chk_filter_enable = SimpleNamespace(IsChecked=True)
+        win.combo_combine = SimpleNamespace(SelectedIndex=0)
+        win._dimtext_rules = [_rule(dims, "equals", "3 meters")]
+        win._dimtext_scope = lambda: ([object()], "selected")
+        win.dimtext_apply(None, None)
+        self.assertEqual(applied, [])
+        self.assertTrue(win.status.Text.startswith("Length rule 1:"), win.status.Text)
+        self.assertTrue(win.status.Text.endswith("Nothing was changed."))
+        self.assertEqual(win.status_dot.Fill, "T3.Danger.Accent")
+        win._dimtext_rules = [_rule(dims, "equals", "3 m")]   # fixed → it runs
+        win.dimtext_apply(None, None)
+        self.assertEqual(len(applied), 1)
+
 if __name__ == "__main__":
     sys.exit(0 if unittest.main(exit=False).result.wasSuccessful() else 1)

@@ -21,6 +21,7 @@ __version__ = "1.1.0"
 
 # IMPORT LIBRARIES
 # ==================================================
+import math
 import os
 import re
 import sys
@@ -57,6 +58,7 @@ from GUI import DimTextDialog
 from GUI.GridPendingEdits import column_key, editor_text, revert_editor
 from GUI.WPF_Base import T3WPFWindow
 from Snippets._compat import disposing
+from Snippets._units import MM_PER_FT, paper_unit, project_length_unit
 
 # DEFINE VARIABLES
 # ==================================================
@@ -91,6 +93,11 @@ try:
     uidoc = resolve_uidoc(getattr(revit, 'uidoc', None))
 except Exception:
     uidoc = None
+# Length unit of the project (Project Units › Length). Re-read with the
+# document on every launch (_refresh_active_document). Segment lengths on the
+# Dim Text page are in it; text sizes are measured on paper, so they use
+# paper_unit(unit): mm in a metric project, inches in an imperial one.
+unit = project_length_unit(doc)
 
 # ============================================================
 # NAMING STRUCTURE CONFIGURATION — ISO 19650 COMPLIANT
@@ -104,7 +111,7 @@ NAMING_TEMPLATES = {
         "Fields": [
             "Discipline",      # "ARC" or "STR"
             "TypeIndicator",   # Always "DIM"
-            "Size",            # E.g. "2.50mm"
+            "Size",            # Text size on paper: "2.50mm" (metric) / '3/32"' (imperial)
             "Font",            # E.g. "Arial"
             "WidthScale",      # E.g. "0.7"
             "Background",      # "Transparent" or "Opaque"
@@ -120,7 +127,7 @@ NAMING_TEMPLATES = {
         "Fields": [
             "Discipline",      # "ARC" or "STR"
             "TypeIndicator",   # Always "TXT"
-            "Size",            # E.g. "2.50mm"
+            "Size",            # Text size on paper: "2.50mm" (metric) / '3/32"' (imperial)
             "Font",            # E.g. "Arial"
             "WidthScale",      # E.g. "0.7"
             "Background",      # "Transparent" or "Opaque"
@@ -158,8 +165,83 @@ def _sanitize(v):
     value = re.sub(r'[\\/:{}\[\]|;<>?`~=\r\n\t"]', '', str(v)).strip()
     return value[:240] or "N/A"
 
-def _mm(param):
-    return "{:.2f}mm".format(round(param.AsDouble() * 304.8, 2))
+# ============================================================
+# TEXT SIZE IN THE PROJECT'S PAPER UNIT
+# ============================================================
+# A text size is measured on the sheet, so it never switches to m or ft: mm in
+# a metric project, inches in an imperial one (Snippets._units.paper_unit).
+# paper_unit().text() rounds to 1 mm / 1/8", too coarse for 2.5 mm or 3/32"
+# text, so the number is written here from the helper's conversion.
+_INCH_GRID = 64             # imperial sizes are named in fractions down to 1/64"
+
+
+def _paper_size(feet, paper=None):
+    """A size measured on paper (internal feet) → (number, unit mark).
+
+    Metric:   ("2.50", "mm") — exactly the text Rename All always wrote, so a
+              metric project keeps its names.
+    Imperial: ("3/32", '"') — the way imperial text types are named
+              ('3/32" Arial'). A size off the 1/64" grid (a metric type in an
+              imperial project) stays exact in decimal inches: ("0.098", '"').
+    `paper` may be the paper unit or the model unit (None = mm).
+    """
+    paper = paper_unit(paper)
+    if paper.is_metric:
+        # feet × MM_PER_FT is the exact float the names were always written
+        # from. from_feet() divides by 1/304.8 and lands one bit off at x.xx5 mm
+        # (1.875, 2.495 ...), which would rename types that already match.
+        return "{:.2f}".format(round(feet * MM_PER_FT, 2)), "mm"
+    value = paper.from_feet(feet)
+    steps = int(round(abs(value) * _INCH_GRID))
+    if abs(steps / float(_INCH_GRID) - abs(value)) > 1e-4:
+        return "{:.3f}".format(value).rstrip("0").rstrip("."), '"'
+    whole, rest = divmod(steps, _INCH_GRID)
+    if not rest:
+        return str(whole), '"'
+    common = math.gcd(rest, _INCH_GRID)
+    fraction = "{}/{}".format(rest // common, _INCH_GRID // common)
+    return ("{} {}".format(whole, fraction) if whole else fraction), '"'
+
+
+def _size_name(param, paper=None):
+    """TEXT_SIZE as the Size token of a type name: '2.50mm' / '3/32"'."""
+    number, mark = _paper_size(param.AsDouble(), paper)
+    return number + mark
+
+
+def _size_cell(param, paper=None):
+    """TEXT_SIZE for the SIZE column; the unit rides on the column header."""
+    return _paper_size(param.AsDouble(), paper)[0]
+
+
+# Rename All tooltip, written from NAMING_TEMPLATES so it never drifts from it.
+_FIELD_TOKENS = {
+    "Discipline": "[discipline]", "Size": "[size]", "Font": "[font]",
+    "WidthScale": "[width]", "Background": "[background]", "Color": "[color]",
+    "CenterSymbol": "[center]", "PrefixText": "[prefix]",
+    "ElevationText": "[elevation]", "Rounding": "[rounding]",
+    "Border": "[border]", "TextStyles": "[B/U/I]",
+}
+_TYPE_INDICATORS = {"Dimension": "DIM", "TextNote": "TXT"}
+_RENAME_NOUNS = {"Dimension": "dimension type", "TextNote": "text note type"}
+# Example text size per unit system, in the paper unit (mm / inches).
+_EXAMPLE_TEXT_SIZE = {True: 2.5, False: 3.0 / 32}
+
+
+def _rename_tooltip(kind, paper=None):
+    """Tooltip of a Rename All button: the naming pattern, and the unit the
+    [size] part is written in for this project."""
+    paper = paper_unit(paper)
+    template = NAMING_TEMPLATES[kind]
+    pattern = template["Separator"].join(
+        _TYPE_INDICATORS[kind] if field == "TypeIndicator"
+        else _FIELD_TOKENS.get(field, "[{}]".format(field.lower()))
+        for field in template["Fields"])
+    example = _paper_size(paper.to_feet(_EXAMPLE_TEXT_SIZE[paper.is_metric]), paper)
+    return (u"Rename every {} from its settings: {}. [size] is the text size in {}, "
+            u"e.g. {}. Empty parts are left out.").format(
+                _RENAME_NOUNS[kind], pattern, "mm" if paper.is_metric else "inches",
+                "".join(example))
 
 
 def _param_text(param, default=""):
@@ -217,14 +299,16 @@ def _run_transaction(label, action):
 # ============================================================
 # DIMENSION RENAME HELPERS
 # ============================================================
-def _dim_name(dt, origin):
+def _dim_name(dt, origin, paper=None):
+    """Standard name of a DimensionType; `paper` = the project's paper unit
+    (the Size part: "2.50mm" metric, '3/32"' imperial)."""
     def gp(bip):
         try: return dt.get_Parameter(bip)
         except: return None
 
     discipline = "STR" if "STR" in origin.upper() else "ARC"
     p = gp(BuiltInParameter.TEXT_SIZE)
-    size  = _mm(p) if p else "N/A"
+    size  = _size_name(p, paper) if p else "N/A"
     p = gp(BuiltInParameter.TEXT_FONT)
     font  = _sanitize(_param_text(p, "N/A"))
     p = gp(BuiltInParameter.TEXT_WIDTH_SCALE)
@@ -284,14 +368,15 @@ def _dim_name(dt, origin):
 # ============================================================
 # TEXTNOTE RENAME HELPERS
 # ============================================================
-def _txt_name(tt, origin):
+def _txt_name(tt, origin, paper=None):
+    """Standard name of a TextNoteType; `paper` as in _dim_name."""
     def gp(bip):
         try: return tt.get_Parameter(bip)
         except: return None
 
     discipline = "STR" if "STR" in origin.upper() else "ARC"
     p = gp(BuiltInParameter.TEXT_SIZE)
-    size   = _mm(p) if p else "N/A"
+    size   = _size_name(p, paper) if p else "N/A"
     p = gp(BuiltInParameter.TEXT_FONT)
     font   = _sanitize(_param_text(p, "N/A").replace(" ", ""))
     p = gp(BuiltInParameter.TEXT_BACKGROUND)
@@ -348,6 +433,8 @@ PAGE_DIM, PAGE_TXT, PAGE_DIMTEXT = 0, 1, 2
 # text: instance rows show where they sit, type rows show their text settings.
 _TYPE_ONLY_COLUMNS = ("Size", "Font", "Background", "Color", "Count")
 _INSTANCE_ONLY_COLUMNS = ("Details", "View")
+# Columns that hold a size measured on paper: the header carries the unit.
+_PAPER_SIZE_COLUMNS = {"Size": "SIZE"}
 
 # Footer status dot: the colour always sits next to the sentence, never alone.
 _DOT_KEYS = {
@@ -503,6 +590,11 @@ class AnnotationManagerWindow(T3WPFWindow):
     def __init__(self):
         try:
             T3WPFWindow.__init__(self, _XAML_PATH)
+            # Units of the project this window opened on (re-read per launch by
+            # _refresh_active_document): segment lengths in `unit`, text sizes
+            # on paper (mm metric / inches imperial).
+            self._unit = unit
+            self._paper = paper_unit(unit)
             self._dim_submode = "instances"  # "instances" | "types"
             self._txt_submode = "notes"      # "notes"     | "types"
 
@@ -542,6 +634,9 @@ class AnnotationManagerWindow(T3WPFWindow):
             self.dg_txt.ItemsSource = self._txt_dt.DefaultView
             self._txt_map = {}   # id-str → Revit element
             self.dg_txt.CellEditEnding += self.txt_cell_edit_ending
+
+            # Headers, tooltips and labels that name a unit, before any fill.
+            self._apply_units()
 
             # Every checkbox click inside a grid (row boxes and the header box)
             # bubbles here, after the row has been written: keep the "N checked"
@@ -762,6 +857,28 @@ class AnnotationManagerWindow(T3WPFWindow):
             self.txt_jump(sender, args)
         else:
             self.dimtext_apply(sender, args)
+
+    def _apply_units(self):
+        """Every label that names a unit shows the project's units: the SIZE
+        column (paper unit: "SIZE (MM)" / "SIZE (IN)"), the Rename All naming
+        tooltips, and the Dim Text segment-length filter (model unit)."""
+        paper = getattr(self, "_paper", None) or paper_unit(None)
+        length = getattr(self, "_unit", None) or project_length_unit(None)
+        for grid in (getattr(self, "dg_dim", None), getattr(self, "dg_txt", None)):
+            if grid is None:
+                continue
+            for col in grid.Columns:
+                header = _PAPER_SIZE_COLUMNS.get(column_key(col))
+                if header:
+                    col.Header = paper.label(header)
+        for name, kind in (("btn_dim_rename_all", "Dimension"),
+                           ("btn_txt_rename_all", "TextNote")):
+            button = getattr(self, name, None)
+            if button is not None:
+                button.ToolTip = _rename_tooltip(kind, paper)
+        label = getattr(self, "lbl_dimtext_filter", None)
+        if label is not None:
+            label.Text = length.label("FILTER BY SEGMENT LENGTH")
 
     def _set_mode_columns(self, grid, is_type, name_header=None, name_editable=True):
         """Show the columns of the current mode: instance rows show where they
@@ -1342,13 +1459,13 @@ class AnnotationManagerWindow(T3WPFWindow):
         dt.Rows.Add(row)
 
     @staticmethod
-    def _get_dim_params(dt):
-        """Extract common params from a DimensionType element."""
+    def _get_dim_params(dt, paper=None):
+        """Extract common params from a DimensionType element (size in `paper`)."""
         def gp(bip):
             try: return dt.get_Parameter(bip)
             except: return None
         p = gp(BuiltInParameter.TEXT_SIZE)
-        size = _mm(p) if p else ""
+        size = _size_cell(p, paper) if p else ""
         p = gp(BuiltInParameter.TEXT_FONT)
         font = _param_text(p)
         p = gp(BuiltInParameter.DIM_TEXT_BACKGROUND)
@@ -1358,13 +1475,13 @@ class AnnotationManagerWindow(T3WPFWindow):
         return size, font, bg, color
 
     @staticmethod
-    def _get_txt_params(tt):
-        """Extract common params from a TextNoteType element."""
+    def _get_txt_params(tt, paper=None):
+        """Extract common params from a TextNoteType element (size in `paper`)."""
         def gp(bip):
             try: return tt.get_Parameter(bip)
             except: return None
         p = gp(BuiltInParameter.TEXT_SIZE)
-        size = _mm(p) if p else ""
+        size = _size_cell(p, paper) if p else ""
         p = gp(BuiltInParameter.TEXT_FONT)
         font = _param_text(p)
         p = gp(BuiltInParameter.TEXT_BACKGROUND)
@@ -1402,7 +1519,7 @@ class AnnotationManagerWindow(T3WPFWindow):
                     if kw and kw not in name.lower():
                         continue
                     try:
-                        size, font, bg, color = self._get_dim_params(item)
+                        size, font, bg, color = self._get_dim_params(item, self._paper)
                     except Exception:
                         size, font, bg, color = "", "", "", ""
                     count = counts.get(elem_id, 0)
@@ -1458,7 +1575,7 @@ class AnnotationManagerWindow(T3WPFWindow):
                     if kw and kw not in name.lower():
                         continue
                     try:
-                        size, font, bg, color = self._get_txt_params(item)
+                        size, font, bg, color = self._get_txt_params(item, self._paper)
                     except Exception:
                         size, font, bg, color = "", "", "", ""
                     count = counts.get(elem_id, 0)
@@ -1637,7 +1754,7 @@ class AnnotationManagerWindow(T3WPFWindow):
             if not origin:
                 continue
             used_names.discard(origin.lower())
-            base_name = _dim_name(item, origin)
+            base_name = _dim_name(item, origin, self._paper)
             new_name = base_name
             suffix = 2
             while new_name.lower() in used_names:
@@ -1819,7 +1936,7 @@ class AnnotationManagerWindow(T3WPFWindow):
             if not origin:
                 continue
             used_names.discard(origin.lower())
-            base_name = _txt_name(item, origin)
+            base_name = _txt_name(item, origin, self._paper)
             new_name = base_name
             suffix = 2
             while new_name.lower() in used_names:
@@ -1950,7 +2067,8 @@ class AnnotationManagerWindow(T3WPFWindow):
             label.Text = "Dimensions in scope: unknown"
 
     def dimtext_add_rule(self, sender, args):
-        rd = DimTextDialog.create_rule_row(self, self._dimtext_remove_rule)
+        # Rule values are segment lengths: typed and labelled in the project unit.
+        rd = DimTextDialog.create_rule_row(self, self._dimtext_remove_rule, self._unit)
         self._dimtext_rules.append(rd)
         self.sp_rules.Children.Add(rd["panel"])
 
@@ -1960,10 +2078,13 @@ class AnnotationManagerWindow(T3WPFWindow):
             self._dimtext_rules.remove(rd)
 
     def _dimtext_build_filter_fn(self):
+        """Length filter from the rule rows, values parsed in the project unit.
+        Raises ValueError (naming the rule) when a value is not a length."""
         if not self.chk_filter_enable.IsChecked or not self._dimtext_rules:
             return None
         return DimTextDialog.build_filter_fn(self._dimtext_rules,
-                                             self.combo_combine.SelectedIndex == 0)
+                                             self.combo_combine.SelectedIndex == 0,
+                                             self._unit)
 
     def dimtext_apply(self, sender, args):
         prefix   = self.txt_prefix.Text.strip()
@@ -1972,7 +2093,11 @@ class AnnotationManagerWindow(T3WPFWindow):
         below    = self.txt_below.Text.strip()
         override = self.txt_override.Text.strip()
         leader_off = bool(self.chk_leader.IsChecked)
-        filter_fn  = self._dimtext_build_filter_fn()
+        try:
+            filter_fn = self._dimtext_build_filter_fn()
+        except ValueError as ex:
+            self._status(u"{} Nothing was changed.".format(ex), PAGE_DIMTEXT, "error")
+            return
 
         try:
             dims, where = self._dimtext_scope()
@@ -2092,8 +2217,9 @@ def _refresh_active_document():
     project was active the FIRST time the tool opened — after switching
     projects the window read and wrote that first project. The Dim Text page
     uses DimTextDialog's module globals, so they are refreshed too.
+    The project's length unit belongs to the document: it is re-read with it.
     """
-    global doc, uidoc
+    global doc, uidoc, unit
     try:
         doc = resolve_doc(getattr(revit, 'doc', None)).doc
     except Exception:
@@ -2102,8 +2228,10 @@ def _refresh_active_document():
         uidoc = resolve_uidoc(getattr(revit, 'uidoc', None))
     except Exception:
         uidoc = None
+    unit = project_length_unit(doc)
     DimTextDialog.doc = doc
     DimTextDialog.uidoc = uidoc
+    DimTextDialog.unit = unit
 
 
 def show_dialog():
