@@ -18,14 +18,24 @@ clr.AddReference('PresentationCore')
 clr.AddReference('WindowsBase')
 clr.AddReference('System')
 
+from System import TimeSpan
 from System.Windows import WindowState, Visibility as WinVis, Clipboard
 from System.Windows.Controls import DataGridComboBoxColumn, DataGridLength
 from System.Windows.Data import Binding, BindingMode, UpdateSourceTrigger
+from System.Windows.Media import Color as MediaColor, Colors, SolidColorBrush
+from System.Windows.Media.Media3D import (
+    AmbientLight, DiffuseMaterial, DirectionalLight, GeometryModel3D, Int32Collection,
+    MeshGeometry3D, Model3DGroup, ModelVisual3D, PerspectiveCamera, Point3D,
+    Point3DCollection, Vector3D,
+)
+from System.Windows.Threading import DispatcherTimer
 
 from pyrevit import forms
 from GUI.WPF_Base import T3WPFWindow, to_items_source
 from Intelligence.family_schema import (
-    build_system_prompt, generate_family_schema, validate_ai_schema,
+    CATEGORY_TABLE, SUPPORTED_CATEGORIES, build_system_prompt, color_hex,
+    generate_family_schema, material_parameter_name, parse_color, schema_summary,
+    validate_ai_schema, validate_family_schema,
 )
 import pyrevit.script as _pyrevit_script
 
@@ -39,12 +49,8 @@ if _LIB_DIR not in sys.path:
 
 _EXTENSION_DIR = os.path.dirname(_LIB_DIR)
 from core.extension_paths import tab_dir  # noqa: E402  (after the sys.path insert)
-# Per-category prompts: prompts/<slug>.md is a fully self-contained system prompt
-# for that family category (schema, forms, curve segments, failure modes, checklist
-# and category-specific guidance) — picked by the user before "Copy Prompt".
-_PROMPTS_DIR = os.path.join(
-    tab_dir(_EXTENSION_DIR), 'Modeling & Datum.panel',
-    'FamiGen.pushbutton', 'prompts')
+# Per-category prompts (prompts/<slug>.md) are located by FamilyGen.guidance,
+# shared with the MCP tool famigen_get_schema.
 
 from Autodesk.Revit.DB import (
     ImportInstance, FilteredElementCollector,
@@ -59,13 +65,20 @@ from Autodesk.Revit.DB import (
 )
 from System.Collections.Generic import List as _NetList
 
+from Autodesk.Revit.UI import ExternalEvent, IExternalEventHandler, TaskDialog
+
 from Utils.DWGFamilyHelpers import get_xy_bounds, _project_curve_to_z as _dwg_project_curve
 from GUI.ProgressPauseMixin import ProgressPauseMixin
+from FamilyGen import builder as family_builder
+from FamilyGen import guidance as family_guidance
+from FamilyGen import preview_mesh
+from FamilyGen import proposals as family_proposals
 
 # ==============================================================================
 # CONSTANTS
 # ==============================================================================
 SCL = 1.0 / 304.8
+_PREVIEW_DEBOUNCE_MS = 600
 MAX_DETAIL_CURVES = 150
 MIN_CURVE_RATIO = 0.30
 
@@ -74,21 +87,9 @@ _DISCIPLINES = [
     "Plumbing", "Fire Protection", "General",
 ]
 
-_CATEGORY_TEMPLATES = [
-    ("Generic Model",        ["Generic Model.rft", "Metric Generic Model.rft"]),
-    ("Door",                 ["Door.rft", "Metric Door.rft"]),
-    ("Window",               ["Window.rft", "Metric Window.rft"]),
-    ("Furniture",            ["Furniture.rft", "Metric Furniture.rft"]),
-    ("Plumbing Fixture",     ["Plumbing Fixture.rft", "Metric Plumbing Fixture.rft"]),
-    ("Electrical Equipment", ["Electrical Equipment.rft"]),
-    ("Mechanical Equipment", ["Mechanical Equipment.rft"]),
-    ("Specialty Equipment",  ["Specialty Equipment.rft", "Metric Specialty Equipment.rft"]),
-    ("Casework",             ["Casework.rft", "Metric Casework.rft"]),
-    ("Columns",              ["Column.rft", "Metric Column.rft"]),
-    ("Lighting Fixture",     ["Lighting Fixture.rft", "Metric Lighting Fixture.rft"]),
-    ("Site",                 ["Site.rft", "Metric Site.rft"]),
-    ("Entourage",            ["Entourage.rft", "Metric Entourage.rft"]),
-]
+# One category table for CAD, presets and JSON: Intelligence.family_schema
+# (the JSON contract validates against the same list the builder can template).
+_CATEGORY_TEMPLATES = [(name, list(templates)) for name, templates, _bic, _hosted in CATEGORY_TABLE]
 
 DOOR_PRESETS = [
     ("Single_Swing_700x2100",   700, 2100, 65, 25, 25, 40, 1),
@@ -496,6 +497,60 @@ class BlockItem(object):
         self.Category     = self.SuggestedCat
 
 
+class _LegendRow(object):
+    """One materials-legend row. `swatch` is the material colour as "#RRGGBB" -
+    DATA from the schema, read by the XAML through a string bridge (WPF cannot
+    convert a Python attribute to a Brush, but converts a string)."""
+
+    def __init__(self, material, rgb, solids):
+        self.name = material.get('name', '')
+        self.swatch = color_hex(rgb) if rgb else '#00000000'
+        self.count_text = '{} part{}'.format(solids, '' if solids == 1 else 's')
+        extras = []
+        if material.get('transparency'):
+            extras.append('transparency {}%'.format(material['transparency']))
+        if material.get('shininess') is not None:
+            extras.append('shininess {}'.format(material['shininess']))
+        if material.get('smoothness') is not None:
+            extras.append('smoothness {}'.format(material['smoothness']))
+        self.detail = '{} · parameter "{}"{}'.format(
+            self.swatch, material_parameter_name(material),
+            (' · ' + ', '.join(extras)) if extras else '')
+
+
+class _FamiGenAction(IExternalEventHandler):
+    """Runs one queued callable on Revit's API thread for the modeless window.
+
+    Only the window the MCP server opens is modeless; its WPF handlers run
+    OUTSIDE Revit API context, so Create Family is queued here. Static
+    `__namespace__` is right: the class lives in lib/ (rule S15).
+    """
+    __namespace__ = "T3Lab.FamiGenAction"
+
+    def __init__(self):
+        self._action = None
+
+    def set_action(self, action):
+        self._action = action
+
+    def Execute(self, uiapp):
+        action, self._action = self._action, None
+        if action is None:
+            return
+        try:
+            action(uiapp)
+        except Exception as ex:
+            # An exception escaping Execute() takes Revit down - report instead.
+            try:
+                TaskDialog.Show('FamiGen', 'The action failed:\n{}\n\n{}'.format(
+                    ex, traceback.format_exc()))
+            except Exception:
+                pass
+
+    def GetName(self):
+        return "T3Lab FamiGen action"
+
+
 # Aliases so methods copied verbatim from CAD script compile without change
 DISCIPLINES       = _DISCIPLINES
 CATEGORY_TEMPLATES = _CATEGORY_TEMPLATES
@@ -515,10 +570,20 @@ class FamilyCreatorDialog(T3WPFWindow):
     PP_STOP     = "btn_stop_export"
     PP_STOP_MSG = u"Stopping… finishing current block"
 
-    def __init__(self, revit_doc, revit_app, initial_mode='cad'):
+    def __init__(self, revit_doc, revit_app, initial_mode='cad', modeless=False):
         T3WPFWindow.__init__(self, _XAML)
         self._doc = revit_doc
         self._app = revit_app
+        # Modeless = opened by the MCP server (famigen_propose_family). It
+        # runs outside Revit API context after Show(), so it offers the JSON
+        # review workflow only and queues Create Family on an ExternalEvent.
+        # ExternalEvent.Create needs API context: true here in both cases.
+        self._modeless = bool(modeless)
+        self._action_handler = None
+        self._action_event = None
+        if self._modeless:
+            self._action_handler = _FamiGenAction()
+            self._action_event = ExternalEvent.Create(self._action_handler)
         self._block_items      = []
         self._cad_instances    = []
         self._filter_text      = ""
@@ -533,8 +598,16 @@ class FamilyCreatorDialog(T3WPFWindow):
 
         self._init_cad_panel()
         self._init_json_panel()
+        self._init_preview()
+        if self._modeless:
+            try:
+                self.mode_cad.IsEnabled = False
+                self.mode_cad.ToolTip = ("From CAD is available when FamiGen is opened "
+                                         "from the ribbon")
+            except Exception:
+                pass
 
-        if initial_mode == 'json':
+        if initial_mode == 'json' or self._modeless:
             self._show_panel('json')
         else:
             self._show_panel('cad')
@@ -566,6 +639,13 @@ class FamilyCreatorDialog(T3WPFWindow):
         self._ai_request_id += 1
         self._ai_generating = False
         self._ai_control_states = []
+        timer = getattr(self, '_preview_timer', None)
+        if timer is not None:
+            try:
+                timer.Stop()
+            except Exception:
+                pass
+        family_proposals.clear_active_window(self)
 
     # ── Mode switching ───────────────────────────────────────────────────────
 
@@ -690,19 +770,18 @@ class FamilyCreatorDialog(T3WPFWindow):
         self.blocks_grid.Columns.Add(col)
 
     def _init_json_panel(self):
-        """Populate the family-type selector on the From JSON tab so 'Copy Prompt'
-        can append the matching per-category overlay before copying. Only
-        categories that actually have a prompts/<slug>.md overlay are listed,
-        so the dropdown stays in sync with whatever overlay files exist."""
+        """Populate the family category selector on the AI / JSON panel with
+        every category FamiGen has a template for (the same list the schema
+        validates against). A prompts/<slug>.md overlay adds category guidance
+        when it exists; it is optional."""
         try:
             combo = (getattr(self, 'json_category_combo', None)
                      or self.FindName('json_category_combo'))
             if combo is None:
                 return
             combo.Items.Clear()
-            for name, _ in CATEGORY_TEMPLATES:
-                if os.path.isfile(self._overlay_path(name)):
-                    combo.Items.Add(name)
+            for name in SUPPORTED_CATEGORIES:
+                combo.Items.Add(name)
             combo.SelectedIndex = 0
         except Exception:
             logger.warning("json panel init: {}".format(traceback.format_exc()))
@@ -2211,13 +2290,10 @@ class FamilyCreatorDialog(T3WPFWindow):
     @staticmethod
     def _category_slug(cat_name):
         """'Plumbing Fixture' -> 'plumbing_fixture' (overlay filename stem)."""
-        return re.sub(r'[^a-z0-9]+', '_', (cat_name or "").lower()).strip('_')
+        return family_guidance.category_slug(cat_name)
 
     def _overlay_path(self, cat_name):
-        slug = self._category_slug(cat_name)
-        if not slug:
-            return None
-        return os.path.join(_PROMPTS_DIR, slug + '.md')
+        return family_guidance.overlay_path(cat_name)
 
     def copy_prompt_clicked(self, sender, e):
         # External models receive the same authoritative contract as AI Mode.
@@ -2257,7 +2333,7 @@ class FamilyCreatorDialog(T3WPFWindow):
             self._ai_control_states = []
             for name in ('btn_ai_generate', 'ai_prompt_tb', 'json_category_combo',
                          'json_tb', 'create_btn', 'btn_ai_undo', 'copy_prompt_btn',
-                         'mode_cad', 'mode_json'):
+                         'mode_cad', 'mode_json', 'chk_json_load'):
                 control = getattr(self, name, None)
                 if control is not None:
                     self._ai_control_states.append((control, control.IsEnabled))
@@ -2319,12 +2395,13 @@ class FamilyCreatorDialog(T3WPFWindow):
                     return
                 formatted = json.dumps(schema, indent=2, ensure_ascii=False, allow_nan=False)
                 self._prev_json_backup = previous_json
+                self._request_preview(fit=True)
                 self.json_tb.Text = formatted
                 self.btn_ai_undo.Visibility = WinVis.Visible
                 self.lbl_status.Text = (
-                    "JSON checked: {} part(s), {}. Review dimensions, then Create Family. "
-                    "Revit will check the geometry during creation."
-                ).format(len(schema['geometry']), category)
+                    "JSON checked: {} part(s), {} material(s), {}. Review the model on the "
+                    "right, then Create Family. Revit checks the geometry during creation."
+                ).format(len(schema['geometry']), len(schema.get('materials') or []), category)
             except Exception as ex:
                 self.lbl_status.Text = "AI JSON could not be used. Your previous draft is unchanged."
                 forms.alert("AI JSON validation failed:\n{}".format(ex), title="AI Generation")
@@ -2364,17 +2441,28 @@ class FamilyCreatorDialog(T3WPFWindow):
         except Exception as ex:
             logger.warning("Error reverting JSON: {}".format(ex))
 
+    # ── Create Family (shared builder) ───────────────────────────────────────
+
     def create_clicked(self, sender, e):
+        """Validate the reviewed JSON, then build it with FamilyGen.builder.
+
+        Every check that can fail runs here, on the UI side, before any
+        document access - so a bad draft never opens a family document. The
+        Revit work itself runs in `_create_family_impl`, through
+        `_run_in_revit` (direct when modal, ExternalEvent when modeless).
+        """
         if self._ai_generating:
             return
         raw = self.json_tb.Text
         if not raw or raw.strip() in ("", "Paste your JSON schema here..."):
-            forms.alert("Please paste a valid JSON schema first.")
+            forms.alert("Paste or generate a family JSON first, review it in the preview, "
+                        "then press Create Family.", title="Create Family")
             return
         try:
             schema = json.loads(raw)
         except ValueError as ex:
-            forms.alert("Invalid JSON:\n\n{}".format(ex), title="JSON Error")
+            forms.alert("The family JSON cannot be read:\n\n{}\n\nFix the JSON on the left "
+                        "and try again.".format(ex), title="JSON Error")
             return
         if (not isinstance(schema, dict)
                 or not isinstance(schema.get("geometry"), list)
@@ -2384,684 +2472,395 @@ class FamilyCreatorDialog(T3WPFWindow):
                         "Generate a new definition or fix the JSON before creating a family.",
                         title="JSON Error")
             return
-        self.lbl_status.Text = "Creating family..."
-        if self._doc.IsFamilyDocument:
-            try:
-                t = Transaction(self._doc, "T3Lab - JSON to Family")
-                start_transaction(t)
-                try:
-                    built, total, skipped = self._generate_json_family(self._doc, schema)
-                    t.Commit()
-                except Exception:
-                    try: t.RollBack()
-                    except Exception: pass
-                    raise
-                self.lbl_status.Text = "Built {}/{} parts.".format(built, total)
-                forms.alert(self._json_result_message(built, total, skipped),
-                            title="Family Generated" if not skipped else "Family Generated (with warnings)")
-            except Exception as ex:
-                self.lbl_status.Text = "Error."
-                forms.alert("Error:\n{}".format(ex), title="Error")
-        else:
-            cat_name = schema.get("family_category", "Generic Model")
-            template_path = self._find_template_by_name(cat_name)
-            if not template_path:
-                forms.alert("Template for '{}' not found.".format(cat_name))
-                self.lbl_status.Text = "Template not found."
-                return
+        errors, _warnings = validate_family_schema(schema)
+        if errors:
+            shown = errors[:8]
+            more = "\n... and {} more".format(len(errors) - 8) if len(errors) > 8 else ""
+            self.lbl_status.Text = "{} problem(s) in the JSON. Nothing was created.".format(len(errors))
+            forms.alert("The family JSON has {} problem(s), so nothing was created:\n\n{}{}\n\n"
+                        "Fix the JSON, or run AI Generate again.".format(
+                            len(errors), "\n".join(shown), more),
+                        title="JSON Error")
+            return
+
+        # A modeless window (opened by MCP) always creates a new .rfa; only the
+        # modal ribbon window may add geometry to an open family document.
+        into_active = (not self._modeless) and self._doc.IsFamilyDocument
+        output_folder = None
+        if not into_active:
             output_folder = self.output_path.Text
             if not output_folder or not os.path.isdir(output_folder):
-                output_folder = forms.pick_folder()
+                output_folder = forms.pick_folder(title="Choose the folder to save the family in")
             if not output_folder:
-                self.lbl_status.Text = "No output folder selected."
+                self.lbl_status.Text = "No output folder selected. Nothing was created."
                 return
-            fam_doc = self._app.NewFamilyDocument(template_path)
             try:
-                t = Transaction(fam_doc, "T3Lab - JSON to Family")
-                start_transaction(t)
-                try:
-                    built, total, skipped = self._generate_json_family(fam_doc, schema)
-                    t.Commit()
-                except Exception:
-                    try: t.RollBack()
-                    except Exception: pass
-                    raise
-                family_name = schema.get("family_name", "T3Lab_JSONFamily")
-                family_name = re.sub(r'[\\/*?:"<>|]', "_", family_name)
-                save_path = os.path.join(output_folder, "{}.rfa".format(family_name))
-                opts = SaveAsOptions()
-                opts.OverwriteExistingFile = True
-                fam_doc.SaveAs(save_path, opts)
-                self.lbl_status.Text = "Saved ({}/{} parts): {}".format(
-                    built, total, os.path.basename(save_path))
-                msg = self._json_result_message(built, total, skipped)
-                forms.alert("{}\n\nSaved to:\n{}".format(msg, save_path),
-                            title="Family Saved" if not skipped else "Family Saved (with warnings)")
-            except Exception as ex:
-                self.lbl_status.Text = "Error."
-                forms.alert("Error:\n{}".format(ex), title="Error")
-            finally:
-                try: fam_doc.Close(False)
-                except Exception: pass
+                self.output_path.Text = output_folder
+            except Exception:
+                pass
+        load = bool(getattr(self.chk_json_load, 'IsChecked', False))
+        self.lbl_status.Text = "Creating '{}'...".format(schema.get("family_name"))
+        self._run_in_revit(lambda uiapp: self._create_family_impl(
+            schema, output_folder, load, into_active, uiapp))
 
-    def _json_result_message(self, built, total, skipped):
-        """Compose a user-facing summary of the JSON build result."""
-        if total == 0:
-            return "No geometry found in the schema — nothing was built."
-        lines = ["Built {} of {} geometry parts.".format(built, total)]
-        if skipped:
-            lines.append("")
-            lines.append("Skipped {} part(s):".format(len(skipped)))
-            for s in skipped[:12]:
-                lines.append("  - {}".format(s))
-            if len(skipped) > 12:
-                lines.append("  ... and {} more".format(len(skipped) - 12))
-        return "\n".join(lines)
-
-    # ── JSON geometry parsing (with auto-heal) ──────────────────────────────
-    # AI-generated JSON is often "almost right": profile points drawn off the
-    # sketch plane, blend loops wound in opposite directions, small endpoint
-    # gaps, zero-length closing segments.  These helpers project, snap,
-    # bridge and re-wind the input before it reaches the Revit API, so a
-    # near-miss schema still builds instead of dying with a cryptic error.
-
-    _PLANE_AXES = {
-        'z': (XYZ.BasisX, XYZ.BasisY),
-        'x': (XYZ.BasisY, XYZ.BasisZ),   # arcs on an X-facing plane: 0 rad = +Y
-        'y': (XYZ.BasisZ, XYZ.BasisX),   # arcs on a Y-facing plane: 0 rad = +Z
-    }
-    _SNAP_TOL = 2.0 * SCL   # snap endpoint gaps under ~2 mm
-    _MIN_LEN  = 1.0 * SCL   # drop segments under ~1 mm (Revit short-curve tol ~0.8 mm)
-
-    def _plane_info(self, geom_data):
-        """Which plane the entry sketches on: ('x'|'y'|'z', value in feet)."""
-        if "sketch_plane_x" in geom_data:
-            return ('x', geom_data["sketch_plane_x"] * SCL)
-        if "sketch_plane_y" in geom_data:
-            return ('y', geom_data["sketch_plane_y"] * SCL)
-        return ('z', geom_data.get("sketch_plane_z", 0.0) * SCL)
-
-    def _make_sketch_plane(self, fam_doc, plane):
-        """Create the SketchPlane for a ('x'|'y'|'z', value) plane tuple."""
-        kind, val = plane
-        if kind == 'x':
-            base_plane = Plane.CreateByNormalAndOrigin(XYZ.BasisX, XYZ(val, 0, 0))
-        elif kind == 'y':
-            base_plane = Plane.CreateByNormalAndOrigin(XYZ.BasisY, XYZ(0, val, 0))
-        else:
-            base_plane = Plane.CreateByNormalAndOrigin(XYZ.BasisZ, XYZ(0, 0, val))
-        return SketchPlane.Create(fam_doc, base_plane)
-
-    def _json_point(self, coords, plane):
-        """mm triple -> XYZ (feet), projected onto the sketch plane if given."""
-        x, y, z = coords[0] * SCL, coords[1] * SCL, coords[2] * SCL
-        if plane is not None:
-            kind, val = plane
-            if kind == 'x':
-                x = val
-            elif kind == 'y':
-                y = val
+    def _create_family_impl(self, schema, output_folder, load, into_active, uiapp=None):
+        """Runs in Revit API context. One Transaction in the family document."""
+        doc, app = self._doc, self._app
+        if uiapp is not None:
+            try:
+                active = uiapp.ActiveUIDocument
+                if active is not None:
+                    doc = active.Document
+                app = uiapp.Application
+            except Exception:
+                pass
+        name = schema.get("family_name")
+        try:
+            if into_active:
+                report = family_builder.build_into_document(doc, schema)
             else:
-                z = val
-        return XYZ(x, y, z)
+                report = family_builder.create_family(
+                    app, schema, output_folder, project_doc=doc,
+                    load_into_project=load and not doc.IsFamilyDocument)
+        except family_builder.FamilyBuildError as ex:
+            self.lbl_status.Text = "'{}' was not created. See the message for what to fix.".format(name)
+            forms.alert(str(ex), title="Create Family")
+            return
+        except Exception as ex:
+            logger.warning("FamiGen create: {}".format(traceback.format_exc()))
+            self.lbl_status.Text = "'{}' was not created: Revit reported an error.".format(name)
+            forms.alert("Revit could not create '{}':\n{}\n\nCheck the parts listed in the "
+                        "preview warnings, simplify the failing part and try again."
+                        .format(name, ex), title="Create Family")
+            return
+        where = os.path.basename(report.get('saved_path') or '') or 'the open family'
+        self.lbl_status.Text = "{}: built {} of {} part(s), {} material(s){}.".format(
+            where, report['built'], report['total'],
+            len(report['materials_created']) + len(report['materials_reused']),
+            ", loaded into the project" if report.get('loaded') else "")
+        problems = report['skipped'] or report['warnings']
+        forms.alert("\n".join(family_builder.report_lines(report)),
+                    title="Family Created (with warnings)" if problems else "Family Created")
 
-    def _json_curve(self, seg, plane, split_full=0):
-        """Parse one JSON segment into a Revit Curve (None = unusable).
+    # ── Modeless plumbing (window opened by the MCP server) ─────────────────
 
-        With ``split_full`` >= 2, a full circle/ellipse is returned as a
-        LIST of that many arc segments instead of one closed curve —
-        NewBlend rejects single-curve cyclic loops because it needs
-        vertices to pair the two profiles ("internal error code 1")."""
-        try:
-            seg_type = seg.get("type", "Line")
-            ax, ay = self._PLANE_AXES[plane[0] if plane else 'z']
-            if seg_type == "Line":
-                p0 = self._json_point(seg["start"], plane)
-                p1 = self._json_point(seg["end"], plane)
-                if p0.DistanceTo(p1) < self._MIN_LEN:
-                    return None            # degenerate; _heal_loop bridges the gap
-                return Line.CreateBound(p0, p1)
-            elif seg_type in ("Arc3P", "ArcThreePoint"):
-                # three-point arc: start / end / any point on the arc between
-                # them — far easier for AI to emit than center+angles, and the
-                # right tool for organic outlines (petals, scallops, domes)
-                p0 = self._json_point(seg["start"], plane)
-                p1 = self._json_point(seg["end"], plane)
-                pm = self._json_point(seg["mid"], plane)
-                if p0.DistanceTo(p1) < self._MIN_LEN:
-                    return None
-                return Arc.Create(p0, p1, pm)
-            elif seg_type == "Spline":
-                pts = [self._json_point(p, plane)
-                       for p in (seg.get("points") or [])]
-                clean = []
-                for p in pts:
-                    if not clean or clean[-1].DistanceTo(p) >= self._MIN_LEN / 4.0:
-                        clean.append(p)
-                if len(clean) < 3:
-                    return None
-                net_pts = _NetList[XYZ]()
-                for p in clean:
-                    net_pts.Add(p)
-                return HermiteSpline.Create(net_pts, False)
-            elif seg_type in ("Arc", "Circle"):
-                nc = self._json_point(seg["center"], plane)
-                r = seg["radius"] * SCL
-                if seg_type == "Circle":
-                    a0, a1 = 0.0, 6.283185307
-                else:
-                    a0 = seg.get("start_angle", 0.0)
-                    a1 = seg.get("end_angle", 6.283185307)
-                if abs(a1 - a0) >= 6.2831 and split_full >= 2:
-                    step = (a1 - a0) / split_full
-                    return [Arc.Create(nc, r, a0 + i * step, a0 + (i + 1) * step, ax, ay)
-                            for i in range(split_full)]
-                return Arc.Create(nc, r, a0, a1, ax, ay)
-            elif seg_type == "Ellipse":
-                nc = self._json_point(seg["center"], plane)
-                rx = seg["radius_x"] * SCL
-                ry = seg["radius_y"] * SCL
-                a0 = seg.get("start_angle", 0.0)
-                a1 = seg.get("end_angle", 6.283185307)
-                if abs(a1 - a0) >= 6.2831 and split_full >= 2:
-                    step = (a1 - a0) / split_full
-                    return [Ellipse.CreateCurve(nc, rx, ry, ax, ay,
-                                                a0 + i * step, a0 + (i + 1) * step)
-                            for i in range(split_full)]
-                return Ellipse.CreateCurve(nc, rx, ry, ax, ay, a0, a1)
-        except Exception:
-            logger.warning("JSON curve skip: {}".format(traceback.format_exc()))
-        return None
+    def _run_in_revit(self, action):
+        """Run `action(uiapp)` where the Revit API is usable.
 
-    @staticmethod
-    def _endpoints(curve):
-        try:
-            return curve.GetEndPoint(0), curve.GetEndPoint(1)
-        except Exception:
-            return None, None              # closed curve (full circle/ellipse)
-
-    def _heal_loop(self, curves, close=True):
-        """Snap sub-2mm endpoint gaps, then bridge remaining spans with lines."""
-        if len(curves) < 2:
-            return curves
-        curves = list(curves)
-        n = len(curves)
-        pair_count = n if close else n - 1
-        for i in range(pair_count):
-            j = (i + 1) % n
-            a_end = self._endpoints(curves[i])[1]
-            b_start = self._endpoints(curves[j])[0]
-            if a_end is None or b_start is None:
-                continue
-            gap = a_end.DistanceTo(b_start)
-            if gap <= 1e-9 or gap > self._SNAP_TOL:
-                continue
-            if isinstance(curves[i], Line):
-                a_start = curves[i].GetEndPoint(0)
-                if a_start.DistanceTo(b_start) >= self._MIN_LEN:
-                    curves[i] = Line.CreateBound(a_start, b_start)
-            elif isinstance(curves[j], Line):
-                b_end = curves[j].GetEndPoint(1)
-                if a_end.DistanceTo(b_end) >= self._MIN_LEN:
-                    curves[j] = Line.CreateBound(a_end, b_end)
-        healed = []
-        for i in range(n):
-            healed.append(curves[i])
-            if i == n - 1 and not close:
-                break
-            j = (i + 1) % n
-            a_end = self._endpoints(curves[i])[1]
-            b_start = self._endpoints(curves[j])[0]
-            if a_end is None or b_start is None:
-                continue
-            if a_end.DistanceTo(b_start) >= self._MIN_LEN:
-                healed.append(Line.CreateBound(a_end, b_start))
-        return healed
-
-    def _json_loop(self, segs, plane, close=True, split_full=0):
-        """Parse + heal a list of JSON segments into a python list of Curves."""
-        curves = []
-        for seg in segs or []:
-            c = self._json_curve(seg, plane, split_full)
-            if isinstance(c, list):
-                curves.extend(c)
-            elif c is not None:
-                curves.append(c)
-        return self._heal_loop(curves, close)
-
-    @staticmethod
-    def _curve_arr(curves):
-        arr = CurveArray()
-        for c in curves:
-            arr.Append(c)
-        return arr
-
-    def _json_profile(self, geom_data, plane):
-        """Build a CurveArrArray (outer profile + inner hole loops)."""
-        outer = self._json_loop(geom_data.get("profile", []), plane)
-        if not outer:
-            return None
-        profile = CurveArrArray()
-        profile.Append(self._curve_arr(outer))
-        for inner in geom_data.get("inner_loops", []):
-            inner_curves = self._json_loop(inner, plane)
-            if inner_curves:
-                profile.Append(self._curve_arr(inner_curves))
-        return profile
-
-    def _loop_area(self, curves, plane):
-        """Signed area of a loop in sketch-plane UV coords (CCW > 0)."""
-        ax, ay = self._PLANE_AXES[plane[0] if plane else 'z']
-        pts = []
-        for c in curves:
-            try:
-                tess = list(c.Tessellate())
-            except Exception:
-                continue
-            for p in tess[:-1]:
-                pts.append((p.X * ax.X + p.Y * ax.Y + p.Z * ax.Z,
-                            p.X * ay.X + p.Y * ay.Y + p.Z * ay.Z))
-        if len(pts) < 3:
-            return 0.0
-        area = 0.0
-        for i in range(len(pts)):
-            u0, v0 = pts[i]
-            u1, v1 = pts[(i + 1) % len(pts)]
-            area += u0 * v1 - u1 * v0
-        return 0.5 * area
-
-    @staticmethod
-    def _reversed_loop(curves):
-        return [c.CreateReversed() for c in reversed(curves)]
-
-    def _align_loop_start(self, loop, ref_loop, plane):
-        """Rotate a blend loop's segment order so its start vertex sits at
-        roughly the same angular position as the reference loop's start.
-
-        NewBlend pairs the first vertex of the top loop with the first
-        vertex of the base loop; a mismatched start twists the solid or
-        makes the vertex pairing fail outright ("internal error code 1")."""
-        if len(loop) < 2:
-            return loop
-        ax, ay = self._PLANE_AXES[plane[0] if plane else 'z']
-
-        def _uv(p):
-            return (p.X * ax.X + p.Y * ax.Y + p.Z * ax.Z,
-                    p.X * ay.X + p.Y * ay.Y + p.Z * ay.Z)
-
-        def _starts(curves):
-            pts = []
-            for c in curves:
-                s = self._endpoints(c)[0]
-                if s is None:
-                    return None
-                pts.append(_uv(s))
-            return pts
-
-        ref_pts = _starts(ref_loop)
-        pts = _starts(loop)
-        if not ref_pts or not pts:
-            return loop
-        rcu = sum(p[0] for p in ref_pts) / len(ref_pts)
-        rcv = sum(p[1] for p in ref_pts) / len(ref_pts)
-        cu = sum(p[0] for p in pts) / len(pts)
-        cv = sum(p[1] for p in pts) / len(pts)
-        ref_ang = math.atan2(ref_pts[0][1] - rcv, ref_pts[0][0] - rcu)
-        best_k, best_d = 0, None
-        for k in range(len(pts)):
-            ang = math.atan2(pts[k][1] - cv, pts[k][0] - cu)
-            d = abs(math.atan2(math.sin(ang - ref_ang), math.cos(ang - ref_ang)))
-            if best_d is None or d < best_d:
-                best_k, best_d = k, d
-        if best_k == 0:
-            return loop
-        return loop[best_k:] + loop[:best_k]
-
-    def _loop_centroid_uv(self, curves, plane):
-        """Average of a loop's tessellated points in sketch-plane UV coords."""
-        ax, ay = self._PLANE_AXES[plane[0] if plane else 'z']
-        us, vs = [], []
-        for c in curves:
-            try:
-                tess = list(c.Tessellate())
-            except Exception:
-                continue
-            for p in tess[:-1]:
-                us.append(p.X * ax.X + p.Y * ax.Y + p.Z * ax.Z)
-                vs.append(p.X * ay.X + p.Y * ay.Y + p.Z * ay.Z)
-        if not us:
-            return None
-        return (sum(us) / len(us), sum(vs) / len(vs))
-
-    def _loops_congruent(self, loop_a, loop_b, plane):
-        """True when two loops have essentially the same area and centroid.
-
-        A "Blend" between congruent profiles (e.g. a drum shade = circle to an
-        identical circle) is really a prism/cylinder — and NewBlend rejects such
-        pairs with "internal error code 1".  Detecting this lets the caller build
-        an Extrusion instead of losing the part."""
-        area_a = abs(self._loop_area(loop_a, plane))
-        area_b = abs(self._loop_area(loop_b, plane))
-        if area_a <= 0 or area_b <= 0:
-            return False
-        if abs(area_a - area_b) > 0.02 * max(area_a, area_b):
-            return False
-        ca = self._loop_centroid_uv(loop_a, plane)
-        cb = self._loop_centroid_uv(loop_b, plane)
-        if ca is None or cb is None:
-            return False
-        du, dv = ca[0] - cb[0], ca[1] - cb[1]
-        return (du * du + dv * dv) ** 0.5 <= self._SNAP_TOL
-
-    def _loop_plane_offset(self, segs, plane):
-        """Constant signed offset (feet) of raw JSON points from the plane.
-
-        AI output often draws a blend's top profile at its real height
-        instead of on the sketch plane; recover that height so it can be
-        used as the implicit top offset."""
-        kind, val = plane
-        idx = {'x': 0, 'y': 1, 'z': 2}[kind]
-        vals = []
-        for seg in segs or []:
-            for key in ("start", "end", "center", "mid"):
-                if key in seg:
-                    try:
-                        vals.append(seg[key][idx] * SCL)
-                    except Exception:
-                        pass
-            for p in seg.get("points") or []:
-                try:
-                    vals.append(p[idx] * SCL)
-                except Exception:
-                    pass
-        if not vals:
-            return 0.0
-        lo, hi = min(vals), max(vals)
-        if hi - lo > self._SNAP_TOL:       # not a constant offset — ignore
-            return 0.0
-        return (lo + hi) / 2.0 - val
-
-    def _generate_json_family(self, fam_doc, schema):
-        """Apply a JSON schema to a (possibly new) family document.
-
-        Returns (built, total, skipped) where ``skipped`` is a list of
-        human-readable strings describing every geometry entry that failed,
-        so the caller can warn the user instead of silently saving a
-        family that is missing parts.
+        Modal ribbon window: we are inside the command, call it directly.
+        Modeless (MCP) window: queue it on an ExternalEvent; `Raise()` is
+        asynchronous, so everything depending on the result lives in `action`.
         """
-        fm = fam_doc.FamilyManager
-        param_dict = {}
-        for param_data in schema.get("parameters", []):
-            name = param_data.get("name", "")
-            for p in fm.Parameters:
-                if p.Definition.Name == name:
-                    param_dict[name] = p
-                    try:
-                        val = param_data.get("value")
-                        if val is not None:
-                            fm.Set(p, float(val) * SCL)
-                    except Exception:
-                        pass
-                    break
+        if not self._modeless or self._action_event is None:
+            action(None)
+            return
+        self._action_handler.set_action(action)
+        self._action_event.Raise()
 
-        geometry = schema.get("geometry", [])
-        total   = len(geometry)
-        built   = 0
-        skipped = []
-        for idx, geom_data in enumerate(geometry):
-            geom_type = geom_data.get("type", "Extrusion")
-            label = geom_data.get("id") or "#{} ({})".format(idx + 1, geom_type)
-            try:
-                is_solid = geom_data.get("is_solid", True)
-                plane = self._plane_info(geom_data)
-                sketch_plane = self._make_sketch_plane(fam_doc, plane)
+    # ── Review pane (3D preview) ─────────────────────────────────────────────
 
-                if geom_type == "Extrusion":
-                    profile = self._json_profile(geom_data, plane)
-                    if not profile:
-                        skipped.append("{}: empty/invalid profile".format(label))
-                        continue
-                    start_ft = geom_data.get("extrusion_start", 0.0) * SCL
-                    end_ft   = geom_data.get("extrusion_end", 1.0) * SCL
-                    if end_ft < start_ft:
-                        start_ft, end_ft = end_ft, start_ft
-                    if end_ft - start_ft < self._MIN_LEN:
-                        end_ft = start_ft + self._MIN_LEN
-                    ext = fam_doc.FamilyCreate.NewExtrusion(
-                        is_solid, profile, sketch_plane, end_ft - start_ft)
-                    # reassign offsets keeping end > start at every step
-                    if end_ft > 0:
-                        ext.EndOffset = end_ft
-                        ext.StartOffset = start_ft
-                    else:
-                        ext.StartOffset = start_ft
-                        ext.EndOffset = end_ft
+    def _init_preview(self):
+        self._preview_yaw = preview_mesh.DEFAULT_YAW
+        self._preview_pitch = preview_mesh.DEFAULT_PITCH
+        self._preview_zoom = 1.0
+        self._preview_model = None
+        self._preview_drag = None
+        self._preview_fit_next = True
+        self._preview_camera = None
+        try:
+            self._preview_timer = DispatcherTimer()
+            self._preview_timer.Interval = TimeSpan.FromMilliseconds(_PREVIEW_DEBOUNCE_MS)
+            self._preview_timer.Tick += self._on_preview_timer
+        except Exception:
+            self._preview_timer = None
+        try:
+            camera = PerspectiveCamera()
+            camera.FieldOfView = preview_mesh.FIELD_OF_VIEW
+            camera.NearPlaneDistance = 0.001
+            camera.FarPlaneDistance = 10000.0
+            self.preview_viewport.Camera = camera
+            self._preview_camera = camera
+        except Exception:
+            logger.warning("preview camera: {}".format(traceback.format_exc()))
 
-                elif geom_type == "Blend":
-                    base_segs = geom_data.get("profile", [])
-                    top_segs  = geom_data.get("top_profile", [])
-                    # full circles/ellipses in blend loops must be split into
-                    # arcs (NewBlend needs vertices to pair); match the other
-                    # loop's segment count for a clean vertex mapping
-                    base_loop = self._json_loop(base_segs, plane,
-                                                split_full=max(2, len(top_segs or [])))
-                    top_loop  = self._json_loop(top_segs, plane,
-                                                split_full=max(2, len(base_segs or [])))
-                    if not base_loop or not top_loop:
-                        skipped.append("{}: Blend needs both 'profile' and 'top_profile'".format(label))
-                        continue
-                    # NewBlend is picky: it wants both loops counter-clockwise
-                    # and pairs first vertices.  Normalize to CCW, align the
-                    # top loop's start vertex with the base's, then fall back
-                    # through reversed combinations if Revit still balks.
-                    if self._loop_area(base_loop, plane) < 0:
-                        base_loop = self._reversed_loop(base_loop)
-                    if self._loop_area(top_loop, plane) < 0:
-                        top_loop = self._reversed_loop(top_loop)
-                    # Base/top heights first (the extrusion fallback below needs them).
-                    base_off = geom_data.get("base_offset")
-                    top_off  = geom_data.get("top_offset")
-                    base_ft = (base_off * SCL if base_off is not None
-                               else self._loop_plane_offset(base_segs, plane))
-                    top_ft  = (top_off * SCL if top_off is not None
-                               else self._loop_plane_offset(top_segs, plane))
-                    if top_ft < base_ft:
-                        base_ft, top_ft = top_ft, base_ft
-                    if top_ft - base_ft < self._MIN_LEN:
-                        top_ft = base_ft + self._MIN_LEN
+    def json_text_changed(self, sender, e):
+        """Debounce: rebuild the preview once typing pauses."""
+        self._request_preview()
 
-                    # A Blend between two congruent loops (same size & centre —
-                    # e.g. a drum shade: circle -> identical circle) is really a
-                    # prism/cylinder.  NewBlend rejects it with "internal error
-                    # code 1", so build it as an Extrusion of the base loop instead.
-                    if self._loops_congruent(base_loop, top_loop, plane):
-                        prism = CurveArrArray()
-                        prism.Append(self._curve_arr(base_loop))
-                        ext = fam_doc.FamilyCreate.NewExtrusion(
-                            is_solid, prism, sketch_plane, top_ft - base_ft)
-                        if top_ft > 0:
-                            ext.EndOffset = top_ft
-                            ext.StartOffset = base_ft
-                        else:
-                            ext.StartOffset = base_ft
-                            ext.EndOffset = top_ft
-                        built += 1
-                        continue
+    def _request_preview(self, fit=False):
+        if fit:
+            self._preview_fit_next = True
+        timer = getattr(self, '_preview_timer', None)
+        if timer is None:
+            self._refresh_preview()
+            return
+        timer.Stop()
+        timer.Start()
 
-                    # NewBlend pairs the first vertices of the two loops; align the
-                    # top loop's start with the base's, then fall back through
-                    # reversed combinations if Revit still balks.
-                    top_aligned = self._align_loop_start(top_loop, base_loop, plane)
-                    attempts = [(top_aligned, base_loop)]
-                    if top_aligned is not top_loop:
-                        attempts.append((top_loop, base_loop))
-                    attempts.append((self._reversed_loop(top_aligned),
-                                     self._reversed_loop(base_loop)))
-                    blend = None
-                    last_err = None
-                    for t_loop, b_loop in attempts:
-                        try:
-                            blend = fam_doc.FamilyCreate.NewBlend(
-                                is_solid, self._curve_arr(t_loop),
-                                self._curve_arr(b_loop), sketch_plane)
-                            break
-                        except Exception as blend_err:
-                            last_err = blend_err
-                    if blend is None:
-                        raise last_err
-                    # assign offsets keeping top > base at every step
-                    if base_ft < 0:
-                        blend.BaseOffset = base_ft
-                        blend.TopOffset  = top_ft
-                    else:
-                        blend.TopOffset  = top_ft
-                        blend.BaseOffset = base_ft
+    def _on_preview_timer(self, sender, e):
+        try:
+            self._preview_timer.Stop()
+        except Exception:
+            pass
+        self._refresh_preview()
 
-                elif geom_type == "Revolution":
-                    profile = self._json_profile(geom_data, plane)
-                    ax_pt = geom_data.get("axis_start")
-                    bx_pt = geom_data.get("axis_end")
-                    if not (profile and ax_pt and bx_pt):
-                        skipped.append("{}: Revolution needs 'profile', 'axis_start', 'axis_end'".format(label))
-                        continue
-                    # the axis must lie in the sketch plane — project it too
-                    p0 = self._json_point(ax_pt, plane)
-                    p1 = self._json_point(bx_pt, plane)
-                    if p0.DistanceTo(p1) < self._MIN_LEN:
-                        skipped.append("{}: Revolution axis has zero length".format(label))
-                        continue
-                    axis = Line.CreateBound(p0, p1)
-                    a0 = geom_data.get("start_angle", 0.0)
-                    a1 = geom_data.get("end_angle", 6.283185307)
-                    fam_doc.FamilyCreate.NewRevolution(
-                        is_solid, profile, sketch_plane, axis, a0, a1)
+    def _res_brush(self, key):
+        """A T3 token brush (rule 21: dot-notation, never raises)."""
+        try:
+            return self.FindResource(key)
+        except Exception:
+            return None
 
-                elif geom_type == "Sweep":
-                    path_curves = self._json_loop(
-                        geom_data.get("path", []), plane, close=False)
-                    prof_curves = self._json_loop(
-                        geom_data.get("profile", []), None)
-                    if not path_curves or not prof_curves:
-                        skipped.append("{}: Sweep needs both 'path' and 'profile'".format(label))
-                        continue
-                    prof_arr = CurveArrArray()
-                    prof_arr.Append(self._curve_arr(prof_curves))
-                    sweep_profile = fam_doc.Application.Create.NewCurveLoopsProfile(prof_arr)
-                    try:
-                        fam_doc.FamilyCreate.NewSweep(
-                            is_solid, self._curve_arr(path_curves), sketch_plane,
-                            sweep_profile, 0, ProfilePlaneLocation.Start)
-                    except Exception:
-                        # sharp/kinked corners often kill a multi-segment sweep
-                        # (profile wider than the corner allows) — rebuild it as
-                        # one sweep per path segment instead of losing the part
-                        if len(path_curves) < 2:
-                            raise
-                        seg_ok = 0
-                        for pc in path_curves:
-                            try:
-                                one_path = CurveArray()
-                                one_path.Append(pc)
-                                seg_prof = CurveArrArray()
-                                seg_prof.Append(self._curve_arr(
-                                    self._json_loop(geom_data.get("profile", []), None)))
-                                fam_doc.FamilyCreate.NewSweep(
-                                    is_solid, one_path, sketch_plane,
-                                    fam_doc.Application.Create.NewCurveLoopsProfile(seg_prof),
-                                    0, ProfilePlaneLocation.Start)
-                                seg_ok += 1
-                            except Exception:
-                                pass
-                        if seg_ok == 0:
-                            raise
-                        logger.warning(
-                            "JSON sweep '{}' built per-segment ({}/{} runs)".format(
-                                label, seg_ok, len(path_curves)))
+    def _token_color(self, key):
+        brush = self._res_brush(key)
+        try:
+            return brush.Color
+        except Exception:
+            return None
 
-                elif geom_type == "Cylinder":
-                    # Axis-agnostic rod/tube: the AI gives two axis endpoints +
-                    # radius and the parser derives the sketch plane & direction.
-                    # This removes the #1 tube failure — mismatching sketch_plane
-                    # with the extrusion axis (e.g. drawing a vertical rod on
-                    # sketch_plane_x, which actually extrudes horizontally).
-                    s = geom_data.get("start")
-                    e = geom_data.get("end")
-                    r = geom_data.get("radius")
-                    if not (s and e and r is not None):
-                        skipped.append("{}: Cylinder needs 'start', 'end', 'radius'".format(label))
-                        continue
-                    dx = abs(e[0] - s[0]); dy = abs(e[1] - s[1]); dz = abs(e[2] - s[2])
-                    tol = 1.0   # mm — treat as axis-aligned within 1 mm
-                    kind = None
-                    if dx <= tol and dy <= tol and dz > tol:
-                        kind = 'z'
-                    elif dy <= tol and dz <= tol and dx > tol:
-                        kind = 'x'
-                    elif dx <= tol and dz <= tol and dy > tol:
-                        kind = 'y'
-                    if kind is not None:
-                        val = {'x': s[0], 'y': s[1], 'z': s[2]}[kind] * SCL
-                        cyl_plane = (kind, val)
-                        cyl_sp = self._make_sketch_plane(fam_doc, cyl_plane)
-                        circ = self._json_curve(
-                            {"type": "Circle", "center": s, "radius": r}, cyl_plane)
-                        prof = CurveArrArray()
-                        prof.Append(self._curve_arr([circ]))
-                        end_norm = {'x': e[0], 'y': e[1], 'z': e[2]}[kind] * SCL
-                        length = end_norm - val
-                        ext = fam_doc.FamilyCreate.NewExtrusion(
-                            is_solid, prof, cyl_sp, abs(length))
-                        if length >= 0:
-                            ext.EndOffset = length
-                            ext.StartOffset = 0.0
-                        else:
-                            ext.StartOffset = length
-                            ext.EndOffset = 0.0
-                    else:
-                        # diagonal rod → Revolution of a rectangle about the rod's
-                        # OWN axis.  Revit's sweep engine is unreliable here, but
-                        # NewRevolution is solid, so build the cylinder as a solid
-                        # of revolution instead of sweeping a circle along a path.
-                        p0 = self._json_point(s, None)
-                        p1 = self._json_point(e, None)
-                        if p0.DistanceTo(p1) < self._MIN_LEN:
-                            skipped.append("{}: Cylinder has zero length".format(label))
-                            continue
-                        rr = r * SCL
-                        axis_dir = (p1 - p0).Normalize()
-                        ref = XYZ.BasisZ if abs(axis_dir.Z) < 0.9 else XYZ.BasisX
-                        normal = axis_dir.CrossProduct(ref).Normalize()   # sketch-plane normal ⟂ axis
-                        out = axis_dir.CrossProduct(normal).Normalize()   # in-plane, ⟂ axis
-                        o0 = p0 + out.Multiply(rr)
-                        o1 = p1 + out.Multiply(rr)
-                        rect = CurveArray()
-                        rect.Append(Line.CreateBound(p0, p1))   # on the axis
-                        rect.Append(Line.CreateBound(p1, o1))   # out by radius
-                        rect.Append(Line.CreateBound(o1, o0))   # back along axis
-                        rect.Append(Line.CreateBound(o0, p0))   # in to the axis
-                        prof = CurveArrArray()
-                        prof.Append(rect)
-                        cyl_sp = SketchPlane.Create(
-                            fam_doc, Plane.CreateByNormalAndOrigin(normal, p0))
-                        axis = Line.CreateBound(p0, p1)
-                        fam_doc.FamilyCreate.NewRevolution(
-                            is_solid, prof, cyl_sp, axis, 0.0, 6.283185307)
+    def _refresh_preview(self):
+        raw = (self.json_tb.Text or "").strip()
+        if not raw or raw == "Paste your JSON schema here...":
+            self._render_preview(None, None, [], [])
+            return
+        try:
+            schema = json.loads(raw)
+        except ValueError as ex:
+            self._show_preview_issues(
+                ["The JSON cannot be read yet ({}). The preview keeps the last valid model."
+                 .format(ex)])
+            return
+        if not isinstance(schema, dict):
+            self._render_preview(None, None, ["$: must be a JSON object with a geometry array"], [])
+            return
+        errors, warnings = validate_family_schema(schema)
+        try:
+            model = preview_mesh.build_preview(schema)
+        except Exception as ex:
+            logger.warning("preview build: {}".format(traceback.format_exc()))
+            model = None
+            warnings = list(warnings) + ["Preview failed: {}".format(ex)]
+        self._render_preview(schema, model, errors, warnings + (model.warnings if model else []))
 
-                else:
-                    skipped.append("{}: unsupported type '{}'".format(label, geom_type))
+    def _material_brush(self, rgb, alpha):
+        color = MediaColor.FromArgb(int(alpha), int(rgb[0]), int(rgb[1]), int(rgb[2]))
+        brush = SolidColorBrush(color)
+        brush.Freeze()
+        return brush
+
+    def _render_preview(self, schema, model, errors, warnings):
+        """Scene, materials legend and summary for one schema (None clears)."""
+        self._preview_model = model
+        group = Model3DGroup()
+        ambient = self._token_color('T3.TextMuted')
+        key = self._token_color('T3.Border')
+        if ambient is not None:
+            group.Children.Add(AmbientLight(ambient))
+        # Lights take their colours from T3 tokens (no hex in code): a key light
+        # from the front-right, a dimmer fill from behind, and the ambient.
+        fill = self._token_color('T3.TextDisabled')
+        if key is not None:
+            group.Children.Add(DirectionalLight(key, Vector3D(-0.45, 0.6, -0.65)))
+        if fill is not None:
+            group.Children.Add(DirectionalLight(fill, Vector3D(0.6, -0.35, 0.4)))
+        materials = {}
+        for mat in (schema or {}).get('materials') or []:
+            if isinstance(mat, dict) and isinstance(mat.get('name'), str):
+                rgb = parse_color(mat.get('color'))
+                if rgb is not None:
+                    materials[mat['name']] = (rgb, mat.get('transparency') or 0)
+        # Parts without a material use the T3.BorderStrong token (stock grey only
+        # if the stylesheet were missing); voids use the danger accent, translucent.
+        fallback = self._token_color('T3.BorderStrong')
+        if fallback is None:
+            fallback = Colors.Gray
+        fallback_rgb = (fallback.R, fallback.G, fallback.B)
+        void_color = self._token_color('T3.Danger.Accent')
+        void_rgb = (void_color.R, void_color.G, void_color.B) if void_color is not None else fallback_rgb
+        opaque, translucent = [], []
+        if model is not None:
+            for mesh in model.meshes:
+                if not mesh.triangles:
                     continue
+                if not mesh.is_solid:
+                    rgb, alpha = void_rgb, 70
+                elif mesh.material in materials:
+                    rgb, transparency = materials[mesh.material]
+                    try:
+                        alpha = max(60, 255 - int(round(2.55 * float(transparency))))
+                    except (TypeError, ValueError):
+                        alpha = 255
+                else:
+                    rgb, alpha = fallback_rgb, 255
+                (opaque if alpha >= 255 else translucent).append((mesh, rgb, alpha))
+            # WPF 3D blends in draw order: opaque parts first, translucent last.
+            for mesh, rgb, alpha in opaque + translucent:
+                group.Children.Add(self._mesh_model(mesh, self._material_brush(rgb, alpha)))
+        visual = ModelVisual3D()
+        visual.Content = group
+        viewport = self.preview_viewport
+        viewport.Children.Clear()
+        viewport.Children.Add(visual)
+        has_geometry = model is not None and not model.is_empty
+        self.preview_empty.Visibility = WinVis.Collapsed if has_geometry else WinVis.Visible
+        if self._preview_fit_next and has_geometry:
+            self._preview_yaw = preview_mesh.DEFAULT_YAW
+            self._preview_pitch = preview_mesh.DEFAULT_PITCH
+            self._preview_zoom = 1.0
+            self._preview_fit_next = False
+        self._update_preview_camera()
+        self._fill_legend(schema, model)
+        self._fill_summary(schema, model, errors)
+        self._show_preview_issues(list(errors) + list(warnings))
 
-                built += 1
-            except Exception as ex:
-                msg = "{}".format(ex)
-                if "conditions for the inputs" in msg:
-                    msg += " [profile likely open or self-intersecting]"
-                elif "internal error" in msg.lower():
-                    msg += " [blend loops may self-intersect or pair badly]"
-                skipped.append("{}: {}".format(label, msg))
-                logger.warning("JSON geometry skip: {}".format(traceback.format_exc()))
+    def _mesh_model(self, mesh, brush):
+        """One schema part -> GeometryModel3D (meters, Z up)."""
+        positions = Point3DCollection(len(mesh.positions))
+        for x, y, z in mesh.positions:
+            positions.Add(Point3D(x / 1000.0, y / 1000.0, z / 1000.0))
+        indices = Int32Collection(len(mesh.triangles) * 3)
+        for a, b, c in mesh.triangles:
+            indices.Add(a)
+            indices.Add(b)
+            indices.Add(c)
+        geometry = MeshGeometry3D()
+        geometry.Positions = positions
+        geometry.TriangleIndices = indices
+        geometry.Freeze()
+        material = DiffuseMaterial(brush)
+        model = GeometryModel3D(geometry, material)
+        model.BackMaterial = material   # the preview never hides a mis-wound face
+        model.Freeze()
+        return model
 
-        return built, total, skipped
+    def _update_preview_camera(self):
+        camera = self._preview_camera
+        if camera is None:
+            return
+        model = self._preview_model
+        bmin = model.bbox_min if model is not None else None
+        bmax = model.bbox_max if model is not None else None
+        position, look, up = preview_mesh.camera_pose(
+            bmin, bmax, self._preview_yaw, self._preview_pitch, self._preview_zoom)
+        camera.Position = Point3D(position[0] / 1000.0, position[1] / 1000.0, position[2] / 1000.0)
+        camera.LookDirection = Vector3D(look[0] / 1000.0, look[1] / 1000.0, look[2] / 1000.0)
+        camera.UpDirection = Vector3D(up[0], up[1], up[2])
+
+    def _fill_legend(self, schema, model):
+        counts = model.material_counts() if model is not None else {}
+        rows = []
+        for mat in (schema or {}).get('materials') or []:
+            if not isinstance(mat, dict) or not isinstance(mat.get('name'), str):
+                continue
+            rgb = parse_color(mat.get('color'))
+            rows.append(_LegendRow(mat, rgb, counts.get(mat['name'], 0)))
+        self.preview_legend.ItemsSource = to_items_source(rows)
+        self.preview_legend_empty.Visibility = WinVis.Collapsed if rows else WinVis.Visible
+
+    def _fill_summary(self, schema, model, errors):
+        if not schema:
+            self.preview_summary.Text = "Category, part count and size appear here."
+            return
+        info = schema_summary(schema)
+        size = model.size_mm() if model is not None else (0, 0, 0)
+        lines = [
+            "{} · {}".format(info.get('family_name') or "(no family_name)",
+                             info.get('family_category') or "(no category)"),
+            "{} solid(s), {} void(s), {} material(s), {} parameter(s)".format(
+                info['solids'], info['voids'], len(info['materials']), info['parameters']),
+            "Size {:.0f} × {:.0f} × {:.0f} mm (W × D × H)".format(size[0], size[1], size[2]),
+            ("Ready to create." if not errors else
+             "{} problem(s) must be fixed before Create Family.".format(len(errors))),
+        ]
+        self.preview_summary.Text = "\n".join(lines)
+
+    def _show_preview_issues(self, issues):
+        issues = [i for i in issues if i]
+        if not issues:
+            self.preview_issues.Visibility = WinVis.Collapsed
+            self.preview_issue_text.Text = ""
+            self.preview_issue_text.ToolTip = None
+            return
+        shown = issues[:4]
+        if len(issues) > 4:
+            shown.append("... and {} more (hover to see all)".format(len(issues) - 4))
+        self.preview_issue_text.Text = "\n".join(shown)
+        self.preview_issue_text.ToolTip = "\n".join(issues)
+        self.preview_issues.Visibility = WinVis.Visible
+
+    def preview_fit_clicked(self, sender, e):
+        self._preview_yaw = preview_mesh.DEFAULT_YAW
+        self._preview_pitch = preview_mesh.DEFAULT_PITCH
+        self._preview_zoom = 1.0
+        self._update_preview_camera()
+
+    def preview_mouse_down(self, sender, e):
+        try:
+            self._preview_drag = e.GetPosition(self.preview_host)
+            self.preview_host.CaptureMouse()
+        except Exception:
+            self._preview_drag = None
+
+    def preview_mouse_up(self, sender, e):
+        self._preview_drag = None
+        try:
+            self.preview_host.ReleaseMouseCapture()
+        except Exception:
+            pass
+
+    def preview_mouse_move(self, sender, e):
+        start = self._preview_drag
+        if start is None:
+            return
+        point = e.GetPosition(self.preview_host)
+        self._preview_yaw -= (point.X - start.X) * 0.01
+        self._preview_pitch = preview_mesh.clamp_pitch(
+            self._preview_pitch + (point.Y - start.Y) * 0.01)
+        self._preview_drag = point
+        self._update_preview_camera()
+
+    def preview_mouse_wheel(self, sender, e):
+        factor = 0.88 if e.Delta > 0 else 1.0 / 0.88
+        self._preview_zoom = max(0.1, min(8.0, self._preview_zoom * factor))
+        self._update_preview_camera()
+
+    # ── MCP proposals ────────────────────────────────────────────────────────
+
+    def load_proposal(self, schema, proposal_id, note=u""):
+        """Show an externally proposed schema in the JSON panel and preview.
+
+        The current draft is kept for Undo AI. Nothing is created in Revit.
+        """
+        self._show_panel('json')
+        category = schema.get('family_category') if isinstance(schema, dict) else None
+        try:
+            if category in SUPPORTED_CATEGORIES:
+                self.json_category_combo.SelectedItem = category
+        except Exception:
+            pass
+        previous = self.json_tb.Text or ""
+        formatted = json.dumps(schema, indent=2, ensure_ascii=False)
+        if formatted != previous:
+            self._prev_json_backup = previous
+            self.btn_ai_undo.Visibility = WinVis.Visible
+        self._preview_fit_next = True
+        self.json_tb.Text = formatted
+        timer = getattr(self, '_preview_timer', None)
+        if timer is not None:
+            timer.Stop()            # the TextChanged debounce would only redo this
+        self._refresh_preview()
+        info = schema_summary(schema)
+        self.lbl_status.Text = (
+            u"Proposal {} received: {} part(s), {} material(s). Review the model, then "
+            u"Create Family.{}".format(proposal_id, info.get('parts', 0),
+                                       len(info.get('materials') or []),
+                                       u" Note: " + note if note else u""))
+        try:
+            if self.WindowState == WindowState.Minimized:
+                self.WindowState = WindowState.Normal
+            self.Activate()
+        except Exception:
+            pass
 
     # ── Batch mode ───────────────────────────────────────────────────────────
 
@@ -3080,3 +2879,27 @@ class FamilyCreatorDialog(T3WPFWindow):
 
 def show_family_creator(revit_doc, revit_app, initial_mode='cad'):
     FamilyCreatorDialog(revit_doc, revit_app, initial_mode).ShowDialog()
+
+
+def show_proposal(revit_doc, revit_app, schema, proposal_id, note=u""):
+    """Open (or reuse) the modeless FamiGen review window and load a proposal.
+
+    Called by the MCP server inside ExternalEvent.Execute, i.e. on Revit's main
+    thread with API context. Returns 'opened' or 'updated' immediately - it
+    never waits for the user (the window is shown with Show(), not ShowDialog()).
+    """
+    window = family_proposals.get_active_window()
+    state = 'updated'
+    if window is not None:
+        try:
+            if not window.IsLoaded and not window.IsVisible:
+                window = None
+        except Exception:
+            window = None
+    if window is None:
+        window = FamilyCreatorDialog(revit_doc, revit_app, initial_mode='json', modeless=True)
+        family_proposals.set_active_window(window)
+        window.Show()
+        state = 'opened'
+    window.load_proposal(schema, proposal_id, note)
+    return state

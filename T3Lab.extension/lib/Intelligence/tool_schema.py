@@ -217,6 +217,10 @@ READ_ONLY_TOOL_NAMES = frozenset([
     "select_elements", "set_active_view", "switch_active_document",
     # Diagnostics and the assistant's own UI
     "file_watcher_status", "say_hello", "show_assistant_pane",
+    # FamiGen: the contract, and a proposal shown in the review window - the
+    # model is untouched until famigen_create_family (not listed: it saves an
+    # .rfa and can load it into the project).
+    "famigen_get_schema", "famigen_propose_family",
 ])
 
 

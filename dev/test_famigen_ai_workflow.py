@@ -45,14 +45,21 @@ class Poison:
 class WorkflowTests(unittest.TestCase):
     def setUp(self):
         self.alerts, self.calls, self.pending = [], [], []
+        self.picked = []
         env = dict(json=json, os=os, codecs=codecs, WinVis=NS(Visible='visible', Collapsed='collapsed'),
-                   forms=NS(alert=lambda text, **kw: self.alerts.append(text)),
+                   forms=NS(alert=lambda text, **kw: self.alerts.append(text),
+                            pick_folder=lambda **kw: self.picked.append(kw) or '/tmp'),
                    logger=NS(warning=lambda message: None),
-                   generate_family_schema=self.generate, validate_ai_schema=contract.validate_ai_schema)
+                   generate_family_schema=self.generate, validate_ai_schema=contract.validate_ai_schema,
+                   validate_family_schema=contract.validate_family_schema,
+                   schema_summary=contract.schema_summary,
+                   SUPPORTED_CATEGORIES=contract.SUPPORTED_CATEGORIES,
+                   WindowState=NS(Minimized='min', Normal='normal'),
+                   family_proposals=NS(clear_active_window=lambda window=None: None))
         source = ast.parse((GUI / 'FamiGenDialog.py').read_text(encoding='utf-8'))
         original = next(n for n in source.body if isinstance(n, ast.ClassDef) and n.name == 'FamilyCreatorDialog')
         names = {'ai_generate_clicked', '_set_ai_generation_busy', 'ai_undo_clicked',
-                 'ai_window_closed', '_show_panel', 'create_clicked'}
+                 'ai_window_closed', '_show_panel', 'create_clicked', 'load_proposal'}
         cls = ast.ClassDef(name='Window', bases=[], keywords=[],
                            body=[n for n in original.body if isinstance(n, ast.FunctionDef) and n.name in names], decorator_list=[])
         exec(compile(ast.fix_missing_locations(ast.Module(body=[cls], type_ignores=[])), str(GUI / 'FamiGenDialog.py'), 'exec'), env)
@@ -61,8 +68,18 @@ class WorkflowTests(unittest.TestCase):
         w._ai_generating, w._ai_closed, w._ai_request_id = False, False, 0
         w._ai_control_states, w._prev_json_backup = [], None
         for name in ('btn_ai_generate', 'ai_prompt_tb', 'json_category_combo', 'json_tb', 'create_btn',
-                     'btn_ai_undo', 'copy_prompt_btn', 'mode_cad', 'mode_json', 'lbl_status', 'btn_export', 'panel_cad', 'panel_json'):
+                     'btn_ai_undo', 'copy_prompt_btn', 'mode_cad', 'mode_json', 'lbl_status', 'btn_export',
+                     'panel_cad', 'panel_json', 'chk_json_load', 'output_path'):
             setattr(w, name, Control(Text='', Visibility='collapsed'))
+        w.chk_json_load.IsChecked = True
+        w._modeless = False
+        w._doc = NS(IsFamilyDocument=False)
+        self.previews, self.queued = [], []
+        w._request_preview = lambda fit=False: self.previews.append(fit)
+        w._refresh_preview = lambda: self.previews.append('now')
+        w._run_in_revit = lambda action: self.queued.append(action)
+        w.WindowState = 'normal'
+        w.Activate = lambda: None
         w.ai_prompt_tb.Text = 'a chair in mm'
         w.json_category_combo.SelectedItem = 'Furniture'
         w.json_tb.Text = '  existing draft\n'
@@ -88,6 +105,7 @@ class WorkflowTests(unittest.TestCase):
         done(worker())
         w = self.window
         self.assertEqual(json.loads(w.json_tb.Text), valid())
+        self.assertEqual(self.previews, [True])          # new result -> preview refit
         self.assertEqual(w._prev_json_backup, '  existing draft\n')
         self.assertFalse(w._ai_generating)
         self.assertTrue(w.create_btn.IsEnabled)
@@ -199,6 +217,58 @@ class WorkflowTests(unittest.TestCase):
             self.assertTrue(expected.IsDefault)
             self.assertEqual(other.Style, 'T3.Button.Secondary')
             self.assertFalse(other.IsDefault)
+
+    def test_create_rejects_schema_errors_before_queueing(self):
+        bad = valid()
+        bad['geometry'][0]['material'] = 'Walnut'           # not in materials[]
+        self.window.json_tb.Text = json.dumps(bad)
+        self.window.create_clicked(None, None)
+        self.assertEqual(self.queued, [])
+        self.assertIn('Walnut', self.alerts[-1])
+        self.assertIn('nothing was created', self.alerts[-1])
+        bad = valid(); bad['family_category'] = 'Spaceship'
+        self.window.json_tb.Text = json.dumps(bad)
+        self.window.create_clicked(None, None)
+        self.assertIn('Generic Model', self.alerts[-1])     # lists the valid categories
+        self.assertEqual(self.queued, [])
+
+    def test_create_valid_schema_queues_shared_builder_with_folder(self):
+        good = valid()
+        good['materials'] = [dict(name='Oak', color='#AA7744')]
+        good['geometry'][0]['material'] = 'Oak'
+        self.window.json_tb.Text = json.dumps(good)
+        self.window.create_clicked(None, None)
+        self.assertEqual(self.alerts, [])
+        self.assertEqual(len(self.queued), 1)
+        self.assertEqual(self.picked and self.window.output_path.Text, '/tmp')
+        calls = []
+        self.window._create_family_impl = lambda *args: calls.append(args)
+        self.queued[0]('uiapp')
+        schema, folder, load, into_active, uiapp = calls[0]
+        self.assertEqual((folder, load, into_active, uiapp), ('/tmp', True, False, 'uiapp'))
+        self.assertEqual(schema['materials'][0]['name'], 'Oak')
+
+    def test_modeless_window_never_builds_into_active_document(self):
+        self.window._modeless = True
+        self.window._doc = Poison()                         # stale/off-context doc untouched
+        self.window.output_path.Text = os.getcwd()
+        self.window.json_tb.Text = json.dumps(valid())
+        self.window.create_clicked(None, None)
+        self.assertEqual(len(self.queued), 1)
+
+    def test_proposal_loads_into_review_with_undo(self):
+        good = valid(); good['family_category'] = 'Casework'
+        self.window.load_proposal(good, 'FG-1', 'from Claude')
+        w = self.window
+        self.assertEqual(json.loads(w.json_tb.Text), good)
+        self.assertEqual(w.json_category_combo.SelectedItem, 'Casework')
+        self.assertEqual(w._prev_json_backup, '  existing draft\n')
+        self.assertEqual(w.btn_ai_undo.Visibility, 'visible')
+        self.assertIn('now', self.previews)
+        self.assertIn('FG-1', w.lbl_status.Text)
+        self.assertEqual(w.mode_json.IsChecked, True)
+        w.ai_undo_clicked(None, None)
+        self.assertEqual(w.json_tb.Text, '  existing draft\n')
 
     def test_create_invalid_json_stops_before_document_access(self):
         self.window._doc = Poison()

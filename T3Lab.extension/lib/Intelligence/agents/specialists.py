@@ -93,6 +93,9 @@ MODELING_TOOLS = READ_TOOLS | frozenset([
     # the subset could not perform it.
     "create_structural_framing_system",
     "split_element", "split_curve",
+    # Loadable families modelled by the AI: contract -> reviewed proposal ->
+    # saved .rfa (FamiGen, schema v2 with materials).
+    "famigen_get_schema", "famigen_propose_family", "famigen_create_family",
 ])
 
 # Model QA / audit: read everything, highlight problems visually.

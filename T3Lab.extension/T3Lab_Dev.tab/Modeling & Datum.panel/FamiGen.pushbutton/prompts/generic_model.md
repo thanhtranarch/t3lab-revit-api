@@ -17,9 +17,15 @@ JSON object — do not explain what changed.
   `6.283185307`).
 - The parser does **not** read `reference_planes`, `dimensions`, or `locks` — position every
   profile with absolute XYZ mm coordinates directly in the curve segments.
-- `"parameters"` (optional array of `{"name","value"}`) only overwrites an **existing** numeric
-  Length parameter by name; it never creates parameters, and doing nothing on a fresh template
-  is normal. Omit `"type"`/`"is_instance"`.
+- `"parameters"` (optional array of `{"name","type","value","instance"}`; `type` is `length`
+  (mm, default), `number`, `integer` or `text`) sets a template parameter with that name and
+  CREATES it when the template has none. Use `"instance": true` only for values that must vary
+  per placed instance; never `"is_instance"`.
+- `"materials"` (schema v2): list every finish once as `{"name","color":"#RRGGBB"}` (optional
+  `transparency` 0-100, `shininess`, `smoothness`, `parameter`) and give EVERY solid geometry
+  entry a `"material"` naming one of them. FamiGen creates the materials and one Material
+  parameter per material, so finishes stay editable per family type. Optional `"subcategory"`
+  on a part (e.g. `"Legs"`) groups parts for visibility control.
 
 # METHOD (apply before emitting)
 1. **Inventory every part first** — scan the object top-to-bottom and list every visible piece

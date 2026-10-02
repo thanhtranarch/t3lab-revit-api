@@ -139,5 +139,118 @@ class FamilyContractTests(unittest.TestCase):
             module.generate_family_schema(FailingBridge(), 'chair', 'Furniture')
 
 
+def v2():
+    value = schema()
+    value['schema_version'] = 2
+    value['materials'] = [
+        {'name': 'Oak', 'color': '#A0522D', 'transparency': 0, 'smoothness': 40},
+        {'name': 'Steel', 'color': [40, 40, 44], 'shininess': 90, 'parameter': 'Frame Material'}]
+    value['geometry'][0]['material'] = 'Steel'
+    value['geometry'][0]['subcategory'] = 'Legs'
+    value['geometry'].append({'type': 'Extrusion', 'material': 'Oak',
+                              'profile': [{'type': 'Circle', 'center': [0, 0, 0], 'radius': 300}],
+                              'extrusion_start': 900, 'extrusion_end': 930})
+    value['parameters'] = [{'name': 'Top Thickness', 'value': 30},
+                           {'name': 'Seats', 'type': 'integer', 'value': 4, 'instance': True},
+                           {'name': 'Designer', 'type': 'text', 'value': 'T3Lab'},
+                           {'name': 'Ratio', 'type': 'number', 'value': 0.5}]
+    return value
+
+
+class SchemaV2Tests(unittest.TestCase):
+    def test_v2_materials_parameters_valid_and_v1_unchanged(self):
+        self.assertEqual(module.validate_ai_schema(v2(), 'Furniture'), [])
+        errors, warnings = module.validate_family_schema(v2())
+        self.assertEqual((errors, warnings), ([], []))
+        self.assertEqual(module.validate_family_schema(schema()), ([], []))
+
+    def test_material_references_must_exist(self):
+        value = v2(); value['geometry'][0]['material'] = 'Walnut'
+        errors = '\n'.join(module.validate_ai_schema(value, 'Furniture'))
+        self.assertIn('$.geometry[0].material', errors)
+        self.assertIn("'Walnut'", errors)
+        self.assertIn('Oak', errors)                      # lists what is defined
+        value = schema(); value['geometry'][0]['material'] = 'Oak'   # no materials at all
+        self.assertIn('none defined', '\n'.join(module.validate_ai_schema(value, 'Furniture')))
+
+    def test_material_fields_checked(self):
+        for color in ('#12345', '#GG0000', 'red', [1, 2], [0, 0, 256], [0, 0, 1.5], [True, 0, 0], None):
+            value = v2(); value['materials'][0]['color'] = color
+            self.assertIn('$.materials[0].color', '\n'.join(module.validate_ai_schema(value, 'Furniture')), repr(color))
+        for field, val in (('transparency', 101), ('transparency', -1), ('shininess', 129),
+                           ('smoothness', True), ('transparency', float('nan'))):
+            value = v2(); value['materials'][0][field] = val
+            self.assertIn('$.materials[0].' + field, '\n'.join(module.validate_ai_schema(value, 'Furniture')))
+        value = v2(); value['materials'][1]['name'] = 'oak'
+        self.assertIn('duplicates', '\n'.join(module.validate_ai_schema(value, 'Furniture')))
+        value = v2(); value['materials'][0]['name'] = 'Oak: natural'
+        self.assertIn('must not contain :', '\n'.join(module.validate_ai_schema(value, 'Furniture')))
+        value = v2(); value['materials'][0]['parameter'] = 'Frame Material'
+        self.assertIn('already used', '\n'.join(module.validate_ai_schema(value, 'Furniture')))
+        value = v2(); value['materials'] = {}
+        self.assertIn('$.materials', '\n'.join(module.validate_ai_schema(value, 'Furniture')))
+
+    def test_parameter_types_and_values(self):
+        for param, path in (({'name': 'A', 'type': 'area'}, '.type'),
+                            ({'name': 'A', 'type': 'integer', 'value': 1.5}, '.value'),
+                            ({'name': 'A', 'type': 'integer', 'value': True}, '.value'),
+                            ({'name': 'A', 'type': 'text', 'value': 3}, '.value'),
+                            ({'name': 'A', 'value': 'wide'}, '.value'),
+                            ({'name': 'A', 'instance': 'yes'}, '.instance'),
+                            ({'name': 'A[1]'}, '.name')):
+            value = v2(); value['parameters'] = [param]
+            self.assertIn('$.parameters[0]' + path, '\n'.join(module.validate_ai_schema(value, 'Furniture')))
+        value = v2(); value['parameters'] = [{'name': 'Width'}, {'name': 'width'}]
+        self.assertIn('duplicates', '\n'.join(module.validate_ai_schema(value, 'Furniture')))
+
+    def test_unsupported_category_lists_valid_ones(self):
+        value = schema(); value['family_category'] = 'Spaceship'
+        errors, _ = module.validate_family_schema(value)
+        self.assertTrue(errors and errors[0].startswith('$.family_category'))
+        for category in module.SUPPORTED_CATEGORIES:
+            self.assertIn(category, errors[0])
+        self.assertTrue(module.validate_ai_schema(value, 'Spaceship'))
+        value = schema(); value['family_category'] = 'Lighting Fixture'
+        self.assertEqual(module.validate_family_schema(value, 'Lighting Fixture'), ([], []))
+
+    def test_warnings_do_not_block(self):
+        value = v2()
+        value['materials'].append({'name': 'Glass', 'color': '#88CCEE', 'transparency': 70, 'gloss': 1})
+        value['geometry'].append({'type': 'Cylinder', 'start': [0, 0, 0], 'end': [0, 0, 10],
+                                  'radius': 5, 'is_solid': False, 'material': 'Oak'})
+        value['geometry'].append({'type': 'Cylinder', 'start': [0, 0, 0], 'end': [0, 0, 10], 'radius': 5})
+        errors, warnings = module.validate_family_schema(value)
+        self.assertEqual(errors, [])
+        text = '\n'.join(warnings)
+        self.assertIn("'Glass' is not used", text)
+        self.assertIn('ignored field(s): gloss', text)
+        self.assertIn('voids take no material', text)
+        self.assertIn('$.geometry[3]: solid has no material', text)
+
+    def test_prompt_and_contract_describe_materials(self):
+        prompt = module.build_system_prompt('Furniture')
+        for word in ('materials', '#RRGGBB', 'transparency', 'Materials and', 'subcategory',
+                     'integer', 'Lighting Fixture'):
+            self.assertIn(word, prompt)
+        contract = module.schema_contract()
+        self.assertEqual(contract['schema_version'], 2)
+        self.assertEqual(contract['supported_categories'], list(module.SUPPORTED_CATEGORIES))
+        self.assertEqual(module.validate_family_schema(contract['example']), ([], []))
+        import json
+        json.dumps(contract)                             # JSON-safe for MCP
+
+    def test_helpers(self):
+        self.assertEqual(module.parse_color('#0a0B0c'), (10, 11, 12))
+        self.assertEqual(module.color_hex((10, 11, 12)), '#0A0B0C')
+        self.assertEqual(module.default_material_parameter('Oak'), 'Oak Material')
+        self.assertEqual(module.default_material_parameter('Body Material'), 'Body Material')
+        self.assertEqual(module.category_templates('Columns')[0], 'Column.rft')
+        self.assertEqual(module.category_bic_name('Furniture'), 'OST_Furniture')
+        self.assertTrue(module.category_is_hosted('Door'))
+        summary = module.schema_summary(v2())
+        self.assertEqual((summary['solids'], summary['voids'], summary['parameters']), (2, 0, 4))
+        self.assertEqual(summary['materials'][1], {'name': 'Steel', 'parameter': 'Frame Material', 'solids': 1})
+
+
 if __name__ == '__main__':
     unittest.main()
