@@ -28,7 +28,7 @@ X = '{http://schemas.microsoft.com/winfx/2006/xaml}'
 P = '{http://schemas.microsoft.com/winfx/2006/xaml/presentation}'
 
 EMPTY_STATES = {'AutoDimension.xaml': 'lst_views', 'DoorThreshold.xaml': 'door_datagrid',
-                'PointCloud.xaml': 'results_grid', 'QuickElement.xaml': 'dataGrid',
+                'PointCloud.xaml': 'results_grid',
                 'RoomToFloor.xaml': 'room_datagrid', 'TextToElement.xaml': 'dg_preview',
                 'TileLayout.xaml': 'floors_listview'}
 
@@ -98,7 +98,13 @@ class PropertyLineResults(unittest.TestCase):
                     ('_show_results_message', '_on_search_complete', '_on_search_more',
                      '_on_search_error', '_is_current', '_hide_address_warning')]
         vis = SimpleNamespace(Visible='Visible', Collapsed='Collapsed')
-        scope = dict(Visibility=vis, logger=Mock(), ParcelItem=lambda p: p)
+        import importlib, sys
+        lib = os.path.join(REPO, 'T3Lab.extension', 'lib')
+        if lib not in sys.path:
+            sys.path.insert(0, lib)
+        parcel_search = importlib.import_module('Snippets._parcel_search')
+        scope = dict(Visibility=vis, logger=Mock(), ParcelItem=lambda p: p,
+                     parcel_search=parcel_search)
         exec(compile(ast.Module(body=[cls], type_ignores=[]), 'PropertyLineDialog.py', 'exec'), scope)
         win = scope[cls.name].__new__(scope[cls.name])
         win._search_seq = 1

@@ -1532,6 +1532,35 @@ class T3WPFWindow(Window):
         else:
             header_cb.IsChecked = None      # indeterminate
 
+    def enable_bulk_tick(self, grid, prop, on_change=None, header=None,
+                         context_menu=True):
+        """Bật cử chỉ tick hàng loạt cho cột checkbox (bridged) của `grid`.
+
+        Shift+click checkbox = tick theo khoảng · nhấn checkbox rồi kéo = tô
+        (tự cuộn sát mép) · bôi đen dòng + Space = tick/bỏ tick nhóm · chuột
+        phải = menu Tick selected / Untick selected / Tick all visible /
+        Untick all / Invert ticks. Sau mỗi thao tác header select-all
+        (`header`, mặc định `chk_all_<grid.Name>`) được đồng bộ rồi gọi
+        `on_change()`. Chi tiết: GUI/bulk_tick.py.
+
+        Trả về controller (None nếu không gắn được — bảng vẫn chạy như cũ).
+        """
+        if grid is None or not prop:
+            return None
+        try:
+            from GUI.bulk_tick import BulkTick
+            ctl = BulkTick(self, grid, prop, on_change=on_change, header=header,
+                           context_menu=context_menu)
+        except BaseException:
+            return None
+        # Giữ controller: nó giữ các delegate, GC thu mất thì cử chỉ chết.
+        store = getattr(self, '_t3_bulk_tick', None)
+        if store is None:
+            store = []
+            self._t3_bulk_tick = store
+        store.append(ctl)
+        return ctl
+
     # ── AI Mode Helpers ──────────────────────────────────────────────────
     @property
     def ai_bridge(self):

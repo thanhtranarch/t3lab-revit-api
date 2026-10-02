@@ -570,8 +570,8 @@ def launch_batchout_configured(config, progress_cb=None):
 def launch_loadfamily():
     """Open the Family Manager on its Loader tab."""
     try:
-        from GUI.ManaFamiDialog import show_family_manager
-        show_family_manager(default_tab=0)
+        from GUI.ManaFamiDialog import show_family_manager, TAB_LOADER
+        show_family_manager(mode=TAB_LOADER)
         return True, u""
     except Exception as ex:
         logger.error("Error launching LoadFamily: {}".format(_exc_text(ex)))
@@ -584,7 +584,7 @@ def launch_loadfamily():
 # failed, while still being advertised to the model. `open_grids` and
 # `open_loadfamily_cloud` went with them — Grids.pushbutton never existed, and
 # the "cloud" launcher was a byte-for-byte duplicate of launch_loadfamily
-# (show_family_manager only has tabs 0/1, Loader and Management — no cloud
+# (show_family_manager only has two modes, Management and Loader — no cloud
 # tab). Everything except BatchOut and the Family Manager now comes from the
 # tool_discovery registry, validated against disk. See _build_tool_launchers.
 

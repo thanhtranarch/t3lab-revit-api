@@ -228,7 +228,7 @@
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
                  E8A3 Zoom        E7B3 Isolate    E7C9 Pick       E7C3 Document
-                 E896 Download    EA80 Insight
+                 E896 Download    EA80 Insight    ED1A Hide
 
                Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
                  1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
@@ -867,6 +867,15 @@
                 </ControlTemplate>
               </Setter.Value>
             </Setter>
+          </Style>
+
+          <!-- Cột checkbox của ListView+GridView: bản GridView của
+               T3.DataGridColumnHeader.Check — bỏ Padding 8 và canh giữa để checkbox
+               header nằm đúng trên checkbox dòng (BatchOut 2026-10-02). -->
+          <Style x:Key="T3.GridViewColumnHeader.Check" TargetType="GridViewColumnHeader"
+                 BasedOn="{StaticResource T3.GridViewColumnHeader}">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
           </Style>
 
           <Style x:Key="T3.ListViewItem" TargetType="ListViewItem">
@@ -1861,7 +1870,26 @@
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
                                                     </DataGridTemplateColumn>
-                                                    <DataGridTextColumn Header="NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
+                                                    <!-- NAME: inline rename (lib/GUI/inline_rename.py) — double-click / F2 / Enter
+                                                         shows row_name_editor, Enter or focus loss commits, Esc cancels.
+                                                         Tooltip via string bridge: rows are Python objects. -->
+                                                    <DataGridTemplateColumn SortMemberPath="name" Width="*" IsReadOnly="True">
+                                                        <DataGridTemplateColumn.Header>
+                                                            <TextBlock Text="NAME" ToolTip="Double-click or press F2 to rename"/>
+                                                        </DataGridTemplateColumn.Header>
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Grid ToolTip="{Binding Text, ElementName=row_name_tip}">
+                                                                    <TextBlock x:Name="row_name_tip" Text="{Binding rename_tip}" Visibility="Collapsed"/>
+                                                                    <TextBlock x:Name="row_name_display" Text="{Binding name}"
+                                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBox x:Name="row_name_editor" Style="{StaticResource T3.TextBox}"
+                                                                             Height="{StaticResource T3.H.Row}" Padding="4,0"
+                                                                             VerticalAlignment="Center" Visibility="Collapsed"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
                                                     <DataGridTemplateColumn Header="ILLUSTRATION" Width="110" IsReadOnly="True">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate>
@@ -1977,7 +2005,26 @@
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
                                                     </DataGridTemplateColumn>
-                                                    <DataGridTextColumn Header="NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
+                                                    <!-- NAME: inline rename (lib/GUI/inline_rename.py) — double-click / F2 / Enter
+                                                         shows row_name_editor, Enter or focus loss commits, Esc cancels.
+                                                         Tooltip via string bridge: rows are Python objects. -->
+                                                    <DataGridTemplateColumn SortMemberPath="name" Width="*" IsReadOnly="True">
+                                                        <DataGridTemplateColumn.Header>
+                                                            <TextBlock Text="NAME" ToolTip="Double-click or press F2 to rename"/>
+                                                        </DataGridTemplateColumn.Header>
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Grid ToolTip="{Binding Text, ElementName=row_name_tip}">
+                                                                    <TextBlock x:Name="row_name_tip" Text="{Binding rename_tip}" Visibility="Collapsed"/>
+                                                                    <TextBlock x:Name="row_name_display" Text="{Binding name}"
+                                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBox x:Name="row_name_editor" Style="{StaticResource T3.TextBox}"
+                                                                             Height="{StaticResource T3.H.Row}" Padding="4,0"
+                                                                             VerticalAlignment="Center" Visibility="Collapsed"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
                                                     <DataGridTemplateColumn Header="ILLUSTRATION" Width="130" IsReadOnly="True">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate>
@@ -2101,7 +2148,26 @@
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
                                                     </DataGridTemplateColumn>
-                                                    <DataGridTextColumn Header="NAME" Binding="{Binding name}" Width="*" IsReadOnly="True"/>
+                                                    <!-- NAME: inline rename (lib/GUI/inline_rename.py) — double-click / F2 / Enter
+                                                         shows row_name_editor, Enter or focus loss commits, Esc cancels.
+                                                         Tooltip via string bridge: rows are Python objects. -->
+                                                    <DataGridTemplateColumn SortMemberPath="name" Width="*" IsReadOnly="True">
+                                                        <DataGridTemplateColumn.Header>
+                                                            <TextBlock Text="NAME" ToolTip="Double-click or press F2 to rename"/>
+                                                        </DataGridTemplateColumn.Header>
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Grid ToolTip="{Binding Text, ElementName=row_name_tip}">
+                                                                    <TextBlock x:Name="row_name_tip" Text="{Binding rename_tip}" Visibility="Collapsed"/>
+                                                                    <TextBlock x:Name="row_name_display" Text="{Binding name}"
+                                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBox x:Name="row_name_editor" Style="{StaticResource T3.TextBox}"
+                                                                             Height="{StaticResource T3.H.Row}" Padding="4,0"
+                                                                             VerticalAlignment="Center" Visibility="Collapsed"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
                                                     <DataGridTemplateColumn Header="ILLUSTRATION" Width="100" IsReadOnly="True">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate>

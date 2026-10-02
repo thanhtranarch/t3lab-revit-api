@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Family Manager Dialog — Unified Central Hub
-Combines Family Loader (Local/Cloud progressive load) and Family Management (Renaming/Worksets).
+Combines Family Management (batch renaming, the default mode) and Family Loader
+(progressive load from a local folder).
 """
 
 import os
@@ -39,12 +40,12 @@ from System.Windows.Threading import Dispatcher
 # pyRevit Imports
 from pyrevit import revit, DB, forms, script
 from GUI.WPF_Base import T3WPFWindow, to_items_source
-from Snippets._compat import eid_value, elem_name
+from Snippets._compat import elem_name
 
 from Autodesk.Revit.DB import (
-    FilteredElementCollector, FilteredWorksetCollector, WorksetKind,
+    FilteredElementCollector,
     Family, FamilySymbol, ElementType, GroupType, AssemblyType,
-    Transaction, BuiltInParameter, ElementId
+    Transaction
 )
 
 # Global logging variables
@@ -70,6 +71,22 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "family_loader_config.json")
 
 THUMBNAIL_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".t3lab", "thumbnails")
 SCAN_BATCH_SIZE = 20
+
+# Rail modes -> TabControl index. Batch Operations (Family Management) is used
+# most, so it is the first rail tile and the mode the window opens on.
+TAB_MANAGEMENT = 0
+TAB_LOADER = 1
+
+_MODE_TEXT = {
+    TAB_MANAGEMENT: (
+        "Family Management",
+        "Batch rename families and types, change case, and add a prefix or suffix",
+    ),
+    TAB_LOADER: (
+        "Family Loader",
+        "Load Revit families from a local folder",
+    ),
+}
 
 
 # CONFIGURATION HELPERS
@@ -269,29 +286,20 @@ class FamilyItem(_Reactive):
 
 
 class FamilyRow(object):
-    def __init__(self, element, family_name, type_name, category_name, workset_id, is_loadable=True):
+    def __init__(self, element, family_name, type_name, category_name, is_loadable=True):
         self.IsSelected = False
         self.FamilyName = family_name
         self.TypeName = type_name
         self.CategoryName = category_name or "Unknown"
-        self.WorksetId = workset_id
         self.element = element
         self.is_loadable = is_loadable
         self.OriginalFamilyName = family_name
         self.OriginalTypeName = type_name
-        self.OriginalWorksetId = workset_id
 
     @property
     def IsModified(self):
-        return (self.FamilyName != self.OriginalFamilyName or 
-                self.TypeName != self.OriginalTypeName or 
-                self.WorksetId != self.OriginalWorksetId)
-
-
-class WorksetItem(object):
-    def __init__(self, name, ws_id):
-        self.Name = name
-        self.Id = ws_id
+        return (self.FamilyName != self.OriginalFamilyName or
+                self.TypeName != self.OriginalTypeName)
 
 
 class FamilyLoadOptions(DB.IFamilyLoadOptions):
@@ -332,7 +340,6 @@ class ManaFamiWindow(T3WPFWindow):
         # Management initialization
         self._all_rows = []
         self._visible_rows = []
-        self._worksets = []
 
         # Find Controls
         self._find_named_controls()
@@ -343,6 +350,18 @@ class ManaFamiWindow(T3WPFWindow):
         
         # Event Wireup
         self._wire_events()
+
+        # Rule S7: the default mode's grid is filled here, not in Loaded,
+        # so the window never opens on an empty Batch Operations table.
+        self.set_mode(TAB_MANAGEMENT)
+        try:
+            self._refresh_data()
+        except Exception as ex:
+            logger.error("Error refreshing project data: {}".format(ex))
+            if getattr(self, 'status_text', None) is not None:
+                self.status_text.Text = (
+                    "Could not read families from the project: {}. "
+                    "Change the scope or category to retry.".format(ex))
 
     @property
     def doc(self):
@@ -400,7 +419,7 @@ class ManaFamiWindow(T3WPFWindow):
         self.rb_scope_selection = _get('rb_scope_selection')
         self.cb_category = _get('cb_category')
         self.tb_find = _get('tb_find')
-        self.btn_match_case = _get('btn_match_case')
+        self.chk_match_case = _get('chk_match_case')
         self.btn_find_next = _get('btn_find_next')
         self.btn_find_all = _get('btn_find_all')
         self.tb_replace = _get('tb_replace')
@@ -455,7 +474,6 @@ class ManaFamiWindow(T3WPFWindow):
         self.rb_scope_view.Checked += self.scope_changed
         self.rb_scope_selection.Checked += self.scope_changed
         self.cb_category.SelectionChanged += self.category_changed
-        self.btn_match_case.Click += self.match_case_click
         self.btn_find_next.Click += self.find_next_click
         self.btn_find_all.Click += self.find_all_click
         self.btn_replace.Click += self.replace_click
@@ -484,9 +502,10 @@ class ManaFamiWindow(T3WPFWindow):
         self.Loaded += self.window_loaded
 
     def window_loaded(self, sender, e):
-        """Restore saved folder, load worksets, and refresh grid data"""
-        # Loader setup — isolated in its own try so a folder-scan failure
-        # can never block the Management tab's project data below.
+        """Restore the saved Loader folder (background scan).
+
+        The Batch Operations grid is already filled in __init__ (rule S7).
+        """
         try:
             saved_folder = self.config.get('last_folder', '')
             if saved_folder and os.path.exists(saved_folder):
@@ -498,31 +517,32 @@ class ManaFamiWindow(T3WPFWindow):
         except Exception as ex:
             logger.error("Error loading saved folder: {}".format(ex))
 
-        # Management setup — always runs even if the Loader setup above
-        # failed; surfaces failures in the status bar instead of staying
-        # silently empty.
-        try:
-            self._load_worksets()
-            self._refresh_data()
-            self._update_counts()
-        except Exception as ex:
-            logger.error("Error refreshing project data: {}".format(ex))
-            self.status_text.Text = "Failed to load data from the project: {}".format(ex)
-
     # NAVIGATION ROUTING
     # ==============================================================================
+    def set_mode(self, mode):
+        """Switch rail tile, tab page, title and subtitle together.
+
+        `mode` is TAB_MANAGEMENT (0, default) or TAB_LOADER (1).
+        """
+        if mode not in _MODE_TEXT:
+            mode = TAB_MANAGEMENT
+        if getattr(self, 'nav_management', None) is not None:
+            self.nav_management.IsChecked = (mode == TAB_MANAGEMENT)
+        if getattr(self, 'nav_loader', None) is not None:
+            self.nav_loader.IsChecked = (mode == TAB_LOADER)
+        if getattr(self, 'main_tab_control', None) is not None:
+            self.main_tab_control.SelectedIndex = mode
+        title, subtitle = _MODE_TEXT[mode]
+        if getattr(self, 'lbl_title', None) is not None:
+            self.lbl_title.Text = title
+        if getattr(self, 'lbl_subtitle', None) is not None:
+            self.lbl_subtitle.Text = subtitle
+
     def nav_toggle_clicked(self, sender, e):
-        self.nav_loader.IsChecked = (sender == self.nav_loader)
-        self.nav_management.IsChecked = (sender == self.nav_management)
-        
         if sender == self.nav_loader:
-            self.main_tab_control.SelectedIndex = 0
-            self.lbl_title.Text = "Family Loader"
-            self.lbl_subtitle.Text = "Load Revit families from local folders or cloud library"
-        elif sender == self.nav_management:
-            self.main_tab_control.SelectedIndex = 1
-            self.lbl_title.Text = "Family Management"
-            self.lbl_subtitle.Text = "Batch rename families/types, modify case, customize prefix/suffix, and assign worksets"
+            self.set_mode(TAB_LOADER)
+        else:
+            self.set_mode(TAB_MANAGEMENT)
 
     # CHROME EVENT HANDLERS
     # ==============================================================================
@@ -1005,18 +1025,6 @@ class ManaFamiWindow(T3WPFWindow):
 
     # FAMILY MANAGEMENT WORKSPACE
     # ==============================================================================
-    def _load_worksets(self):
-        self._worksets = [WorksetItem("<No Workset / None>", -1)]
-        cur_doc = self.doc
-        if cur_doc and cur_doc.IsWorkshared:
-            try:
-                f_collector = FilteredWorksetCollector(cur_doc).OfKind(WorksetKind.UserWorkset)
-                for ws in f_collector.ToWorksets():
-                    self._worksets.append(WorksetItem(ws.Name, eid_value(ws.Id)))
-            except Exception:
-                pass
-        self.Worksets = self._worksets
-
     def _refresh_data(self):
         cur_doc = self.doc
         cur_uidoc = self.uidoc
@@ -1061,13 +1069,11 @@ class ManaFamiWindow(T3WPFWindow):
                         if symbol and symbol.Id not in symbols_found:
                             symbols_found.add(symbol.Id)
                             family = symbol.Family
-                            ws_id = inst.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM).AsInteger() if cur_doc.IsWorkshared else -1
                             rows.append(FamilyRow(
                                 element=symbol,
                                 family_name=family.Name,
                                 type_name=elem_name(symbol),
                                 category_name=symbol.Category.Name if symbol.Category else "Generic Models",
-                                workset_id=ws_id,
                                 is_loadable=True
                             ))
                     except Exception:
@@ -1081,17 +1087,11 @@ class ManaFamiWindow(T3WPFWindow):
                         for symbol_id in fam.GetFamilySymbolIds():
                             symbol = cur_doc.GetElement(symbol_id)
                             if symbol:
-                                ws_id = -1
-                                try:
-                                    ws_id = symbol.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM).AsInteger()
-                                except Exception:
-                                    pass
                                 rows.append(FamilyRow(
                                     element=symbol,
                                     family_name=fam.Name,
                                     type_name=elem_name(symbol),
                                     category_name=symbol.Category.Name if symbol.Category else "Generic Models",
-                                    workset_id=ws_id,
                                     is_loadable=True
                                 ))
                     except Exception:
@@ -1112,13 +1112,11 @@ class ManaFamiWindow(T3WPFWindow):
                                 pass
                         
                         if not is_loadable:
-                            ws_id = t.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM).AsInteger() if cur_doc.IsWorkshared else -1
                             rows.append(FamilyRow(
                                 element=t,
                                 family_name=t.FamilyName,
                                 type_name=elem_name(t),
                                 category_name=t.Category.Name,
-                                workset_id=ws_id,
                                 is_loadable=False
                             ))
                 except Exception:
@@ -1129,13 +1127,11 @@ class ManaFamiWindow(T3WPFWindow):
             group_types = FilteredElementCollector(cur_doc).OfClass(GroupType).ToElements()
             for gt in group_types:
                 try:
-                    ws_id = gt.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM).AsInteger() if cur_doc.IsWorkshared else -1
                     rows.append(FamilyRow(
                         element=gt,
                         family_name="Model Group",
                         type_name=elem_name(gt),
                         category_name="Groups",
-                        workset_id=ws_id,
                         is_loadable=False
                     ))
                 except Exception:
@@ -1146,13 +1142,11 @@ class ManaFamiWindow(T3WPFWindow):
             assembly_types = FilteredElementCollector(cur_doc).OfClass(AssemblyType).ToElements()
             for at in assembly_types:
                 try:
-                    ws_id = at.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM).AsInteger() if cur_doc.IsWorkshared else -1
                     rows.append(FamilyRow(
                         element=at,
                         family_name="Assembly",
                         type_name=elem_name(at),
                         category_name="Assemblies",
-                        workset_id=ws_id,
                         is_loadable=False
                     ))
                 except Exception:
@@ -1214,14 +1208,11 @@ class ManaFamiWindow(T3WPFWindow):
         self.dg_families.Items.Refresh()
         self._update_counts()
 
-    def match_case_click(self, sender, e):
-        pass
-
     def find_next_click(self, sender, e):
         find_val = (self.tb_find.Text or "").strip()
         if not find_val:
             return
-        match_case = self.btn_match_case.IsChecked == True
+        match_case = self.chk_match_case.IsChecked == True
         current_idx = self.dg_families.SelectedIndex
         rows_len = len(self._visible_rows)
         for i in range(1, rows_len + 1):
@@ -1238,7 +1229,7 @@ class ManaFamiWindow(T3WPFWindow):
         find_val = (self.tb_find.Text or "").strip()
         if not find_val:
             return
-        match_case = self.btn_match_case.IsChecked == True
+        match_case = self.chk_match_case.IsChecked == True
         count = 0
         for row in self._visible_rows:
             f_match = find_val in row.FamilyName if match_case else find_val.lower() in row.FamilyName.lower()
@@ -1257,7 +1248,7 @@ class ManaFamiWindow(T3WPFWindow):
         if not selected_row:
             forms.alert("Please select a row in the table first.")
             return
-        match_case = self.btn_match_case.IsChecked == True
+        match_case = self.chk_match_case.IsChecked == True
         if match_case:
             selected_row.FamilyName = selected_row.FamilyName.replace(find_val, replace_val)
             selected_row.TypeName = selected_row.TypeName.replace(find_val, replace_val)
@@ -1274,7 +1265,7 @@ class ManaFamiWindow(T3WPFWindow):
         target_rows = [r for r in self._visible_rows if r.IsSelected]
         if not target_rows:
             target_rows = self._visible_rows
-        match_case = self.btn_match_case.IsChecked == True
+        match_case = self.chk_match_case.IsChecked == True
         import re
         pattern = re.compile(re.escape(find_val), re.IGNORECASE)
         for r in target_rows:
@@ -1370,7 +1361,6 @@ class ManaFamiWindow(T3WPFWindow):
         for r in self._all_rows:
             r.FamilyName = r.OriginalFamilyName
             r.TypeName = r.OriginalTypeName
-            r.WorksetId = r.OriginalWorksetId
         self.dg_families.Items.Refresh()
         self.status_text.Text = "Staged changes discarded."
 
@@ -1382,21 +1372,6 @@ class ManaFamiWindow(T3WPFWindow):
 
         success_count = 0
         error_count = 0
-        worksets_changed = any(doc.IsWorkshared and r.WorksetId != r.OriginalWorksetId for r in modified_rows)
-        
-        instances_by_type = {}
-        if worksets_changed:
-            try:
-                all_instances = FilteredElementCollector(doc).WhereElementIsNotElementType().ToElements()
-                for inst in all_instances:
-                    tid = inst.GetTypeId()
-                    if tid and tid != ElementId.InvalidElementId:
-                        tid_val = eid_value(tid)
-                        if tid_val not in instances_by_type:
-                            instances_by_type[tid_val] = []
-                        instances_by_type[tid_val].append(inst)
-            except Exception:
-                pass
 
         t = Transaction(doc, "T3Lab - Family Management Apply")
         t.Start()
@@ -1411,21 +1386,6 @@ class ManaFamiWindow(T3WPFWindow):
                     if r.TypeName != r.OriginalTypeName:
                         sanitized_type = sanitize_name(r.TypeName)
                         r.element.Name = sanitized_type
-
-                    if doc.IsWorkshared and r.WorksetId != r.OriginalWorksetId:
-                        ws_val = r.WorksetId
-                        ws_param = r.element.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM)
-                        if ws_param and not ws_param.IsReadOnly:
-                            ws_param.Set(ws_val)
-                            
-                        related_instances = instances_by_type.get(eid_value(r.element.Id), [])
-                        for inst in related_instances:
-                            try:
-                                inst_ws_param = inst.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM)
-                                if inst_ws_param and not inst_ws_param.IsReadOnly:
-                                    inst_ws_param.Set(ws_val)
-                            except Exception:
-                                pass
                     success_count += 1
                 except Exception:
                     error_count += 1
@@ -1448,16 +1408,13 @@ class ManaFamiWindow(T3WPFWindow):
             return
         try:
             import csv
-            with open(dest_file, "wb") as f:
+            # Python 3: text mode + newline="" (the old "wb" + .encode() was
+            # Python 2 and raised TypeError on the first row).
+            with open(dest_file, "w", newline="", encoding="utf-8-sig") as f:
                 writer = csv.writer(f)
-                writer.writerow(["Family Name", "Type Name", "Category", "Workset ID"])
+                writer.writerow(["Family Name", "Type Name", "Category"])
                 for r in self._visible_rows:
-                    writer.writerow([
-                        r.FamilyName.encode('utf-8'),
-                        r.TypeName.encode('utf-8'),
-                        r.CategoryName.encode('utf-8'),
-                        r.WorksetId
-                    ])
+                    writer.writerow([r.FamilyName, r.TypeName, r.CategoryName])
             self.status_text.Text = "Exported list to: {}".format(dest_file)
         except Exception as ex:
             forms.alert("Failed to export list:\n{}".format(ex))
@@ -1490,36 +1447,24 @@ class ManaFamiWindow(T3WPFWindow):
         self.toggle_all_rows(self.dg_families, "IsSelected", sender.IsChecked)
 
 
-def show_family_manager(script_dir=None, revit=None, default_tab=0):
+def show_family_manager(script_dir=None, revit=None, default_tab=None, mode=TAB_MANAGEMENT):
+    """Open the Family Manager.
+
+    `mode` picks the start page: TAB_MANAGEMENT (Batch Operations, default)
+    or TAB_LOADER. `default_tab` is the legacy argument from before the rail
+    order was swapped (0 = Loader, 1 = Management); it is still honoured
+    with its OLD meaning so existing callers keep landing on the same page.
+    """
     try:
         if script_dir is None:
             script_dir = os.path.dirname(__file__)
         if revit is None:
             from pyrevit import revit as rvt
             revit = rvt
+        if default_tab is not None:
+            mode = TAB_LOADER if default_tab == 0 else TAB_MANAGEMENT
         window = ManaFamiWindow(script_dir, revit)
-        if default_tab == 1:
-            if getattr(window, 'main_tab_control', None) is not None:
-                window.main_tab_control.SelectedIndex = 1
-            if getattr(window, 'nav_management', None) is not None:
-                window.nav_management.IsChecked = True
-            if getattr(window, 'nav_loader', None) is not None:
-                window.nav_loader.IsChecked = False
-            if getattr(window, 'lbl_title', None) is not None:
-                window.lbl_title.Text = "Family Management"
-            if getattr(window, 'lbl_subtitle', None) is not None:
-                window.lbl_subtitle.Text = "Batch rename families/types, modify case, customize prefix/suffix, and assign worksets"
-        else:
-            if getattr(window, 'main_tab_control', None) is not None:
-                window.main_tab_control.SelectedIndex = 0
-            if getattr(window, 'nav_loader', None) is not None:
-                window.nav_loader.IsChecked = True
-            if getattr(window, 'nav_management', None) is not None:
-                window.nav_management.IsChecked = False
-            if getattr(window, 'lbl_title', None) is not None:
-                window.lbl_title.Text = "Family Loader"
-            if getattr(window, 'lbl_subtitle', None) is not None:
-                window.lbl_subtitle.Text = "Load Revit families from local folders"
+        window.set_mode(mode)
         window.ShowDialog()
     except Exception as ex:
         logger.error("Error running Family Manager:\n{}".format(traceback.format_exc()))

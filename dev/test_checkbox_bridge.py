@@ -205,6 +205,8 @@ class ShippedXaml(unittest.TestCase):
         # 25 template checkboxes + 13 former DataGridCheckBoxColumns + BatchOut
         # + DWGManagement (binding only, its UI stays frozen)
         # + DatumSync, CropSync, FamilyTransfer x2 (2026-09-29)
+        # - QuickElement (deleted with ManaSelect's Quick Select mode, 2026-10-02)
+        # + CADToElements layer list (one shared grid for every mode, 2026-10-02)
         self.assertEqual(count, 44)
 
     def test_read_only_workset_state_is_display_only(self):
@@ -249,7 +251,9 @@ class CheckColumnAlignment(unittest.TestCase):
                         self.assertIsNone(box.get(geometry), where)
         # 15 aligned first, 16 more on 2026-09-26 (AutoWork, BatchLink, DoorThreshold,
         # FamiGen, ManaAnno, ManaFami, ManaGroup, ManaPara, PointCloud, QuickElement,
-        # RoomToFloor), then DatumSync, CropSync, FamilyTransfer x2 (2026-09-29)
+        # RoomToFloor), then DatumSync, CropSync, FamilyTransfer x2 (2026-09-29);
+        # QuickElement dropped 2026-10-02 (ManaSelect keeps only Explore);
+        # CADToElements layer list added 2026-10-02
         self.assertEqual(len(seen), 35, seen)
 
     def test_renumber_tab_has_the_same_metrics_frame_as_the_sheets_tab(self):

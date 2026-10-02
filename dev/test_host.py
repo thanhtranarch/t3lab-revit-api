@@ -148,28 +148,10 @@ def test_module_imports():
     sys.modules['Autodesk.Revit.UI.Selection'].ISelectionFilter = object
 
     try:
-        import CopyAnnotationDialog
-        check('import CopyAnnotationDialog succeeded', True)
-    except Exception as e:
-        check('import CopyAnnotationDialog succeeded', False, str(e))
-
-    try:
         import ManaAnnoDialog
         check('import ManaAnnoDialog succeeded', True)
     except Exception as e:
         check('import ManaAnnoDialog succeeded', False, str(e))
-
-    try:
-        import TagCheckerDialog
-        check('import TagCheckerDialog succeeded', True)
-    except Exception as e:
-        check('import TagCheckerDialog succeeded', False, str(e))
-
-    try:
-        import QuickElementDialog
-        check('import QuickElementDialog succeeded', True)
-    except Exception as e:
-        check('import QuickElementDialog succeeded', False, str(e))
 
     try:
         import ManaSelectDialog
@@ -210,15 +192,15 @@ def test_stale_module_recovery():
     if hasattr(Snippets._host, 'resolve_uidoc'):
         delattr(Snippets._host, 'resolve_uidoc')
 
-    for k in ('CopyAnnotationDialog', 'GUI.CopyAnnotationDialog'):
+    for k in ('ManaAnnoDialog', 'GUI.ManaAnnoDialog'):
         if k in sys.modules:
             del sys.modules[k]
 
     try:
-        import CopyAnnotationDialog
-        check('CopyAnnotationDialog imports despite stale Snippets._host', hasattr(CopyAnnotationDialog, 'resolve_uidoc'))
+        import ManaAnnoDialog
+        check('ManaAnnoDialog imports despite stale Snippets._host', hasattr(ManaAnnoDialog, 'resolve_uidoc'))
     except Exception as e:
-        check('CopyAnnotationDialog imports despite stale Snippets._host', False, str(e))
+        check('ManaAnnoDialog imports despite stale Snippets._host', False, str(e))
     finally:
         # Restore real resolve_uidoc if needed
         if real_resolve is not None and not hasattr(Snippets._host, 'resolve_uidoc'):

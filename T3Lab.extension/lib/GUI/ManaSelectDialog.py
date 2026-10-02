@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""ManaSelect — unified controller for smart selection tools.
+"""ManaSelect — Explore: cây phần tử có đếm (Category -> Family -> Type).
 
-5 mode, đổi bằng rail bên trái:
-  0 Explore        — cây có đếm (Category -> Family -> Type), mode mặc định
-  1 Quick Select   — grid của QuickElementDialog, nhúng vào tab
-  2 Select Similar — khớp Type / Family / Category của phần tử mồi
-  3 On Sheets      — CAD import / title block trên sheet
-  4 Warnings       — cây cảnh báo của model, chọn được phần tử bị cờ
+2026-10-02: tool chỉ còn MỘT chức năng. Bốn mode cũ đã bỏ vì trùng tool khác:
+  - Quick Select   — trùng Explore (Filter + Search) và Filter của Revit
+  - Select Similar — trùng Explore (tick một Type/Family) và "Select All
+                     Instances" có sẵn của Revit
+  - On Sheets      — CAD import trên sheet đã có ở ManaDWG
+  - Warnings       — trùng tab Warnings của ModelAuditor (đầy đủ hơn)
 
-Logic Revit của Explore/Warnings nằm ở `Selection.explorer` (không import WPF);
-file này chỉ dựng cây, xử lý tick và gọi hành động.
+Logic Revit nằm ở `Selection.explorer` (không import WPF); file này chỉ dựng
+cây, xử lý tick và gọi hành động.
 """
 
 import csv
@@ -34,63 +34,56 @@ from System.Windows.Controls import (
     TextBlock,
     TreeViewItem,
 )
-from System.Windows.Input import Cursors
+from System.Windows.Input import Cursors, Key
 from System.Windows.Media import VisualTreeHelper
+from System.Windows.Threading import DispatcherTimer
 
-from Autodesk.Revit.DB import (
-    BuiltInCategory,
-    FilteredElementCollector,
-    ImportInstance,
-    Transaction,
-    ViewSheet,
-)
+from Autodesk.Revit.DB import TemporaryViewMode, Transaction
 from Autodesk.Revit.UI import ExternalEvent, IExternalEventHandler, TaskDialog
 from Autodesk.Revit.UI.Selection import ObjectType
 from Autodesk.Revit.Exceptions import OperationCanceledException
 
 from pyrevit import forms, revit
 
-# Add current folder to sys.path to find GUI dialog classes
-sys.path.append(os.path.dirname(__file__))
-# Add parent of Selection folder to find Selection
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
-try:
-    from GUI import QuickElementDialog
-except Exception:
-    import QuickElementDialog
+# Parent của GUI/ để import được `GUI.*` và `Selection.*`.
+_LIB_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _LIB_DIR not in sys.path:
+    sys.path.append(_LIB_DIR)
 
 from GUI.WPF_Base import T3WPFWindow
 from GUI import T3Dialog
-
-# Import dqt selection logic
-from Selection.dqt_select import core as dqt_core
-from Selection.dqt_select import compat as dqt_compat
 from Selection import explorer
 
 _XAML = os.path.join(os.path.dirname(__file__), 'Tools', 'ManaSelect.xaml')
 
-MODE_EXPLORE = 0
-MODE_QUICK = 1
-MODE_SIMILAR = 2
-MODE_SHEETS = 3
-MODE_WARNINGS = 4
+# Gõ Search thì đợi người dùng ngừng tay rồi mới dựng lại cây — bản cũ dựng lại
+# ở MỖI phím, model 8000 phần tử là giật theo từng chữ.
+_SEARCH_DELAY_MS = 250
 
-# subtitle · nhãn nút primary ở footer.
-# Cửa sổ giờ rộng 560 nên subtitle phải NGẮN, không thì T3.Subtitle cắt cụt.
-_MODES = {
-    MODE_EXPLORE: ('Counted tree of every element in scope', 'Select'),
-    MODE_QUICK: ('Query elements by parameter and text', 'Select'),
-    MODE_SIMILAR: ('Match Type, Family or Category', 'Apply Match'),
-    MODE_SHEETS: ('CAD imports and title blocks on sheets', 'Select'),
-    MODE_WARNINGS: ('Model warnings and the elements they flag', 'Select Flagged'),
-}
+# Display / Sort by / Filter lần trước — tiện ích cho người dùng, mất cũng không
+# sao (đọc/ghi luôn bọc try).
+_SETTINGS_PATH = os.path.join(os.environ.get('APPDATA', ''), 'T3LabAI',
+                              'mana_select.json')
 
-# Mode nào cần bề ngang tối thiểu. Chỉ Quick Select cần: nó nhúng DataGrid của
-# QuickElementDialog với 6 cột cố định (~700px) và T3.DataGrid tắt cuộn ngang,
-# nên ở cửa sổ hẹp cột bị cắt chứ không cuộn được. Đổi sang mode đó thì NỚI
-# rộng ra, không bao giờ thu lại — thu lại là giật cửa sổ dưới tay người dùng.
-_MODE_MIN_WIDTH = {MODE_QUICK: 900}
+
+def _load_settings():
+    try:
+        with io.open(_SETTINGS_PATH, 'r', encoding='utf-8') as handle:
+            data = json.load(handle)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_settings(data):
+    try:
+        folder = os.path.dirname(_SETTINGS_PATH)
+        if folder and not os.path.isdir(folder):
+            os.makedirs(folder)
+        with io.open(_SETTINGS_PATH, 'w', encoding='utf-8') as handle:
+            handle.write(json.dumps(data, ensure_ascii=False, indent=2))
+    except Exception:
+        pass
 
 
 class _ActionHandler(IExternalEventHandler):
@@ -172,7 +165,6 @@ class ManaSelectWindow(T3WPFWindow):
         self.uidoc = revit.uidoc
         self.doc = revit.doc
 
-        self._mode = MODE_EXPLORE
         self._loading = True            # chặn event trong lúc nạp combo box
 
         # ── Modeless plumbing ────────────────────────────────────────────
@@ -186,18 +178,13 @@ class ManaSelectWindow(T3WPFWindow):
         self._action_handler = _ActionHandler(self)
         self._action_event = ExternalEvent.Create(self._action_handler)
 
-        # Explore state
         self._records = []
         self._explore_root = None
         self._explore_binding = None
 
-        # Warnings state
-        self._warning_root = None
-        self._warning_binding = None
-        self._warning_total = 0
-
-        # Initialize and nest sub-panels
-        self._init_sub_panels()
+        self._search_timer = DispatcherTimer()
+        self._search_timer.Interval = System.TimeSpan.FromMilliseconds(_SEARCH_DELAY_MS)
+        self._search_timer.Tick += self._on_search_timer_tick
 
         self._init_explore_controls()
         self._wire_events()
@@ -206,8 +193,6 @@ class ManaSelectWindow(T3WPFWindow):
         # nếu không tool mở ra là một trang trắng.
         self._loading = False
         self._reload_explore()
-        self._reload_warnings()
-        self._apply_mode(MODE_EXPLORE)
 
     # =========================================================================
     # SETUP
@@ -240,220 +225,91 @@ class ManaSelectWindow(T3WPFWindow):
         self._action_handler.set_action(action)
         self._action_event.Raise()
 
-    def _init_sub_panels(self):
-        """Loads Quick Select window grid and collapses its header to avoid duplicates."""
-        try:
-            self._quick_select_win = QuickElementDialog.QuickSelectWindow(set_owner=False)
-            quick_select_border = self._quick_select_win.Content
-            # Content is Border, its Child is Grid. The Border is QuickElement's own
-            # standalone window chrome (rounded corners + gray edge) - reparenting it
-            # as-is would nest that chrome frame inside ManaSelect's own window chrome,
-            # showing up as a gray gutter/border around the tab. Reparent the inner
-            # Grid only and drop the outer chrome Border.
-            if hasattr(quick_select_border, 'Child') and quick_select_border.Child is not None:
-                quick_select_grid = quick_select_border.Child
-                self._quick_select_win.Content = None
-                quick_select_border.Child = None
-            else:
-                quick_select_grid = quick_select_border
-                self._quick_select_win.Content = None
-            self.grid_quick_select.Children.Add(quick_select_grid)
-
-            # Collapse sub-tool header and footer to unify status bar
-            if hasattr(quick_select_grid, 'RowDefinitions'):
-                if quick_select_grid.RowDefinitions.Count > 0:
-                    quick_select_grid.RowDefinitions[0].Height = System.Windows.GridLength(0)
-                if quick_select_grid.RowDefinitions.Count > 2:
-                    quick_select_grid.RowDefinitions[quick_select_grid.RowDefinitions.Count - 1].Height = System.Windows.GridLength(0)
-
-            # Quick Select's OWN action strip (Zoom / Select in Model /
-            # Isolate / Show Element / Refresh) sits inside the content we just
-            # reparented — only its title bar and footer got collapsed, so
-            # those buttons stay live. Their handlers call uidoc/doc directly,
-            # which is fatal once this host window is modeless. Hand the panel
-            # our dispatcher so it re-enters through the ExternalEvent; when
-            # Quick Select runs standalone this stays None and nothing changes.
-            try:
-                self._quick_select_win._api_dispatch = self._run_in_revit
-            except BaseException:
-                pass
-
-            # Quick Select's own "Select in Model" is T3.Button.Primary +
-            # IsDefault. Mounted here that makes TWO primaries and TWO default
-            # buttons in one window: the standard allows exactly one of each,
-            # and two IsDefault leaves Enter depending on focus scope. Demote
-            # the guest — `audit_t3.py` reads one file at a time so it cannot
-            # see this collision.
-            try:
-                guest_primary = getattr(self._quick_select_win, 'btnSelect', None)
-                if guest_primary is not None:
-                    guest_primary.IsDefault = False
-                    secondary = self._res('T3.Button.Secondary')
-                    if secondary is not None:
-                        guest_primary.Style = secondary
-            except BaseException:
-                pass
-
-            # Re-wire close
-            try:
-                self._quick_select_win.Close = self.Close
-            except BaseException:
-                pass
-        except BaseException:
-            self._quick_select_win = None
-            try:
-                import traceback
-                traceback.print_exc()
-            except BaseException:
-                pass
+    @staticmethod
+    def _pick_saved(combo, options, saved):
+        """Chọn lại giá trị đã lưu nếu nó còn trong danh sách, không thì mục đầu."""
+        combo.SelectedIndex = options.index(saved) if saved in options else 0
 
     def _init_explore_controls(self):
-        """Nạp 3 combo box của Explore. `_loading` chặn SelectionChanged nổ ra
-        giữa lúc gán, nếu không mỗi Add là một lần rebuild cây."""
+        """Nạp 3 combo box, khôi phục lựa chọn lần trước. `_loading` chặn
+        SelectionChanged nổ ra giữa lúc gán, nếu không mỗi Add là một lần
+        rebuild cây."""
+        saved = _load_settings()
         self._loading = True
         try:
-            for scope in explorer.SCOPES:
-                self.cbo_explore_scope.Items.Add(scope)
-            self.cbo_explore_scope.SelectedIndex = 0
-
-            for group in explorer.GROUP_ORDER:
-                self.cbo_explore_group.Items.Add(group)
-            self.cbo_explore_group.SelectedIndex = 0
-
-            for name in explorer.FILTER_ORDER:
-                self.cbo_explore_filter.Items.Add(name)
-            self.cbo_explore_filter.SelectedIndex = 0
+            for combo, options, key in (
+                    (self.cbo_explore_scope, explorer.SCOPES, 'scope'),
+                    (self.cbo_explore_group, explorer.GROUP_ORDER, 'group'),
+                    (self.cbo_explore_filter, explorer.FILTER_ORDER, 'filter')):
+                for option in options:
+                    combo.Items.Add(option)
+                self._pick_saved(combo, list(options), saved.get(key))
         finally:
             self._loading = False
 
+    def _remember_query(self):
+        _save_settings({
+            'scope': str(self.cbo_explore_scope.SelectedItem or ''),
+            'group': str(self.cbo_explore_group.SelectedItem or ''),
+            'filter': str(self.cbo_explore_filter.SelectedItem or ''),
+        })
+
     def _wire_events(self):
-        # Rail navigation. Chrome (min/max/close) do T3WPFWindow tự nối trong
+        # Chrome (min/max/close) do T3WPFWindow tự nối trong
         # _wire_window_controls() — nối tay thêm một lần nữa làm Maximize toggle
         # hai nhịp và trở thành no-op.
-        self.nav_toggle_explore.Click += self._on_nav_toggle_clicked
-        self.nav_toggle_quick_select.Click += self._on_nav_toggle_clicked
-        self.nav_toggle_select_similar.Click += self._on_nav_toggle_clicked
-        self.nav_toggle_select_sheets.Click += self._on_nav_toggle_clicked
-        self.nav_toggle_warnings.Click += self._on_nav_toggle_clicked
 
-        # Explore query bar
+        # Query bar
         self.cbo_explore_scope.SelectionChanged += self._on_explore_query_changed
         self.cbo_explore_filter.SelectionChanged += self._on_explore_query_changed
         self.cbo_explore_group.SelectionChanged += self._on_explore_group_changed
         self.txt_explore_search.TextChanged += self._on_explore_search_changed
 
-        # Explore actions
+        # Action bar
         self.btn_explore_refresh.Click += self._on_explore_refresh
-        self.btn_explore_expand.Click += self._on_explore_expand_all
-        self.btn_explore_collapse.Click += self._on_explore_collapse_all
         self.btn_explore_pick.Click += self._on_explore_pick
         self.btn_explore_zoom.Click += self._on_explore_zoom
         self.btn_explore_isolate.Click += self._on_explore_isolate
+        self.btn_explore_hide.Click += self._on_explore_hide
+        self.btn_explore_reset.Click += self._on_explore_reset
         self.btn_explore_export.Click += self._on_explore_export
         self.btn_explore_delete.Click += self._on_explore_delete
+
+        # Tally strip
         self.btn_explore_all.Click += self._on_check_all
         self.btn_explore_none.Click += self._on_check_none
+        self.btn_explore_expand.Click += self._on_explore_expand_all
+        self.btn_explore_collapse.Click += self._on_explore_collapse_all
+
+        # Tree
         self.tree_explore.SelectedItemChanged += self._on_explore_node_highlighted
-
-        # Select Similar
-        self.btn_pick_similar_seed.Click += self._on_pick_similar_seed
-
-        # Warnings
-        self.txt_warning_search.TextChanged += self._on_warning_search_changed
-        self.btn_warning_refresh.Click += self._on_warning_refresh
-        self.btn_warning_expand.Click += self._on_warning_expand_all
-        self.btn_warning_zoom.Click += self._on_explore_zoom
-        self.btn_warning_export.Click += self._on_warning_export
-        self.btn_warning_all.Click += self._on_check_all
-        self.btn_warning_none.Click += self._on_check_none
-        self.tree_warnings.SelectedItemChanged += self._on_warning_node_highlighted
-
         # Lazy expand: Expanded là routed event nên một handler trên chính
         # TreeView phục vụ mọi node, không phải nối vào từng item.
-        handler = RoutedEventHandler(self._on_item_expanded)
-        self.tree_explore.AddHandler(TreeViewItem.ExpandedEvent, handler)
-        self.tree_warnings.AddHandler(TreeViewItem.ExpandedEvent, handler)
-
-        # Nháy đúp = hiện trong model.
+        self.tree_explore.AddHandler(TreeViewItem.ExpandedEvent,
+                                     RoutedEventHandler(self._on_item_expanded))
+        # Nháy đúp = hiện trong model. Space = tick hàng đang trỏ.
         self.tree_explore.PreviewMouseDoubleClick += self._on_tree_double_click
-        self.tree_warnings.PreviewMouseDoubleClick += self._on_tree_double_click
+        self.tree_explore.PreviewKeyDown += self._on_tree_key_down
 
         # Footer
         self.btn_apply.Click += self._on_apply
+        self.btn_add_selection.Click += self._on_add_selection
         self.btn_close_footer.Click += self._on_close_footer
+        self.Closed += self._on_closed
 
-    # =========================================================================
-    # MODE SWITCHING
-    # =========================================================================
-    def _on_nav_toggle_clicked(self, sender, e):
-        # PythonNet event senders may wrap the same CLR control differently.
-        mode = {
-            "nav_toggle_explore": MODE_EXPLORE,
-            "nav_toggle_quick_select": MODE_QUICK,
-            "nav_toggle_select_similar": MODE_SIMILAR,
-            "nav_toggle_select_sheets": MODE_SHEETS,
-            "nav_toggle_warnings": MODE_WARNINGS,
-        }.get(getattr(sender, "Name", None))
-        if mode is not None:
-            self._apply_mode(mode)
-            return
-        # Bấm lại tile đang bật thì ToggleButton tự bỏ tick — ghim lại.
-        self._apply_mode(self._mode)
-
-    def _apply_mode(self, mode):
-        self._mode = mode
-        subtitle, apply_label = _MODES[mode]
-
-        self.main_tab_control.SelectedIndex = mode
-        self.txt_mode_subtitle.Text = subtitle
-        self.btn_apply.Content = apply_label
-
-        for toggle, value in ((self.nav_toggle_explore, MODE_EXPLORE),
-                              (self.nav_toggle_quick_select, MODE_QUICK),
-                              (self.nav_toggle_select_similar, MODE_SIMILAR),
-                              (self.nav_toggle_select_sheets, MODE_SHEETS),
-                              (self.nav_toggle_warnings, MODE_WARNINGS)):
-            toggle.IsChecked = (value == mode)
-
-        self._update_selected_count()
-        self._set_status(self._mode_status())
-        # Sau _set_status: nới cửa sổ có câu trạng thái riêng và phải thắng.
-        self._widen_for_mode(mode)
-
-    def _widen_for_mode(self, mode):
-        """Nới cửa sổ nếu mode cần bề ngang hơn mức đang có. Chỉ NỚI, không thu."""
-        needed = _MODE_MIN_WIDTH.get(mode)
-        if not needed:
-            return
+    def _on_closed(self, sender, e):
         try:
-            if self.WindowState != WindowState.Normal:
-                return          # đang maximize thì đã đủ rộng
-            if self.Width < needed:
-                self.Width = needed
-                self._set_status('Widened the window to %dpx — Quick Select '
-                                 'needs the room for its columns' % needed)
+            self._search_timer.Stop()
         except Exception:
             pass
 
-    def _mode_status(self):
-        """Câu trạng thái của mode đang xem — luôn kèm SỐ LƯỢNG, không bao giờ
-        chỉ là 'Ready' (luật mục 4 của chuẩn)."""
-        if self._mode == MODE_EXPLORE:
-            if self._explore_root is None:
-                return 'Nothing loaded yet — press Refresh'
-            groups = sum(1 for n in self._explore_root.walk()
-                         if n.kind in ('group', 'leaf'))
-            return '%d element(s) in %d group(s)' % (self._explore_root.count,
-                                                     groups)
-        if self._mode == MODE_WARNINGS:
-            if self._warning_total == 0:
-                return 'No warnings in this model'
-            return '%d warning(s) in this model' % self._warning_total
-        if self._mode == MODE_QUICK:
-            return 'Quick Select — set the filters, then press the footer button'
-        if self._mode == MODE_SIMILAR:
-            return 'Select Similar — pick a seed element, then press the footer button'
-        return 'On Sheets — choose a target, then press the footer button'
+    def _status_summary(self):
+        """Câu trạng thái mặc định — luôn kèm SỐ LƯỢNG (mục 4 của chuẩn)."""
+        if self._explore_root is None:
+            return 'Nothing loaded yet — press Refresh'
+        groups = sum(1 for n in self._explore_root.walk()
+                     if n.kind in ('group', 'leaf'))
+        return '%d element(s) in %d group(s)' % (self._explore_root.count, groups)
 
     def _set_status(self, text):
         try:
@@ -570,11 +426,6 @@ class ManaSelectWindow(T3WPFWindow):
         if isinstance(binding, _NodeBinding):
             self._expand_binding(binding)
 
-    def _current_binding(self):
-        if self._mode == MODE_WARNINGS:
-            return self._warning_binding
-        return self._explore_binding
-
     @staticmethod
     def _is_ticked(binding):
         """Checkbox của node có đang tick ĐẦY hay không.
@@ -595,8 +446,11 @@ class ManaSelectWindow(T3WPFWindow):
         binding = getattr(sender, 'Tag', None)
         if not isinstance(binding, _NodeBinding):
             return
-        value = bool(sender.IsChecked)
-        self._set_subtree(binding, value)
+        self._apply_check(binding)
+
+    def _apply_check(self, binding):
+        """Lan trạng thái tick của `binding` xuống con và lên cha."""
+        self._set_subtree(binding, self._is_ticked(binding))
         self._refresh_ancestors(binding)
         self._update_selected_count()
 
@@ -639,7 +493,7 @@ class ManaSelectWindow(T3WPFWindow):
         gộp hết phần tử bên dưới. Nhờ vậy tick một category là chọn đủ cả
         nhánh dù các bậc dưới chưa bao giờ được mở ra.
         """
-        root = self._current_binding()
+        root = self._explore_binding
         if root is None:
             return []
 
@@ -661,14 +515,25 @@ class ManaSelectWindow(T3WPFWindow):
         return out
 
     def _update_selected_count(self):
-        """Con số "đã tick" sống ở dải tally của chính cây đó, không ở footer —
-        cửa sổ 560px không còn chỗ, và nó thuộc về cái cây chứ không thuộc cửa sổ."""
-        if self._mode not in (MODE_EXPLORE, MODE_WARNINGS):
-            return
+        """Số đã tick hiện ở dải tally VÀ trên nút primary — người dùng biết
+        bấm Select sẽ chọn bao nhiêu trước khi bấm."""
         count = len(self._checked_ids())
-        target = (self.txt_warning_tally_checked if self._mode == MODE_WARNINGS
-                  else self.txt_explore_tally_checked)
-        target.Text = '%d checked' % count
+        self.txt_explore_tally_checked.Text = '%d checked' % count
+        self.btn_apply.Content = 'Select (%d)' % count if count else 'Select'
+
+    # -- Space: tick hàng đang trỏ ------------------------------------------
+    def _on_tree_key_down(self, sender, e):
+        """Space bật/tắt checkbox của hàng đang highlight — chọn bằng bàn phím
+        mà không phải ngắm vào ô 14px. Không chạm Revit API."""
+        if e.Key != Key.Space:
+            return
+        item = self.tree_explore.SelectedItem
+        binding = getattr(item, 'Tag', None) if item is not None else None
+        if not isinstance(binding, _NodeBinding) or binding.checkbox is None:
+            return
+        e.Handled = True
+        binding.checkbox.IsChecked = not self._is_ticked(binding)
+        self._apply_check(binding)
 
     # =========================================================================
     # EXPLORE
@@ -677,8 +542,8 @@ class ManaSelectWindow(T3WPFWindow):
         self._run_in_revit(self._reload_explore_impl)
 
     def _reload_explore_impl(self):
-        """Đọc lại model rồi dựng cây. Đây là chỗ tốn thời gian duy nhất của
-        Explore, nên nó báo trạng thái trước khi chạy.
+        """Đọc lại model rồi dựng cây. Đây là chỗ tốn thời gian duy nhất,
+        nên nó báo trạng thái trước khi chạy.
 
         Đọc combo box TẠI ĐÂY, không phải lúc xếp hàng: khi modeless, action
         này chạy trễ và phải phản ánh lựa chọn mới nhất của người dùng.
@@ -700,7 +565,7 @@ class ManaSelectWindow(T3WPFWindow):
             self._records = []
             T3Dialog.show_error(
                 'Could not read the elements for "%s".\n\n%s\n\n'
-                'Try a different Display scope, or reload pyRevit if the model '
+                'Try a different Display scope, or restart Revit if the model '
                 'has just changed.' % (scope, ex),
                 title='Explore', owner=self)
         finally:
@@ -715,12 +580,8 @@ class ManaSelectWindow(T3WPFWindow):
         """Gom nhóm lại từ `self._records` đã thu.
 
         VẪN phải chạy trong API context dù không gọi collector: `ElementRecord`
-        đọc LƯỜI workset / level / phase / design option, nên lần đầu gom nhóm
-        theo một trong bốn cái đó sẽ chạm `doc.GetWorksetTable()`,
-        `doc.GetElement()` và `get_Parameter()`. Gọi thẳng từ handler WPF của
-        cửa sổ modeless là "Attempting to access Revit API outside of API
-        context" — gom theo Category/Family/Type thì thoát vì ba khoá đó đã
-        cache sẵn lúc collect, nên lỗi chỉ hiện ra ở 4 lựa chọn Sort by kia.
+        đọc LƯỜI workset / level / phase / design option, nên gom theo một
+        trong bốn cái đó sẽ chạm document (xem dev/audit_api_context.py).
         """
         group_by = str(self.cbo_explore_group.SelectedItem or explorer.GROUP_CATEGORY)
         search = self.txt_explore_search.Text or ''
@@ -742,10 +603,7 @@ class ManaSelectWindow(T3WPFWindow):
         self._explore_binding = self._build_tree(self.tree_explore, self._explore_root)
 
         total = self._explore_root.count
-        groups = sum(1 for n in self._explore_root.walk()
-                     if n.kind in ('group', 'leaf'))
         self.txt_explore_tally_elements.Text = '%d elements' % total
-        self.txt_explore_tally_groups.Text = '%d groups' % groups
 
         empty = (total == 0)
         self.txt_explore_empty.Visibility = (Visibility.Visible if empty
@@ -757,21 +615,30 @@ class ManaSelectWindow(T3WPFWindow):
         if empty:
             self._set_status('No elements in scope — widen Display or clear Search')
         else:
-            self._set_status('%d element(s) in %d group(s)' % (total, groups))
+            self._set_status(self._status_summary())
 
     def _on_explore_query_changed(self, sender, e):
         if self._loading:
             return
+        self._remember_query()
         self._reload_explore()
 
     def _on_explore_group_changed(self, sender, e):
         if self._loading:
             return
+        self._remember_query()
         self._rebuild_explore_tree()
 
     def _on_explore_search_changed(self, sender, e):
+        """Chỉ khởi động lại đồng hồ — cây dựng lại ở `_on_search_timer_tick`
+        khi người dùng ngừng gõ."""
         if self._loading:
             return
+        self._search_timer.Stop()
+        self._search_timer.Start()
+
+    def _on_search_timer_tick(self, sender, e):
+        self._search_timer.Stop()
         self._rebuild_explore_tree()
 
     def _on_explore_refresh(self, sender, e):
@@ -929,7 +796,7 @@ class ManaSelectWindow(T3WPFWindow):
         binding = getattr(item, 'Tag', None) if item is not None else None
         if not isinstance(binding, _NodeBinding):
             title_block.Text = 'Nothing highlighted'
-            detail_block.Text = 'Click a row in the tree to read its details.'
+            detail_block.Text = 'Click a row to read its details. Space ticks it, double-click shows it in the model.'
             return
 
         node = binding.node
@@ -962,7 +829,7 @@ class ManaSelectWindow(T3WPFWindow):
         if not ids:
             T3Dialog.show_warning(
                 'Nothing is checked yet.\n\nTick a category, family or type in '
-                'the tree — or press All in the footer — then %s again.' % verb,
+                'the tree — or press All under the tree — then %s again.' % verb,
                 title='Nothing checked', owner=self)
             return None
         return ids
@@ -1015,6 +882,64 @@ class ManaSelectWindow(T3WPFWindow):
                 % (getattr(view, 'Name', '?'), ex),
                 title='Isolate', owner=self)
 
+    def _on_explore_hide(self, sender, e):
+        ids = self._require_checked('Hide')
+        if ids:
+            self._run_in_revit(lambda: self._hide_impl(ids))
+
+    def _hide_impl(self, ids):
+        view = self.doc.ActiveView
+        if view is None:
+            T3Dialog.show_warning('There is no active view to hide in.',
+                                  title='Hide', owner=self)
+            return
+
+        transaction = Transaction(self.doc, 'ManaSelect - Hide elements')
+        try:
+            transaction.Start()
+            view.HideElementsTemporary(explorer.to_id_list(ids))
+            transaction.Commit()
+            self._set_status('Temporarily hid %d element(s) in %s — press Reset '
+                             'to show them again' % (len(ids), view.Name))
+        except Exception as ex:
+            try:
+                if transaction.HasStarted():
+                    transaction.RollBack()
+            except Exception:
+                pass
+            T3Dialog.show_error(
+                'Could not hide the checked elements in "%s".\n\n%s\n\n'
+                'Some views (schedules, sheets) do not support temporary '
+                'hiding — open a model view and try again.'
+                % (getattr(view, 'Name', '?'), ex),
+                title='Hide', owner=self)
+
+    def _on_explore_reset(self, sender, e):
+        self._run_in_revit(self._reset_impl)
+
+    def _reset_impl(self):
+        """Tắt Temporary Hide/Isolate của view đang mở — gỡ cả Isolate lẫn Hide
+        của tool này, giống nút "Reset Temporary Hide/Isolate" của Revit."""
+        view = self.doc.ActiveView
+        if view is None:
+            return
+        transaction = Transaction(self.doc, 'ManaSelect - Reset temporary hide/isolate')
+        try:
+            transaction.Start()
+            view.DisableTemporaryViewMode(TemporaryViewMode.TemporaryHideIsolate)
+            transaction.Commit()
+            self._set_status('Reset temporary hide/isolate in %s' % view.Name)
+        except Exception as ex:
+            try:
+                if transaction.HasStarted():
+                    transaction.RollBack()
+            except Exception:
+                pass
+            T3Dialog.show_error(
+                'Could not reset temporary hide/isolate in "%s".\n\n%s'
+                % (getattr(view, 'Name', '?'), ex),
+                title='Reset', owner=self)
+
     def _on_explore_delete(self, sender, e):
         ids = self._require_checked('Delete')
         if not ids:
@@ -1063,27 +988,58 @@ class ManaSelectWindow(T3WPFWindow):
                            title='Delete elements', owner=self)
         self._reload_explore()
 
-    def _on_explore_export(self, sender, e):
-        if self._explore_root is None:
-            return
-        self._export_tree(self._explore_root, 'ManaSelect_Explore')
+    def _export_records(self):
+        """Record cần xuất: của các nhánh đang tick, hoặc cả cây nếu chưa tick
+        gì. Không trùng Id."""
+        root = self._explore_binding
+        if root is None:
+            return []
+        picked = []
 
-    def _export_tree(self, root, default_name):
+        def walk(binding):
+            if self._is_ticked(binding):
+                picked.extend(binding.node.walk_records())
+                return
+            for child in binding.children:
+                walk(child)
+
+        walk(root)
+        if not picked:
+            picked = list(self._explore_root.walk_records())
+
+        seen = set()
+        out = []
+        for record in picked:
+            if record.id_int not in seen:
+                seen.add(record.id_int)
+                out.append(record)
+        return out
+
+    def _on_explore_export(self, sender, e):
+        """Hỏi đường dẫn TRƯỚC (dialog WPF), rồi mới vào API context để ghi —
+        cột Level / Workset đọc lười từ document."""
+        if self._explore_root is None or self._explore_root.count == 0:
+            T3Dialog.show_warning('The tree is empty, so there is nothing to export.',
+                                  title='Export CSV', owner=self)
+            return
         try:
-            path = forms.save_file(file_ext='csv', default_name=default_name)
+            path = forms.save_file(file_ext='csv', default_name='ManaSelect_Elements')
         except Exception:
             path = None
         if not path:
             self._set_status('Export cancelled')
             return
+        self._run_in_revit(lambda: self._export_impl(path))
 
+    def _export_impl(self, path):
+        records = self._export_records()
         try:
+            rows = explorer.element_rows(records)
             # newline='' + text mode: luật S13 cấm open(..., 'wb') cho CSV.
             with io.open(path, 'w', encoding='utf-8-sig', newline='') as handle:
                 writer = csv.writer(handle)
-                writer.writerow(['Level', 'Name', 'Count'])
-                for depth, label, count in explorer.tree_rows(root):
-                    writer.writerow([depth, label, count])
+                writer.writerow(explorer.ELEMENT_COLUMNS)
+                writer.writerows(rows)
         except Exception as ex:
             T3Dialog.show_error(
                 'Could not write "%s".\n\n%s\n\n'
@@ -1091,104 +1047,51 @@ class ManaSelectWindow(T3WPFWindow):
                 'already open in Excel.' % (path, ex),
                 title='Export CSV', owner=self)
             return
-
-        self._set_status('Exported the tree to %s' % os.path.basename(path))
-
-    # =========================================================================
-    # WARNINGS
-    # =========================================================================
-    def _reload_warnings(self):
-        self._run_in_revit(self._reload_warnings_impl)
-
-    def _reload_warnings_impl(self):
-        search = self.txt_warning_search.Text or ''
-        try:
-            self._warning_root, self._warning_total = \
-                explorer.build_warning_tree(self.doc, search=search)
-        except Exception as ex:
-            self._warning_root, self._warning_total = None, 0
-            T3Dialog.show_error('Could not read the model warnings.\n\n%s' % ex,
-                                title='Warnings', owner=self)
-
-        self._warning_binding = self._build_tree(self.tree_warnings,
-                                                 self._warning_root)
-
-        kinds = len(self._warning_root.children) if self._warning_root else 0
-        self.txt_warning_tally_total.Text = '%d warnings' % self._warning_total
-        self.txt_warning_tally_kinds.Text = '%d kinds' % kinds
-
-        empty = (self._warning_total == 0)
-        self.txt_warning_empty.Visibility = (Visibility.Visible if empty
-                                             else Visibility.Collapsed)
-        self.tree_warnings.Visibility = (Visibility.Collapsed if empty
-                                         else Visibility.Visible)
-        if self._mode == MODE_WARNINGS:
-            self._update_selected_count()
-
-    def _on_warning_search_changed(self, sender, e):
-        if self._loading:
-            return
-        self._reload_warnings()
-
-    def _on_warning_refresh(self, sender, e):
-        self._reload_warnings()
-        self._set_status('%d warning(s) in this model' % self._warning_total)
-
-    def _on_warning_expand_all(self, sender, e):
-        self._expand_all(self._warning_binding)
-
-    def _on_warning_export(self, sender, e):
-        if self._warning_root is None:
-            return
-        self._export_tree(self._warning_root, 'ManaSelect_Warnings')
-
-    def _on_warning_node_highlighted(self, sender, e):
-        self._show_node_info(self.tree_warnings.SelectedItem,
-                             self.txt_warning_info_title,
-                             self.txt_warning_info_detail)
+        self._set_status('Exported %d element(s) to %s'
+                         % (len(rows), os.path.basename(path)))
 
     # =========================================================================
     # FOOTER
     # =========================================================================
-    def _on_check_all(self, sender, e):
-        root = self._current_binding()
+    def _set_all_checks(self, value):
+        root = self._explore_binding
         if root is None:
             return
         if root.checkbox is not None:
-            root.checkbox.IsChecked = True
-        self._set_subtree(root, True)
+            root.checkbox.IsChecked = value
+        self._set_subtree(root, value)
         self._update_selected_count()
 
+    def _on_check_all(self, sender, e):
+        self._set_all_checks(True)
+
     def _on_check_none(self, sender, e):
-        root = self._current_binding()
-        if root is None:
-            return
-        if root.checkbox is not None:
-            root.checkbox.IsChecked = False
-        self._set_subtree(root, False)
-        self._update_selected_count()
+        self._set_all_checks(False)
 
     def _on_close_footer(self, sender, e):
         self.Close()
 
     def _on_apply(self, sender, e):
-        if self._mode in (MODE_EXPLORE, MODE_WARNINGS):
-            self._select_checked()
-        elif self._mode == MODE_QUICK:
-            self._apply_quick_select()
-        elif self._mode == MODE_SIMILAR:
-            self._on_run_select_similar(sender, e)
-        elif self._mode == MODE_SHEETS:
-            self._on_run_select_sheets(sender, e)
-
-    def _select_checked(self):
         ids = self._require_checked('Select')
         if ids:
-            self._run_in_revit(lambda: self._select_impl(ids))
+            self._run_in_revit(lambda: self._select_impl(ids, add=False))
 
-    def _select_impl(self, ids):
+    def _on_add_selection(self, sender, e):
+        ids = self._require_checked('Add to Selection')
+        if ids:
+            self._run_in_revit(lambda: self._select_impl(ids, add=True))
+
+    def _select_impl(self, ids, add=False):
+        """`add=True` giữ nguyên selection hiện có của Revit và cộng thêm."""
         try:
-            self.uidoc.Selection.SetElementIds(explorer.to_id_list(ids))
+            final = list(ids)
+            if add:
+                seen = set(explorer.eid_int(i) for i in final)
+                for current in self.uidoc.Selection.GetElementIds():
+                    if explorer.eid_int(current) not in seen:
+                        seen.add(explorer.eid_int(current))
+                        final.append(current)
+            self.uidoc.Selection.SetElementIds(explorer.to_id_list(final))
             self.uidoc.RefreshActiveView()
         except Exception as ex:
             T3Dialog.show_error(
@@ -1197,178 +1100,11 @@ class ManaSelectWindow(T3WPFWindow):
                 'since the tree was built, cannot be selected — press Refresh and try again.' % ex,
                 title='Select in Revit', owner=self)
             return
-        self._set_status('Selected %d element(s) in Revit' % len(ids))
-
-    def _apply_quick_select(self):
-        """Quick Select có nút Select riêng trong grid nhúng — nút footer chỉ
-        chuyển tiếp, không dựng lại logic của nó."""
-        window = getattr(self, '_quick_select_win', None)
-        handler = getattr(window, '_on_select', None) if window is not None else None
-        if handler is None:
-            T3Dialog.show_warning(
-                'The Quick Select panel did not load, so there is nothing to '
-                'apply.\n\nReload pyRevit and reopen ManaSelect.',
-                title='Quick Select', owner=self)
-            return
-        try:
-            handler(None, None)
-        except Exception as ex:
-            T3Dialog.show_error('Quick Select could not apply the selection.\n\n%s'
-                                % ex, title='Quick Select', owner=self)
-
-    # =========================================================================
-    # TAB 2: SELECT SIMILAR
-    # =========================================================================
-    def _on_pick_similar_seed(self, sender, e):
-        self._run_in_revit(self._pick_similar_seed_impl)
-
-    def _pick_similar_seed_impl(self):
-        """Chọn một phần tử mồi ngay trong model.
-
-        Không còn `Hide()`/`Show()` như bản modal: cửa sổ modeless không chặn
-        Revit nên người dùng khoanh ngay được, và nhìn thấy kết quả đổi trên
-        cửa sổ trong lúc làm.
-        """
-        try:
-            ref = self.uidoc.Selection.PickObject(
-                ObjectType.Element, 'Pick a seed element for Select Similar')
-        except OperationCanceledException:
-            self._set_status('Picking cancelled — seed element unchanged')
-            return
-        except Exception as ex:
-            T3Dialog.show_error(
-                'Could not pick a seed element.\n\n%s\n\n'
-                'Open a model view and try again.' % ex,
-                title='Select Similar', owner=self)
-            return
-
-        elem = self.doc.GetElement(ref.ElementId)
-        if elem is None:
-            return
-        self.uidoc.Selection.SetElementIds(
-            dqt_compat.to_element_id_list([elem.Id]))
-        cat_name = (elem.Category.Name if elem.Category is not None
-                    else elem.__class__.__name__)
-        self.txt_similar_seed_status.Text = 'Picked: {} (Id {})'.format(
-            cat_name, dqt_compat.eid_int(elem.Id))
-        self._set_status('Seed element set — press the footer button to match')
-
-    def _on_run_select_similar(self, sender, e):
-        self._run_in_revit(self._run_select_similar_impl)
-
-    def _run_select_similar_impl(self):
-        """Execute select similar based on UI configurations."""
-        if not self.uidoc.Selection.GetElementIds():
-            T3Dialog.show_warning(
-                'Select Similar needs a seed element.\n\n'
-                'Pick one with "Pick Element in Model", or select an element in '
-                'Revit before pressing the action button.',
-                title='Select Similar', owner=self)
-            return
-
-        scope = 'view' if self.rb_similar_scope_view.IsChecked else 'model'
-        try:
-            if self.rb_similar_mode_type.IsChecked:
-                dqt_core.select_similar_type(mode=scope)
-            elif self.rb_similar_mode_family.IsChecked:
-                dqt_core.select_similar_family(mode=scope)
-            else:
-                dqt_core.select_similar_category(mode=scope)
-        except Exception as ex:
-            T3Dialog.show_error('Select Similar failed.\n\n%s' % ex,
-                                title='Select Similar', owner=self)
-            return
-
-        count = len(self.uidoc.Selection.GetElementIds())
-        self._set_status('Select Similar matched %d element(s)' % count)
-
-    # =========================================================================
-    # TAB 3: SELECT ON SHEETS
-    # =========================================================================
-    def _on_run_select_sheets(self, sender, e):
-        """Hỏi sheet TRƯỚC khi vào API context.
-
-        `SelectFromList` là dialog modal của WPF và đợi người dùng bấm xong
-        mới trả về. Dựng nó bên trong `Execute()` là chặn vòng lặp idle của
-        Revit suốt thời gian đó — đúng lý do `_on_explore_delete` phải hỏi
-        xác nhận trước. Chỉ thao tác đặt selection mới đi qua ExternalEvent.
-        """
-        use_dwg = bool(self.rb_sheet_target_dwg.IsChecked)
-        if use_dwg:
-            sheets = self._get_target_sheets('Select DWGs', 'On Sheets: CAD Imports')
-            if not sheets:
-                return
-            self._run_in_revit(lambda: self._select_dwgs(sheets))
+        if add:
+            self._set_status('Added %d element(s) — %d now selected in Revit'
+                             % (len(ids), len(final)))
         else:
-            sheets = self._get_target_sheets('Select Title Blocks',
-                                             'On Sheets: Title Blocks')
-            if not sheets:
-                return
-            self._run_in_revit(lambda: self._select_title_blocks(sheets))
-
-    def _get_target_sheets(self, button_name, alert_title):
-        sel_ids = self.uidoc.Selection.GetElementIds()
-        sheets = [self.doc.GetElement(i) for i in sel_ids
-                  if isinstance(self.doc.GetElement(i), ViewSheet)]
-        if sheets:
-            return sheets
-
-        all_sheets = FilteredElementCollector(self.doc).OfClass(ViewSheet).ToElements()
-        if not all_sheets:
-            T3Dialog.show_warning('There are no sheets in this model.',
-                                  title=alert_title, owner=self)
-            return None
-
-        sheet_map = {'{} - {}'.format(s.SheetNumber, s.Name): s for s in all_sheets}
-        chosen = forms.SelectFromList.show(
-            sorted(sheet_map.keys()),
-            title='Pick Sheets',
-            button_name=button_name,
-            multiselect=True,
-        )
-        if not chosen:
-            return None
-        return [sheet_map[c] for c in chosen]
-
-    def _select_dwgs(self, sheets):
-        sheet_ids = set(dqt_compat.eid_int(s.Id) for s in sheets)
-        all_imports = (FilteredElementCollector(self.doc)
-                       .OfClass(ImportInstance)
-                       .WhereElementIsNotElementType()
-                       .ToElements())
-
-        dwg_ids = [imp.Id for imp in all_imports
-                   if dqt_compat.eid_int(imp.OwnerViewId) in sheet_ids]
-
-        if dwg_ids:
-            self.uidoc.Selection.SetElementIds(dqt_compat.to_element_id_list(dwg_ids))
-            self._set_status('Selected %d DWG(s) on %d sheet(s)'
-                             % (len(dwg_ids), len(sheets)))
-        else:
-            T3Dialog.show_warning(
-                'No DWGs found on the %d sheet(s) you picked.\n\n'
-                'Those sheets have no imported CAD on them — check the sheets '
-                'or switch the target to Title Blocks.' % len(sheets),
-                title='On Sheets: CAD Imports', owner=self)
-
-    def _select_title_blocks(self, sheets):
-        sheet_ids = set(dqt_compat.eid_int(s.Id) for s in sheets)
-        all_tb = (FilteredElementCollector(self.doc)
-                  .OfCategory(BuiltInCategory.OST_TitleBlocks)
-                  .WhereElementIsNotElementType()
-                  .ToElements())
-
-        tb_ids = [tb.Id for tb in all_tb
-                  if dqt_compat.eid_int(tb.OwnerViewId) in sheet_ids]
-
-        if tb_ids:
-            self.uidoc.Selection.SetElementIds(dqt_compat.to_element_id_list(tb_ids))
-            self._set_status('Selected %d title block(s) on %d sheet(s)'
-                             % (len(tb_ids), len(sheets)))
-        else:
-            T3Dialog.show_warning(
-                'No title blocks found on the %d sheet(s) you picked.' % len(sheets),
-                title='On Sheets: Title Blocks', owner=self)
+            self._set_status('Selected %d element(s) in Revit' % len(ids))
 
     # =========================================================================
     # WINDOW CHROME
@@ -1440,11 +1176,11 @@ def show_dialog(modal=None):
     if not modal:
         window.Closed += _on_window_closed
         if window._explore_root is not None:
-            window._set_status(window._mode_status()
+            window._set_status(window._status_summary()
                                + ' — the model stays clickable')
     else:
-        window._set_status(window._mode_status()
-                           + ' — reload pyRevit for a non-blocking window')
+        window._set_status(window._status_summary()
+                           + ' — restart Revit for a non-blocking window')
 
     # Từ đây trở đi mọi handler của WPF chạy NGOÀI Revit API context, nên
     # `_run_in_revit` phải đẩy qua ExternalEvent.

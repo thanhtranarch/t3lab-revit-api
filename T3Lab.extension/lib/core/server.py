@@ -1994,6 +1994,105 @@ class T3LabAIServer(object):
                     'required': ['file_path']
                 }
             },
+            # ── FamiGen: AI-modelled families (schema v2 with materials) ──────
+            'famigen_get_schema': {
+                'name': 'famigen_get_schema',
+                'description': ('Get the FamiGen family-JSON contract (schema v2): units, '
+                                'supported family categories, geometry forms (Extrusion, '
+                                'Blend, Revolution, Sweep, Cylinder), curve segments, '
+                                'materials (name, colour, transparency) and parameters, '
+                                'plus a complete example. Call this FIRST before modelling '
+                                'a family with famigen_propose_family. Pass a category to '
+                                'also get the exact system prompt FamiGen uses for it.'),
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': {
+                        'category': {
+                            'type': 'string',
+                            'description': ('Optional family category to get the full '
+                                            'modelling prompt for.'),
+                            'enum': ['Generic Model', 'Door', 'Window', 'Furniture',
+                                     'Plumbing Fixture', 'Electrical Equipment',
+                                     'Mechanical Equipment', 'Specialty Equipment',
+                                     'Casework', 'Columns', 'Lighting Fixture', 'Site',
+                                     'Entourage'],
+                        },
+                        'include_guidance': {
+                            'type': 'boolean',
+                            'description': ('With category: append the long category design '
+                                            'guidance (recipes, proportions). Default false.'),
+                        },
+                    },
+                    'required': [],
+                },
+            },
+            'famigen_propose_family': {
+                'name': 'famigen_propose_family',
+                'description': ('Propose a family to the user for review: validates a FamiGen '
+                                'schema-v2 JSON (geometry + materials) and shows it in the '
+                                'FamiGen window as a 3D preview with its materials, WITHOUT '
+                                'changing the model. Returns errors to fix, or a proposal_id. '
+                                'The user then presses Create Family in FamiGen, or you call '
+                                'famigen_create_family with the proposal_id once they approve. '
+                                'Returns immediately; it never waits for the user. If FamiGen '
+                                'is open from the ribbon, it must be closed first.'),
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': {
+                        'schema': {
+                            'type': 'object',
+                            'description': ('The family JSON (see famigen_get_schema): '
+                                            'family_name, family_category, geometry, and '
+                                            'optional materials and parameters. Lengths in mm.'),
+                        },
+                        'note': {
+                            'type': 'string',
+                            'description': 'Optional short note shown to the user with the proposal.',
+                        },
+                        'open_window': {
+                            'type': 'boolean',
+                            'description': ('Show the proposal in the FamiGen review window '
+                                            '(default true). False only validates and stores it.'),
+                        },
+                    },
+                    'required': ['schema'],
+                },
+            },
+            'famigen_create_family': {
+                'name': 'famigen_create_family',
+                'description': ('Create and save a complete Revit family (.rfa) from a FamiGen '
+                                'schema or a proposal_id, without the review window: new family '
+                                'from the category template, all parts, materials with one '
+                                'Material parameter each, subcategories and parameters. '
+                                'Optionally loads it into the active project. Use after the '
+                                'user approved the proposal. Returns the saved path and what '
+                                'was built or skipped.'),
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': {
+                        'proposal_id': {
+                            'type': 'string',
+                            'description': 'Id returned by famigen_propose_family.',
+                        },
+                        'schema': {
+                            'type': 'object',
+                            'description': 'The family JSON, when no proposal_id is given.',
+                        },
+                        'output_folder': {
+                            'type': 'string',
+                            'description': ('Folder for the .rfa (created if missing). Default: '
+                                            'Documents\\T3Lab\\FamiGen. An existing file with '
+                                            'the same family_name is overwritten.'),
+                        },
+                        'load_into_project': {
+                            'type': 'boolean',
+                            'description': ('Load the saved family into the active project, '
+                                            'replacing an already loaded one. Default false.'),
+                        },
+                    },
+                    'required': [],
+                },
+            },
             # ── Geometry editing ──────────────────────────────────────────────
             'split_curve': {
                 'name': 'split_curve',
@@ -2993,6 +3092,9 @@ class T3LabAIServer(object):
         'create_schedule', 'duplicate_view', 'apply_view_template',
         'create_view_filter', 'place_views_on_sheets', 'export_dwg', 'export_image',
         'create_project_parameter', 'room_to_floor', 'purge_unused', 'create_workset',
+        # FamiGen: propose opens a WPF window (UI thread only); create opens a
+        # family document, transacts, saves and may load into the project.
+        'famigen_propose_family', 'famigen_create_family',
         # These call UIApplication.OpenAndActivateDocument / Document.Close,
         # which throw "outside of API context" from the HTTP worker thread.
         'switch_active_document', 'open_document', 'close_document',
@@ -3054,6 +3156,7 @@ class T3LabAIServer(object):
         'say_hello', 'list_open_documents', 'switch_active_document',
         'open_document', 'close_document', 'list_recent_documents',
         'show_assistant_pane', 'file_watcher_status',
+        'famigen_get_schema',
     ])
 
     def _show_elements_smart(self, uidoc, doc, ids):
@@ -8627,6 +8730,132 @@ class T3LabAIServer(object):
                     return {'error': str(e)}
             except Exception as e:
                 return {'error': str(e)}
+
+        # ── FamiGen (schema v2: geometry + materials) ────────────────────────
+        elif tool_name == 'famigen_get_schema':
+            try:
+                from Intelligence.family_schema import (
+                    SUPPORTED_CATEGORIES, build_system_prompt, schema_contract)
+                category = arguments.get('category')
+                result = schema_contract()
+                if category:
+                    if category not in SUPPORTED_CATEGORIES:
+                        return {'error': "Unsupported category '{}'.".format(category),
+                                'supported_categories': list(SUPPORTED_CATEGORIES),
+                                'hint': 'Retry with one of supported_categories.'}
+                    overlay = ''
+                    if bool(arguments.get('include_guidance', False)):
+                        from FamilyGen.guidance import read_overlay
+                        overlay = read_overlay(category)
+                    result['category'] = category
+                    result['system_prompt'] = build_system_prompt(category, overlay)
+                result['workflow'] = [
+                    'Model the object as schema-v2 JSON (millimeters, one material per solid).',
+                    'Call famigen_propose_family with it; fix any returned errors and repeat.',
+                    'Ask the user to review the 3D preview and materials in FamiGen.',
+                    'After approval: the user presses Create Family, or call '
+                    'famigen_create_family with the proposal_id.',
+                ]
+                return result
+            except Exception as e:
+                return {'error': str(e), 'tool': tool_name}
+
+        elif tool_name == 'famigen_propose_family':
+            try:
+                import json as _json
+                from Intelligence.family_schema import schema_summary, validate_family_schema
+                from FamilyGen.proposals import ProposalStore
+                from FamilyGen.preview_mesh import build_preview
+                schema = arguments.get('schema')
+                note = u'{}'.format(arguments.get('note') or '')[:200]
+                open_window = bool(arguments.get('open_window', True))
+                if isinstance(schema, str):
+                    try:
+                        schema = _json.loads(schema)
+                    except ValueError as ex:
+                        return {'success': False, 'error': 'schema is not valid JSON: {}'.format(ex)}
+                if not isinstance(schema, dict):
+                    return {'success': False,
+                            'error': 'schema must be a JSON object (see famigen_get_schema).'}
+                errors, warnings = validate_family_schema(schema)
+                summary = schema_summary(schema)
+                if errors:
+                    return {'success': False, 'valid': False, 'errors': errors,
+                            'warnings': warnings, 'summary': summary, 'window': 'not_opened',
+                            'hint': ('Nothing was shown or created. Fix every listed JSON path '
+                                     'and call famigen_propose_family again.')}
+                preview = build_preview(schema)
+                proposal_id = ProposalStore().save(schema, source='mcp', note=note)
+                result = {'success': True, 'valid': True, 'proposal_id': proposal_id,
+                          'warnings': list(warnings) + list(preview.warnings),
+                          'summary': summary,
+                          'size_mm': [round(v, 1) for v in preview.size_mm()],
+                          'model_changed': False, 'window': 'not_opened'}
+                if open_window:
+                    try:
+                        from FamilyGen.review import open_review
+                        result['window'] = open_review(doc, doc.Application, schema,
+                                                       proposal_id, note)
+                    except Exception as ex:
+                        result['window'] = 'failed'
+                        result['window_error'] = str(ex)
+                result['next'] = (
+                    'Ask the user to review the preview in FamiGen. They can press Create '
+                    'Family there, or approve and you call famigen_create_family with '
+                    'proposal_id "{}".'.format(proposal_id))
+                return result
+            except Exception as e:
+                return {'error': str(e), 'tool': tool_name}
+
+        elif tool_name == 'famigen_create_family':
+            try:
+                import json as _json
+                from FamilyGen import builder as _famigen_builder
+                from FamilyGen.proposals import ProposalStore
+                proposal_id = arguments.get('proposal_id')
+                schema = arguments.get('schema')
+                output_folder = arguments.get('output_folder') or \
+                    _famigen_builder.default_output_folder()
+                load_into_project = bool(arguments.get('load_into_project', False))
+                if schema is None and proposal_id:
+                    record = ProposalStore().load(proposal_id)
+                    if record is None:
+                        return {'success': False,
+                                'error': "Proposal '{}' was not found.".format(proposal_id),
+                                'hint': 'Call famigen_propose_family again, or pass the schema.'}
+                    schema = record.get('schema')
+                if isinstance(schema, str):
+                    try:
+                        schema = _json.loads(schema)
+                    except ValueError as ex:
+                        return {'success': False, 'error': 'schema is not valid JSON: {}'.format(ex)}
+                if not isinstance(schema, dict):
+                    return {'success': False,
+                            'error': 'Pass a proposal_id or a schema object.'}
+                try:
+                    report = _famigen_builder.create_family(
+                        doc.Application, schema, output_folder, project_doc=doc,
+                        load_into_project=load_into_project and not doc.IsFamilyDocument)
+                except _famigen_builder.FamilyBuildError as ex:
+                    return {'success': False, 'error': str(ex), 'model_changed': False}
+                return {
+                    'success': True,
+                    'saved_path': report['saved_path'],
+                    'category': report['category'],
+                    'template': report['template'],
+                    'built': report['built'], 'total': report['total'],
+                    'skipped': report['skipped'], 'warnings': report['warnings'],
+                    'materials_created': report['materials_created'],
+                    'materials_reused': report['materials_reused'],
+                    'material_parameters': report['material_parameters'],
+                    'parameters_created': report['parameters_created'],
+                    'parameters_set': report['parameters_set'],
+                    'subcategories': report['subcategories'],
+                    'loaded_into_project': bool(report.get('loaded')),
+                    'summary': '\n'.join(_famigen_builder.report_lines(report)),
+                }
+            except Exception as e:
+                return {'error': str(e), 'tool': tool_name}
 
         # ── file_watcher_status ──────────────────────────────────────────────
         elif tool_name == 'file_watcher_status':

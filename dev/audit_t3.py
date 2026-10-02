@@ -50,7 +50,7 @@ UI_LOCKED = set()
 
 # Item-template XAML (root là <Border>/<DataTemplate> của một dòng list, không phải
 # cửa sổ) — copyright thuộc về cửa sổ chứa nó, không lặp trên từng dòng.
-COPYRIGHT_EXEMPT = {"CadtoFloorLayerItem.xaml"}
+COPYRIGHT_EXEMPT = set()  # CadtoFloorLayerItem.xaml was deleted 2026-10-02
 COPYRIGHT_TEXT = "© Copyright by T3Lab"
 
 # ── Luật 23 · Select-all ở header cột checkbox ───────────────────────────

@@ -228,7 +228,7 @@
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
                  E8A3 Zoom        E7B3 Isolate    E7C9 Pick       E7C3 Document
-                 E896 Download    EA80 Insight
+                 E896 Download    EA80 Insight    ED1A Hide
 
                Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
                  1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
@@ -867,6 +867,15 @@
                 </ControlTemplate>
               </Setter.Value>
             </Setter>
+          </Style>
+
+          <!-- Cột checkbox của ListView+GridView: bản GridView của
+               T3.DataGridColumnHeader.Check — bỏ Padding 8 và canh giữa để checkbox
+               header nằm đúng trên checkbox dòng (BatchOut 2026-10-02). -->
+          <Style x:Key="T3.GridViewColumnHeader.Check" TargetType="GridViewColumnHeader"
+                 BasedOn="{StaticResource T3.GridViewColumnHeader}">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
           </Style>
 
           <Style x:Key="T3.ListViewItem" TargetType="ListViewItem">
@@ -1711,8 +1720,11 @@
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,16,0">
                         </StackPanel>
 
-                        <!-- Window Controls -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Window Controls — IsHitTestVisibleInChrome BẮT BUỘC: cả dải 48px
+                             là caption của WindowChrome, thiếu nó thì click bị chrome nuốt
+                             (để kéo cửa sổ) và 3 nút không bấm được. -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+                                    WindowChrome.IsHitTestVisibleInChrome="True">
                             <Button x:Name="btn_minimize" Style="{StaticResource T3.WinCtrl}" ToolTip="Minimize"
                                     Click="minimize_button_clicked">
                                 <TextBlock Text="&#xE921;" Style="{StaticResource T3.Icon}"/>
@@ -1995,7 +2007,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" Text="Describe → Generate JSON → Review → Create Family"
+                                <TextBlock Grid.Row="0" Text="Describe (or receive an MCP proposal) → Review the model and materials → Create Family"
                                            Style="{StaticResource T3.Caption}" Margin="0,0,0,12" TextWrapping="Wrap"/>
                                 <Grid Grid.Row="1" Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
@@ -2008,7 +2020,7 @@
                                                   Style="{StaticResource T3.ComboBox}"
                                                   ToolTip="Choose the category before generating the family definition"/>
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="Use mm for dimensions. Include shapes and any existing template parameters to set."
+                                    <TextBlock Grid.Column="1" Text="Use mm for dimensions. Name the materials and colours of each part."
                                                Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Bottom"/>
                                 </Grid>
                                 <Grid Grid.Row="2">
@@ -2021,7 +2033,7 @@
                                         <TextBox x:Name="ai_prompt_tb" Height="84" AcceptsReturn="True" TextWrapping="Wrap"
                                                  VerticalScrollBarVisibility="Auto" Style="{StaticResource T3.TextBox}"
                                                  ToolTip="Describe geometry, dimensions in mm, and parameters to generate"/>
-                                        <TextBlock Text="Example: Dining table 2400 × 1200 × 750 mm, tabletop 40 mm, four round legs with radius 30 mm."
+                                        <TextBlock Text="Example: Dining table 2400 × 1200 × 750 mm, 40 mm oak tabletop, four round black steel legs with radius 30 mm."
                                                    Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -2036,49 +2048,159 @@
                                         <Button x:Name="btn_ai_undo" Content="Undo AI"
                                                 Style="{StaticResource T3.Button.Ghost}" Padding="12,0"
                                                 Click="ai_undo_clicked" Visibility="Collapsed"
-                                                ToolTip="Restore the JSON definition from before the last generation"/>
+                                                ToolTip="Restore the JSON from before the last AI generation or MCP proposal"/>
                                     </StackPanel>
                                 </Grid>
                             </Grid>
                         </Border>
 
-                        <!-- JSON Editor -->
+                        <!-- JSON editor (left) + review pane (right). The preview is built
+                             from the JSON on the left (debounced) and from every AI or MCP
+                             proposal, BEFORE anything is created in Revit. -->
                         <Grid Grid.Row="1" Margin="16,12,16,12">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="Review family JSON" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="json_tb" Grid.Row="1"
-                                 AcceptsReturn="True" TextWrapping="Wrap"
-                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                                 FontFamily="Consolas" FontSize="12.5"
-                                 Style="{StaticResource T3.TextBox}"
-                                 Text="Paste your JSON schema here..."/>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid Grid.Column="0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Family JSON" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="json_tb" Grid.Row="1"
+                                     AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas" FontSize="12.5"
+                                     Style="{StaticResource T3.TextBox}"
+                                     TextChanged="json_text_changed"
+                                     Text="Paste your JSON schema here..."/>
+                            </Grid>
+                            <Grid Grid.Column="2">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid Grid.Row="0" Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Review model" Style="{StaticResource T3.Label}" VerticalAlignment="Bottom"/>
+                                    <Button x:Name="btn_preview_fit" Grid.Column="1" Style="{StaticResource T3.Button.Ghost}"
+                                            Padding="8,0" Click="preview_fit_clicked"
+                                            ToolTip="Fit the whole model in the preview and reset the view angle">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8A3;" Style="{StaticResource T3.Icon.Lead}"/>
+                                            <TextBlock Text="Fit" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <Border x:Name="preview_host" Grid.Row="1" Style="{StaticResource T3.Panel}"
+                                        Padding="0" ClipToBounds="True" Background="{StaticResource T3.SurfaceSunken}"
+                                        Cursor="SizeAll"
+                                        ToolTip="Drag to orbit, use the mouse wheel to zoom"
+                                        MouseLeftButtonDown="preview_mouse_down"
+                                        MouseLeftButtonUp="preview_mouse_up"
+                                        MouseMove="preview_mouse_move"
+                                        MouseWheel="preview_mouse_wheel">
+                                    <Grid>
+                                        <Viewport3D x:Name="preview_viewport" ClipToBounds="True" IsHitTestVisible="False"/>
+                                        <TextBlock x:Name="preview_empty" Style="{StaticResource T3.Empty}" Margin="24"
+                                                   Text="No model to review yet. Generate one with AI, paste JSON on the left, or send a proposal from an AI client over MCP."/>
+                                        <TextBlock Text="Drag to orbit · Wheel to zoom" Style="{StaticResource T3.Caption}"
+                                                   HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8"/>
+                                    </Grid>
+                                </Border>
+                                <!-- Materials legend + summary share one panel (rule 19). Swatch colours
+                                     are DATA (the schema's material colours), read through a string
+                                     bridge - not UI styling. -->
+                                <Border Grid.Row="2" Style="{StaticResource T3.Panel}" Padding="0" Margin="0,8,0,0"
+                                        ClipToBounds="True">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Grid.Column="0" MinHeight="78">
+                                            <ListBox x:Name="preview_legend" Style="{StaticResource T3.ListBox}"
+                                                     BorderThickness="0" MaxHeight="104"
+                                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid ToolTip="{Binding detail}">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock x:Name="row_swatch_text" Text="{Binding swatch}" Visibility="Collapsed"/>
+                                                            <Border Grid.Column="0" Width="12" Height="12" Margin="0,0,8,0"
+                                                                    CornerRadius="{StaticResource T3.R.Pill}"
+                                                                    BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
+                                                                    Background="{Binding Text, ElementName=row_swatch_text}"/>
+                                                            <TextBlock Grid.Column="1" Text="{Binding name}" Style="{StaticResource T3.Body}"
+                                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Grid.Column="2" Text="{Binding count_text}" Style="{StaticResource T3.Caption}"
+                                                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                            <TextBlock x:Name="preview_legend_empty" Style="{StaticResource T3.Empty}" Margin="12"
+                                                       Text="No materials. Add a materials list to colour the parts."/>
+                                        </Grid>
+                                        <Border Grid.Column="1" Width="1" Background="{StaticResource T3.Border}"/>
+                                        <StackPanel Grid.Column="2" Margin="12,8">
+                                            <TextBlock x:Name="preview_summary" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                                       Text="Category, part count and size appear here."/>
+                                            <Border x:Name="preview_issues" Style="{StaticResource T3.Callout.Warning}"
+                                                    Margin="0,8,0,0" Visibility="Collapsed">
+                                                <TextBlock x:Name="preview_issue_text" Style="{StaticResource T3.Caption}"
+                                                           TextWrapping="Wrap"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
                         </Grid>
 
-                        <!-- JSON Action Bar -->
+                        <!-- JSON Action Bar — MỘT hàng, cùng nhịp với CAD Action Bar: trạng
+                             thái của bước JSON bên trái (cắt "…" + tooltip đủ câu), nút bên
+                             phải, hành động chính ngoài cùng. Bỏ "Cancel": nó chỉ Close()
+                             cửa sổ, trùng nút X (IsCancel) trên title bar. -->
                         <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
                                 BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                 Padding="16,8">
                             <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock x:Name="lbl_status" Text="Ready"
-                                           Style="{StaticResource T3.Body.Secondary}"
-                                           VerticalAlignment="Center" HorizontalAlignment="Left" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                                            Margin="0,0,16,0">
+                                    <TextBlock Text="&#xE946;" Style="{StaticResource T3.Icon.Field}"/>
+                                    <TextBlock x:Name="lbl_status" Text="Describe the family and press AI Generate, or paste JSON"
+                                               Style="{StaticResource T3.Body.Secondary}"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <CheckBox x:Name="chk_json_load" Content="Load into project"
+                                              Style="{StaticResource T3.CheckBox}" Margin="0,0,16,0"
+                                              VerticalAlignment="Center"
+                                              ToolTip="After saving the .rfa, load it into the active project (an already loaded family is replaced)"/>
                                     <Button x:Name="copy_prompt_btn" Content="Copy Prompt"
                                             Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0"
-                                            Click="copy_prompt_clicked" Margin="0,0,8,0"/>
-                                    <Button x:Name="cancel_btn" Content="Cancel"
-                                            Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="12,0"
-                                            Click="cancel_clicked" Margin="0,0,8,0"/>
+                                            Click="copy_prompt_clicked" Margin="0,0,8,0"
+                                            ToolTip="Copy an AI prompt for the chosen category, to use in any chat assistant"/>
                                     <Button x:Name="create_btn" Content="Create Family"
                                             Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="16,0"
-                                            Click="create_clicked"/>
+                                            Click="create_clicked"
+                                            ToolTip="Build and save the .rfa family from the reviewed JSON, using the template of its category"/>
                                 </StackPanel>
                             </Grid>
                         </Border>

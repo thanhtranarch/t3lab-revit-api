@@ -11,7 +11,9 @@ try:
 except Exception:
     _theme = None
 
-from GUI.WPF_Base import T3WPFWindow
+import System
+
+from GUI.WPF_Base import T3WPFWindow, set_items_source
 from Snippets._compat import eid_value
 
 _XAML = os.path.join(os.path.dirname(__file__), 'Tools', 'WallAdjustBase.xaml')
@@ -118,7 +120,7 @@ class WallAdjustBaseWindow(T3WPFWindow):
         self._levels = [LevelItem(lvl) for lvl in levels]
 
         if hasattr(self, 'cmb_levels') and self.cmb_levels:
-            self.cmb_levels.ItemsSource = [item.display for item in self._levels]
+            set_items_source(self.cmb_levels, [item.display for item in self._levels])
             if len(self._levels) > 0:
                 self.cmb_levels.SelectedIndex = 0
 

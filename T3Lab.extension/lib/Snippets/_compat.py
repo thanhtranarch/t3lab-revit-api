@@ -125,3 +125,82 @@ def net_list(item_type, items):
         if item is not None:
             out.Add(item)
     return out
+
+
+# ── Family parameters (FamilyManager) ────────────────────────────────────────
+# Revit 2022 added the ForgeTypeId overload
+#   FamilyManager.AddParameter(name, GroupTypeId, SpecTypeId, isInstance);
+# the BuiltInParameterGroup / ParameterType overload is gone on 2023 / 2025+.
+# Every supported release (2022-2027) has the ForgeTypeId one, so it is tried
+# first; the legacy enums are only looked up by name, inside the fallback.
+_FAMILY_PARAM_GROUPS = {
+    'materials': ('Materials', 'PG_MATERIALS'),
+    'geometry': ('Geometry', 'PG_GEOMETRY'),
+    'data': ('Data', 'PG_DATA'),
+    'text': ('Text', 'PG_TEXT'),
+}
+_FAMILY_PARAM_SPECS = {
+    'material': (('Reference', 'Material'), 'Material'),
+    'length': (('Length',), 'Length'),
+    'number': (('Number',), 'Number'),
+    'integer': (('Int', 'Integer'), 'Integer'),
+    'text': (('String', 'Text'), 'Text'),
+}
+
+
+def _spec_type_id(spec):
+    from Autodesk.Revit import DB as _DB
+    value = _DB.SpecTypeId
+    for attr in _FAMILY_PARAM_SPECS[spec][0]:
+        value = getattr(value, attr)
+    return value
+
+
+def add_family_parameter(family_manager, name, group, spec, is_instance=False):
+    """Add a family parameter, version-safe.
+
+    `group`: 'materials' | 'geometry' | 'data' | 'text'.
+    `spec`: 'material' | 'length' | 'number' | 'integer' | 'text'.
+    """
+    from Autodesk.Revit import DB as _DB
+    try:
+        group_id = getattr(_DB.GroupTypeId, _FAMILY_PARAM_GROUPS[group][0])
+        spec_id = _spec_type_id(spec)
+    except AttributeError:
+        # Pre-2022 API only (outside the supported range): legacy enums by name.
+        legacy_group = getattr(getattr(_DB, 'BuiltInParameterGroup'), _FAMILY_PARAM_GROUPS[group][1])
+        legacy_type = getattr(getattr(_DB, 'ParameterType'), _FAMILY_PARAM_SPECS[spec][1])
+        return family_manager.AddParameter(name, legacy_group, legacy_type, bool(is_instance))
+    return family_manager.AddParameter(name, group_id, spec_id, bool(is_instance))
+
+
+def _type_id_stem(forge_type_id):
+    """'autodesk.spec.aec:length-2.0.0' -> 'autodesk.spec.aec:length'."""
+    try:
+        return (forge_type_id.TypeId or '').rsplit('-', 1)[0]
+    except Exception:
+        return ''
+
+
+def family_parameter_kind(definition, storage_type=None):
+    """'length' | 'number' | 'integer' | 'text' | 'material' | 'other'.
+
+    Reads Definition.GetDataType() (2022+). Without it, falls back on the
+    parameter's StorageType, treating every Double as a length - FamiGen's
+    behaviour before data types existed.
+    """
+    try:
+        stem = _type_id_stem(definition.GetDataType())
+    except Exception:
+        stem = ''
+    if stem:
+        for kind in ('length', 'number', 'integer', 'text', 'material'):
+            try:
+                if stem == _type_id_stem(_spec_type_id(kind)):
+                    return kind
+            except Exception:
+                continue
+        return 'other'
+    name = str(storage_type or '')
+    return {'Double': 'length', 'Integer': 'integer', 'String': 'text',
+            'ElementId': 'material'}.get(name.rsplit('.', 1)[-1], 'other')

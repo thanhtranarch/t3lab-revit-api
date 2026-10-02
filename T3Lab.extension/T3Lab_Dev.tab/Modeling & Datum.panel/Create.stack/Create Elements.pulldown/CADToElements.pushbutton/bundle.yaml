@@ -1,9 +1,10 @@
 title: "CAD to\nElements"
-tooltip: "Convert CAD linework into Walls, Floors, or Beams."
+tooltip: "Convert CAD linework into walls, floors, ceilings, rooms, columns, beams, grids, lines or MEP runs."
 description: |
-  Detect lines in an imported DWG by layer and color
-  Map selected CAD layers to Walls, Floors, or Beams
-  Batch-create Revit elements following the original CAD geometry
-  Supports height/thickness assignment per element category
+  Pick an imported or linked DWG and a level, choose what to create on the left rail,
+  tick the CAD layers that hold it, then review the count before anything is created.
+  Walls and beams from paired parallel lines, floors/ceilings/rooms from closed outlines,
+  columns from rectangles and circles, grids from axis lines, model/detail lines,
+  and ducts, pipes, cable trays or conduits from single or double lines.
 author: "Dang Quoc Truong"
-version: "1.0.0"
+version: "2.0.0"

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 __title__ = "Family\nManager"
 __author__ = "Tran Tien Thanh & Dang Quoc Truong"
-__doc__ = "Family Manager — Manage families and load new families in one dialog."
+__doc__ = "Family Manager — Batch rename families and types, and load new families, in one dialog."
 
 import os, sys
 # ─── CPython 3 & lib bootstrap ────────────────────────────────────────────────

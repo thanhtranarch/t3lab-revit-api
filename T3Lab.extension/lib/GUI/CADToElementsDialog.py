@@ -1,4402 +1,1146 @@
 # -*- coding: utf-8 -*-
 """
-CAD to Elements — Unified launcher and creation logic.
+CAD to Elements — convert CAD linework into Revit elements.
 
-Combines Wall, Floor, Beam and MEP routing (Duct / Pipe / Cable Tray /
-Conduit) creation from CAD into one integrated module. CADToElementsWindow
-loads the hub XAML that contains every panel inline; sidebar buttons switch
-the active panel and all Revit API logic runs in-place — no child windows
-are spawned.
+One window, nine modes (rail tiles), ONE fixed layout:
+
+    A  CAD SOURCE | LEVEL          shared by every mode, selection persists
+    B  mode title + description
+    C  options card                same row skeleton in every mode
+    D  CAD layers                  same toolbar / list / tally in every mode
+
+Switching mode only swaps which `opt_<mode>` grid is visible inside the fixed
+options card and re-ticks that mode's own layer selection — nothing moves.
+
+Modes: Walls · Floors · Ceilings · Rooms · Columns · Beams · Grids · Lines ·
+MEP Runs (ducts, pipes, cable trays, conduits).
+
+Rules deciding WHAT gets created live in `Snippets/_cad_geometry.py` (pure,
+unit-tested); Revit calls in `Snippets/_cad_revit.py` (one transaction per
+run). Every run shows the count first (P5 confirm), then a result with counts.
 
 Copyright (c) 2026 T3Lab
-All rights reserved.
 """
-
-from __future__ import print_function
-
 import os
-import sys
-import math
-import codecs
+import re
 
-import clr
-clr.AddReference("PresentationFramework")
-clr.AddReference("PresentationCore")
-clr.AddReference("WindowsBase")
-clr.AddReference("System")
-clr.AddReference("System.Xml")
-
-import System
-from System.Collections.Generic import List
-from System.IO import MemoryStream, StringReader
-from System.Text import Encoding
-from System.Xml import XmlReader
-from System.Windows import (
-    Window, WindowState, Visibility, Thickness,
-    HorizontalAlignment, VerticalAlignment, MessageBox,
-    MessageBoxButton, MessageBoxResult, MessageBoxImage,
-    FontWeights
-)
-from System.Windows.Controls import (
-    StackPanel, TextBlock, Border, CheckBox, ComboBoxItem,
-    Orientation, ScrollBarVisibility
-)
-from System.Windows.Markup import XamlReader
-from System.Windows.Media import SolidColorBrush, Color, BrushConverter
+from System.Windows import Visibility, RoutedEventHandler
+from System.Windows.Controls import CheckBox, ComboBoxItem
+from System.Windows.Input import Key
 
 import Autodesk.Revit.DB as DB
-from Autodesk.Revit.DB import (
-    Transaction, FilteredElementCollector,
-    ElementId, XYZ, Line, Wall, WallType, Level,
-    ImportInstance,
-    CompoundStructure, MaterialFunctionAssignment
-)
+from pyrevit import revit
 
-from pyrevit import revit, forms, script
-from GUI.WPF_Base import T3WPFWindow, to_items_source
+from GUI.WPF_Base import T3WPFWindow
+from GUI.T3Dialog import show_info, show_warning, show_error, confirm
+from Snippets import _cad_geometry as geo
+from Snippets import _cad_revit as cr
+from Snippets._compat import eid_value
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
-_HERE = os.path.dirname(__file__)  # …/lib/GUI/
-if os.path.dirname(_HERE) not in sys.path:
-    sys.path.insert(0, os.path.dirname(_HERE))  # …/lib on path for GUI.* imports
-from GUI.ProgressPauseMixin import ProgressPauseMixin
-_TOOLS_DIR = os.path.join(_HERE, "Tools")
-_XAML_HUB = os.path.join(_TOOLS_DIR, "CADToElements.xaml")
-_XAML_WALL = os.path.join(_TOOLS_DIR, "CadtoWall.xaml")
-_XAML_FLOOR = os.path.join(_TOOLS_DIR, "CadtoFloor.xaml")
-_XAML_FLOOR_ITEM = os.path.join(_TOOLS_DIR, "CadtoFloorLayerItem.xaml")
-_XAML_BEAM = os.path.join(_TOOLS_DIR, "CADtoBeam.xaml")
+_XAML_HUB = os.path.join(os.path.dirname(__file__), "Tools", "CADToElements.xaml")
+TITLE = "CAD to Elements"
 
-# ---------------------------------------------------------------------------
-# CONSTANTS (shared)
-# ---------------------------------------------------------------------------
-TOLERANCE = 0.01
-MERGE_TOL = 0.15
-PARALLEL_TOL = 0.998
-MAX_WALL_THICKNESS = 2.0
-THICKNESS_ROUND_MM = 1
+ROUND_SKIP = {"element": None, "name": "(Skip circles)"}
+UNCONNECTED = {"element": None, "name": "Unconnected (use height)"}
 
-FT_TO_MM = 304.8
-MM_TO_FT = 1.0 / 304.8
 
-MODE_FLOOR = "floor"
-MODE_PART = "part"
+class _InputError(Exception):
+    """A field the user has to fix; the message is shown as-is."""
 
 
-# ===========================================================================
-# SHARED HELPERS
-# ===========================================================================
+class LayerRow(object):
+    """One CAD layer in the shared list. `count` is text for the grid."""
 
-def _eid_int(eid):
-    """Get integer value from ElementId — Revit 2024 uses .IntegerValue, 2025+ uses .Value."""
-    try:
-        return eid.IntegerValue
-    except Exception:
-        try:
-            return eid.Value
-        except Exception:
-            return int(str(eid))
-
-
-def mm_to_ft(mm):
-    return mm / FT_TO_MM
-
-
-def ft_to_mm_str(feet):
-    return str(int(round(feet * FT_TO_MM)))
-
-
-def safe_bool(nullable_bool):
-    """Safely convert Nullable[Boolean] to Python bool."""
-    try:
-        if nullable_bool is None:
-            return False
-        return bool(nullable_bool)
-    except Exception:
-        return False
-
-
-def load_xaml_file(path):
-    """Load XAML from a file path using XamlReader."""
-    with codecs.open(path, "r", "utf-8") as f:
-        content = f.read()
-    byte_array = Encoding.UTF8.GetBytes(content)
-    stream = MemoryStream(byte_array)
-    return XamlReader.Load(stream)
-
-
-def load_xaml_string(xaml_string):
-    """Load XAML from a string."""
-    string_reader = StringReader(xaml_string)
-    xml_reader = XmlReader.Create(string_reader)
-    return XamlReader.Load(xml_reader)
-
-
-# ===========================================================================
-# CAD INSTANCE COLLECTION (shared by all three tools)
-# ===========================================================================
-
-def _add_cad_to_list(doc, inst, cad_list):
-    """Helper to safely add a CAD ImportInstance to the list."""
-    name = "Unknown CAD"
-    try:
-        cad_type = doc.GetElement(inst.GetTypeId())
-        if cad_type:
-            try:
-                name = DB.Element.Name.GetValue(cad_type)
-            except Exception:
-                try:
-                    p = cad_type.LookupParameter("Name")
-                    if p:
-                        name = p.AsString()
-                except Exception:
-                    pass
-            if not name or name == "Unknown CAD":
-                try:
-                    name = str(_eid_int(cad_type.Id))
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-    is_linked = False
-    try:
-        is_linked = inst.IsLinked
-    except Exception:
-        try:
-            cad_type = doc.GetElement(inst.GetTypeId())
-            if cad_type:
-                efr = cad_type.GetExternalFileReference()
-                if efr:
-                    is_linked = True
-        except Exception:
-            pass
-
-    label = "{} [{}]".format(name, "Linked" if is_linked else "Imported")
-
-    eid = 0
-    try:
-        eid = _eid_int(inst.Id)
-    except Exception:
-        try:
-            eid = inst.Id.Value
-        except Exception:
-            pass
-
-    cad_list.append({
-        "element": inst,
-        "name": label,
-        "id": eid,
-        "is_linked": is_linked,
-        "revit_id": inst.Id,
-    })
-
-
-def get_cad_instances(doc):
-    """Get all CAD imports/links — compatible with Revit 2024–2026."""
-    cad_list = []
-
-    try:
-        collector = FilteredElementCollector(doc).OfClass(ImportInstance)
-        for inst in collector:
-            try:
-                _add_cad_to_list(doc, inst, cad_list)
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-    if not cad_list:
-        try:
-            from Autodesk.Revit.DB import BuiltInCategory
-            collector2 = FilteredElementCollector(doc).OfCategory(
-                BuiltInCategory.OST_ImportObjectStyles).WhereElementIsNotElementType()
-            for elem in collector2:
-                if isinstance(elem, ImportInstance):
-                    try:
-                        _add_cad_to_list(doc, elem, cad_list)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-    # Deduplicate by element id
-    seen_ids = set()
-    unique_list = []
-    for cad in cad_list:
-        if cad["id"] not in seen_ids:
-            seen_ids.add(cad["id"])
-            unique_list.append(cad)
-
-    return unique_list
-
-
-def get_levels(doc):
-    """Get all levels sorted by elevation."""
-    collector = FilteredElementCollector(doc).OfClass(Level)
-    lvs = []
-    for lv in collector:
-        try:
-            name = DB.Element.Name.GetValue(lv)
-            lvs.append({"name": name, "id": lv.Id, "elevation": lv.Elevation})
-        except Exception:
-            pass
-    lvs.sort(key=lambda x: x["elevation"])
-    return lvs
-
-
-# ===========================================================================
-# WALL — GEOMETRY EXTRACTION
-# ===========================================================================
-
-def get_cad_layers_wall(doc, cad_instance):
-    """Return sorted list of every layer defined on the CAD instance (not just ones with detected geometry)."""
-    layers = []
-    try:
-        import_cat = cad_instance.Category
-        for sc in import_cat.SubCategories:
-            try:
-                layers.append(sc.Name)
-            except Exception:
-                pass
-    except Exception:
-        pass
-    return sorted(layers)
-
-
-def extract_lines_from_cad(doc, cad_instance, selected_layers):
-    """Extract line segments from a CAD instance on the given layers.
-
-    Recurses to arbitrary depth through nested DB.GeometryInstance objects
-    (CAD blocks nested inside other blocks). No manual Transform is applied
-    at any depth: GeometryInstance.GetInstanceGeometry() already returns
-    geometry pre-transformed into the coordinate system of its immediate
-    container, so repeatedly calling it while descending already yields
-    fully-composed document-space coordinates at any nesting level (matching
-    the original single-level implementation's behavior, which never applied
-    a transform either). A previous revision of this function re-applied
-    each nested instance's own .Transform via CreateTransformed()/OfPoint(),
-    which double-transforms geometry whenever the CAD import itself has a
-    non-identity placement transform (rotated/offset to match site
-    coordinates) — walls still got created, just silently shifted/rotated
-    away from their real position. Do not reintroduce that.
-    """
-    lines = []
-    selected_set = set(selected_layers)
-
-    def scan_geo(geo_iterable):
-        for sub_obj in geo_iterable:
-            if isinstance(sub_obj, DB.GeometryInstance):
-                sub_geo = sub_obj.GetInstanceGeometry()
-                if sub_geo:
-                    scan_geo(sub_geo)
-                continue
-            try:
-                layer_name = ""
-                gstyle = doc.GetElement(sub_obj.GraphicsStyleId)
-                if gstyle:
-                    cat = gstyle.GraphicsStyleCategory
-                    if cat:
-                        layer_name = cat.Name
-                if layer_name not in selected_set:
-                    continue
-                if isinstance(sub_obj, DB.Line):
-                    p0 = sub_obj.GetEndPoint(0)
-                    p1 = sub_obj.GetEndPoint(1)
-                    if p0.DistanceTo(p1) > TOLERANCE:
-                        lines.append({"start": p0, "end": p1, "layer": layer_name})
-                elif isinstance(sub_obj, DB.PolyLine):
-                    coords = sub_obj.GetCoordinates()
-                    for i in range(len(coords) - 1):
-                        p0 = coords[i]
-                        p1 = coords[i + 1]
-                        if p0.DistanceTo(p1) > TOLERANCE:
-                            lines.append({"start": p0, "end": p1, "layer": layer_name})
-            except Exception:
-                pass
-
-    try:
-        geo_elem = cad_instance.get_Geometry(DB.Options())
-        if geo_elem is None:
-            return lines
-        scan_geo(geo_elem)
-    except Exception as ex:
-        print("Error extracting CAD lines: {}".format(str(ex)))
-    return lines
-
-
-# ===========================================================================
-# WALL — MERGE COLLINEAR
-# ===========================================================================
-
-def merge_collinear_lines(lines):
-    """Merge collinear line segments with small gaps."""
-    if not lines:
-        return lines
-    merged = True
-    result = list(lines)
-    while merged:
-        merged = False
-        new_result = []
-        used = [False] * len(result)
-        for i in range(len(result)):
-            if used[i]:
-                continue
-            cur = result[i]
-            cs = cur["start"]
-            ce = cur["end"]
-            dx = ce.X - cs.X
-            dy = ce.Y - cs.Y
-            clen = math.sqrt(dx * dx + dy * dy)
-            if clen < TOLERANCE:
-                used[i] = True
-                continue
-            cdx = dx / clen
-            cdy = dy / clen
-            for j in range(i + 1, len(result)):
-                if used[j]:
-                    continue
-                other = result[j]
-                os_ = other["start"]
-                oe = other["end"]
-                odx = oe.X - os_.X
-                ody = oe.Y - os_.Y
-                olen = math.sqrt(odx * odx + ody * ody)
-                if olen < TOLERANCE:
-                    used[j] = True
-                    continue
-                dot = abs(cdx * (odx / olen) + cdy * (ody / olen))
-                if dot < PARALLEL_TOL:
-                    continue
-                vx = os_.X - cs.X
-                vy = os_.Y - cs.Y
-                cross = abs(vx * cdy - vy * cdx)
-                if cross > MERGE_TOL:
-                    continue
-                ns = ne = None
-                if ce.DistanceTo(os_) < MERGE_TOL:
-                    ns, ne = cs, oe
-                elif ce.DistanceTo(oe) < MERGE_TOL:
-                    ns, ne = cs, os_
-                elif cs.DistanceTo(os_) < MERGE_TOL:
-                    ns, ne = ce, oe
-                elif cs.DistanceTo(oe) < MERGE_TOL:
-                    ns, ne = ce, os_
-                if ns and ne and ns.DistanceTo(ne) > TOLERANCE:
-                    cur = {"start": ns, "end": ne, "layer": cur["layer"]}
-                    cs, ce = ns, ne
-                    dx = ce.X - cs.X
-                    dy = ce.Y - cs.Y
-                    clen = math.sqrt(dx * dx + dy * dy)
-                    if clen > TOLERANCE:
-                        cdx = dx / clen
-                        cdy = dy / clen
-                    used[j] = True
-                    merged = True
-            new_result.append(cur)
-            used[i] = True
-        result = new_result
-    return result
-
-
-# ===========================================================================
-# WALL — PARALLEL PAIR DETECTION
-# ===========================================================================
-
-def _project_point_on_line_2d(px, py, ax, ay, dx, dy):
-    vx = px - ax
-    vy = py - ay
-    t = vx * dx + vy * dy
-    fx = ax + t * dx
-    fy = ay + t * dy
-    dist = math.sqrt((px - fx) ** 2 + (py - fy) ** 2)
-    return t, dist
-
-
-def find_parallel_pairs(lines, max_sep=MAX_WALL_THICKNESS):
-    """Detect parallel line pairs and compute centerlines using UNION extent.
-
-    max_sep caps the pair separation (feet). The default preserves the wall
-    behavior; MEP double-line callers pass a wider cap for ducts/trays.
-    """
-    n = len(lines)
-    paired = [False] * n
-    centerlines = []
-
-    dirs = []
-    for line in lines:
-        dx = line["end"].X - line["start"].X
-        dy = line["end"].Y - line["start"].Y
-        length = math.sqrt(dx * dx + dy * dy)
-        if length > TOLERANCE:
-            dirs.append({"dx": dx / length, "dy": dy / length, "len": length})
-        else:
-            dirs.append({"dx": 0, "dy": 0, "len": 0})
-
-    for i in range(n):
-        if paired[i] or dirs[i]["len"] == 0:
-            continue
-        di = dirs[i]
-        si = lines[i]["start"]
-
-        candidates = []
-        for j in range(n):
-            if j == i or paired[j] or dirs[j]["len"] == 0:
-                continue
-            dj = dirs[j]
-            dot = abs(di["dx"] * dj["dx"] + di["dy"] * dj["dy"])
-            if dot < PARALLEL_TOL:
-                continue
-            sj = lines[j]["start"]
-            ej = lines[j]["end"]
-            _, dist_s = _project_point_on_line_2d(sj.X, sj.Y, si.X, si.Y, di["dx"], di["dy"])
-            _, dist_e = _project_point_on_line_2d(ej.X, ej.Y, si.X, si.Y, di["dx"], di["dy"])
-            avg_dist = (dist_s + dist_e) / 2.0
-            if avg_dist > max_sep or avg_dist < TOLERANCE:
-                continue
-            t_js, _ = _project_point_on_line_2d(sj.X, sj.Y, si.X, si.Y, di["dx"], di["dy"])
-            t_je, _ = _project_point_on_line_2d(ej.X, ej.Y, si.X, si.Y, di["dx"], di["dy"])
-            overlap = min(di["len"], max(t_js, t_je)) - max(0, min(t_js, t_je))
-            shorter = min(di["len"], dj["len"])
-            if overlap < shorter * 0.2:
-                continue
-            candidates.append({"idx": j, "dist": avg_dist, "t_s": t_js, "t_e": t_je})
-
-        if not candidates:
-            continue
-
-        candidates.sort(key=lambda c: c["dist"])
-        best_dist = candidates[0]["dist"]
-        same_side = [c for c in candidates if abs(c["dist"] - best_dist) < mm_to_ft(20)]
-
-        all_t_values = [0.0, di["len"]]
-        for c in same_side:
-            all_t_values.append(c["t_s"])
-            all_t_values.append(c["t_e"])
-
-        t_union_start = min(all_t_values)
-        t_union_end = max(all_t_values)
-
-        if t_union_end - t_union_start < TOLERANCE:
-            continue
-
-        pi_s = XYZ(si.X + di["dx"] * t_union_start, si.Y + di["dy"] * t_union_start, 0)
-        pi_e = XYZ(si.X + di["dx"] * t_union_end, si.Y + di["dy"] * t_union_end, 0)
-
-        perp_dx = -di["dy"]
-        perp_dy = di["dx"]
-
-        mid_c = same_side[0]
-        sj_pt = lines[mid_c["idx"]]["start"]
-        vx = sj_pt.X - si.X
-        vy = sj_pt.Y - si.Y
-        side = vx * perp_dx + vy * perp_dy
-        half_t = best_dist / 2.0
-        if side > 0:
-            offset_x = perp_dx * half_t
-            offset_y = perp_dy * half_t
-        else:
-            offset_x = -perp_dx * half_t
-            offset_y = -perp_dy * half_t
-
-        cs = XYZ(pi_s.X + offset_x, pi_s.Y + offset_y, 0)
-        ce = XYZ(pi_e.X + offset_x, pi_e.Y + offset_y, 0)
-
-        if cs.DistanceTo(ce) > TOLERANCE:
-            centerlines.append({
-                "start": cs, "end": ce,
-                "thickness": best_dist,
-                "layer": lines[i]["layer"]
-            })
-
-        paired[i] = True
-        for c in same_side:
-            paired[c["idx"]] = True
-
-    unpaired = [lines[i] for i in range(n) if not paired[i]]
-    return centerlines, unpaired
-
-
-# ===========================================================================
-# WALL — TYPE MANAGEMENT
-# ===========================================================================
-
-def _round_thickness_mm(thickness_ft):
-    mm = thickness_ft * FT_TO_MM
-    return int(round(mm / THICKNESS_ROUND_MM) * THICKNESS_ROUND_MM)
-
-
-def group_by_thickness(centerlines):
-    """Group centerlines by rounded thickness (mm). Returns {thickness_mm: [cl_list]}."""
-    groups = {}
-    for cl in centerlines:
-        t_mm = _round_thickness_mm(cl["thickness"])
-        if t_mm not in groups:
-            groups[t_mm] = []
-        groups[t_mm].append(cl)
-    return groups
-
-
-def find_base_wall_type(doc):
-    """Find a basic wall type to use as template — prefers Generic types."""
-    collector = FilteredElementCollector(doc).OfClass(WallType)
-    generic_type = None
-    any_basic = None
-    for wt in collector:
-        try:
-            kind = wt.Kind
-            if kind != DB.WallKind.Basic:
-                continue
-            name = DB.Element.Name.GetValue(wt)
-            any_basic = wt
-            if "generic" in name.lower():
-                generic_type = wt
-                break
-        except Exception:
-            pass
-    return generic_type or any_basic
-
-
-def get_or_create_wall_type(doc, thickness_mm, base_type):
-    """Find existing or create new WallType named 'Generic - XXXmm'."""
-    target_name = "Generic - {}mm".format(thickness_mm)
-    thickness_ft = thickness_mm / FT_TO_MM
-
-    collector = FilteredElementCollector(doc).OfClass(WallType)
-    for wt in collector:
-        try:
-            name = DB.Element.Name.GetValue(wt)
-            if name == target_name:
-                return wt
-        except Exception:
-            pass
-
-    try:
-        new_type = base_type.Duplicate(target_name)
-    except Exception as ex:
-        print("Error duplicating wall type: {}".format(str(ex)))
-        return base_type
-
-    try:
-        cs = new_type.GetCompoundStructure()
-        if cs:
-            layers = cs.GetLayers()
-            if layers.Count == 1:
-                cs.SetLayerWidth(0, thickness_ft)
-            else:
-                found = False
-                for idx in range(layers.Count):
-                    layer = layers[idx]
-                    if layer.Function == MaterialFunctionAssignment.Structure:
-                        cs.SetLayerWidth(idx, thickness_ft)
-                        found = True
-                        break
-                if not found:
-                    cs.SetLayerWidth(0, thickness_ft)
-            new_type.SetCompoundStructure(cs)
-        print("Created wall type: {} ({}mm)".format(target_name, thickness_mm))
-    except Exception as ex:
-        print("Error setting wall thickness: {}".format(str(ex)))
-
-    return new_type
-
-
-# ===========================================================================
-# WALL — CREATION
-# ===========================================================================
-
-def create_walls_auto(doc, centerlines, unpaired, level_id, height, use_unpaired,
-                      default_thickness_mm, structural=False,
-                      progress_callback=None, cancel_check=None):
-    """Create walls with auto-generated wall types based on detected thickness."""
-    created = 0
-    failed = 0
-    skipped = 0
-    types_created = []
-    _done = [0]
-    _total = len(centerlines) + (len(unpaired) if use_unpaired else 0)
-
-    def _tick():
-        if progress_callback:
-            progress_callback(_done[0], _total)
-        _done[0] += 1
-
-    level = doc.GetElement(level_id)
-    level_elev = level.Elevation
-
-    base_type = find_base_wall_type(doc)
-    if not base_type:
-        print("ERROR: No basic wall type found in model!")
-        return 0, 0, 0, []
-
-    groups = group_by_thickness(centerlines)
-
-    t = Transaction(doc, "T3Lab: CAD to Wall")
-    t.Start()
-    try:
-        wall_type_cache = {}
-
-        for t_mm, cl_list in groups.items():
-            if cancel_check and cancel_check():
-                break
-            if t_mm not in wall_type_cache:
-                wt = get_or_create_wall_type(doc, t_mm, base_type)
-                wall_type_cache[t_mm] = wt
-                types_created.append("Generic - {}mm".format(t_mm))
-            wt = wall_type_cache[t_mm]
-
-            for cl in cl_list:
-                if cancel_check and cancel_check():
-                    break
-                _tick()
-                try:
-                    s = cl["start"]
-                    e = cl["end"]
-                    start = XYZ(s.X, s.Y, level_elev)
-                    end = XYZ(e.X, e.Y, level_elev)
-                    if start.DistanceTo(end) < TOLERANCE:
-                        skipped += 1
-                        continue
-                    if abs(end.X - start.X) < TOLERANCE and abs(end.Y - start.Y) < TOLERANCE:
-                        skipped += 1
-                        continue
-                    wall_line = Line.CreateBound(start, end)
-                    new_wall = Wall.Create(doc, wall_line, wt.Id, level_id, height, 0.0, False, structural)
-                    if new_wall:
-                        created += 1
-                    else:
-                        failed += 1
-                except Exception:
-                    failed += 1
-
-        if use_unpaired and unpaired and not (cancel_check and cancel_check()):
-            default_wt_key = default_thickness_mm
-            if default_wt_key not in wall_type_cache:
-                wt = get_or_create_wall_type(doc, default_wt_key, base_type)
-                wall_type_cache[default_wt_key] = wt
-                types_created.append("Generic - {}mm".format(default_wt_key))
-            wt = wall_type_cache[default_wt_key]
-
-            for ln in unpaired:
-                if cancel_check and cancel_check():
-                    break
-                _tick()
-                try:
-                    s = ln["start"]
-                    e = ln["end"]
-                    start = XYZ(s.X, s.Y, level_elev)
-                    end = XYZ(e.X, e.Y, level_elev)
-                    if start.DistanceTo(end) < TOLERANCE:
-                        skipped += 1
-                        continue
-                    if abs(end.X - start.X) < TOLERANCE and abs(end.Y - start.Y) < TOLERANCE:
-                        skipped += 1
-                        continue
-                    wall_line = Line.CreateBound(start, end)
-                    new_wall = Wall.Create(doc, wall_line, wt.Id, level_id, height, 0.0, False, structural)
-                    if new_wall:
-                        created += 1
-                    else:
-                        failed += 1
-                except Exception:
-                    failed += 1
-
-        status = t.Commit()
-        if status != DB.TransactionStatus.Committed:
-            print("Wall transaction did not commit, status: {}".format(status))
-            return 0, created + failed, skipped, []
-    except Exception as ex:
-        if t.HasStarted() and not t.HasEnded():
-            t.RollBack()
-        print("Wall transaction error: {}".format(str(ex)))
-        return 0, created + failed, skipped, []
-
-    return created, failed, skipped, types_created
-
-
-# ===========================================================================
-# FLOOR — GEOMETRY EXTRACTION
-# ===========================================================================
-
-def _process_geom_obj_floor(geom_obj, layers, layer_name):
-    """Process a single geometry object and add to layer dict for floors."""
-    if layer_name not in layers:
-        layers[layer_name] = {"curves": [], "closed_loops": [], "all_curves_count": 0}
-
-    layer = layers[layer_name]
-
-    try:
-        if isinstance(geom_obj, DB.PolyLine):
-            coords = geom_obj.GetCoordinates()
-            layer["all_curves_count"] += 1
-            if coords.Count >= 4:
-                first = coords[0]
-                last = coords[coords.Count - 1]
-                if first.DistanceTo(last) < 0.01:
-                    try:
-                        curve_loop = DB.CurveLoop()
-                        for i in range(coords.Count - 1):
-                            p1 = coords[i]
-                            p2 = coords[i + 1]
-                            dist = p1.DistanceTo(p2)
-                            if dist > 0.001:
-                                ln = DB.Line.CreateBound(p1, p2)
-                                curve_loop.Append(ln)
-                        if not curve_loop.IsOpen():
-                            layer["closed_loops"].append(curve_loop)
-                    except Exception:
-                        pass
-        elif isinstance(geom_obj, DB.Line):
-            layer["all_curves_count"] += 1
-            layer["curves"].append(geom_obj)
-        elif isinstance(geom_obj, DB.Arc):
-            layer["all_curves_count"] += 1
-            layer["curves"].append(geom_obj)
-        elif isinstance(geom_obj, DB.Curve):
-            layer["all_curves_count"] += 1
-            layer["curves"].append(geom_obj)
-    except Exception:
-        pass
-
-
-def get_cad_layer_geometry_floor(doc, cad_instance):
-    """Extract geometry from CAD instance, organised by layer, for floor creation."""
-    layers = {}
-    try:
-        opts = DB.Options()
-        geom_elem = cad_instance.get_Geometry(opts)
-        if geom_elem is None:
-            return layers
-        for geom_obj in geom_elem:
-            if isinstance(geom_obj, DB.GeometryInstance):
-                sub_geom = geom_obj.GetInstanceGeometry()
-                if sub_geom:
-                    for sub_obj in sub_geom:
-                        layer_name = "Default"
-                        try:
-                            style = doc.GetElement(sub_obj.GraphicsStyleId)
-                            if style:
-                                cat = style.GraphicsStyleCategory
-                                if cat:
-                                    layer_name = cat.Name
-                        except Exception:
-                            pass
-                        _process_geom_obj_floor(sub_obj, layers, layer_name)
-            else:
-                _process_geom_obj_floor(geom_obj, layers, "Default")
-    except Exception:
-        pass
-
-    try:
-        import_cat = cad_instance.Category
-        for sc in import_cat.SubCategories:
-            try:
-                if sc.Name not in layers:
-                    layers[sc.Name] = {"curves": [], "closed_loops": [], "all_curves_count": 0}
-            except Exception:
-                pass
-    except Exception:
-        pass
-    return layers
-
-
-def try_build_loops_from_curves(curves):
-    """Try to build closed CurveLoops from individual curves by endpoint matching."""
-    if not curves:
-        return []
-    closed_loops = []
-    used = set()
-    tolerance = 0.01
-
-    for start_idx in range(len(curves)):
-        if start_idx in used:
-            continue
-        try:
-            loop_curves = [curves[start_idx]]
-            used_in_loop = {start_idx}
-            current_end = curves[start_idx].GetEndPoint(1)
-            start_point = curves[start_idx].GetEndPoint(0)
-            max_iter = len(curves)
-            it = 0
-
-            while it < max_iter:
-                it += 1
-                found = False
-                if current_end.DistanceTo(start_point) < tolerance and len(loop_curves) >= 3:
-                    try:
-                        cl = DB.CurveLoop()
-                        for c in loop_curves:
-                            cl.Append(c)
-                        if not cl.IsOpen():
-                            closed_loops.append(cl)
-                            used.update(used_in_loop)
-                    except Exception:
-                        pass
-                    break
-
-                for j in range(len(curves)):
-                    if j in used or j in used_in_loop:
-                        continue
-                    try:
-                        c = curves[j]
-                        p0 = c.GetEndPoint(0)
-                        p1 = c.GetEndPoint(1)
-                        if current_end.DistanceTo(p0) < tolerance:
-                            loop_curves.append(c)
-                            used_in_loop.add(j)
-                            current_end = p1
-                            found = True
-                            break
-                        elif current_end.DistanceTo(p1) < tolerance:
-                            rev = c.CreateReversed()
-                            loop_curves.append(rev)
-                            used_in_loop.add(j)
-                            current_end = rev.GetEndPoint(1)
-                            found = True
-                            break
-                    except Exception:
-                        pass
-                if not found:
-                    break
-        except Exception:
-            pass
-    return closed_loops
-
-
-def get_floor_types(doc):
-    """Get all floor types sorted by name."""
-    floor_types = []
-    try:
-        collector = FilteredElementCollector(doc).OfClass(DB.FloorType)
-        for ft in collector:
-            try:
-                name_param = ft.get_Parameter(DB.BuiltInParameter.ALL_MODEL_TYPE_NAME)
-                type_name = name_param.AsString() if name_param and name_param.AsString() else "Unknown"
-                family_name = ""
-                try:
-                    family_name = ft.FamilyName
-                except Exception:
-                    pass
-                display = "{}: {}".format(family_name, type_name) if family_name else type_name
-                floor_types.append({"id": ft.Id, "name": display, "element": ft})
-            except Exception:
-                pass
-    except Exception:
-        pass
-    floor_types.sort(key=lambda x: x["name"])
-    return floor_types
-
-
-def get_ds_categories():
-    """Return common categories for DirectShape."""
-    return [
-        {"name": "Floors", "bic": DB.BuiltInCategory.OST_Floors},
-        {"name": "Generic Models", "bic": DB.BuiltInCategory.OST_GenericModel},
-        {"name": "Mass", "bic": DB.BuiltInCategory.OST_Mass},
-        {"name": "Structural Foundations", "bic": DB.BuiltInCategory.OST_StructuralFoundation},
-        {"name": "Walls", "bic": DB.BuiltInCategory.OST_Walls},
-        {"name": "Roofs", "bic": DB.BuiltInCategory.OST_Roofs},
-        {"name": "Ceilings", "bic": DB.BuiltInCategory.OST_Ceilings},
-        {"name": "Site", "bic": DB.BuiltInCategory.OST_Site},
-    ]
-
-
-# ===========================================================================
-# FLOOR — CREATION
-# ===========================================================================
-
-def create_floor_from_loop(doc, curve_loop, floor_type_id, level_id, offset_mm=0, is_structural=False):
-    """Create a Floor element from a CurveLoop — tries Revit 2022+ API, falls back to legacy."""
-    try:
-        try:
-            loop_list = List[DB.CurveLoop]()
-            loop_list.Add(curve_loop)
-            floor = DB.Floor.Create(doc, loop_list, floor_type_id, level_id)
-            if floor and offset_mm != 0:
-                param = floor.get_Parameter(DB.BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)
-                if param and not param.IsReadOnly:
-                    param.Set(mm_to_ft(offset_mm))
-            return floor
-        except Exception:
-            pass
-
-        try:
-            curve_array = DB.CurveArray()
-            for curve in curve_loop:
-                curve_array.Append(curve)
-            floor_type = doc.GetElement(floor_type_id)
-            level = doc.GetElement(level_id)
-            normal = DB.XYZ.BasisZ
-            floor = doc.Create.NewFloor(curve_array, floor_type, level, is_structural, normal)
-            if floor and offset_mm != 0:
-                param = floor.get_Parameter(DB.BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)
-                if param and not param.IsReadOnly:
-                    param.Set(mm_to_ft(offset_mm))
-            return floor
-        except Exception:
-            pass
-    except Exception:
-        pass
-    return None
-
-
-def create_part_from_loop(doc, curve_loop, category_bic, level_id, thickness_mm=200, offset_mm=0):
-    """Create a DirectShape by extruding a CurveLoop vertically."""
-    try:
-        thickness_ft = mm_to_ft(thickness_mm)
-        offset_ft = mm_to_ft(offset_mm)
-
-        if curve_loop.IsOpen():
-            return None
-
-        profile = List[DB.CurveLoop]()
-        profile.Add(curve_loop)
-
-        solid = DB.GeometryCreationUtilities.CreateExtrusionGeometry(
-            profile, DB.XYZ.BasisZ, thickness_ft)
-
-        if solid is None:
-            return None
-
-        try:
-            vol = solid.Volume
-            if vol < 0.0001:
-                return None
-        except Exception:
-            return None
-
-        if abs(offset_ft) > 0.0001:
-            try:
-                move_tf = DB.Transform.CreateTranslation(DB.XYZ(0, 0, offset_ft))
-                moved = DB.SolidUtils.CreateTransformed(solid, move_tf)
-                if moved is not None:
-                    solid = moved
-            except Exception:
-                pass
-
-        cat_id = ElementId(category_bic)
-        ds = DB.DirectShape.CreateElement(doc, cat_id)
-        geom_list = List[DB.GeometryObject]()
-        geom_list.Add(solid)
-        ds.SetShape(geom_list)
-        ds.Name = "T3Lab Part"
-        return ds
-    except Exception:
-        pass
-    return None
-
-
-def build_rect_loop_from_centerline(start_xyz, end_xyz, half_width_ft):
-    """Build a closed rectangular CurveLoop by offsetting a centerline segment
-    perpendicular by half_width_ft on each side. start_xyz/end_xyz must already
-    be at the same Z (the loop is flat)."""
-    direction = (end_xyz - start_xyz).Normalize()
-    perp = DB.XYZ(-direction.Y, direction.X, 0).Normalize()
-    offset = perp.Multiply(half_width_ft)
-    p1 = start_xyz + offset
-    p2 = end_xyz + offset
-    p3 = end_xyz - offset
-    p4 = start_xyz - offset
-    loop = DB.CurveLoop()
-    loop.Append(DB.Line.CreateBound(p1, p2))
-    loop.Append(DB.Line.CreateBound(p2, p3))
-    loop.Append(DB.Line.CreateBound(p3, p4))
-    loop.Append(DB.Line.CreateBound(p4, p1))
-    return loop
-
-
-# ===========================================================================
-# BEAM — GEOMETRY AND TYPE HELPERS
-# ===========================================================================
-
-def get_or_create_beam_type(doc, family_name, width_mm, height_mm):
-    """Find or create a beam FamilySymbol within the specified family."""
-    type_name = "{}x{}mm".format(int(width_mm), int(height_mm))
-
-    symbols = (FilteredElementCollector(doc)
-               .OfClass(DB.FamilySymbol)
-               .OfCategory(DB.BuiltInCategory.OST_StructuralFraming)
-               .ToElements())
-    target_symbols = [s for s in symbols if s.Family.Name == family_name]
-
-    if not target_symbols:
-        return None
-
-    for s in target_symbols:
-        try:
-            if DB.Element.Name.GetValue(s) == type_name:
-                return s
-        except Exception:
-            pass
-
-    source_symbol = target_symbols[0]
-    try:
-        new_symbol = source_symbol.Duplicate(type_name)
-        p_b = (new_symbol.LookupParameter("b") or
-               new_symbol.LookupParameter("Width") or
-               new_symbol.LookupParameter("B"))
-        p_h = (new_symbol.LookupParameter("h") or
-               new_symbol.LookupParameter("Height") or
-               new_symbol.LookupParameter("H"))
-        if p_b:
-            p_b.Set(width_mm * MM_TO_FT)
-        if p_h:
-            p_h.Set(height_mm * MM_TO_FT)
-        return new_symbol
-    except Exception as ex:
-        print("Failed to create beam type {}: {}".format(type_name, ex))
-        return source_symbol
-
-
-def _pair_lines_h(lines):
-    """Pair horizontal CAD lines to find beam centerlines and widths."""
-    pairs = []
-    used = set()
-    for i, l1 in enumerate(lines):
-        if i in used:
-            continue
-        best_j, best_dist = None, None
-        for j, l2 in enumerate(lines):
-            if j <= i or j in used:
-                continue
-            min1, max1 = min(l1["x1"], l1["x2"]), max(l1["x1"], l1["x2"])
-            min2, max2 = min(l2["x1"], l2["x2"]), max(l2["x1"], l2["x2"])
-            overlap = min(max1, max2) - max(min1, min2)
-            min_len = min(max1 - min1, max2 - min2)
-            if min_len < 1 or overlap / min_len < 0.7:
-                continue
-            dist = abs(l1["y1"] - l2["y1"])
-            if dist < 50 or dist > 1500:
-                continue
-            if best_dist is None or dist < best_dist:
-                best_dist = dist
-                best_j = j
-        if best_j is not None:
-            l2 = lines[best_j]
-            x_start = (min(l1["x1"], l1["x2"]) + min(l2["x1"], l2["x2"])) / 2
-            x_end = (max(l1["x1"], l1["x2"]) + max(l2["x1"], l2["x2"])) / 2
-            cy = (l1["y1"] + l2["y1"]) / 2
-            pairs.append({
-                "dir": "H", "main_s": x_start, "main_e": x_end,
-                "perp": cy, "z": l1["z"],
-                "width": round(abs(l1["y1"] - l2["y1"]))
-            })
-            used.add(i)
-            used.add(best_j)
-    return pairs
-
-
-def _pair_lines_v(lines):
-    """Pair vertical CAD lines to find beam centerlines and widths."""
-    pairs = []
-    used = set()
-    for i, l1 in enumerate(lines):
-        if i in used:
-            continue
-        best_j, best_dist = None, None
-        for j, l2 in enumerate(lines):
-            if j <= i or j in used:
-                continue
-            min1, max1 = min(l1["y1"], l1["y2"]), max(l1["y1"], l1["y2"])
-            min2, max2 = min(l2["y1"], l2["y2"]), max(l2["y1"], l2["y2"])
-            overlap = min(max1, max2) - max(min1, min2)
-            min_len = min(max1 - min1, max2 - min2)
-            if min_len < 1 or overlap / min_len < 0.7:
-                continue
-            dist = abs(l1["x1"] - l2["x1"])
-            if dist < 50 or dist > 1500:
-                continue
-            if best_dist is None or dist < best_dist:
-                best_dist = dist
-                best_j = j
-        if best_j is not None:
-            l2 = lines[best_j]
-            y_start = (min(l1["y1"], l1["y2"]) + min(l2["y1"], l2["y2"])) / 2
-            y_end = (max(l1["y1"], l1["y2"]) + max(l2["y1"], l2["y2"])) / 2
-            cx = (l1["x1"] + l2["x1"]) / 2
-            pairs.append({
-                "dir": "V", "main_s": y_start, "main_e": y_end,
-                "perp": cx, "z": l1["z"],
-                "width": round(abs(l1["x1"] - l2["x1"]))
-            })
-            used.add(i)
-            used.add(best_j)
-    return pairs
-
-
-def _get_height_for_width(w):
-    """Map beam width (mm) to standard height."""
-    if w <= 200:
-        return 500
-    if w <= 250:
-        return 600
-    if w <= 300:
-        return 600
-    if w <= 400:
-        return 800
-    if w <= 500:
-        return 1000
-    return w * 2
-
-
-# ===========================================================================
-# MEP — TYPE COLLECTION
-# ===========================================================================
-
-def _collect_types_by_class(doc, cls):
-    """Collect element types of a class as [{id, name, element}] sorted by name."""
-    results = []
-    try:
-        collector = FilteredElementCollector(doc).OfClass(cls)
-        for el in collector:
-            try:
-                name = DB.Element.Name.GetValue(el)
-                results.append({"id": el.Id, "name": name or "Unknown", "element": el})
-            except Exception:
-                pass
-    except Exception:
-        pass
-    results.sort(key=lambda x: x["name"])
-    return results
-
-
-def _collect_system_types(doc, cls):
-    """Collect MEP system types of a given subclass, sorted by name."""
-    results = []
-    try:
-        collector = FilteredElementCollector(doc).OfClass(DB.MEPSystemType)
-        for st in collector:
-            try:
-                if isinstance(st, cls):
-                    name = DB.Element.Name.GetValue(st)
-                    results.append({"id": st.Id, "name": name or "Unknown", "element": st})
-            except Exception:
-                pass
-    except Exception:
-        pass
-    results.sort(key=lambda x: x["name"])
-    return results
-
-
-def get_duct_types(doc):
-    """All duct types (rectangular / round / oval) sorted by name."""
-    return _collect_types_by_class(doc, DB.Mechanical.DuctType)
-
-
-def get_mech_system_types(doc):
-    """Mechanical system types (Supply / Return / Exhaust Air)."""
-    return _collect_system_types(doc, DB.Mechanical.MechanicalSystemType)
-
-
-def get_pipe_types(doc):
-    """All pipe types sorted by name."""
-    return _collect_types_by_class(doc, DB.Plumbing.PipeType)
-
-
-def get_piping_system_types(doc):
-    """Piping system types (Domestic / Sanitary / Hydronic ...)."""
-    return _collect_system_types(doc, DB.Plumbing.PipingSystemType)
-
-
-def get_cabletray_types(doc):
-    """All cable tray types sorted by name."""
-    return _collect_types_by_class(doc, DB.Electrical.CableTrayType)
-
-
-def get_conduit_types(doc):
-    """All conduit types sorted by name."""
-    return _collect_types_by_class(doc, DB.Electrical.ConduitType)
-
-
-# ===========================================================================
-# MEP — CREATION
-# ===========================================================================
-
-MEP_TX_NAMES = {
-    "duct": "T3Lab: CAD to Duct",
-    "pipe": "T3Lab: CAD to Pipe",
-    "tray": "T3Lab: CAD to Cable Tray",
-    "conduit": "T3Lab: CAD to Conduit",
-}
-
-
-def _set_param_ft(elem, bip, value_ft):
-    """Set a BuiltInParameter (feet) if present and writable. True on success."""
-    try:
-        p = elem.get_Parameter(bip)
-        if p and not p.IsReadOnly:
-            p.Set(value_ft)
-            return True
-    except Exception:
-        pass
-    return False
-
-
-def _set_mep_size(elem, category_key, width_ft, height_ft):
-    """Best-effort sizing — sets whichever size parameters the instance exposes.
-
-    Ducts: rectangular/oval types expose width+height params, round types a
-    diameter param — the created instance tells us its shape, so no
-    MEPCurveType.Shape lookup is needed. Pipe and conduit diameters snap to
-    their segment/size catalogs and may reject off-catalog values.
-    Returns True if the requested size was applied; callers count a False
-    as 'size not applied' and the element keeps its type default size.
-    """
-    if not width_ft:
-        return True
-    if category_key == "duct":
-        if _set_param_ft(elem, DB.BuiltInParameter.RBS_CURVE_WIDTH_PARAM, width_ft):
-            if height_ft:
-                _set_param_ft(elem, DB.BuiltInParameter.RBS_CURVE_HEIGHT_PARAM, height_ft)
-            return True
-        # Round duct — the width input drives the diameter
-        return _set_param_ft(elem, DB.BuiltInParameter.RBS_CURVE_DIAMETER_PARAM, width_ft)
-    if category_key == "pipe":
-        return _set_param_ft(elem, DB.BuiltInParameter.RBS_PIPE_DIAMETER_PARAM, width_ft)
-    if category_key == "tray":
-        ok_w = _set_param_ft(elem, DB.BuiltInParameter.RBS_CABLETRAY_WIDTH_PARAM, width_ft)
-        ok_h = True
-        if height_ft:
-            ok_h = _set_param_ft(elem, DB.BuiltInParameter.RBS_CABLETRAY_HEIGHT_PARAM, height_ft)
-        return ok_w and ok_h
-    if category_key == "conduit":
-        return _set_param_ft(elem, DB.BuiltInParameter.RBS_CONDUIT_DIAMETER_PARAM, width_ft)
-    return False
-
-
-def _nearest_end_connector(elem, point, tol_ft):
-    """Nearest unconnected end connector of an MEP curve within tol_ft of point."""
-    best = None
-    best_dist = None
-    try:
-        for c in elem.ConnectorManager.Connectors:
-            try:
-                if c.ConnectorType != DB.ConnectorType.End:
-                    continue
-                if c.IsConnected:
-                    continue
-                dist = c.Origin.DistanceTo(point)
-                if dist <= tol_ft and (best_dist is None or dist < best_dist):
-                    best = c
-                    best_dist = dist
-            except Exception:
-                pass
-    except Exception:
-        pass
-    return best
-
-
-def connect_with_elbows(doc, created_items, tol_ft=0.03):
-    """Best-effort elbow placement at shared endpoints of created MEP curves.
-
-    created_items: [{"elem": MEPCurve, "p0": XYZ, "p1": XYZ}]. Skips T/X
-    junctions (3+ segment ends at one point) and near-collinear joints.
-    Every corner attempt is individually guarded so a failed fitting (no
-    elbow in the type's routing preferences, unsupported angle) never aborts
-    the enclosing transaction. Returns (placed, skipped).
-    """
-    placed = 0
-    skipped = 0
-    try:
-        ends = []
-        for idx, item in enumerate(created_items):
-            p0 = item["p0"]
-            p1 = item["p1"]
-            if p0.DistanceTo(p1) < TOLERANCE:
-                continue
-            d = (p1 - p0).Normalize()
-            ends.append({"idx": idx, "pt": p0, "away": d})
-            ends.append({"idx": idx, "pt": p1, "away": d.Negate()})
-
-        used = [False] * len(ends)
-        for i in range(len(ends)):
-            if used[i]:
-                continue
-            group = [i]
-            for j in range(i + 1, len(ends)):
-                if not used[j] and ends[i]["pt"].DistanceTo(ends[j]["pt"]) <= tol_ft:
-                    group.append(j)
-            if len(group) < 2:
-                continue
-            for g in group:
-                used[g] = True
-            if len(group) > 2:
-                skipped += 1  # T/X junction — connect manually in Revit
-                continue
-            a = ends[group[0]]
-            b = ends[group[1]]
-            if a["idx"] == b["idx"]:
-                continue
-            dot = a["away"].DotProduct(b["away"])
-            if abs(dot) > 0.985:
-                skipped += 1  # straight continuation or fold-back — no elbow possible
-                continue
-            c1 = _nearest_end_connector(created_items[a["idx"]]["elem"], a["pt"], tol_ft)
-            c2 = _nearest_end_connector(created_items[b["idx"]]["elem"], b["pt"], tol_ft)
-            if not c1 or not c2:
-                skipped += 1
-                continue
-            try:
-                doc.Create.NewElbowFitting(c1, c2)
-                placed += 1
-            except Exception:
-                skipped += 1
-    except Exception:
-        pass
-    return placed, skipped
-
-
-def create_mep_runs(doc, category_key, segments, level_id, offset_ft,
-                    type_id, system_type_id=None,
-                    width_ft=None, height_ft=None, auto_elbow=True):
-    """Create one MEP category's runs inside a single transaction.
-
-    segments: [{"start": XYZ, "end": XYZ, "width_ft": float or None}] —
-    a per-segment width (from double-line detection) overrides width_ft.
-    Only the CAD XY is used; Z = level elevation + offset_ft.
-    Returns (created, failed, skipped, size_failed, elbow_placed, elbow_skipped).
-    """
-    created = 0
-    failed = 0
-    skipped = 0
-    size_failed = 0
-    elbow_placed = 0
-    elbow_skipped = 0
-
-    level = doc.GetElement(level_id)
-    z_ft = level.Elevation + offset_ft
-
-    t = Transaction(doc, MEP_TX_NAMES.get(category_key, "T3Lab: CAD to MEP"))
-    t.Start()
-    try:
-        created_items = []
-        for seg in segments:
-            try:
-                s = seg["start"]
-                e = seg["end"]
-                p0 = XYZ(s.X, s.Y, z_ft)
-                p1 = XYZ(e.X, e.Y, z_ft)
-                if p0.DistanceTo(p1) < TOLERANCE:
-                    skipped += 1
-                    continue
-                if category_key == "duct":
-                    elem = DB.Mechanical.Duct.Create(
-                        doc, system_type_id, type_id, level_id, p0, p1)
-                elif category_key == "pipe":
-                    elem = DB.Plumbing.Pipe.Create(
-                        doc, system_type_id, type_id, level_id, p0, p1)
-                elif category_key == "tray":
-                    elem = DB.Electrical.CableTray.Create(
-                        doc, type_id, p0, p1, level_id)
-                elif category_key == "conduit":
-                    elem = DB.Electrical.Conduit.Create(
-                        doc, type_id, p0, p1, level_id)
-                else:
-                    skipped += 1
-                    continue
-                if not elem:
-                    failed += 1
-                    continue
-                w = seg.get("width_ft") or width_ft
-                try:
-                    if not _set_mep_size(elem, category_key, w, height_ft):
-                        size_failed += 1
-                except Exception:
-                    size_failed += 1
-                created_items.append({"elem": elem, "p0": p0, "p1": p1})
-                created += 1
-            except Exception:
-                failed += 1
-
-        if auto_elbow and len(created_items) >= 2:
-            try:
-                # Connector origins are only reliable after sizes are applied
-                doc.Regenerate()
-            except Exception:
-                pass
-            elbow_placed, elbow_skipped = connect_with_elbows(doc, created_items)
-
-        if created > 0:
-            status = t.Commit()
-            if status != DB.TransactionStatus.Committed:
-                print("MEP transaction did not commit, status: {}".format(status))
-                return 0, created + failed, skipped, 0, 0, 0
-        else:
-            t.RollBack()
-    except Exception as ex:
-        if t.HasStarted() and not t.HasEnded():
-            t.RollBack()
-        print("MEP transaction error: {}".format(str(ex)))
-        return 0, created + failed, skipped, size_failed, 0, 0
-
-    return created, failed, skipped, size_failed, elbow_placed, elbow_skipped
-
-
-# UI configuration per MEP category — drives the shared _run_mep flow.
-MEP_UI_CONFIG = {
-    "duct": {
-        "title": "CAD to Duct", "noun": "ducts", "type_label": "duct type",
-        "double": True, "system": True,
-        "type_combo": "cmb_duct_type",
-        "width_box": "txt_duct_width", "default_width": 300.0,
-        "height_box": "txt_duct_height", "default_height": 250.0,
-        "offset_box": "txt_duct_offset", "default_offset": 2800.0,
-        "elbow_chk": "chk_duct_elbows", "merge_chk": "chk_duct_merge",
-    },
-    "pipe": {
-        "title": "CAD to Pipe", "noun": "pipes", "type_label": "pipe type",
-        "double": False, "system": True,
-        "type_combo": "cmb_pipe_type",
-        "width_box": "txt_pipe_diameter", "default_width": 100.0,
-        "height_box": None, "default_height": None,
-        "offset_box": "txt_pipe_offset", "default_offset": 2600.0,
-        "elbow_chk": "chk_pipe_elbows", "merge_chk": "chk_pipe_merge",
-    },
-    "tray": {
-        "title": "CAD to Cable Tray", "noun": "cable trays", "type_label": "cable tray type",
-        "double": True, "system": False,
-        "type_combo": "cmb_tray_type",
-        "width_box": "txt_tray_width", "default_width": 300.0,
-        "height_box": "txt_tray_height", "default_height": 100.0,
-        "offset_box": "txt_tray_offset", "default_offset": 2700.0,
-        "elbow_chk": "chk_tray_elbows", "merge_chk": "chk_tray_merge",
-    },
-    "conduit": {
-        "title": "CAD to Conduit", "noun": "conduits", "type_label": "conduit type",
-        "double": False, "system": False,
-        "type_combo": "cmb_conduit_type",
-        "width_box": "txt_conduit_diameter", "default_width": 25.0,
-        "height_box": None, "default_height": None,
-        "offset_box": "txt_conduit_offset", "default_offset": 2700.0,
-        "elbow_chk": "chk_conduit_elbows", "merge_chk": "chk_conduit_merge",
-    },
-}
-
-# MEP double-line detection: cap the parallel-pair separation at 2500 mm
-MEP_MAX_PAIR_SEP_MM = 2500.0
-
-
-# ===========================================================================
-# LAYER DATA (Floor)
-# ===========================================================================
-
-class LayerData(object):
-    def __init__(self, name, closed_loops, all_curves_count):
-        self.name = name
-        self.closed_loops = closed_loops
-        self.all_curves_count = all_curves_count
-        self.closed_count = len(closed_loops)
+    def __init__(self, geom):
+        self.geom = geom
+        self.name = geom.name
         self.is_selected = False
+        self.count = "0"
 
 
-# ===========================================================================
-# WALL WINDOW
-# ===========================================================================
+def _counted(n, noun):
+    """'1 wall' / '3 walls' — nouns are given in the plural."""
+    if n == 1 and noun.endswith("s"):
+        noun = noun[:-1]
+    return u"{} {}".format(n, noun)
 
-class _CADtoWallWindow(ProgressPauseMixin):
-    """Full Wall creation window — loads CadtoWall.xaml and embeds all logic."""
 
-    # ProgressPauseMixin — object-wrapper window; the mixin reaches the
-    # dispatcher through self.window.Dispatcher (see _pp_dispatcher).
-    PP_PANEL      = "wall_progress_panel"
-    PP_BAR        = "wall_pb"
-    PP_PAUSE      = "wall_btn_pause"
-    PP_STOP       = "wall_btn_stop"
-    PP_PAUSE_ICON = "wall_btn_pause_icon"
-    PP_PAUSE_TEXT = "wall_btn_pause_label"
-    PP_STATUS     = "txtStatus"
-    PP_STOP_MSG   = u"Stopping… finishing current wall"
+_ONE_PLURAL = re.compile(r"\b1 ([A-Za-z][A-Za-z ]*?)s\b")
 
-    def __init__(self, doc, uidoc):
-        self.doc = doc
-        self.uidoc = uidoc
 
-        xr = load_xaml_file(_XAML_WALL)
-        self.window = xr
+class Plan(object):
+    """What a run will do — shown in the confirm dialog before anything changes."""
 
-        self.cmbCAD = xr.FindName("cmbCAD")
-        self.cmbLevel = xr.FindName("cmbLevel")
-        self.txtHeight = xr.FindName("txtHeight")
-        self.txtDefaultThk = xr.FindName("txtDefaultThk")
-        self.chkStructural = xr.FindName("chkStructural")
-        self.chkMerge = xr.FindName("chkMerge")
-        self.chkUnpaired = xr.FindName("chkUnpaired")
-        self.chkSelectAll = xr.FindName("chkSelectAll")
-        self.txtSummary = xr.FindName("txtSummary")
-        self.txtSearch = xr.FindName("txtSearch")
-        self.layerPanel = xr.FindName("layerPanel")
-        self.btnRefresh = xr.FindName("btnRefresh")
-        self.btnPreview = xr.FindName("btnPreview")
-        self.btnCreate = xr.FindName("btnCreate")
-        self.btnClose = xr.FindName("btnClose")
-        self.txtStatus = xr.FindName("txtStatus")
+    def __init__(self, count, noun, question, ok_text, details, execute, empty_msg=None):
+        if count == 1:
+            question = _ONE_PLURAL.sub(r"1 \1", question, count=1)
+            ok_text = _ONE_PLURAL.sub(r"1 \1", ok_text, count=1)
+        self.count = count
+        self.noun = noun
+        self.question = question
+        self.ok_text = ok_text
+        self.details = details
+        self.execute = execute
+        self.empty_msg = empty_msg
 
-        # Try optional window control buttons
-        for btn_name, handler in [
-            ("btn_minimize", self._on_minimize),
-            ("btn_maximize", self._on_maximize),
-            ("btn_close_chrome", self._on_close),
-        ]:
-            btn = xr.FindName(btn_name)
-            if btn is not None:
-                btn.Click += handler
-
-        self.cad_list = []
-        self.levels = []
-        self.layer_checkboxes = {}
-
-        if self.cmbCAD is not None:
-            self.cmbCAD.SelectionChanged += self._on_cad_changed
-        if self.chkSelectAll is not None:
-            self.chkSelectAll.Checked += self._on_select_all_checked
-            self.chkSelectAll.Unchecked += self._on_select_all_unchecked
-        if self.txtSearch is not None:
-            self.txtSearch.TextChanged += self._on_search_changed
-        if self.btnRefresh is not None:
-            self.btnRefresh.Click += self._on_refresh
-        if self.btnPreview is not None:
-            self.btnPreview.Click += self._on_preview
-        if self.btnCreate is not None:
-            self.btnCreate.Click += self._on_create
-        if self.btnClose is not None:
-            self.btnClose.Click += self._on_close
-
-        # Progress + Pause/Stop (ProgressPauseMixin)
-        self.wall_progress_panel  = xr.FindName("wall_progress_panel")
-        self.wall_pb              = xr.FindName("wall_pb")
-        self.wall_btn_pause       = xr.FindName("wall_btn_pause")
-        self.wall_btn_pause_icon  = xr.FindName("wall_btn_pause_icon")
-        self.wall_btn_pause_label = xr.FindName("wall_btn_pause_label")
-        self.wall_btn_stop        = xr.FindName("wall_btn_stop")
-        if self.wall_btn_pause is not None:
-            self.wall_btn_pause.Click += self.pause_resume_clicked
-        if self.wall_btn_stop is not None:
-            self.wall_btn_stop.Click += self.stop_clicked
-
-        self._load_data()
-
-    def _status(self, msg):
-        if self.txtStatus is not None:
-            self.txtStatus.Text = str(msg)
-
-    def _load_data(self):
-        self.cad_list = get_cad_instances(self.doc)
-        if self.cmbCAD is None:
-            return
-        self.cmbCAD.Items.Clear()
-        if not self.cad_list:
-            item = ComboBoxItem()
-            item.Content = "No CAD found in model"
-            item.IsEnabled = False
-            self.cmbCAD.Items.Add(item)
-        else:
-            for cad in self.cad_list:
-                item = ComboBoxItem()
-                item.Content = cad["name"]
-                self.cmbCAD.Items.Add(item)
-            self.cmbCAD.SelectedIndex = 0
-
-        self.levels = get_levels(self.doc)
-        if self.cmbLevel is None:
-            return
-        self.cmbLevel.Items.Clear()
-        for lv in self.levels:
-            item = ComboBoxItem()
-            item.Content = "{} (Elev: {} mm)".format(lv["name"], ft_to_mm_str(lv["elevation"]))
-            self.cmbLevel.Items.Add(item)
-        if self.levels:
-            try:
-                av = self.doc.ActiveView
-                alid = av.GenLevel.Id if hasattr(av, "GenLevel") and av.GenLevel else None
-                if alid:
-                    for i, lv in enumerate(self.levels):
-                        if _eid_int(lv["id"]) == _eid_int(alid):
-                            self.cmbLevel.SelectedIndex = i
-                            break
-                    else:
-                        self.cmbLevel.SelectedIndex = 0
-                else:
-                    self.cmbLevel.SelectedIndex = 0
-            except Exception:
-                self.cmbLevel.SelectedIndex = 0
-
-    def _load_layers(self, cad_data):
-        if self.layerPanel is None:
-            return
-        self.layerPanel.Children.Clear()
-        self.layer_checkboxes = {}
-        if not cad_data:
-            return
-        layers = get_cad_layers_wall(self.doc, cad_data["element"])
-        if not layers:
-            tb = TextBlock()
-            tb.Text = "No layers found"
-            tb.FontSize = 11
-            tb.Margin = Thickness(8, 8, 8, 8)
-            self.layerPanel.Children.Add(tb)
-            return
-        for layer_name in layers:
-            border = Border()
-            border.Padding = Thickness(8, 4, 8, 4)
-            border.Margin = Thickness(0, 0, 0, 1)
-            border.Tag = layer_name
-            sp = StackPanel()
-            sp.Orientation = Orientation.Horizontal
-            cb = CheckBox()
-            cb.VerticalContentAlignment = VerticalAlignment.Center
-            cb.Margin = Thickness(0, 0, 8, 0)
-            cb.IsChecked = System.Nullable[System.Boolean](False)
-            cb.Tag = layer_name
-            tb = TextBlock()
-            tb.Text = layer_name
-            tb.FontSize = 11
-            tb.Foreground = SolidColorBrush(Color.FromRgb(51, 51, 51))
-            tb.VerticalAlignment = VerticalAlignment.Center
-            sp.Children.Add(cb)
-            sp.Children.Add(tb)
-            border.Child = sp
-            self.layerPanel.Children.Add(border)
-            self.layer_checkboxes[layer_name] = cb
-        if self.txtSummary is not None:
-            self.txtSummary.Text = "{} layers found. Select layers with wall lines.".format(len(layers))
-
-    def _get_selected_layers(self):
-        selected = []
-        for name, cb in self.layer_checkboxes.items():
-            try:
-                if cb.IsChecked == True:
-                    selected.append(name)
-            except Exception:
-                pass
-        return selected
-
-    def _get_cad(self):
-        if self.cmbCAD is None:
-            return None
-        idx = self.cmbCAD.SelectedIndex
-        if idx < 0 or idx >= len(self.cad_list):
-            return None
-        return self.cad_list[idx]
-
-    def _get_lv(self):
-        if self.cmbLevel is None:
-            return None
-        idx = self.cmbLevel.SelectedIndex
-        if idx < 0 or idx >= len(self.levels):
-            return None
-        return self.levels[idx]
-
-    def _get_height(self):
-        try:
-            return mm_to_ft(float(self.txtHeight.Text.strip()))
-        except Exception:
-            return mm_to_ft(3000)
-
-    def _get_default_thk(self):
-        try:
-            return int(float(self.txtDefaultThk.Text.strip()))
-        except Exception:
-            return 200
-
-    def _chk(self, c):
-        try:
-            return c.IsChecked == True
-        except Exception:
-            return False
-
-    def _process(self):
-        cad = self._get_cad()
-        sel = self._get_selected_layers()
-        lines = extract_lines_from_cad(self.doc, cad["element"], sel)
-        raw = len(lines)
-        if self.chkMerge is not None and self._chk(self.chkMerge):
-            lines = merge_collinear_lines(lines)
-        cl, up = find_parallel_pairs(lines)
-        return cl, up, raw, len(lines)
-
-    def _on_cad_changed(self, sender, args):
-        cad = self._get_cad()
-        if cad:
-            self._load_layers(cad)
-
-    def _on_select_all_checked(self, sender, args):
-        for cb in self.layer_checkboxes.values():
-            cb.IsChecked = System.Nullable[System.Boolean](True)
-
-    def _on_select_all_unchecked(self, sender, args):
-        for cb in self.layer_checkboxes.values():
-            cb.IsChecked = System.Nullable[System.Boolean](False)
-
-    def _on_search_changed(self, sender, args):
-        if self.txtSearch is None or self.layerPanel is None:
-            return
-        txt = self.txtSearch.Text.strip().lower()
-        for i in range(self.layerPanel.Children.Count):
-            child = self.layerPanel.Children[i]
-            if isinstance(child, Border) and child.Tag:
-                name = str(child.Tag).lower()
-                child.Visibility = (Visibility.Visible
-                                    if (not txt or txt in name)
-                                    else Visibility.Collapsed)
-
-    def _on_refresh(self, sender, args):
-        self._load_data()
-        cad = self._get_cad()
-        if cad:
-            self._load_layers(cad)
-
-    def _on_preview(self, sender, args):
-        cad = self._get_cad()
-        if not cad:
-            MessageBox.Show("Select a CAD instance.", "CAD to Wall",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-        sel = self._get_selected_layers()
-        if not sel:
-            MessageBox.Show("Select at least one layer.", "CAD to Wall",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-
-        cl, up, raw, merged_count = self._process()
-        groups = group_by_thickness(cl)
-
-        msg = "Raw lines: {} | After merge: {}\n".format(raw, merged_count)
-        msg += "Parallel pairs: {} centerline walls\n".format(len(cl))
-        msg += "Unpaired lines: {}\n\n".format(len(up))
-
-        if groups:
-            msg += "Wall types to create:\n"
-            for t_mm in sorted(groups.keys()):
-                count = len(groups[t_mm])
-                msg += "  Generic - {}mm : {} walls\n".format(t_mm, count)
-
-        if self.txtSummary is not None:
-            self.txtSummary.Text = msg
-        self._status("Preview: {} wall types, {} total walls".format(len(groups), len(cl)))
-
-    def _on_create(self, sender, args):
-        cad = self._get_cad()
-        if not cad:
-            MessageBox.Show("Select a CAD instance.", "CAD to Wall",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-        sel = self._get_selected_layers()
-        if not sel:
-            MessageBox.Show("Select at least one layer.", "CAD to Wall",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-        lv = self._get_lv()
-        if not lv:
-            MessageBox.Show("Select a Level.", "CAD to Wall",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-        height = self._get_height()
-        if height <= 0:
-            MessageBox.Show("Enter a valid wall height.", "CAD to Wall",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-
-        cl, up, _raw, _merged = self._process()
-        use_up = self.chkUnpaired is not None and self._chk(self.chkUnpaired)
-        total = len(cl) + (len(up) if use_up else 0)
-        if total == 0:
-            MessageBox.Show("No lines found.", "CAD to Wall",
-                            MessageBoxButton.OK, MessageBoxImage.Information)
-            return
-
-        groups = group_by_thickness(cl)
-        msg = "Create walls?\n\n"
-        for t_mm in sorted(groups.keys()):
-            msg += "Generic - {}mm: {} walls\n".format(t_mm, len(groups[t_mm]))
-        if use_up:
-            thk = self._get_default_thk()
-            msg += "\nUnpaired: {} walls (Generic - {}mm)\n".format(len(up), thk)
-        msg += "\nTotal: {} walls\n".format(total)
-        msg += "Level: {}\nHeight: {} mm".format(
-            lv["name"],
-            self.txtHeight.Text.strip() if self.txtHeight is not None else "?"
-        )
-
-        if (MessageBox.Show(msg, "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question)
-                != MessageBoxResult.Yes):
-            return
-
-        structural = self.chkStructural is not None and self._chk(self.chkStructural)
-
-        self.begin_progress(total, disable=[self.btnCreate])
-        def progress_cb(current, total_):
-            self.step_progress(current, "Creating wall {}/{}...".format(current + 1, total_))
-        created, failed, skipped, types_created = create_walls_auto(
-            self.doc, cl, up, lv["id"], height, use_up, self._get_default_thk(), structural,
-            progress_callback=progress_cb, cancel_check=lambda: self.is_cancelled)
-        cancelled = self.is_cancelled
-        self.end_progress()
-
-        result_msg = ("Cancelled — created: {} walls\n".format(created)
-                      if cancelled else "Created: {} walls\n".format(created))
-        if failed > 0:
-            result_msg += "Failed: {}\n".format(failed)
-        if skipped > 0:
-            result_msg += "Skipped: {}\n".format(skipped)
-        if types_created:
-            result_msg += "\nWall types created/used:\n"
-            for tn in types_created:
-                result_msg += "  {}\n".format(tn)
-
-        if self.txtSummary is not None:
-            self.txtSummary.Text = "Done: {} walls, {} types".format(created, len(types_created))
-        self._status("Done: {} created, {} failed".format(created, failed))
-        MessageBox.Show(result_msg, "CAD to Wall",
-                        MessageBoxButton.OK, MessageBoxImage.Information)
-
-    def _on_minimize(self, sender, args):
-        self.window.WindowState = WindowState.Minimized
-
-    def _on_maximize(self, sender, args):
-        if self.window.WindowState == WindowState.Maximized:
-            self.window.WindowState = WindowState.Normal
-        else:
-            self.window.WindowState = WindowState.Maximized
-
-    def _on_close(self, sender, args):
-        self.window.Close()
-
-    def show(self):
-        self.window.ShowDialog()
-
-
-# ===========================================================================
-# FLOOR WINDOW
-# ===========================================================================
-
-class _CADtoFloorWindow(ProgressPauseMixin):
-    """Full Floor/Part creation window — loads CadtoFloor.xaml and embeds all logic."""
-
-    # ProgressPauseMixin — object-wrapper window (dispatcher via self.window)
-    PP_PANEL      = "floor_progress_panel"
-    PP_BAR        = "floor_pb"
-    PP_PAUSE      = "floor_btn_pause"
-    PP_STOP       = "floor_btn_stop"
-    PP_PAUSE_ICON = "floor_btn_pause_icon"
-    PP_PAUSE_TEXT = "floor_btn_pause_label"
-    PP_STATUS     = "txt_status"
-    PP_STOP_MSG   = u"Stopping… finishing current loop"
-
-    def __init__(self, doc, uidoc):
-        self.doc = doc
-        self.uidoc = uidoc
-
-        xr = load_xaml_file(_XAML_FLOOR)
-        self.window = xr
-
-        def _n(name):
-            return xr.FindName(name)
-
-        self.rb_floor = _n("rb_floor")
-        self.rb_part = _n("rb_part")
-        self.cmb_cad_files = _n("cmb_cad_files")
-        self.btn_pick_cad = _n("btn_pick_cad")
-        self.btn_scan = _n("btn_scan")
-        self.cmb_levels = _n("cmb_levels")
-        self.pnl_floor_type_row = _n("pnl_floor_type_row")
-        self.cmb_floor_types = _n("cmb_floor_types")
-        self.pnl_part_row1 = _n("pnl_part_row1")
-        self.pnl_part_row2 = _n("pnl_part_row2")
-        self.cmb_ds_category = _n("cmb_ds_category")
-        self.txt_thickness = _n("txt_thickness")
-        self.txt_offset = _n("txt_offset")
-        self.chk_structural = _n("chk_structural")
-        self.txt_total_layers = _n("txt_total_layers")
-        self.txt_selected_layers = _n("txt_selected_layers")
-        self.txt_total_curves = _n("txt_total_curves")
-        self.txt_elements_created = _n("txt_elements_created")
-        self.lbl_created = _n("lbl_created")
-        self.txt_search = _n("txt_search")
-        self.btn_select_all = _n("btn_select_all")
-        self.btn_select_none = _n("btn_select_none")
-        self.pnl_layers = _n("pnl_layers")
-        self.txt_status = _n("txt_status")
-        self.btn_refresh = _n("btn_refresh")
-        self.btn_create = _n("btn_create")
-        self.btn_close = _n("btn_close")
-
-        # Window chrome controls
-        for btn_name, handler in [
-            ("btn_minimize", self._on_minimize),
-            ("btn_maximize", self._on_maximize),
-            ("btn_close_chrome", self._on_close),
-        ]:
-            btn = _n(btn_name)
-            if btn is not None:
-                btn.Click += handler
-
-        self.cad_instances = []
-        self.floor_types = []
-        self.levels = []
-        self.ds_categories = get_ds_categories()
-        self.layer_data = []
-        self.layer_checkboxes = []
-        self.elements_created_count = 0
-        self.current_mode = MODE_FLOOR
-        self._pick_element_id = None
-
-        if self.btn_pick_cad is not None:
-            self.btn_pick_cad.Click += self._on_pick_cad
-        if self.btn_scan is not None:
-            self.btn_scan.Click += self._on_scan_layers
-        if self.txt_search is not None:
-            self.txt_search.TextChanged += self._on_search_changed
-        if self.btn_select_all is not None:
-            self.btn_select_all.Click += self._on_select_all
-        if self.btn_select_none is not None:
-            self.btn_select_none.Click += self._on_select_none
-        if self.btn_refresh is not None:
-            self.btn_refresh.Click += self._on_refresh
-        if self.btn_create is not None:
-            self.btn_create.Click += self._on_create_elements
-        if self.btn_close is not None:
-            self.btn_close.Click += self._on_close
-        if self.rb_floor is not None:
-            self.rb_floor.Checked += self._on_mode_changed
-        if self.rb_part is not None:
-            self.rb_part.Checked += self._on_mode_changed
-
-        # Progress + Pause/Stop (ProgressPauseMixin)
-        self.floor_progress_panel  = _n("floor_progress_panel")
-        self.floor_pb              = _n("floor_pb")
-        self.floor_btn_pause       = _n("floor_btn_pause")
-        self.floor_btn_pause_icon  = _n("floor_btn_pause_icon")
-        self.floor_btn_pause_label = _n("floor_btn_pause_label")
-        self.floor_btn_stop        = _n("floor_btn_stop")
-        if self.floor_btn_pause is not None:
-            self.floor_btn_pause.Click += self.pause_resume_clicked
-        if self.floor_btn_stop is not None:
-            self.floor_btn_stop.Click += self.stop_clicked
-
-        self._load_cad_files()
-        self._load_floor_types()
-        self._load_levels()
-        self._load_ds_categories()
-        self._update_mode_ui()
-
-    def _update_status(self, msg):
-        if self.txt_status is not None:
-            self.txt_status.Text = str(msg)
-
-    def _update_mode_ui(self):
-        if self.rb_floor is not None and safe_bool(self.rb_floor.IsChecked):
-            self.current_mode = MODE_FLOOR
-            if self.pnl_floor_type_row is not None:
-                self.pnl_floor_type_row.Visibility = Visibility.Visible
-            if self.pnl_part_row1 is not None:
-                self.pnl_part_row1.Visibility = Visibility.Collapsed
-            if self.pnl_part_row2 is not None:
-                self.pnl_part_row2.Visibility = Visibility.Collapsed
-            if self.chk_structural is not None:
-                self.chk_structural.Visibility = Visibility.Visible
-            if self.btn_create is not None:
-                self.btn_create.Content = "Create Floors"
-            if self.lbl_created is not None:
-                self.lbl_created.Text = "Floors Created"
-        else:
-            self.current_mode = MODE_PART
-            if self.pnl_floor_type_row is not None:
-                self.pnl_floor_type_row.Visibility = Visibility.Collapsed
-            if self.pnl_part_row1 is not None:
-                self.pnl_part_row1.Visibility = Visibility.Visible
-            if self.pnl_part_row2 is not None:
-                self.pnl_part_row2.Visibility = Visibility.Visible
-            if self.chk_structural is not None:
-                self.chk_structural.Visibility = Visibility.Collapsed
-            if self.btn_create is not None:
-                self.btn_create.Content = "Create Parts"
-            if self.lbl_created is not None:
-                self.lbl_created.Text = "Parts Created"
-
-    def _update_summary(self):
-        total_layers = len(self.layer_data)
-        selected = 0
-        for _, ld in self.layer_checkboxes:
-            if ld.is_selected:
-                selected += 1
-        total_closed = sum(ld.closed_count for ld in self.layer_data)
-
-        if self.txt_total_layers is not None:
-            self.txt_total_layers.Text = str(total_layers)
-        if self.txt_selected_layers is not None:
-            self.txt_selected_layers.Text = str(selected)
-        if self.txt_total_curves is not None:
-            self.txt_total_curves.Text = str(total_closed)
-        if self.txt_elements_created is not None:
-            self.txt_elements_created.Text = str(self.elements_created_count)
-        if self.btn_create is not None:
-            self.btn_create.IsEnabled = selected > 0
-
-    def _load_cad_files(self):
-        self.cad_instances = get_cad_instances(self.doc)
-        if self.cmb_cad_files is None:
-            return
-        self.cmb_cad_files.Items.Clear()
-
-        if not self.cad_instances:
-            self.cmb_cad_files.Items.Add("No CAD files found in model")
-            self.cmb_cad_files.SelectedIndex = 0
-            self.cmb_cad_files.IsEnabled = False
-            if self.btn_scan is not None:
-                self.btn_scan.IsEnabled = False
-            self._update_status("No linked/imported CAD files found.")
-            return
-
-        for cad in self.cad_instances:
-            prefix = "[Linked]" if cad["is_linked"] else "[Imported]"
-            display = "{} {} (ID: {})".format(prefix, cad["name"], str(cad["id"]))
-            self.cmb_cad_files.Items.Add(display)
-
-        self.cmb_cad_files.IsEnabled = True
-        if self.btn_scan is not None:
-            self.btn_scan.IsEnabled = True
-        self.cmb_cad_files.SelectedIndex = 0
-        self._update_status("{} CAD file(s) found. Select one and click 'Scan Layers'.".format(
-            len(self.cad_instances)))
-
-    def _load_floor_types(self):
-        self.floor_types = get_floor_types(self.doc)
-        if self.cmb_floor_types is None:
-            return
-        self.cmb_floor_types.Items.Clear()
-        for ft in self.floor_types:
-            self.cmb_floor_types.Items.Add(ft["name"])
-        if self.floor_types:
-            self.cmb_floor_types.SelectedIndex = 0
-
-    def _load_levels(self):
-        self.levels = get_levels(self.doc)
-        if self.cmb_levels is None:
-            return
-        self.cmb_levels.Items.Clear()
-        for lvl in self.levels:
-            elev_mm = str(int(round(lvl["elevation"] * FT_TO_MM)))
-            display = "{} ({} mm)".format(lvl["name"], elev_mm)
-            self.cmb_levels.Items.Add(display)
-        if self.levels:
-            self.cmb_levels.SelectedIndex = 0
-
-    def _load_ds_categories(self):
-        if self.cmb_ds_category is None:
-            return
-        self.cmb_ds_category.Items.Clear()
-        for cat in self.ds_categories:
-            self.cmb_ds_category.Items.Add(cat["name"])
-        if self.ds_categories:
-            self.cmb_ds_category.SelectedIndex = 0
-
-    def _scan_layers(self, cad_instance):
-        self.layer_data = []
-        self._update_status("Scanning CAD layers...")
-
-        try:
-            layers_geom = get_cad_layer_geometry_floor(self.doc, cad_instance)
-            for layer_name, data in sorted(layers_geom.items()):
-                closed_loops = list(data.get("closed_loops", []))
-                all_curves_count = data.get("all_curves_count", 0)
-                individual_curves = data.get("curves", [])
-                if individual_curves:
-                    extra_loops = try_build_loops_from_curves(individual_curves)
-                    closed_loops.extend(extra_loops)
-                ld = LayerData(layer_name, closed_loops, all_curves_count)
-                self.layer_data.append(ld)
-        except Exception as ex:
-            self._update_status("Error scanning: {}".format(str(ex)))
-
-        self._render_layers()
-        self._update_summary()
-
-        total_closed = sum(ld.closed_count for ld in self.layer_data)
-        self._update_status("Found {} layers with {} closed loops.".format(
-            len(self.layer_data), total_closed))
-
-    def _render_layers(self, filter_text=""):
-        if self.pnl_layers is None:
-            return
-        self.pnl_layers.Children.Clear()
-        self.layer_checkboxes = []
-        filter_lower = filter_text.lower().strip()
-
-        for ld in self.layer_data:
-            if filter_lower and filter_lower not in ld.name.lower():
-                continue
-            try:
-                with codecs.open(_XAML_FLOOR_ITEM, "r", "utf-8") as f:
-                    item_content = f.read()
-                border = load_xaml_string(item_content)
-                chk = border.FindName("chk")
-                txt_name = border.FindName("txt_name")
-                txt_closed = border.FindName("txt_closed")
-                txt_total = border.FindName("txt_total")
-
-                if txt_name is not None:
-                    txt_name.Text = ld.name
-                if txt_closed is not None:
-                    txt_closed.Text = str(ld.closed_count)
-                if txt_total is not None:
-                    txt_total.Text = str(ld.all_curves_count)
-                if chk is not None:
-                    chk.IsChecked = ld.is_selected
-
-                try:
-                    bc = BrushConverter()
-                    if ld.closed_count > 0:
-                        if txt_name is not None:
-                            txt_name.FontWeight = FontWeights.SemiBold
-                        if txt_closed is not None:
-                            txt_closed.Foreground = bc.ConvertFromString("#10B981")
-                    else:
-                        if txt_closed is not None:
-                            txt_closed.Foreground = bc.ConvertFromString("#CCC")
-                except Exception:
-                    pass
-
-                def make_chk_handler(layer_data, checkbox):
-                    def handler(sender, args):
-                        layer_data.is_selected = safe_bool(checkbox.IsChecked)
-                        self._update_summary()
-                    return handler
-
-                if chk is not None:
-                    h = make_chk_handler(ld, chk)
-                    chk.Checked += h
-                    chk.Unchecked += h
-
-                def make_border_handler(checkbox):
-                    def handler(sender, args):
-                        try:
-                            src = args.OriginalSource
-                            if src != checkbox:
-                                checkbox.IsChecked = not safe_bool(checkbox.IsChecked)
-                        except Exception:
-                            pass
-                    return handler
-
-                if chk is not None:
-                    border.MouseLeftButtonUp += make_border_handler(chk)
-
-                def make_enter(brd):
-                    def handler(s, e):
-                        try:
-                            bc2 = BrushConverter()
-                            brd.Background = bc2.ConvertFromString("#FFF5E0")
-                            brd.BorderBrush = bc2.ConvertFromString("#0F172A")
-                        except Exception:
-                            pass
-                    return handler
-
-                def make_leave(brd):
-                    def handler(s, e):
-                        try:
-                            bc2 = BrushConverter()
-                            brd.Background = bc2.ConvertFromString("Transparent")
-                            brd.BorderBrush = bc2.ConvertFromString("Transparent")
-                        except Exception:
-                            pass
-                    return handler
-
-                border.MouseEnter += make_enter(border)
-                border.MouseLeave += make_leave(border)
-
-                self.pnl_layers.Children.Add(border)
-                self.layer_checkboxes.append((chk, ld))
-            except Exception:
-                pass
-
-        self._update_summary()
-
-    # --- Event handlers ---
-
-    def _on_mode_changed(self, sender, args):
-        self._update_mode_ui()
-
-    def _on_pick_cad(self, sender, args):
-        self._pick_element_id = "PICK_REQUESTED"
-        self.window.Close()
-
-    def _on_scan_layers(self, sender, args):
-        if self.cmb_cad_files is None:
-            return
-        idx = self.cmb_cad_files.SelectedIndex
-        if idx < 0 or idx >= len(self.cad_instances):
-            MessageBox.Show("Please select a CAD file first.", "CAD to Floor/Part",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-        cad = self.cad_instances[idx]
-        self._scan_layers(cad["element"])
-
-    def _on_search_changed(self, sender, args):
-        if self.txt_search is not None:
-            self._render_layers(self.txt_search.Text)
-
-    def _on_select_all(self, sender, args):
-        for chk, ld in self.layer_checkboxes:
-            if chk is not None:
-                chk.IsChecked = True
-            ld.is_selected = True
-        self._update_summary()
-
-    def _on_select_none(self, sender, args):
-        for chk, ld in self.layer_checkboxes:
-            if chk is not None:
-                chk.IsChecked = False
-            ld.is_selected = False
-        self._update_summary()
-
-    def _on_refresh(self, sender, args):
-        self.elements_created_count = 0
-        self._load_cad_files()
-        self._load_floor_types()
-        self._load_levels()
-        self._load_ds_categories()
-        self.layer_data = []
-        self.layer_checkboxes = []
-        if self.pnl_layers is not None:
-            self.pnl_layers.Children.Clear()
-        self._update_summary()
-        self._update_status("Refreshed.")
-
-    def _on_create_elements(self, sender, args):
-        selected_layers = [ld for _, ld in self.layer_checkboxes if ld.is_selected]
-
-        if not selected_layers:
-            MessageBox.Show("No layers selected.", "CAD to Floor/Part",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-
-        total_loops = sum(ld.closed_count for ld in selected_layers)
-
-        if total_loops == 0:
-            MessageBox.Show(
-                "Selected layers have no closed loops.\nOnly closed polylines can be converted.",
-                "CAD to Floor/Part", MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-
-        if self.cmb_levels is None:
-            return
-        lvl_idx = self.cmb_levels.SelectedIndex
-        if lvl_idx < 0 or lvl_idx >= len(self.levels):
-            MessageBox.Show("Please select a Level.", "CAD to Floor/Part",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-        level_id = self.levels[lvl_idx]["id"]
-
-        try:
-            offset_mm = float(self.txt_offset.Text) if self.txt_offset is not None else 0.0
-        except (ValueError, TypeError):
-            offset_mm = 0.0
-
-        if self.current_mode == MODE_FLOOR:
-            self._create_floors(selected_layers, total_loops, level_id, offset_mm)
-        else:
-            self._create_parts(selected_layers, total_loops, level_id, offset_mm)
-
-    def _create_floors(self, selected_layers, total_loops, level_id, offset_mm):
-        if self.cmb_floor_types is None:
-            return
-        ft_idx = self.cmb_floor_types.SelectedIndex
-        if ft_idx < 0 or ft_idx >= len(self.floor_types):
-            MessageBox.Show("Please select a Floor Type.", "CAD to Floor",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-        floor_type_id = self.floor_types[ft_idx]["id"]
-        is_structural = self.chk_structural is not None and safe_bool(self.chk_structural.IsChecked)
-
-        msg = "Create FLOORS from {} layer(s) with {} loop(s)?\n\n".format(
-            len(selected_layers), total_loops)
-        if self.cmb_levels is not None:
-            lvl_idx = self.cmb_levels.SelectedIndex
-            msg += "Floor Type: {}\n".format(self.floor_types[ft_idx]["name"])
-            if lvl_idx >= 0 and lvl_idx < len(self.levels):
-                msg += "Level: {}\n".format(self.levels[lvl_idx]["name"])
-        msg += "Offset: {} mm".format(offset_mm)
-
-        result = MessageBox.Show(msg, "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question)
-        if result != MessageBoxResult.Yes:
-            return
-
-        self._update_status("Creating floors...")
-        created = 0
-        failed = 0
-
-        self.begin_progress(total_loops, disable=[self.btn_create])
-        t = Transaction(self.doc, "T3Lab: CAD to Floor")
-        t.Start()
-        try:
-            _done = 0
-            for ld in selected_layers:
-                if self.is_cancelled:
-                    break
-                for loop in ld.closed_loops:
-                    if self.is_cancelled:
-                        break
-                    self.step_progress(_done, "Creating floor {}/{}...".format(_done + 1, total_loops))
-                    _done += 1
-                    try:
-                        floor = create_floor_from_loop(
-                            self.doc, loop, floor_type_id, level_id, offset_mm, is_structural)
-                        if floor:
-                            created += 1
-                        else:
-                            failed += 1
-                    except Exception:
-                        failed += 1
-
-            cancelled = self.is_cancelled
-            if created > 0:
-                t.Commit()
-                self.elements_created_count += created
-                self._update_summary()
-                _verb = "Cancelled — created" if cancelled else "Created"
-                self._update_status("{} {} floor(s). {} failed.".format(_verb, created, failed))
-                MessageBox.Show("{}: {} floor(s)\nFailed: {}".format(_verb, created, failed),
-                                "Result", MessageBoxButton.OK, MessageBoxImage.Information)
-            else:
-                t.RollBack()
-                self._update_status("No floors created.")
-                MessageBox.Show("Failed to create any floors.", "Error",
-                                MessageBoxButton.OK, MessageBoxImage.Error)
-        except Exception as ex:
-            try:
-                if t.HasStarted() and not t.HasEnded():
-                    t.RollBack()
-            except Exception:
-                pass
-            self._update_status("Error: {}".format(str(ex)))
-        finally:
-            self.end_progress()
-
-    def _create_parts(self, selected_layers, total_loops, level_id, offset_mm):
-        if self.cmb_ds_category is None:
-            return
-        cat_idx = self.cmb_ds_category.SelectedIndex
-        if cat_idx < 0 or cat_idx >= len(self.ds_categories):
-            MessageBox.Show("Please select a Category.", "CAD to Part",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-        category_bic = self.ds_categories[cat_idx]["bic"]
-
-        try:
-            thickness_mm = float(self.txt_thickness.Text) if self.txt_thickness is not None else 200.0
-            if thickness_mm <= 0:
-                MessageBox.Show("Thickness must be > 0.", "CAD to Part",
-                                MessageBoxButton.OK, MessageBoxImage.Warning)
-                return
-        except (ValueError, TypeError):
-            MessageBox.Show("Invalid thickness.", "CAD to Part",
-                            MessageBoxButton.OK, MessageBoxImage.Warning)
-            return
-
-        msg = "Create PARTS from {} layer(s) with {} loop(s)?\n\n".format(
-            len(selected_layers), total_loops)
-        msg += "Category: {}\n".format(self.ds_categories[cat_idx]["name"])
-        msg += "Thickness: {} mm\n".format(thickness_mm)
-        msg += "Offset: {} mm".format(offset_mm)
-
-        result = MessageBox.Show(msg, "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question)
-        if result != MessageBoxResult.Yes:
-            return
-
-        self._update_status("Creating parts...")
-        created = 0
-        failed = 0
-
-        self.begin_progress(total_loops, disable=[self.btn_create])
-        t = Transaction(self.doc, "T3Lab: CAD to Part")
-        t.Start()
-        try:
-            _done = 0
-            for ld in selected_layers:
-                if self.is_cancelled:
-                    break
-                for loop in ld.closed_loops:
-                    if self.is_cancelled:
-                        break
-                    self.step_progress(_done, "Creating part {}/{}...".format(_done + 1, total_loops))
-                    _done += 1
-                    try:
-                        ds = create_part_from_loop(
-                            self.doc, loop, category_bic, level_id, thickness_mm, offset_mm)
-                        if ds:
-                            created += 1
-                        else:
-                            failed += 1
-                    except Exception:
-                        failed += 1
-
-            cancelled = self.is_cancelled
-            if created > 0:
-                t.Commit()
-                self.elements_created_count += created
-                self._update_summary()
-                _verb = "Cancelled — created" if cancelled else "Created"
-                self._update_status("{} {} part(s). {} failed.".format(_verb, created, failed))
-                MessageBox.Show("{}: {} part(s)\nFailed: {}".format(_verb, created, failed),
-                                "Result", MessageBoxButton.OK, MessageBoxImage.Information)
-            else:
-                t.RollBack()
-                self._update_status("No parts created.")
-                MessageBox.Show("Failed to create any parts.", "Error",
-                                MessageBoxButton.OK, MessageBoxImage.Error)
-        except Exception as ex:
-            try:
-                if t.HasStarted() and not t.HasEnded():
-                    t.RollBack()
-            except Exception:
-                pass
-            self._update_status("Error: {}".format(str(ex)))
-        finally:
-            self.end_progress()
-
-    def _on_minimize(self, sender, args):
-        self.window.WindowState = WindowState.Minimized
-
-    def _on_maximize(self, sender, args):
-        if self.window.WindowState == WindowState.Maximized:
-            self.window.WindowState = WindowState.Normal
-        else:
-            self.window.WindowState = WindowState.Maximized
-
-    def _on_close(self, sender, args):
-        self._pick_element_id = None
-        self.window.Close()
-
-    def show(self):
-        self.window.ShowDialog()
-
-
-# ===========================================================================
-# BEAM WINDOW
-# ===========================================================================
-
-class _CADtoBeamWindow(T3WPFWindow):
-    """Full Beam creation window — loads CADtoBeam.xaml via forms.WPFWindow."""
-
-    # ProgressPauseMixin — CADtoBeam.xaml status-bar progress panel
-    PP_PANEL      = "beam_progress_panel"
-    PP_BAR        = "beam_pb"
-    PP_PAUSE      = "beam_btn_pause"
-    PP_STOP       = "beam_btn_stop"
-    PP_PAUSE_ICON = "beam_btn_pause_icon"
-    PP_PAUSE_TEXT = "beam_btn_pause_label"
-    PP_STATUS     = "lbl_status"
-    PP_STOP_MSG   = u"Stopping… finishing current beam"
-
-    def __init__(self, doc, uidoc):
-        self.doc = doc
-        self.uidoc = uidoc
-        T3WPFWindow.__init__(self, _XAML_BEAM)
-        self._populate_initial_data()
-
-    def _populate_initial_data(self):
-        # CAD links
-        cad_list = get_cad_instances(self.doc)
-        self.cad_map = {}
-        for cad in cad_list:
-            key = "{} (Id:{})".format(cad["name"], cad["id"])
-            self.cad_map[key] = cad["element"]
-
-        self.cb_cad_links.ItemsSource = to_items_source(sorted(self.cad_map.keys()))
-
-        # Beam families
-        beam_symbols = (FilteredElementCollector(self.doc)
-                        .OfCategory(DB.BuiltInCategory.OST_StructuralFraming)
-                        .OfClass(DB.FamilySymbol)
-                        .ToElements())
-        self.family_names = sorted(list(set(s.Family.Name for s in beam_symbols)))
-        self.cb_beam_types.ItemsSource = to_items_source(self.family_names)
-
-        # Levels
-        levels = FilteredElementCollector(self.doc).OfClass(Level).ToElements()
-        self.level_map = {l.Name: l for l in levels}
-        self.cb_levels.ItemsSource = to_items_source(sorted(self.level_map.keys()))
-
-    def cad_link_changed(self, sender, e):
-        selected_key = self.cb_cad_links.SelectedItem
-        if not selected_key:
-            return
-        instance = self.cad_map[selected_key]
-        layers = set()
-        opt = DB.Options()
-        geom = instance.get_Geometry(opt)
-        for obj in geom:
-            if isinstance(obj, DB.GeometryInstance):
-                for sym_obj in obj.GetSymbolGeometry():
-                    g_style = self.doc.GetElement(sym_obj.GraphicsStyleId)
-                    if g_style:
-                        try:
-                            layers.add(g_style.GraphicsStyleCategory.Name)
-                        except Exception:
-                            pass
-        self.cb_layers.ItemsSource = to_items_source(sorted(list(layers)))
-
-    def generate_clicked(self, sender, e):
-        cad_key = self.cb_cad_links.SelectedItem
-        layer_name = self.cb_layers.SelectedItem
-        family_name = self.cb_beam_types.SelectedItem
-        level_name = self.cb_levels.SelectedItem
-
-        if not all([cad_key, layer_name, family_name, level_name]):
-            forms.alert("Please select all required fields.")
-            return
-
-        instance = self.cad_map[cad_key]
-        level = self.level_map[level_name]
-
-        try:
-            default_z_offset = float(self.txt_offset.Text)
-        except (ValueError, TypeError):
-            default_z_offset = -50.0
-
-        # Get GraphicsStyle ID for the layer
-        beam_gs_id = None
-        import_cat = instance.Category
-        for sc in import_cat.SubCategories:
-            if sc.Name == layer_name:
-                beam_gs_id = sc.GetGraphicsStyle(DB.GraphicsStyleType.Projection).Id
-                break
-
-        if not beam_gs_id:
-            forms.alert("Could not find GraphicsStyle for the selected layer.")
-            return
-
-        # Extract geometry
-        raw_curves = []
-        opt = DB.Options()
-        geom = instance.get_Geometry(opt)
-
-        def scan_geo(geo_iterable, transform=None):
-            for obj in geo_iterable:
-                if isinstance(obj, DB.GeometryInstance):
-                    scan_geo(obj.GetInstanceGeometry(), obj.Transform)
-                elif isinstance(obj, (DB.Line, DB.Curve)):
-                    if obj.GraphicsStyleId == beam_gs_id:
-                        if transform:
-                            raw_curves.append(obj.CreateTransformed(transform))
-                        else:
-                            raw_curves.append(obj)
-
-        scan_geo(geom)
-
-        # Pair lines
-        lines_h = []
-        lines_v = []
-        for c in raw_curves:
-            sp = c.GetEndPoint(0)
-            ep = c.GetEndPoint(1)
-            dx = ep.X - sp.X
-            dy = ep.Y - sp.Y
-            length_2d = math.sqrt(dx * dx + dy * dy) * FT_TO_MM
-            if length_2d < 10:
-                continue
-            angle = abs(math.degrees(math.atan2(dy, dx))) % 180
-            entry = {
-                "x1": sp.X * FT_TO_MM, "y1": sp.Y * FT_TO_MM,
-                "x2": ep.X * FT_TO_MM, "y2": ep.Y * FT_TO_MM,
-                "z": sp.Z * FT_TO_MM, "length": length_2d
-            }
-            if angle < 10 or angle > 170:
-                lines_h.append(entry)
-            elif 80 < angle < 100:
-                lines_v.append(entry)
-
-        all_pairs = _pair_lines_h(lines_h) + _pair_lines_v(lines_v)
-
-        if not all_pairs:
-            forms.alert("No parallel pairs found in the selected layer.")
-            return
-
-        # Create beams in a transaction
-        self.begin_progress(len(all_pairs), disable=[self.btn_generate])
-        t = Transaction(self.doc, "T3Lab: CAD to Beam")
-        t.Start()
-        try:
-            created = 0
-            for _beam_idx, p in enumerate(all_pairs):
-                if self.is_cancelled:
-                    break
-                self.step_progress(_beam_idx, "Creating beam {}/{}...".format(_beam_idx + 1, len(all_pairs)))
-                width_rounded = round(p["width"] / 50) * 50
-                height = _get_height_for_width(width_rounded)
-
-                fam_sym = get_or_create_beam_type(self.doc, family_name, width_rounded, height)
-                if not fam_sym:
-                    continue
-                if not fam_sym.IsActive:
-                    fam_sym.Activate()
-
-                z_ft = level.Elevation + (default_z_offset * MM_TO_FT)
-
-                if p["dir"] == "H":
-                    sp_pt = DB.XYZ(p["main_s"] * MM_TO_FT, p["perp"] * MM_TO_FT, z_ft)
-                    ep_pt = DB.XYZ(p["main_e"] * MM_TO_FT, p["perp"] * MM_TO_FT, z_ft)
-                else:
-                    sp_pt = DB.XYZ(p["perp"] * MM_TO_FT, p["main_s"] * MM_TO_FT, z_ft)
-                    ep_pt = DB.XYZ(p["perp"] * MM_TO_FT, p["main_e"] * MM_TO_FT, z_ft)
-
-                if sp_pt.DistanceTo(ep_pt) < 0.1:
-                    continue
-
-                beam_line = DB.Line.CreateBound(sp_pt, ep_pt)
-                beam = self.doc.Create.NewFamilyInstance(
-                    beam_line, fam_sym, level, DB.Structure.StructuralType.Beam)
-
-                p_offset = beam.get_Parameter(DB.BuiltInParameter.Z_OFFSET_VALUE)
-                if p_offset:
-                    p_offset.Set(default_z_offset * MM_TO_FT)
-
-                created += 1
-
-            t.Commit()
-        except Exception as ex:
-            self.end_progress()
-            try:
-                t.RollBack()
-            except Exception:
-                pass
-            forms.alert("Error creating beams: {}".format(str(ex)))
-            return
-
-        cancelled = self.is_cancelled
-        self.end_progress()
-        if cancelled:
-            forms.alert("Cancelled — created {} beam(s).".format(created))
-        else:
-            forms.alert("Created {} beams successfully!".format(created))
-        self.Close()
-
-    def minimize_button_clicked(self, sender, e):
-        self.WindowState = WindowState.Minimized
-
-    def maximize_button_clicked(self, sender, e):
-        if self.WindowState == WindowState.Maximized:
-            self.WindowState = WindowState.Normal
-            self.btn_maximize.ToolTip = "Restore"
-        else:
-            self.WindowState = WindowState.Maximized
-            self.btn_maximize.ToolTip = "Restore"
-
-    def close_button_clicked(self, sender, e):
-        self.Close()
-
-
-# ===========================================================================
-# HUB WINDOW
-# ===========================================================================
 
 class CADToElementsWindow(T3WPFWindow):
-    """
-    Unified CAD to Elements window with sidebar navigation.
-
-    Loads CADToElements.xaml which contains all panels (Wall, Floor, Beam,
-    Duct, Pipe, Cable Tray, Conduit) inline. Sidebar buttons switch the
-    active panel; all Revit logic runs in-place — no child windows are
-    spawned.
-    """
     AI_TOOL = "CADToElements"
 
-
     # ------------------------------------------------------------------
-    # Construction
+    # Construction — everything is loaded here (rule S7), not on Loaded
     # ------------------------------------------------------------------
 
     def __init__(self):
         T3WPFWindow.__init__(self, _XAML_HUB)
         self._doc = revit.doc
         self._uidoc = revit.uidoc
+        self._mode = "wall"
+        self._mep_key = "duct"
+        self._mep_values = {}
+        self._mep_types = {}
+        self._mep_systems = {}
+        self._column_structural = None
+        self._cad_list = []
+        self._levels = []
+        self._rows = []
+        self._selected = dict((k, set()) for k in geo.MODE_KEYS)
+        self._lists = {}
+        self._busy = True
 
-        # State
-        self._active_type = "wall"
-        self._cad_list = []       # list of dicts from get_cad_instances()
-        self._levels = []         # list of dicts from get_levels()
-        self._floor_types = []    # list of dicts from get_floor_types()
-        self._ds_categories = []  # list of dicts from get_ds_categories()
-        self._family_names = []   # beam family names (strings)
-        self._beam_cad_layers = []  # beam layer names from current CAD
-        self._beam_layer_checkboxes = {}   # name -> CheckBox
+        self._tiles = dict((k, getattr(self, "btn_mode_" + k)) for k in geo.MODE_KEYS)
+        self._panels = dict((k, getattr(self, "opt_" + k)) for k in geo.MODE_KEYS)
 
-        # Wall layer state
-        self._wall_layer_checkboxes = {}   # name -> CheckBox
-
-        # Floor layer state
-        self._floor_layer_data = []          # list of LayerData
-        self._floor_layer_checkboxes = []    # list of (CheckBox, LayerData)
-
-        # MEP state (duct / pipe / tray / conduit)
-        self._duct_types = []
-        self._mech_systems = []
-        self._pipe_types = []
-        self._piping_systems = []
-        self._tray_types = []
-        self._conduit_types = []
-        self._mep_layer_checkboxes = {"duct": {}, "pipe": {}, "tray": {}, "conduit": {}}
-
-        # Sidebar nav map: (key, button, panel) — drives _switch_type
-        self._nav_items = [
-            ("wall", self.btn_type_wall, self.pnl_wall),
-            ("floor", self.btn_type_floor, self.pnl_floor),
-            ("beam", self.btn_type_beam, self.pnl_beam),
-            ("duct", self.btn_type_duct, self.pnl_duct),
-            ("pipe", self.btn_type_pipe, self.pnl_pipe),
-            ("tray", self.btn_type_tray, self.pnl_tray),
-            ("conduit", self.btn_type_conduit, self.pnl_conduit),
-        ]
-
-        # Wire sidebar
-        self.btn_type_wall.Click += self._on_nav_wall
-        self.btn_type_floor.Click += self._on_nav_floor
-        self.btn_type_beam.Click += self._on_nav_beam
-        self.btn_type_duct.Click += self._on_nav_duct
-        self.btn_type_pipe.Click += self._on_nav_pipe
-        self.btn_type_tray.Click += self._on_nav_tray
-        self.btn_type_conduit.Click += self._on_nav_conduit
-
-        # Wire status-bar buttons
-        self.btn_refresh.Click += self._on_refresh
-        self.btn_run.Click += self._on_run
-        self.btn_close_bar.Click += self._on_close
-
-        # Wire wall helpers
-        self.btn_wall_select_all.Click += self._on_wall_select_all
-        self.btn_wall_clear.Click += self._on_wall_clear
-        self.txt_layer_search.TextChanged += self._on_wall_search_changed
-        self.rb_wall_mode.Checked += self._on_wall_mode_changed
-        self.rb_wall_part_mode.Checked += self._on_wall_mode_changed
-
-        # Wire floor helpers
-        self.btn_floor_select_all.Click += self._on_floor_select_all
-        self.btn_floor_clear.Click += self._on_floor_clear
-        self.txt_floor_layer_search.TextChanged += self._on_floor_search_changed
-        self.rb_floor_mode.Checked += self._on_floor_mode_changed
-        self.rb_part_mode.Checked += self._on_floor_mode_changed
-
-        # Wire beam helpers
-        self.btn_beam_select_all.Click += self._on_beam_select_all
-        self.btn_beam_clear.Click += self._on_beam_clear
-        self.txt_beam_layer_search.TextChanged += self._on_beam_search_changed
-        self.rb_beam_mode.Checked += self._on_beam_mode_changed
-        self.rb_beam_part_mode.Checked += self._on_beam_mode_changed
-
-        # Wire MEP helpers (duct / pipe / tray / conduit share generic handlers)
-        for key in ("duct", "pipe", "tray", "conduit"):
-            getattr(self, "btn_{}_select_all".format(key)).Click += \
-                self._make_mep_setall_handler(key, True)
-            getattr(self, "btn_{}_clear".format(key)).Click += \
-                self._make_mep_setall_handler(key, False)
-            getattr(self, "txt_{}_layer_search".format(key)).TextChanged += \
-                self._make_mep_search_handler(key)
-        self.rb_duct_single.Checked += self._on_duct_mode_changed
-        self.rb_duct_double.Checked += self._on_duct_mode_changed
-        self.rb_tray_single.Checked += self._on_tray_mode_changed
-        self.rb_tray_double.Checked += self._on_tray_mode_changed
-
-        # Wire window chrome
-        self.btn_minimize.Click += self._on_minimize
-        self.btn_maximize.Click += self._on_maximize
-        self.btn_close.Click += self._on_close
+        # Row checkbox clicks bubble to the grid; the bridge has already
+        # written the row by then, so the tally reads the new state.
+        self._row_click_handler = RoutedEventHandler(self._on_row_checkbox_click)
+        self.grid_layers.AddHandler(CheckBox.ClickEvent, self._row_click_handler, True)
         self.PreviewKeyDown += self._on_key_down
 
-        # Wire AI layer matching helpers
-        if hasattr(self, "btn_wall_ai"):
-            self.btn_wall_ai.Click += self._on_wall_ai
-        if hasattr(self, "btn_floor_ai"):
-            self.btn_floor_ai.Click += self._on_floor_ai
-        if hasattr(self, "btn_beam_ai"):
-            self.btn_beam_ai.Click += self._on_beam_ai
-        mep_labels = {
-            "duct": "HVAC Duct Lines",
-            "pipe": "Plumbing / Mechanical Pipe Lines",
-            "tray": "Cable Tray Lines",
-            "conduit": "Electrical Conduit Lines"
-        }
-        for key, lbl in mep_labels.items():
-            btn = getattr(self, "btn_{}_ai".format(key), None)
-            if btn is not None:
-                btn.Click += self._make_mep_ai_handler(key, lbl)
-
-        # Populate shared combos and type-specific combos
-        self._populate_cad_files()
-        self._populate_levels()
-        self._populate_floor_types()
-        self._populate_ds_categories()
-        self._populate_beam_families()
-        self._populate_duct_types()
-        self._populate_duct_systems()
-        self._populate_pipe_types()
-        self._populate_pipe_systems()
-        self._populate_tray_types()
-        self._populate_conduit_types()
-
-        # Show the default panel
-        self._switch_type("wall")
-        self._set_status("Ready. Select a CAD file and click Refresh to scan layers.")
-
-        # AI Mode initialization
-        self._init_ai_mode()
-
-    # ------------------------------------------------------------------
-    # Status helper
-    # ------------------------------------------------------------------
-
-    def _set_status(self, msg):
-        try:
-            self.txt_status.Text = str(msg)
-        except Exception:
-            pass
-
-    # ------------------------------------------------------------------
-    # AI Mode Helpers
-    # ------------------------------------------------------------------
-
-    def _init_ai_mode(self):
+        self._load_all()
+        self._busy = False
+        self._apply_mode("wall")
         self.init_ai_badge()
 
-    def _on_wall_ai(self, sender, e):
-        def _apply(matched_names):
-            count = 0
-            matched_lower = {m.lower().strip() for m in matched_names}
-            for name, cb in self._wall_layer_checkboxes.items():
-                if name.lower().strip() in matched_lower:
-                    cb.IsChecked = System.Nullable[System.Boolean](True)
-                    count += 1
-            return count
-        self._ai_match_category_layers("wall", "Walls / Partitions",
-                                       lambda: list(self._wall_layer_checkboxes.keys()),
-                                       _apply)
-
-    def _on_floor_ai(self, sender, e):
-        def _apply(matched_names):
-            count = 0
-            matched_lower = {m.lower().strip() for m in matched_names}
-            for cb, ld in self._floor_layer_checkboxes:
-                if ld.name.lower().strip() in matched_lower:
-                    try:
-                        cb.IsChecked = True
-                    except Exception:
-                        pass
-                    ld.is_selected = True
-                    count += 1
-            return count
-        self._ai_match_category_layers("floor", "Floors / Slabs",
-                                       lambda: [ld.name for _, ld in self._floor_layer_checkboxes],
-                                       _apply)
-
-    def _on_beam_ai(self, sender, e):
-        def _apply(matched_names):
-            count = 0
-            matched_lower = {m.lower().strip() for m in matched_names}
-            for name, cb in self._beam_layer_checkboxes.items():
-                if name.lower().strip() in matched_lower:
-                    cb.IsChecked = System.Nullable[System.Boolean](True)
-                    count += 1
-            return count
-        self._ai_match_category_layers("beam", "Structural Beams / Framing",
-                                       lambda: list(self._beam_layer_checkboxes.keys()),
-                                       _apply)
-
-    def _make_mep_ai_handler(self, key, label):
-        def handler(sender, e):
-            mep_dict = self._mep_layer_checkboxes.get(key, {})
-            def _apply(matched_names):
-                count = 0
-                matched_lower = {m.lower().strip() for m in matched_names}
-                for name, cb in mep_dict.items():
-                    if name.lower().strip() in matched_lower:
-                        cb.IsChecked = System.Nullable[System.Boolean](True)
-                        count += 1
-                return count
-            self._ai_match_category_layers(key, label, lambda: list(mep_dict.keys()), _apply)
-        return handler
-
-    def _ai_match_category_layers(self, category_key, category_label, get_names_fn, apply_fn):
-        """Asynchronously call AI to match CAD layers for a specific element category."""
-        if not self.ai_require():
-            return
-
-        layer_names = get_names_fn()
-        if not layer_names:
-            MessageBox.Show(
-                "No CAD layers found. Please select a CAD file and click Refresh first.",
-                "No Layers",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning
-            )
-            return
-
-        btn = getattr(self, "btn_{}_ai".format(category_key), None)
-
-        def _restore_btn():
-            self.ai_busy(btn, False)
-
-        self.ai_busy(btn, True)
-
-        self._set_status("AI analyzing {} CAD layers for {}...".format(len(layer_names), category_label))
-
-        system_prompt = (
-            "You are an expert BIM Manager and CAD/Revit specialist. "
-            "You analyze AutoCAD/DWG layer names and identify which layers correspond to a specific building element category. "
-            "Return JSON: {\"matched_layers\": [\"LAYER1\", \"LAYER2\"], \"confidence\": 0.0-1.0, \"reasoning\": \"<1-sentence explanation>\"}."
-        )
-        prompt = (
-            "Element Category: {}\n"
-            "CAD Layer Names in Drawing:\n{}\n\n"
-            "Identify all layer names that represent {}. Return only valid matching names from the list."
-        ).format(category_label, "\n".join("- " + l for l in layer_names[:120]), category_label)
-
-        def _worker():
-            return self.ai_bridge.ask_json(prompt, system_prompt=system_prompt)
-
-        def _on_success(result):
-            try:
-                if not result or not isinstance(result, dict) or "matched_layers" not in result:
-                    self._set_status("AI layer analysis completed: No confident matches found.")
-                    return
-                matched = result.get("matched_layers", [])
-                confidence = result.get("confidence", 0.0)
-                reasoning = result.get("reasoning", "")
-                count = apply_fn(matched)
-                try:
-                    conf_pct = float(confidence) * 100
-                except:
-                    conf_pct = 90.0
-                self._set_status("AI selected {} layer(s) for {} ({:.0f}% - {})".format(
-                    count, category_label, conf_pct, reasoning
-                ))
-            finally:
-                _restore_btn()
-
-        def _on_error(err):
-            _restore_btn()
-            self._set_status("AI layer selection error: {}".format(err))
-
-        self.run_ai_async(_worker, on_success=_on_success, on_error=_on_error)
-
     # ------------------------------------------------------------------
-    # Initial population helpers
+    # Loading
     # ------------------------------------------------------------------
 
-    def _populate_cad_files(self):
-        self._cad_list = get_cad_instances(self._doc)
-        self.cmb_cad_files.Items.Clear()
-        if not self._cad_list:
-            item = ComboBoxItem()
-            item.Content = "No CAD found in model"
-            item.IsEnabled = False
-            self.cmb_cad_files.Items.Add(item)
-        else:
-            for cad in self._cad_list:
-                item = ComboBoxItem()
-                item.Content = cad["name"]
-                self.cmb_cad_files.Items.Add(item)
-            self.cmb_cad_files.SelectedIndex = 0
-
-    def _populate_levels(self):
-        self._levels = get_levels(self._doc)
-        self.cmb_levels.Items.Clear()
+    def _load_all(self):
+        keep_cad = self._current_cad_id()
+        keep_level = self._current_level_id()
+        self._cad_list = cr.get_cad_instances(self._doc)
+        self._fill("cmb_cad_files", self._cad_list, "No CAD file in this model",
+                   default=self._index_of(self._cad_list, keep_cad))
+        self._levels = cr.get_levels(self._doc)
         for lv in self._levels:
-            item = ComboBoxItem()
-            item.Content = u"{} ({} mm)".format(
-                lv["name"], ft_to_mm_str(lv["elevation"]))
-            self.cmb_levels.Items.Add(item)
-        if self._levels:
-            # Try to pre-select the active view's level
-            try:
-                av = self._doc.ActiveView
-                alid = av.GenLevel.Id if hasattr(av, "GenLevel") and av.GenLevel else None
-                if alid:
-                    for i, lv in enumerate(self._levels):
-                        if _eid_int(lv["id"]) == _eid_int(alid):
-                            self.cmb_levels.SelectedIndex = i
-                            break
-                    else:
-                        self.cmb_levels.SelectedIndex = 0
-                else:
-                    self.cmb_levels.SelectedIndex = 0
-            except Exception:
-                self.cmb_levels.SelectedIndex = 0
+            lv["label"] = u"{} ({} mm)".format(lv["name"], int(round(geo.to_mm(lv["elevation"]))))
+        self._fill("cmb_levels", self._levels, "No level in this model", label="label",
+                   default=self._default_level_index(keep_level))
+        self._fill_types()
+        self._fill_level_dependent()
+        self._scan_current_cad()
 
-    def _populate_floor_types(self):
-        self._floor_types = get_floor_types(self._doc)
-        self.cmb_floor_type.Items.Clear()
-        for ft in self._floor_types:
-            item = ComboBoxItem()
-            item.Content = ft["name"]
-            self.cmb_floor_type.Items.Add(item)
-        if self._floor_types:
-            self.cmb_floor_type.SelectedIndex = 0
+    def _fill_types(self):
+        doc = self._doc
+        self._fill("cmb_wall_type", cr.get_basic_wall_types(doc), "No basic wall type loaded",
+                   prefer=("generic",))
+        self._fill("cmb_floor_type", cr.get_floor_types(doc), "No floor type loaded")
+        self._fill("cmb_ceiling_type", cr.get_ceiling_types(doc), "No ceiling type loaded")
+        cats = cr.get_ds_categories()
+        for name, prefer in (("cmb_wall_part_category", "walls"),
+                             ("cmb_part_category", "floors"),
+                             ("cmb_ceiling_part_category", "ceilings"),
+                             ("cmb_beam_part_category", "structural framing")):
+            self._fill(name, cats, "No category", prefer=(prefer,), exact=True)
+        self._fill("cb_beam_types",
+                   cr.get_symbols(doc, DB.BuiltInCategory.OST_StructuralFraming),
+                   "No structural framing family loaded")
+        self._fill("cmb_grid_type", cr.get_grid_types(doc), "No grid type loaded")
+        self._fill("cmb_line_style", cr.get_line_styles(doc), "No line style found",
+                   prefer=("thin",))
+        for c in geo.MEP_CATEGORIES:
+            self._mep_types[c["key"]] = cr.get_mep_types(doc, c["key"])
+            self._mep_systems[c["key"]] = cr.get_mep_systems(doc, c["key"])
+        self._column_structural = None
+        self._fill_column_types()
+        self._fill_mep(self._mep_key, restore=True)
 
-    def _populate_ds_categories(self):
-        self._ds_categories = get_ds_categories()
-        for combo in (self.cmb_part_category, self.cmb_wall_part_category,
-                      self.cmb_beam_part_category):
-            combo.Items.Clear()
-            for cat in self._ds_categories:
-                item = ComboBoxItem()
-                item.Content = cat["name"]
-                combo.Items.Add(item)
-            if self._ds_categories:
-                combo.SelectedIndex = 0
-
-    def _populate_beam_families(self):
-        try:
-            beam_symbols = (FilteredElementCollector(self._doc)
-                            .OfCategory(DB.BuiltInCategory.OST_StructuralFraming)
-                            .OfClass(DB.FamilySymbol)
-                            .ToElements())
-            self._family_names = sorted(list(set(s.Family.Name for s in beam_symbols)))
-        except Exception:
-            self._family_names = []
-        self.cb_beam_types.Items.Clear()
-        for fname in self._family_names:
-            item = ComboBoxItem()
-            item.Content = fname
-            self.cb_beam_types.Items.Add(item)
-        if self._family_names:
-            self.cb_beam_types.SelectedIndex = 0
-
-    def _populate_mep_combo(self, combo, items, empty_msg):
-        """Fill an MEP type/system combo; disabled hint row when empty."""
-        combo.Items.Clear()
-        if not items:
-            item = ComboBoxItem()
-            item.Content = empty_msg
-            item.IsEnabled = False
-            combo.Items.Add(item)
+    def _fill_column_types(self):
+        structural = self._checked(self.rb_column_structural)
+        if structural == self._column_structural:
             return
-        for entry in items:
-            item = ComboBoxItem()
-            item.Content = entry["name"]
-            combo.Items.Add(item)
-        combo.SelectedIndex = 0
-
-    def _populate_duct_types(self):
-        self._duct_types = get_duct_types(self._doc)
-        self._populate_mep_combo(self.cmb_duct_type, self._duct_types,
-                                 "No duct types loaded")
-
-    def _populate_duct_systems(self):
-        self._mech_systems = get_mech_system_types(self._doc)
-        self._populate_mep_combo(self.cmb_duct_system, self._mech_systems,
-                                 "No mechanical system types")
-
-    def _populate_pipe_types(self):
-        self._pipe_types = get_pipe_types(self._doc)
-        self._populate_mep_combo(self.cmb_pipe_type, self._pipe_types,
-                                 "No pipe types loaded")
-
-    def _populate_pipe_systems(self):
-        self._piping_systems = get_piping_system_types(self._doc)
-        self._populate_mep_combo(self.cmb_pipe_system, self._piping_systems,
-                                 "No piping system types")
-
-    def _populate_tray_types(self):
-        self._tray_types = get_cabletray_types(self._doc)
-        self._populate_mep_combo(self.cmb_tray_type, self._tray_types,
-                                 "No cable tray types loaded")
-
-    def _populate_conduit_types(self):
-        self._conduit_types = get_conduit_types(self._doc)
-        self._populate_mep_combo(self.cmb_conduit_type, self._conduit_types,
-                                 "No conduit types loaded")
-
-    # ------------------------------------------------------------------
-    # Sidebar navigation
-    # ------------------------------------------------------------------
-
-    def _switch_type(self, type_name):
-        self._active_type = type_name
-        # Update rail tile state and panel visibility from nav map
-        for key, btn, panel in self._nav_items:
-            try:
-                btn.IsChecked = (key == type_name)
-            except Exception:
-                pass
-            try:
-                panel.Visibility = (Visibility.Visible if key == type_name
-                                    else Visibility.Collapsed)
-            except Exception:
-                pass
-
-    def _on_nav_wall(self, sender, e):
-        self._switch_type("wall")
-
-    def _on_nav_floor(self, sender, e):
-        self._switch_type("floor")
-
-    def _on_nav_beam(self, sender, e):
-        self._switch_type("beam")
-
-    def _on_nav_duct(self, sender, e):
-        self._switch_type("duct")
-
-    def _on_nav_pipe(self, sender, e):
-        self._switch_type("pipe")
-
-    def _on_nav_tray(self, sender, e):
-        self._switch_type("tray")
-
-    def _on_nav_conduit(self, sender, e):
-        self._switch_type("conduit")
-
-    # ------------------------------------------------------------------
-    # Floor mode toggle (Floor / Part)
-    # ------------------------------------------------------------------
-
-    def _on_floor_mode_changed(self, sender, e):
-        try:
-            is_floor_mode = safe_bool(self.rb_floor_mode.IsChecked)
-            if is_floor_mode:
-                self.pnl_part_category.Visibility = Visibility.Collapsed
-                self.pnl_part_thickness.Visibility = Visibility.Collapsed
-            else:
-                self.pnl_part_category.Visibility = Visibility.Visible
-                self.pnl_part_thickness.Visibility = Visibility.Visible
-        except Exception:
-            pass
-
-    # ------------------------------------------------------------------
-    # Wall mode toggle (Wall / Part)
-    # ------------------------------------------------------------------
-
-    def _on_wall_mode_changed(self, sender, e):
-        try:
-            is_wall_mode = safe_bool(self.rb_wall_mode.IsChecked)
-            if is_wall_mode:
-                self.pnl_wall_part_category.Visibility = Visibility.Collapsed
-            else:
-                self.pnl_wall_part_category.Visibility = Visibility.Visible
-        except Exception:
-            pass
-
-    # ------------------------------------------------------------------
-    # Beam mode toggle (Beam / Part)
-    # ------------------------------------------------------------------
-
-    def _on_beam_mode_changed(self, sender, e):
-        try:
-            is_beam_mode = safe_bool(self.rb_beam_mode.IsChecked)
-            if is_beam_mode:
-                self.pnl_beam_part_category.Visibility = Visibility.Collapsed
-            else:
-                self.pnl_beam_part_category.Visibility = Visibility.Visible
-        except Exception:
-            pass
-
-    # ------------------------------------------------------------------
-    # MEP line mode toggles (single / double line)
-    # ------------------------------------------------------------------
-
-    def _on_duct_mode_changed(self, sender, e):
-        # Width is auto-detected from the pair spacing in double-line mode
-        try:
-            self.txt_duct_width.IsEnabled = safe_bool(self.rb_duct_single.IsChecked)
-        except Exception:
-            pass
-
-    def _on_tray_mode_changed(self, sender, e):
-        try:
-            self.txt_tray_width.IsEnabled = safe_bool(self.rb_tray_single.IsChecked)
-        except Exception:
-            pass
-
-    # ------------------------------------------------------------------
-    # Refresh — scan layers for the active type
-    # ------------------------------------------------------------------
-
-    def _on_refresh(self, sender, e):
-        self._do_refresh()
-
-    def _do_refresh(self):
-        idx = self.cmb_cad_files.SelectedIndex
-        if idx < 0 or idx >= len(self._cad_list):
-            self._set_status("No CAD file selected.")
-            return
-        cad = self._cad_list[idx]
-
-        if self._active_type == "wall":
-            self._refresh_wall_layers(cad)
-        elif self._active_type == "floor":
-            self._refresh_floor_layers(cad)
-        elif self._active_type == "beam":
-            self._refresh_beam_layers(cad)
-        elif self._active_type in ("duct", "pipe", "tray", "conduit"):
-            self._refresh_mep_layers(cad, self._active_type)
-
-    # ---- Wall layer refresh ----
-
-    def _refresh_wall_layers(self, cad):
-        self._set_status("Scanning wall layers...")
-        try:
-            layers = get_cad_layers_wall(self._doc, cad["element"])
-        except Exception as ex:
-            self._set_status("Error scanning layers: {}".format(str(ex)))
-            return
-        self._build_wall_layer_panel(layers)
-        self._set_status("{} wall layers found.".format(len(layers)))
-
-    def _build_wall_layer_panel(self, layers):
-        self.pnl_wall_layers.Children.Clear()
-        self._wall_layer_checkboxes = {}
-        if not layers:
-            tb = TextBlock()
-            tb.Text = "No layers found"
-            tb.FontSize = 11
-            tb.Margin = Thickness(8, 8, 8, 8)
-            self.pnl_wall_layers.Children.Add(tb)
-            return
-        for layer_name in layers:
-            border = Border()
-            border.Padding = Thickness(8, 4, 8, 4)
-            border.Margin = Thickness(0, 0, 0, 1)
-            border.Tag = layer_name
-            sp = StackPanel()
-            sp.Orientation = Orientation.Horizontal
-            cb = CheckBox()
-            cb.VerticalContentAlignment = VerticalAlignment.Center
-            cb.Margin = Thickness(0, 0, 8, 0)
-            cb.IsChecked = System.Nullable[System.Boolean](False)
-            cb.Tag = layer_name
-            tb = TextBlock()
-            tb.Text = layer_name
-            tb.FontSize = 11
-            tb.VerticalAlignment = VerticalAlignment.Center
-            sp.Children.Add(cb)
-            sp.Children.Add(tb)
-            border.Child = sp
-            self.pnl_wall_layers.Children.Add(border)
-            self._wall_layer_checkboxes[layer_name] = cb
-
-    def _on_wall_select_all(self, sender, e):
-        for cb in self._wall_layer_checkboxes.values():
-            cb.IsChecked = System.Nullable[System.Boolean](True)
-
-    def _on_wall_clear(self, sender, e):
-        for cb in self._wall_layer_checkboxes.values():
-            cb.IsChecked = System.Nullable[System.Boolean](False)
-
-    def _on_wall_search_changed(self, sender, e):
-        try:
-            if self.txt_layer_search.Text:
-                self.lbl_wall_search_placeholder.Visibility = Visibility.Collapsed
-            else:
-                self.lbl_wall_search_placeholder.Visibility = Visibility.Visible
-        except Exception:
-            pass
-        try:
-            txt = self.txt_layer_search.Text.strip().lower()
-        except Exception:
-            return
-        for i in range(self.pnl_wall_layers.Children.Count):
-            child = self.pnl_wall_layers.Children[i]
-            if isinstance(child, Border) and child.Tag is not None:
-                name = str(child.Tag).lower()
-                child.Visibility = (Visibility.Visible
-                                    if not txt or txt in name
-                                    else Visibility.Collapsed)
-
-    def _get_wall_selected_layers(self):
-        selected = []
-        for name, cb in self._wall_layer_checkboxes.items():
-            try:
-                if cb.IsChecked == True:
-                    selected.append(name)
-            except Exception:
-                pass
-        return selected
-
-    # ---- Floor layer refresh ----
-
-    def _refresh_floor_layers(self, cad):
-        self._set_status("Scanning floor layers...")
-        self._floor_layer_data = []
-        self._floor_layer_checkboxes = []
-        try:
-            layers_geom = get_cad_layer_geometry_floor(self._doc, cad["element"])
-            for layer_name, data in sorted(layers_geom.items()):
-                closed_loops = list(data.get("closed_loops", []))
-                all_curves_count = data.get("all_curves_count", 0)
-                individual_curves = data.get("curves", [])
-                if individual_curves:
-                    extra_loops = try_build_loops_from_curves(individual_curves)
-                    closed_loops.extend(extra_loops)
-                ld = LayerData(layer_name, closed_loops, all_curves_count)
-                self._floor_layer_data.append(ld)
-        except Exception as ex:
-            self._set_status("Error scanning floor layers: {}".format(str(ex)))
-            return
-        self._build_floor_layer_panel()
-        total_closed = sum(ld.closed_count for ld in self._floor_layer_data)
-        self._set_status("Found {} floor layers with {} closed loops.".format(
-            len(self._floor_layer_data), total_closed))
-
-    def _build_floor_layer_panel(self, filter_text=""):
-        self.pnl_floor_layers.Children.Clear()
-        self._floor_layer_checkboxes = []
-        filter_lower = filter_text.lower().strip()
-        bc = BrushConverter()
-
-        for ld in self._floor_layer_data:
-            if filter_lower and filter_lower not in ld.name.lower():
-                continue
-            border = Border()
-            border.Padding = Thickness(8, 5, 8, 5)
-            border.Margin = Thickness(0, 0, 0, 1)
-
-            sp = StackPanel()
-            sp.Orientation = Orientation.Horizontal
-
-            cb = CheckBox()
-            cb.VerticalContentAlignment = VerticalAlignment.Center
-            cb.Margin = Thickness(0, 0, 8, 0)
-            cb.IsChecked = System.Nullable[System.Boolean](ld.is_selected)
-
-            tb_name = TextBlock()
-            tb_name.Text = ld.name
-            tb_name.FontSize = 11
-            tb_name.VerticalAlignment = VerticalAlignment.Center
-            tb_name.MinWidth = 140
-
-            tb_closed = TextBlock()
-            tb_closed.Text = str(ld.closed_count)
-            tb_closed.FontSize = 11
-            tb_closed.Margin = Thickness(8, 0, 0, 0)
-            tb_closed.VerticalAlignment = VerticalAlignment.Center
-
-            try:
-                if ld.closed_count > 0:
-                    tb_name.FontWeight = FontWeights.SemiBold
-                    tb_closed.Foreground = bc.ConvertFromString("#10B981")
-                else:
-                    tb_closed.Foreground = bc.ConvertFromString("#CBD5E1")
-            except Exception:
-                pass
-
-            sp.Children.Add(cb)
-            sp.Children.Add(tb_name)
-            sp.Children.Add(tb_closed)
-            border.Child = sp
-            self.pnl_floor_layers.Children.Add(border)
-            self._floor_layer_checkboxes.append((cb, ld))
-
-            # Checkbox change handler via closure
-            def make_chk_handler(layer_data, checkbox):
-                def handler(s, args):
-                    layer_data.is_selected = safe_bool(checkbox.IsChecked)
-                return handler
-
-            h = make_chk_handler(ld, cb)
-            cb.Checked += h
-            cb.Unchecked += h
-
-    def _on_floor_select_all(self, sender, e):
-        for cb, ld in self._floor_layer_checkboxes:
-            try:
-                cb.IsChecked = True
-            except Exception:
-                pass
-            ld.is_selected = True
-
-    def _on_floor_clear(self, sender, e):
-        for cb, ld in self._floor_layer_checkboxes:
-            try:
-                cb.IsChecked = False
-            except Exception:
-                pass
-            ld.is_selected = False
-
-    def _on_floor_search_changed(self, sender, e):
-        try:
-            if self.txt_floor_layer_search.Text:
-                self.lbl_floor_search_placeholder.Visibility = Visibility.Collapsed
-            else:
-                self.lbl_floor_search_placeholder.Visibility = Visibility.Visible
-        except Exception:
-            pass
-        try:
-            txt = self.txt_floor_layer_search.Text
-        except Exception:
-            txt = ""
-        self._build_floor_layer_panel(filter_text=txt)
-
-    # ---- Beam layer refresh ----
-
-    def _refresh_beam_layers(self, cad):
-        self._set_status("Scanning beam layers...")
-        self._beam_cad_layers = []
-        try:
-            instance = cad["element"]
-            import_cat = instance.Category
-            for sc in import_cat.SubCategories:
-                try:
-                    self._beam_cad_layers.append(sc.Name)
-                except Exception:
-                    pass
-            self._beam_cad_layers = sorted(self._beam_cad_layers)
-        except Exception as ex:
-            self._set_status("Error scanning beam layers: {}".format(str(ex)))
-            return
-        self._build_beam_layer_panel(self._beam_cad_layers)
-        self._set_status("{} beam layers found.".format(len(self._beam_cad_layers)))
-
-    def _build_beam_layer_panel(self, layers):
-        self.pnl_beam_layers.Children.Clear()
-        self._beam_layer_checkboxes = {}
-        if not layers:
-            tb = TextBlock()
-            tb.Text = "No layers found"
-            tb.FontSize = 11
-            tb.Margin = Thickness(8, 8, 8, 8)
-            self.pnl_beam_layers.Children.Add(tb)
-            return
-        for layer_name in layers:
-            border = Border()
-            border.Padding = Thickness(8, 4, 8, 4)
-            border.Margin = Thickness(0, 0, 0, 1)
-            border.Tag = layer_name
-            sp = StackPanel()
-            sp.Orientation = Orientation.Horizontal
-            cb = CheckBox()
-            cb.VerticalContentAlignment = VerticalAlignment.Center
-            cb.Margin = Thickness(0, 0, 8, 0)
-            cb.IsChecked = System.Nullable[System.Boolean](False)
-            cb.Tag = layer_name
-            tb = TextBlock()
-            tb.Text = layer_name
-            tb.FontSize = 11
-            tb.VerticalAlignment = VerticalAlignment.Center
-            sp.Children.Add(cb)
-            sp.Children.Add(tb)
-            border.Child = sp
-            self.pnl_beam_layers.Children.Add(border)
-            self._beam_layer_checkboxes[layer_name] = cb
-
-    def _on_beam_select_all(self, sender, e):
-        for cb in self._beam_layer_checkboxes.values():
-            cb.IsChecked = System.Nullable[System.Boolean](True)
-
-    def _on_beam_clear(self, sender, e):
-        for cb in self._beam_layer_checkboxes.values():
-            cb.IsChecked = System.Nullable[System.Boolean](False)
-
-    def _on_beam_search_changed(self, sender, e):
-        try:
-            if self.txt_beam_layer_search.Text:
-                self.lbl_beam_search_placeholder.Visibility = Visibility.Collapsed
-            else:
-                self.lbl_beam_search_placeholder.Visibility = Visibility.Visible
-        except Exception:
-            pass
-        try:
-            txt = self.txt_beam_layer_search.Text.strip().lower()
-        except Exception:
-            return
-        for i in range(self.pnl_beam_layers.Children.Count):
-            child = self.pnl_beam_layers.Children[i]
-            if isinstance(child, Border) and child.Tag is not None:
-                name = str(child.Tag).lower()
-                child.Visibility = (Visibility.Visible
-                                    if not txt or txt in name
-                                    else Visibility.Collapsed)
-
-    def _get_beam_selected_layers(self):
-        selected = []
-        for name, cb in self._beam_layer_checkboxes.items():
-            try:
-                if cb.IsChecked == True:
-                    selected.append(name)
-            except Exception:
-                pass
-        return selected
-
-    # ---- MEP layer refresh (shared by duct / pipe / tray / conduit) ----
-
-    def _refresh_mep_layers(self, cad, key):
-        self._set_status("Scanning layers...")
-        try:
-            layers = get_cad_layers_wall(self._doc, cad["element"])
-        except Exception as ex:
-            self._set_status("Error scanning layers: {}".format(str(ex)))
-            return
-        panel = getattr(self, "pnl_{}_layers".format(key))
-        self._mep_layer_checkboxes[key] = self._build_mep_layer_panel(panel, layers)
-        self._set_status("{} layers found.".format(len(layers)))
-
-    def _build_mep_layer_panel(self, panel, layers):
-        """Fill a layer StackPanel with checkbox rows; returns {name: CheckBox}."""
-        panel.Children.Clear()
-        checkboxes = {}
-        if not layers:
-            tb = TextBlock()
-            tb.Text = "No layers found"
-            tb.FontSize = 11
-            tb.Margin = Thickness(8, 8, 8, 8)
-            panel.Children.Add(tb)
-            return checkboxes
-        for layer_name in layers:
-            border = Border()
-            border.Padding = Thickness(8, 4, 8, 4)
-            border.Margin = Thickness(0, 0, 0, 1)
-            border.Tag = layer_name
-            sp = StackPanel()
-            sp.Orientation = Orientation.Horizontal
-            cb = CheckBox()
-            cb.VerticalContentAlignment = VerticalAlignment.Center
-            cb.Margin = Thickness(0, 0, 8, 0)
-            cb.IsChecked = System.Nullable[System.Boolean](False)
-            cb.Tag = layer_name
-            tb = TextBlock()
-            tb.Text = layer_name
-            tb.FontSize = 11
-            tb.VerticalAlignment = VerticalAlignment.Center
-            sp.Children.Add(cb)
-            sp.Children.Add(tb)
-            border.Child = sp
-            panel.Children.Add(border)
-            checkboxes[layer_name] = cb
-        return checkboxes
-
-    def _make_mep_setall_handler(self, key, value):
-        def handler(sender, e):
-            for cb in self._mep_layer_checkboxes.get(key, {}).values():
-                cb.IsChecked = System.Nullable[System.Boolean](value)
-        return handler
-
-    def _make_mep_search_handler(self, key):
-        def handler(sender, e):
-            try:
-                search_box = getattr(self, "txt_{}_layer_search".format(key))
-                placeholder = getattr(self, "lbl_{}_search_placeholder".format(key))
-                panel = getattr(self, "pnl_{}_layers".format(key))
-            except Exception:
-                return
-            try:
-                placeholder.Visibility = (Visibility.Collapsed if search_box.Text
-                                          else Visibility.Visible)
-            except Exception:
-                pass
-            try:
-                txt = search_box.Text.strip().lower()
-            except Exception:
-                return
-            for i in range(panel.Children.Count):
-                child = panel.Children[i]
-                if isinstance(child, Border) and child.Tag is not None:
-                    name = str(child.Tag).lower()
-                    child.Visibility = (Visibility.Visible
-                                        if not txt or txt in name
-                                        else Visibility.Collapsed)
-        return handler
-
-    def _get_mep_selected_layers(self, key):
-        selected = []
-        for name, cb in self._mep_layer_checkboxes.get(key, {}).items():
-            try:
-                if cb.IsChecked == True:
-                    selected.append(name)
-            except Exception:
-                pass
-        return selected
-
-    # ------------------------------------------------------------------
-    # Run button dispatcher
-    # ------------------------------------------------------------------
-
-    def _on_run(self, sender, e):
-        self._do_run()
-
-    def _do_run(self):
-        if self._active_type == "wall":
-            self._run_wall()
-        elif self._active_type == "floor":
-            self._run_floor()
-        elif self._active_type == "beam":
-            self._run_beam()
-        elif self._active_type in ("duct", "pipe", "tray", "conduit"):
-            self._run_mep(self._active_type)
-
-    # ------------------------------------------------------------------
-    # Wall creation
-    # ------------------------------------------------------------------
-
-    def _run_wall(self):
-        idx = self.cmb_cad_files.SelectedIndex
-        if idx < 0 or idx >= len(self._cad_list):
-            forms.alert("Select a CAD file first.", title="CAD to Wall")
-            return
-        cad = self._cad_list[idx]
-
-        selected_layers = self._get_wall_selected_layers()
-        if not selected_layers:
-            forms.alert("Select at least one layer.", title="CAD to Wall")
-            return
-
-        lv_idx = self.cmb_levels.SelectedIndex
-        if lv_idx < 0 or lv_idx >= len(self._levels):
-            forms.alert("Select a Level.", title="CAD to Wall")
-            return
-        lv = self._levels[lv_idx]
-
-        try:
-            height_ft = mm_to_ft(float(self.txt_wall_height.Text.strip()))
-        except Exception:
-            height_ft = mm_to_ft(3000.0)
-
-        try:
-            default_thk_mm = int(float(self.txt_wall_thickness.Text.strip()))
-        except Exception:
-            default_thk_mm = 200
-
-        structural = False
-        try:
-            structural = safe_bool(self.chk_structural.IsChecked)
-        except Exception:
-            pass
-
-        merge_col = False
-        try:
-            merge_col = safe_bool(self.chk_merge_collinear.IsChecked)
-        except Exception:
-            pass
-
-        include_unpaired = False
-        try:
-            include_unpaired = safe_bool(self.chk_include_unpaired.IsChecked)
-        except Exception:
-            pass
-
-        self._set_status("Extracting lines from CAD...")
-        try:
-            lines = extract_lines_from_cad(self._doc, cad["element"], selected_layers)
-            raw_count = len(lines)
-            if merge_col:
-                lines = merge_collinear_lines(lines)
-            merged_count = len(lines)
-            centerlines, unpaired = find_parallel_pairs(lines)
-        except Exception as ex:
-            self._set_status("Error extracting lines: {}".format(str(ex)))
-            forms.alert("Error extracting lines:\n{}".format(str(ex)), title="CAD to Wall")
-            return
-
-        total = len(centerlines) + (len(unpaired) if include_unpaired else 0)
-        if total == 0:
-            forms.alert("No wall lines found in selected layers.", title="CAD to Wall")
-            self._set_status("No lines found.")
-            return
-
-        is_wall_mode = True
-        try:
-            is_wall_mode = safe_bool(self.rb_wall_mode.IsChecked)
-        except Exception:
-            pass
-
-        if is_wall_mode:
-            self._set_status("Creating {} walls...".format(total))
-            try:
-                created, failed, skipped, types_created = create_walls_auto(
-                    self._doc, centerlines, unpaired, lv["id"],
-                    height_ft, include_unpaired, default_thk_mm, structural)
-            except Exception as ex:
-                self._set_status("Error creating walls: {}".format(str(ex)))
-                forms.alert("Error creating walls:\n{}".format(str(ex)), title="CAD to Wall")
-                return
-
-            msg = "Created: {} walls".format(created)
-            if failed:
-                msg += u" | Failed: {}".format(failed)
-            if skipped:
-                msg += u" | Skipped: {}".format(skipped)
-            self._set_status(msg)
-            forms.alert(
-                u"Created: {}\nFailed: {}\nSkipped: {}\nTypes used: {}".format(
-                    created, failed, skipped, len(types_created)),
-                title="CAD to Wall")
-        else:
-            cat_idx = self.cmb_wall_part_category.SelectedIndex
-            if cat_idx < 0 or cat_idx >= len(self._ds_categories):
-                forms.alert("Select a Part Category.", title="CAD to Wall Part")
-                return
-            category_bic = self._ds_categories[cat_idx]["bic"]
-
-            self._set_status("Creating {} wall parts...".format(total))
-            try:
-                created, failed, skipped, category_used = self._create_wall_parts(
-                    centerlines, unpaired, lv["id"], height_ft,
-                    include_unpaired, default_thk_mm, category_bic)
-            except Exception as ex:
-                self._set_status("Error creating wall parts: {}".format(str(ex)))
-                forms.alert("Error creating wall parts:\n{}".format(str(ex)), title="CAD to Wall Part")
-                return
-
-            msg = "Created: {} part(s)".format(created)
-            if failed:
-                msg += u" | Failed: {}".format(failed)
-            if skipped:
-                msg += u" | Skipped: {}".format(skipped)
-            self._set_status(msg)
-            forms.alert(
-                u"Created: {}\nFailed: {}\nSkipped: {}\nCategory: {}".format(
-                    created, failed, skipped, category_used),
-                title="CAD to Wall Part")
-
-    def _create_wall_parts(self, centerlines, unpaired, level_id, height_ft,
-                            use_unpaired, default_thickness_mm, category_bic):
-        """Create DirectShape 'parts' for wall centerlines instead of real Wall
-        elements — mirrors create_walls_auto's grouping/looping structure but
-        extrudes a rectangular footprint upward by the wall height."""
-        created = 0
-        failed = 0
-        skipped = 0
-
-        level = self._doc.GetElement(level_id)
-        level_elev = level.Elevation
-        height_mm = height_ft * FT_TO_MM
-
-        cat_name = category_bic.ToString()
-        for cat in self._ds_categories:
-            if cat["bic"] == category_bic:
-                cat_name = cat["name"]
+        self._column_structural = structural
+        bic = (DB.BuiltInCategory.OST_StructuralColumns if structural
+               else DB.BuiltInCategory.OST_Columns)
+        syms = cr.get_symbols(self._doc, bic)
+        self._fill("cmb_column_type", syms,
+                   "No {} column family loaded".format("structural" if structural else "architectural"),
+                   prefer=("rectangular", "concrete", "square"))
+        round_default = 0
+        for i, s in enumerate(syms):
+            low = s["name"].lower()
+            if "round" in low or "circular" in low or "pipe" in low:
+                round_default = i + 1
                 break
+        self._fill("cmb_column_round_type", [ROUND_SKIP] + syms, "No column family loaded",
+                   default=round_default)
 
-        t = Transaction(self._doc, "T3Lab: CAD to Wall Part")
-        t.Start()
+    def _fill_level_dependent(self):
+        level = self._pick("cmb_levels")
+        views = cr.get_plan_views(self._doc, level["id"]) if level else []
+        active = 0
         try:
-            all_lines = list(centerlines)
-            if use_unpaired and unpaired:
-                all_lines = all_lines + list(unpaired)
-
-            for cl in all_lines:
-                try:
-                    s = cl["start"]
-                    e = cl["end"]
-                    start = XYZ(s.X, s.Y, level_elev)
-                    end = XYZ(e.X, e.Y, level_elev)
-                    if start.DistanceTo(end) < TOLERANCE:
-                        skipped += 1
-                        continue
-                    if abs(end.X - start.X) < TOLERANCE and abs(end.Y - start.Y) < TOLERANCE:
-                        skipped += 1
-                        continue
-
-                    thickness_mm = _round_thickness_mm(cl.get("thickness", mm_to_ft(default_thickness_mm)))
-                    if thickness_mm <= 0:
-                        thickness_mm = default_thickness_mm
-                    half_width_ft = mm_to_ft(thickness_mm) / 2.0
-
-                    rect_loop = build_rect_loop_from_centerline(start, end, half_width_ft)
-                    ds = create_part_from_loop(
-                        self._doc, rect_loop, category_bic, level_id,
-                        thickness_mm=height_mm, offset_mm=0)
-                    if ds:
-                        created += 1
-                    else:
-                        failed += 1
-                except Exception:
-                    failed += 1
-
-            status = t.Commit()
-            if status != DB.TransactionStatus.Committed:
-                print("Wall part transaction did not commit, status: {}".format(status))
-                return 0, created + failed, skipped, cat_name
-        except Exception as ex:
-            if t.HasStarted() and not t.HasEnded():
-                t.RollBack()
-            print("Wall part transaction error: {}".format(str(ex)))
-            return 0, created + failed, skipped, cat_name
-
-        return created, failed, skipped, cat_name
-
-    # ------------------------------------------------------------------
-    # Floor / Part creation
-    # ------------------------------------------------------------------
-
-    def _run_floor(self):
-        selected_layers = [ld for _, ld in self._floor_layer_checkboxes if ld.is_selected]
-        if not selected_layers:
-            forms.alert("Select at least one floor layer.", title="CAD to Floor")
-            return
-
-        total_loops = sum(ld.closed_count for ld in selected_layers)
-        if total_loops == 0:
-            forms.alert(
-                "Selected layers have no closed loops.\nOnly closed polylines can be converted.",
-                title="CAD to Floor")
-            return
-
-        lv_idx = self.cmb_levels.SelectedIndex
-        if lv_idx < 0 or lv_idx >= len(self._levels):
-            forms.alert("Select a Level.", title="CAD to Floor")
-            return
-        level_id = self._levels[lv_idx]["id"]
-
-        try:
-            offset_mm = float(self.txt_floor_offset.Text)
-        except Exception:
-            offset_mm = 0.0
-
-        is_floor_mode = True
-        try:
-            is_floor_mode = safe_bool(self.rb_floor_mode.IsChecked)
+            av_id = eid_value(self._doc.ActiveView.Id)
+            for i, v in enumerate(views):
+                if eid_value(v["id"]) == av_id:
+                    active = i
         except Exception:
             pass
+        self._fill("cmb_room_view", views, "No floor plan of this level", default=active)
+        above = []
+        if level is not None:
+            above = [lv for lv in self._levels if lv["elevation"] > level["elevation"] + 1e-6]
+        self._fill("cmb_column_top_level", [UNCONNECTED] + above, "No level",
+                   default=1 if above else 0)
+        self._update_enabling()
 
-        if is_floor_mode:
-            self._create_floors(selected_layers, total_loops, level_id, offset_mm)
-        else:
-            self._create_parts(selected_layers, total_loops, level_id, offset_mm)
-
-    def _create_floors(self, selected_layers, total_loops, level_id, offset_mm):
-        ft_idx = self.cmb_floor_type.SelectedIndex
-        if ft_idx < 0 or ft_idx >= len(self._floor_types):
-            forms.alert("Select a Floor Type.", title="CAD to Floor")
-            return
-        floor_type_id = self._floor_types[ft_idx]["id"]
-
-        is_structural = False
-        try:
-            is_structural = safe_bool(self.chk_floor_structural.IsChecked)
-        except Exception:
-            pass
-
-        self._set_status("Creating floors...")
-        created = 0
-        failed = 0
-
-        t = Transaction(self._doc, "T3Lab: CAD to Floor")
-        t.Start()
-        try:
-            for ld in selected_layers:
-                for loop in ld.closed_loops:
-                    try:
-                        floor = create_floor_from_loop(
-                            self._doc, loop, floor_type_id, level_id,
-                            offset_mm, is_structural)
-                        if floor:
-                            created += 1
-                        else:
-                            failed += 1
-                    except Exception:
-                        failed += 1
-            if created > 0:
-                t.Commit()
-            else:
-                t.RollBack()
-        except Exception as ex:
+    def _scan_current_cad(self):
+        cad = self._pick("cmb_cad_files")
+        layers = {}
+        if cad is not None:
+            self._set_status(u"Reading layers of {}…".format(cad["name"]))
+            self._do_events()
             try:
-                if t.HasStarted() and not t.HasEnded():
-                    t.RollBack()
-            except Exception:
-                pass
-            self._set_status("Error: {}".format(str(ex)))
-            forms.alert("Error creating floors:\n{}".format(str(ex)), title="CAD to Floor")
-            return
-
-        msg = "Created: {} floor(s), Failed: {}".format(created, failed)
-        self._set_status(msg)
-        if created > 0:
-            forms.alert(msg, title="CAD to Floor")
-        else:
-            forms.alert("No floors were created.", title="CAD to Floor")
-
-    def _create_parts(self, selected_layers, total_loops, level_id, offset_mm):
-        cat_idx = self.cmb_part_category.SelectedIndex
-        if cat_idx < 0 or cat_idx >= len(self._ds_categories):
-            forms.alert("Select a Part Category.", title="CAD to Part")
-            return
-        category_bic = self._ds_categories[cat_idx]["bic"]
-
-        try:
-            thickness_mm = float(self.txt_part_thickness.Text)
-            if thickness_mm <= 0:
-                forms.alert("Thickness must be > 0.", title="CAD to Part")
-                return
-        except Exception:
-            forms.alert("Enter a valid thickness in mm.", title="CAD to Part")
-            return
-
-        self._set_status("Creating parts...")
-        created = 0
-        failed = 0
-
-        t = Transaction(self._doc, "T3Lab: CAD to Part")
-        t.Start()
-        try:
-            for ld in selected_layers:
-                for loop in ld.closed_loops:
-                    try:
-                        ds = create_part_from_loop(
-                            self._doc, loop, category_bic, level_id,
-                            thickness_mm, offset_mm)
-                        if ds:
-                            created += 1
-                        else:
-                            failed += 1
-                    except Exception:
-                        failed += 1
-            if created > 0:
-                t.Commit()
-            else:
-                t.RollBack()
-        except Exception as ex:
-            try:
-                if t.HasStarted() and not t.HasEnded():
-                    t.RollBack()
-            except Exception:
-                pass
-            self._set_status("Error: {}".format(str(ex)))
-            forms.alert("Error creating parts:\n{}".format(str(ex)), title="CAD to Part")
-            return
-
-        msg = "Created: {} part(s), Failed: {}".format(created, failed)
-        self._set_status(msg)
-        if created > 0:
-            forms.alert(msg, title="CAD to Part")
-        else:
-            forms.alert("No parts were created.", title="CAD to Part")
-
-    # ------------------------------------------------------------------
-    # Beam creation
-    # ------------------------------------------------------------------
-
-    def _run_beam(self):
-        cad_idx = self.cmb_cad_files.SelectedIndex
-        if cad_idx < 0 or cad_idx >= len(self._cad_list):
-            forms.alert("Select a CAD file first.", title="CAD to Beam")
-            return
-        cad = self._cad_list[cad_idx]
-
-        selected_layers = self._get_beam_selected_layers()
-        if not selected_layers:
-            forms.alert("Select at least one beam layer (click Refresh first).", title="CAD to Beam")
-            return
-
-        family_item = self.cb_beam_types.SelectedItem
-        if family_item is None:
-            forms.alert("Select a beam family.", title="CAD to Beam")
-            return
-        try:
-            family_name = family_item.Content
-        except Exception:
-            family_name = str(family_item)
-
-        lv_idx = self.cmb_levels.SelectedIndex
-        if lv_idx < 0 or lv_idx >= len(self._levels):
-            forms.alert("Select a Level.", title="CAD to Beam")
-            return
-        lv_dict = self._levels[lv_idx]
-        level = self._doc.GetElement(lv_dict["id"])
-
-        try:
-            z_offset_mm = float(self.txt_beam_offset.Text)
-        except Exception:
-            z_offset_mm = -50.0
-
-        instance = cad["element"]
-        import_cat = instance.Category
-
-        # Extract + pair lines across every selected layer, combining into one list
-        all_pairs = []
-        for layer_name in selected_layers:
-            # Find GraphicsStyle ID for this layer
-            beam_gs_id = None
-            try:
-                for sc in import_cat.SubCategories:
-                    if sc.Name == layer_name:
-                        beam_gs_id = sc.GetGraphicsStyle(DB.GraphicsStyleType.Projection).Id
-                        break
-            except Exception:
-                pass
-
-            if not beam_gs_id:
-                continue
-
-            # Extract geometry curves for the layer
-            raw_curves = []
-            try:
-                opt = DB.Options()
-                geom = instance.get_Geometry(opt)
-
-                def scan_geo(geo_iterable, transform=None):
-                    for obj in geo_iterable:
-                        if isinstance(obj, DB.GeometryInstance):
-                            scan_geo(obj.GetInstanceGeometry(), obj.Transform)
-                        elif isinstance(obj, (DB.Line, DB.Curve)):
-                            if obj.GraphicsStyleId == beam_gs_id:
-                                if transform:
-                                    raw_curves.append(obj.CreateTransformed(transform))
-                                else:
-                                    raw_curves.append(obj)
-
-                scan_geo(geom)
-            except Exception:
-                continue
-
-            # Classify lines as horizontal or vertical
-            lines_h = []
-            lines_v = []
-            for c in raw_curves:
-                try:
-                    sp = c.GetEndPoint(0)
-                    ep = c.GetEndPoint(1)
-                    dx = ep.X - sp.X
-                    dy = ep.Y - sp.Y
-                    length_2d = math.sqrt(dx * dx + dy * dy) * FT_TO_MM
-                    if length_2d < 10:
-                        continue
-                    angle = abs(math.degrees(math.atan2(dy, dx))) % 180
-                    entry = {
-                        "x1": sp.X * FT_TO_MM, "y1": sp.Y * FT_TO_MM,
-                        "x2": ep.X * FT_TO_MM, "y2": ep.Y * FT_TO_MM,
-                        "z": sp.Z * FT_TO_MM, "length": length_2d
-                    }
-                    if angle < 10 or angle > 170:
-                        lines_h.append(entry)
-                    elif 80 < angle < 100:
-                        lines_v.append(entry)
-                except Exception:
-                    pass
-
-            all_pairs.extend(_pair_lines_h(lines_h) + _pair_lines_v(lines_v))
-
-        if not all_pairs:
-            forms.alert("No parallel pairs found in the selected layer(s).",
-                        title="CAD to Beam")
-            return
-
-        is_beam_mode = True
-        try:
-            is_beam_mode = safe_bool(self.rb_beam_mode.IsChecked)
-        except Exception:
-            pass
-
-        if not is_beam_mode:
-            cat_idx = self.cmb_beam_part_category.SelectedIndex
-            if cat_idx < 0 or cat_idx >= len(self._ds_categories):
-                forms.alert("Select a Part Category.", title="CAD to Beam Part")
-                return
-            category_bic = self._ds_categories[cat_idx]["bic"]
-            cat_name = self._ds_categories[cat_idx]["name"]
-
-            self._set_status("Creating {} beam parts...".format(len(all_pairs)))
-
-            t = Transaction(self._doc, "T3Lab: CAD to Beam Part")
-            t.Start()
-            try:
-                created = 0
-                failed = 0
-                for p in all_pairs:
-                    try:
-                        width_rounded = round(p["width"] / 50) * 50
-                        height_mm = _get_height_for_width(width_rounded)
-
-                        z_ft = level.Elevation + (z_offset_mm * MM_TO_FT)
-
-                        if p["dir"] == "H":
-                            sp_pt = DB.XYZ(p["main_s"] * MM_TO_FT, p["perp"] * MM_TO_FT, z_ft)
-                            ep_pt = DB.XYZ(p["main_e"] * MM_TO_FT, p["perp"] * MM_TO_FT, z_ft)
-                        else:
-                            sp_pt = DB.XYZ(p["perp"] * MM_TO_FT, p["main_s"] * MM_TO_FT, z_ft)
-                            ep_pt = DB.XYZ(p["perp"] * MM_TO_FT, p["main_e"] * MM_TO_FT, z_ft)
-
-                        if sp_pt.DistanceTo(ep_pt) < 0.1:
-                            continue
-
-                        half_width_ft = mm_to_ft(width_rounded) / 2.0
-                        rect_loop = build_rect_loop_from_centerline(sp_pt, ep_pt, half_width_ft)
-                        ds = create_part_from_loop(
-                            self._doc, rect_loop, category_bic, lv_dict["id"],
-                            thickness_mm=height_mm, offset_mm=0)
-                        if ds:
-                            created += 1
-                        else:
-                            failed += 1
-                    except Exception:
-                        failed += 1
-
-                status = t.Commit()
-                if status != DB.TransactionStatus.Committed:
-                    self._set_status("Beam part transaction did not commit, status: {}".format(status))
-                    forms.alert("Beam part transaction did not commit.", title="CAD to Beam Part")
-                    return
+                layers = cr.scan_cad(self._doc, cad["element"])
             except Exception as ex:
-                if t.HasStarted() and not t.HasEnded():
-                    t.RollBack()
-                self._set_status("Error creating beam parts: {}".format(str(ex)))
-                forms.alert("Error creating beam parts:\n{}".format(str(ex)), title="CAD to Beam Part")
-                return
+                self._set_status(u"Could not read {}: {}".format(cad["name"], ex), "danger")
+                layers = {}
+        self._rows = [LayerRow(layers[n]) for n in sorted(layers, key=lambda s: s.lower())]
+        self._restore_selection()
+        self._update_counts()
+        self._apply_filter()
+        if cad is None:
+            self._set_status("No CAD file in this model — import or link a DWG first.", "warning")
+        elif cad is not None and self._rows:
+            self._set_status(u"Read {} layers from {}.".format(len(self._rows), cad["name"]))
 
-            msg = "Created: {} part(s) | Failed: {} | Category: {}".format(created, failed, cat_name)
-            self._set_status(msg)
-            forms.alert(msg, title="CAD to Beam Part")
+    # ------------------------------------------------------------------
+    # Combo helpers
+    # ------------------------------------------------------------------
+
+    def _fill(self, name, items, empty_text, label="name", default=0, prefer=None, exact=False):
+        combo = getattr(self, name)
+        combo.Items.Clear()
+        self._lists[name] = list(items)
+        if not items:
+            hint = ComboBoxItem()
+            hint.Content = empty_text
+            hint.IsEnabled = False
+            combo.Items.Add(hint)
+            combo.SelectedIndex = 0
             return
+        for it in items:
+            combo.Items.Add(it[label])
+        if prefer:
+            for i, it in enumerate(items):
+                low = it[label].lower()
+                if any((low == p) if exact else (p in low) for p in prefer):
+                    default = i
+                    break
+        combo.SelectedIndex = default if 0 <= default < len(items) else 0
 
-        self._set_status("Creating {} beams...".format(len(all_pairs)))
+    def _pick(self, name):
+        items = self._lists.get(name) or []
+        idx = getattr(self, name).SelectedIndex
+        return items[idx] if 0 <= idx < len(items) else None
 
-        t = Transaction(self._doc, "T3Lab: CAD to Beam")
-        t.Start()
-        try:
-            created = 0
-            for p in all_pairs:
-                width_rounded = round(p["width"] / 50) * 50
-                height = _get_height_for_width(width_rounded)
-                fam_sym = get_or_create_beam_type(self._doc, family_name, width_rounded, height)
-                if not fam_sym:
-                    continue
-                if not fam_sym.IsActive:
-                    fam_sym.Activate()
+    @staticmethod
+    def _index_of(items, item_id):
+        for i, it in enumerate(items):
+            if item_id is not None and it.get("id") == item_id:
+                return i
+        return 0
 
-                z_ft = level.Elevation + (z_offset_mm * MM_TO_FT)
+    def _current_cad_id(self):
+        cad = self._pick("cmb_cad_files") if "cmb_cad_files" in self._lists else None
+        return cad["id"] if cad else None
 
-                if p["dir"] == "H":
-                    sp_pt = DB.XYZ(p["main_s"] * MM_TO_FT, p["perp"] * MM_TO_FT, z_ft)
-                    ep_pt = DB.XYZ(p["main_e"] * MM_TO_FT, p["perp"] * MM_TO_FT, z_ft)
-                else:
-                    sp_pt = DB.XYZ(p["perp"] * MM_TO_FT, p["main_s"] * MM_TO_FT, z_ft)
-                    ep_pt = DB.XYZ(p["perp"] * MM_TO_FT, p["main_e"] * MM_TO_FT, z_ft)
+    def _current_level_id(self):
+        lv = self._pick("cmb_levels") if "cmb_levels" in self._lists else None
+        return eid_value(lv["id"]) if lv else None
 
-                if sp_pt.DistanceTo(ep_pt) < 0.1:
-                    continue
-
-                beam_line = DB.Line.CreateBound(sp_pt, ep_pt)
-                beam = self._doc.Create.NewFamilyInstance(
-                    beam_line, fam_sym, level, DB.Structure.StructuralType.Beam)
-
-                p_offset = beam.get_Parameter(DB.BuiltInParameter.Z_OFFSET_VALUE)
-                if p_offset:
-                    p_offset.Set(z_offset_mm * MM_TO_FT)
-
-                created += 1
-
-            t.Commit()
-        except Exception as ex:
+    def _default_level_index(self, keep_id):
+        wanted = keep_id
+        if wanted is None:
             try:
-                t.RollBack()
+                gen = self._doc.ActiveView.GenLevel
+                wanted = eid_value(gen.Id) if gen is not None else None
             except Exception:
-                pass
-            self._set_status("Error creating beams: {}".format(str(ex)))
-            forms.alert("Error creating beams:\n{}".format(str(ex)), title="CAD to Beam")
-            return
+                wanted = None
+        for i, lv in enumerate(self._levels):
+            if wanted is not None and eid_value(lv["id"]) == wanted:
+                return i
+        return 0
 
-        msg = "Created {} beams.".format(created)
-        self._set_status(msg)
-        forms.alert(msg, title="CAD to Beam")
+    @staticmethod
+    def _checked(ctrl):
+        try:
+            return bool(ctrl.IsChecked)
+        except Exception:
+            return False
 
     # ------------------------------------------------------------------
-    # MEP creation (duct / pipe / tray / conduit)
+    # Status line
     # ------------------------------------------------------------------
 
-    def _run_mep(self, key):
-        cfg = MEP_UI_CONFIG[key]
-        title = cfg["title"]
+    def _set_status(self, msg, state="ok"):
+        try:
+            self.txt_status.Text = msg
+        except Exception:
+            pass
+        key = {"ok": "T3.Success.Accent", "warning": "T3.Warning.Accent",
+               "danger": "T3.Danger.Accent"}.get(state, "T3.Success.Accent")
+        try:
+            brush = self.TryFindResource(key)
+            if brush is not None:
+                self.dot_status.Fill = brush
+        except Exception:
+            pass
 
-        idx = self.cmb_cad_files.SelectedIndex
-        if idx < 0 or idx >= len(self._cad_list):
-            forms.alert("Select a CAD file first.", title=title)
-            return
-        cad = self._cad_list[idx]
+    def _update_status(self, text):
+        """Progress messages from T3WPFWindow.step_progress land here."""
+        self._set_status(text)
 
-        selected_layers = self._get_mep_selected_layers(key)
-        if not selected_layers:
-            forms.alert("Select at least one layer (click Refresh to scan).",
-                        title=title)
-            return
+    # ------------------------------------------------------------------
+    # Modes
+    # ------------------------------------------------------------------
 
-        lv_idx = self.cmb_levels.SelectedIndex
-        if lv_idx < 0 or lv_idx >= len(self._levels):
-            forms.alert("Select a Level.", title=title)
-            return
-        lv = self._levels[lv_idx]
+    def mode_tile_clicked(self, sender, e):
+        self._apply_mode(str(sender.Tag))
 
-        # Type selection — combos hold a disabled hint row when nothing is
-        # loaded, so validate against the stored lists, not the combo
-        type_list = {"duct": self._duct_types, "pipe": self._pipe_types,
-                     "tray": self._tray_types, "conduit": self._conduit_types}[key]
-        if not type_list:
-            forms.alert(
-                "No {}s found in this project.\n"
-                "Load an MEP template or family first.".format(cfg["type_label"]),
-                title=title)
+    def _apply_mode(self, key):
+        if key not in self._panels:
             return
-        t_idx = getattr(self, cfg["type_combo"]).SelectedIndex
-        if t_idx < 0 or t_idx >= len(type_list):
-            forms.alert("Select a {}.".format(cfg["type_label"]), title=title)
-            return
-        type_id = type_list[t_idx]["id"]
+        self._store_selection()
+        self._mode = key
+        for k, tile in self._tiles.items():
+            tile.IsChecked = (k == key)
+        for k, panel in self._panels.items():
+            panel.Visibility = Visibility.Visible if k == key else Visibility.Collapsed
+        m = geo.mode(key)
+        self.txt_mode_title.Text = m["title"]
+        self.txt_mode_desc.Text = m["desc"]
+        try:
+            self.grid_layers.Columns[2].Header = geo.COUNT_HEADERS[m["count_kind"]]
+        except Exception:
+            pass
+        self._restore_selection()
+        self._update_counts()
+        self._apply_filter()
+        self._update_run_label()
+        self._update_enabling()
 
-        # System type (duct / pipe only)
-        system_type_id = None
-        if cfg["system"]:
-            if key == "duct":
-                sys_list = self._mech_systems
-                sys_combo = self.cmb_duct_system
-                sys_label = "mechanical"
+    def _update_run_label(self):
+        verb = geo.mode(self._mode)["verb"]
+        if self._mode == "mep":
+            verb = geo.mep_category(self._mep_key)["verb"]
+        self.btn_run.Content = verb
+
+    def create_as_changed(self, sender, e):
+        if self._busy:
+            return
+        if self._mode == "column":
+            self._fill_column_types()
+        self._update_enabling()
+
+    def column_top_level_changed(self, sender, e):
+        self._update_enabling()
+
+    def _update_enabling(self):
+        """Inside a mode, fields that do not apply are disabled — never hidden."""
+        c = self._checked
+        wall_part = c(self.rb_wall_part_mode)
+        for ctrl in (self.cmb_wall_type, self.chk_wall_match_thickness, self.chk_structural):
+            ctrl.IsEnabled = not wall_part
+        self.cmb_wall_part_category.IsEnabled = wall_part
+
+        floor_part = c(self.rb_part_mode)
+        self.cmb_floor_type.IsEnabled = not floor_part
+        self.chk_floor_structural.IsEnabled = not floor_part
+        self.txt_part_thickness.IsEnabled = floor_part
+        self.cmb_part_category.IsEnabled = floor_part
+
+        ceil_part = c(self.rb_ceiling_part_mode)
+        self.cmb_ceiling_type.IsEnabled = not ceil_part
+        self.txt_ceiling_part_thickness.IsEnabled = ceil_part
+        self.cmb_ceiling_part_category.IsEnabled = ceil_part
+
+        lines_only = c(self.rb_room_lines)
+        self.cmb_room_view.IsEnabled = not c(self.rb_room_only)
+        self.txt_room_name.IsEnabled = not lines_only
+        self.chk_room_skip_existing.IsEnabled = not lines_only
+
+        top = self._pick("cmb_column_top_level")
+        self.txt_column_height.IsEnabled = top is None or top.get("element") is None
+
+        beam_part = c(self.rb_beam_part_mode)
+        self.cb_beam_types.IsEnabled = not beam_part
+        self.chk_beam_match_size.IsEnabled = not beam_part
+        self.cmb_beam_part_category.IsEnabled = beam_part
+
+        auto = c(self.rb_grid_autoname)
+        self.txt_grid_start_number.IsEnabled = auto
+        self.txt_grid_start_letter.IsEnabled = auto
+
+        self.txt_lines_offset.IsEnabled = not c(self.rb_lines_detail)
+
+        cat = geo.mep_category(self._mep_key)
+        double = cat["double"] and self.cmb_mep_line_mode.SelectedIndex == 1
+        self.cmb_mep_system.IsEnabled = cat["system"]
+        self.cmb_mep_line_mode.IsEnabled = cat["double"]
+        self.txt_mep_width.IsEnabled = not double
+        self.txt_mep_height.IsEnabled = cat["height"]
+
+    # ── MEP category (ducts / pipes / cable trays / conduits) ──
+
+    def mep_category_changed(self, sender, e):
+        if self._busy:
+            return
+        key = str(sender.Tag)
+        if key != self._mep_key:
+            self._save_mep(self._mep_key)
+            self._fill_mep(key, restore=True)
+            self._update_run_label()
+            self._update_counts()
+            self._update_tally()
+
+    def mep_line_mode_changed(self, sender, e):
+        if not self._busy:
+            self._update_enabling()
+
+    def _save_mep(self, key):
+        self._mep_values[key] = dict(
+            type=self.cmb_mep_type.SelectedIndex, system=self.cmb_mep_system.SelectedIndex,
+            line=self.cmb_mep_line_mode.SelectedIndex, width=self.txt_mep_width.Text,
+            height=self.txt_mep_height.Text, offset=self.txt_mep_offset.Text)
+
+    def _fill_mep(self, key, restore):
+        self._mep_key = key
+        cat = geo.mep_category(key)
+        busy, self._busy = self._busy, True
+        try:
+            self.lbl_mep_type.Text = cat["type_label"].upper()
+            self.lbl_mep_width.Text = cat["width_label"]
+            self._fill("cmb_mep_type", self._mep_types.get(key, []),
+                       "No {} loaded — load an MEP template".format(cat["type_label"]))
+            if cat["system"]:
+                self._fill("cmb_mep_system", self._mep_systems.get(key, []),
+                           "No system type loaded")
             else:
-                sys_list = self._piping_systems
-                sys_combo = self.cmb_pipe_system
-                sys_label = "piping"
-            if not sys_list:
-                forms.alert(
-                    "No {} system types found in this project.\n"
-                    "Load an MEP template first.".format(sys_label),
-                    title=title)
-                return
-            s_idx = sys_combo.SelectedIndex
-            if s_idx < 0 or s_idx >= len(sys_list):
-                forms.alert("Select a system type.", title=title)
-                return
-            system_type_id = sys_list[s_idx]["id"]
-
-        # Inputs (mm -> ft, with defaults)
-        try:
-            width_ft = mm_to_ft(float(getattr(self, cfg["width_box"]).Text.strip()))
-        except Exception:
-            width_ft = mm_to_ft(cfg["default_width"])
-
-        height_ft = None
-        if cfg["height_box"]:
-            try:
-                height_ft = mm_to_ft(float(getattr(self, cfg["height_box"]).Text.strip()))
-            except Exception:
-                height_ft = mm_to_ft(cfg["default_height"])
-
-        try:
-            offset_ft = mm_to_ft(float(getattr(self, cfg["offset_box"]).Text.strip()))
-        except Exception:
-            offset_ft = mm_to_ft(cfg["default_offset"])
-
-        merge_col = safe_bool(getattr(self, cfg["merge_chk"]).IsChecked)
-        auto_elbow = safe_bool(getattr(self, cfg["elbow_chk"]).IsChecked)
-        double_mode = False
-        if cfg["double"]:
-            radio = self.rb_duct_double if key == "duct" else self.rb_tray_double
-            double_mode = safe_bool(radio.IsChecked)
-
-        # Extract geometry
-        self._set_status("Extracting lines from CAD...")
-        try:
-            lines = extract_lines_from_cad(self._doc, cad["element"], selected_layers)
-            if merge_col:
-                lines = merge_collinear_lines(lines)
-        except Exception as ex:
-            self._set_status("Error extracting lines: {}".format(str(ex)))
-            forms.alert("Error extracting lines:\n{}".format(str(ex)), title=title)
-            return
-
-        unpaired_count = 0
-        if double_mode:
-            centerlines, unpaired = find_parallel_pairs(
-                lines, max_sep=mm_to_ft(MEP_MAX_PAIR_SEP_MM))
-            unpaired_count = len(unpaired)
-            if not centerlines:
-                forms.alert(
-                    "No parallel line pairs found in the selected layers.\n"
-                    "Switch to single-line mode or check the CAD layers.",
-                    title=title)
-                self._set_status("No parallel pairs found.")
-                return
-            segments = [{"start": cl["start"], "end": cl["end"],
-                         "width_ft": cl["thickness"]} for cl in centerlines]
-        else:
-            segments = [{"start": ln["start"], "end": ln["end"], "width_ft": None}
-                        for ln in lines]
-
-        if not segments:
-            forms.alert("No lines found in the selected layers.", title=title)
-            self._set_status("No lines found.")
-            return
-
-        self._set_status("Creating {} {}...".format(len(segments), cfg["noun"]))
-        try:
-            created, failed, skipped, size_failed, elb_ok, elb_skip = create_mep_runs(
-                self._doc, key, segments, lv["id"], offset_ft,
-                type_id, system_type_id, width_ft, height_ft, auto_elbow)
-        except Exception as ex:
-            self._set_status("Error creating {}: {}".format(cfg["noun"], str(ex)))
-            forms.alert("Error creating {}:\n{}".format(cfg["noun"], str(ex)),
-                        title=title)
-            return
-
-        msg = "Created: {} {}".format(created, cfg["noun"])
-        if failed:
-            msg += u" | Failed: {}".format(failed)
-        if skipped:
-            msg += u" | Skipped: {}".format(skipped)
-        if auto_elbow:
-            msg += u" | Elbows: {}".format(elb_ok)
-        self._set_status(msg)
-
-        detail = u"Created: {}\nFailed: {}\nSkipped: {}".format(created, failed, skipped)
-        if size_failed:
-            detail += u"\nSize not applied (catalog mismatch): {}".format(size_failed)
-        if auto_elbow:
-            detail += u"\nElbows placed: {} / skipped: {}".format(elb_ok, elb_skip)
-        if double_mode and unpaired_count:
-            detail += u"\nUnpaired lines ignored: {}".format(unpaired_count)
-        forms.alert(detail, title=title)
+                self._fill("cmb_mep_system", [], "Not used for {}".format(cat["noun"]))
+            saved = self._mep_values.get(key) if restore else None
+            if saved:
+                for name, idx in (("cmb_mep_type", saved["type"]), ("cmb_mep_system", saved["system"])):
+                    combo = getattr(self, name)
+                    if 0 <= idx < combo.Items.Count:
+                        combo.SelectedIndex = idx
+                self.cmb_mep_line_mode.SelectedIndex = saved["line"] if cat["double"] else 0
+                self.txt_mep_width.Text = saved["width"]
+                self.txt_mep_height.Text = saved["height"]
+                self.txt_mep_offset.Text = saved["offset"]
+            else:
+                self.cmb_mep_line_mode.SelectedIndex = 0
+                self.txt_mep_width.Text = "{:g}".format(cat["width"])
+                self.txt_mep_height.Text = "{:g}".format(cat["height_mm"]) if cat["height_mm"] else ""
+                self.txt_mep_offset.Text = "{:g}".format(cat["offset"])
+        finally:
+            self._busy = busy
+        self._update_enabling()
 
     # ------------------------------------------------------------------
-    # Window chrome
+    # Source / level
     # ------------------------------------------------------------------
 
-    def _on_minimize(self, sender, e):
-        self.WindowState = WindowState.Minimized
+    def cad_file_changed(self, sender, e):
+        if not self._busy:
+            self._scan_current_cad()
 
-    def _on_maximize(self, sender, e):
-        if self.WindowState == WindowState.Maximized:
-            self.WindowState = WindowState.Normal
-            try:
-                self.btn_maximize.ToolTip = "Maximize"
-            except Exception:
-                pass
-        else:
-            self.WindowState = WindowState.Maximized
-            try:
-                self.btn_maximize.ToolTip = "Restore"
-            except Exception:
-                pass
+    def level_changed(self, sender, e):
+        if not self._busy:
+            self._fill_level_dependent()
 
-    def _on_close(self, sender, e):
-        self.Close()
+    def refresh_clicked(self, sender, e):
+        self._rescan()
+
+    def _rescan(self):
+        self._store_selection()
+        self._busy = True
+        try:
+            self._load_all()
+        finally:
+            self._busy = False
+        self._apply_mode(self._mode)
 
     def _on_key_down(self, sender, e):
-        import System.Windows.Input as WI
-        if e.Key == WI.Key.Escape:
-            self.Close()
-        elif e.Key == WI.Key.F5:
+        if e.Key == Key.F5:
+            self._rescan()
+            e.Handled = True
+
+    def close_bar_clicked(self, sender, e):
+        self.Close()
+
+    # ------------------------------------------------------------------
+    # Layer list (shared by every mode)
+    # ------------------------------------------------------------------
+
+    def _store_selection(self):
+        if self._rows:
+            self._selected[self._mode] = set(r.name for r in self._rows if r.is_selected)
+
+    def _restore_selection(self):
+        chosen = self._selected.get(self._mode, set())
+        for r in self._rows:
+            r.is_selected = r.name in chosen
+
+    def _count_kind(self):
+        return geo.mode(self._mode)["count_kind"]
+
+    def _update_counts(self):
+        kind = self._count_kind()
+        for r in self._rows:
             try:
-                self._populate_cad_files()
-                self._set_status("Refreshed CAD files.")
+                r.count = str(r.geom.count(kind))
+            except Exception:
+                r.count = "0"
+
+    def _visible_rows(self):
+        try:
+            text = (self.txt_layer_search.Text or "").strip().lower()
+        except Exception:
+            text = ""
+        if not text:
+            return list(self._rows)
+        return [r for r in self._rows if text in r.name.lower()]
+
+    def _apply_filter(self):
+        shown = self._visible_rows()
+        self.set_items_source(self.grid_layers, shown)
+        self.txt_layers_empty.Visibility = Visibility.Collapsed if shown else Visibility.Visible
+        self._sync_header()
+        self._update_tally()
+
+    def _refresh_rows(self):
+        try:
+            self.grid_layers.Items.Refresh()
+        except Exception:
+            pass
+        self._sync_header()
+        self._update_tally()
+
+    def _sync_header(self):
+        try:
+            self.sync_header_checkbox(self.chk_all_grid_layers, self.grid_layers, "is_selected")
+        except Exception:
+            pass
+
+    def _update_tally(self):
+        kind = self._count_kind()
+        unit = geo.COUNT_HEADERS[kind].lower()
+        selected = [r for r in self._rows if r.is_selected]
+        total = 0
+        for r in selected:
+            try:
+                total += int(r.count)
+            except ValueError:
+                pass
+        text = u"{} of {} layers selected · {} {}".format(len(selected), len(self._rows), total, unit)
+        shown = len(self._visible_rows())
+        if shown != len(self._rows):
+            text += u" · showing {}".format(shown)
+        self.txt_layer_tally.Text = text
+
+    def layer_search_changed(self, sender, e):
+        self._apply_filter()
+
+    def select_all_grid_layers_clicked(self, sender, e):
+        self.toggle_all_rows(self.grid_layers, "is_selected", sender.IsChecked)
+        self._store_selection()
+        self._refresh_rows()
+
+    def layers_select_all_clicked(self, sender, e):
+        self.toggle_all_rows(self.grid_layers, "is_selected", True)
+        self._store_selection()
+        self._refresh_rows()
+
+    def layers_clear_clicked(self, sender, e):
+        self.toggle_all_rows(self.grid_layers, "is_selected", False)
+        self._store_selection()
+        self._refresh_rows()
+
+    def _on_row_checkbox_click(self, sender, e):
+        self._store_selection()
+        self._sync_header()
+        self._update_tally()
+
+    # ------------------------------------------------------------------
+    # AI Select — semantic match of layer names (T3 AI Mode)
+    # ------------------------------------------------------------------
+
+    def ai_select_clicked(self, sender, e):
+        if not self.ai_require():
+            return
+        names = [r.name for r in self._rows]
+        if not names:
+            show_info("There are no CAD layers to choose from.", title="AI Select",
+                      details="Pick a CAD file under CAD SOURCE first.", owner=self)
+            return
+        mode_key = self._mode
+        label = geo.mode(mode_key)["ai_label"]
+        if mode_key == "mep":
+            label = geo.mep_category(self._mep_key)["ai_label"]
+        system_prompt = (
+            "You are an expert BIM manager and CAD/Revit specialist. You read AutoCAD/DWG "
+            "layer names and decide which layers hold a given building element category. "
+            "Return JSON: {\"matched_layers\": [\"LAYER1\"], \"confidence\": 0.0-1.0, "
+            "\"reasoning\": \"<one short English sentence>\"}.")
+        prompt = ("Element category: {}\nCAD layer names in the drawing:\n{}\n\n"
+                  "List every layer name that holds {}. Return only names from the list."
+                  ).format(label, "\n".join("- " + n for n in names[:200]), label)
+        self.ai_busy(self.btn_ai_select, True)
+        self._set_status(u"AI is reading {} layer names for {}…".format(len(names), label))
+
+        def worker():
+            return self.ai_bridge.ask_json(prompt, system_prompt=system_prompt)
+
+        def on_success(result):
+            try:
+                matched = set()
+                if isinstance(result, dict):
+                    matched = set(str(m).strip().lower() for m in result.get("matched_layers") or [])
+                hits = [n for n in names if n.strip().lower() in matched]
+                if self._mode == mode_key:
+                    for r in self._rows:
+                        if r.name in hits:
+                            r.is_selected = True
+                    self._store_selection()
+                    self._refresh_rows()
+                else:
+                    self._selected[mode_key].update(hits)
+                reason = result.get("reasoning", "") if isinstance(result, dict) else ""
+                if hits:
+                    self._set_status(u"AI ticked {} layer(s) for {}. {}".format(len(hits), label, reason))
+                else:
+                    self._set_status(u"AI found no layer that looks like {}. Tick the layers by hand."
+                                     .format(label), "warning")
+            finally:
+                self.ai_busy(self.btn_ai_select, False)
+
+        def on_error(err):
+            self.ai_busy(self.btn_ai_select, False)
+            self._set_status(u"AI Select failed: {}. Tick the layers by hand.".format(err), "danger")
+
+        self.run_ai_async(worker, on_success=on_success, on_error=on_error)
+
+    # ------------------------------------------------------------------
+    # Run — plan, confirm (P5), create, report
+    # ------------------------------------------------------------------
+
+    def run_clicked(self, sender, e):
+        self._store_selection()
+        try:
+            ctx = self._context()
+            planners = {"wall": self._plan_wall, "floor": self._plan_floor,
+                        "ceiling": self._plan_ceiling, "room": self._plan_room,
+                        "column": self._plan_column, "beam": self._plan_beam,
+                        "grid": self._plan_grid, "lines": self._plan_lines,
+                        "mep": self._plan_mep}
+            plan = planners[self._mode](ctx)
+        except _InputError as ex:
+            show_warning(str(ex), title=TITLE, owner=self)
+            self._set_status(str(ex).splitlines()[0], "warning")
+            return
+        if plan.count <= 0:
+            show_warning(u"Nothing to create: no {} found in the ticked layers.".format(plan.noun),
+                         title=TITLE, details=plan.empty_msg, owner=self)
+            self._set_status(u"No {} found in the ticked layers.".format(plan.noun), "warning")
+            return
+        if not confirm(plan.question, title=TITLE, ok_text=plan.ok_text,
+                       details=plan.details, owner=self):
+            self._set_status("Cancelled — nothing was created.", "warning")
+            return
+        self.begin_progress(max(plan.count, 1), disable=[self.btn_run, self.btn_refresh])
+        try:
+            result = plan.execute(self._progress)
+        except Exception as ex:
+            self.end_progress()
+            self._set_status(u"Failed — nothing was created: {}".format(ex), "danger")
+            show_error(u"Creating {} failed and the change was rolled back.".format(plan.noun),
+                       title=TITLE, owner=self,
+                       details=u"{}\n\nCheck the chosen type and level, then run again. If it "
+                               u"keeps failing, read the latest Revit journal for the stack trace."
+                               .format(ex))
+            return
+        self.end_progress()
+        self._report(result)
+
+    def _progress(self, i, total):
+        step = max(1, total // 100)
+        if i % step == 0 or i == total - 1:
+            self.step_progress(i, u"Creating {} of {}…".format(i + 1, total))
+
+    def _report(self, result):
+        lines = [u"Created: {}".format(_counted(result.created, result.noun))]
+        if result.failed:
+            lines.append(u"Failed: {}".format(result.failed))
+        if result.skipped:
+            lines.append(u"Skipped: {}".format(result.skipped))
+        if result.warnings:
+            lines.append(u"Revit warnings dismissed: {}".format(result.warnings))
+        lines.extend(result.notes)
+        if result.errors:
+            lines.append(u"First error: {}".format(result.errors[0]))
+        details = u"\n".join(lines)
+        level = self._pick("cmb_levels")
+        where = u" on {}".format(level["name"]) if level and self._mode not in ("grid", "lines") else u""
+        if result.created <= 0:
+            self._set_status(u"No {} were created{} — nothing changed.".format(result.noun, where), "danger")
+            show_warning(u"No {} were created; the model is unchanged.".format(result.noun),
+                         title=TITLE, owner=self,
+                         details=details + u"\n\nCheck the chosen type and the ticked layers, then run again.")
+        elif result.failed:
+            self._set_status(u"Created {}{} · {} failed.".format(
+                _counted(result.created, result.noun), where, result.failed), "warning")
+            show_warning(u"Created {}{}; {} could not be created.".format(
+                _counted(result.created, result.noun), where, result.failed),
+                title=TITLE, details=details, owner=self)
+        else:
+            self._set_status(u"Created {}{}. Ctrl+Z undoes the whole run.".format(
+                _counted(result.created, result.noun), where))
+            show_info(u"Created {}{}.".format(_counted(result.created, result.noun), where),
+                      title=TITLE, details=details, owner=self)
+
+    # ── shared inputs ──
+
+    def _context(self):
+        cad = self._pick("cmb_cad_files")
+        if cad is None:
+            raise _InputError(
+                "No CAD file is selected.\nImport or link a DWG into this model, then pick it "
+                "under CAD SOURCE.")
+        layers = [r.geom for r in self._rows if r.is_selected]
+        title = geo.mode(self._mode)["title"]
+        if not layers:
+            raise _InputError(
+                u"No CAD layer is ticked for {}.\nTick the layers that hold the {} in the list "
+                u"on the right, or use AI Select.".format(title, title.lower()))
+        level = self._pick("cmb_levels")
+        if level is None:
+            raise _InputError("The model has no level.\nCreate a level, then run again.")
+        return dict(cad=cad, layers=layers, level=level["element"], level_name=level["name"])
+
+    def _num(self, box, label, default, minimum=None, maximum=None):
+        value, ok = geo.parse_number(box.Text, default, minimum, maximum)
+        if not ok:
+            rng = ""
+            if minimum is not None and maximum is not None:
+                rng = " between {:g} and {:g}".format(minimum, maximum)
+            elif minimum is not None:
+                rng = " of at least {:g}".format(minimum)
+            raise _InputError(u"{} is \"{}\", which is not a usable number.\nEnter a number{} "
+                              u"in the options card, then run again.".format(label, box.Text, rng))
+        return value
+
+    def _need(self, name, what):
+        item = self._pick(name)
+        if item is None or item.get("element") is None:
+            raise _InputError(u"No {} is available.\nLoad one into the model (or pick one in the "
+                              u"options card), then run again.".format(what))
+        return item
+
+    @staticmethod
+    def _segments(layers, merge):
+        segs = [s for lg in layers for s in lg.segments]
+        return geo.merge_collinear(segs) if merge else segs
+
+    @staticmethod
+    def _outline_groups(layers, with_holes):
+        loops = [lp for lg in layers for lp in lg.loops()]
+        polys = [geo.loop_polygon(lp) for lp in loops]
+        keep = geo.dedupe_polygons(polys)
+        loops = [loops[i] for i in keep]
+        polys = [polys[i] for i in keep]
+        if not with_holes:
+            return [(lp, []) for lp in loops], polys, [[] for _ in loops]
+        groups = geo.nest_loops(polys)
+        return ([(loops[o], [loops[h] for h in holes]) for o, holes in groups],
+                [polys[o] for o, _h in groups],
+                [[polys[h] for h in holes] for _o, holes in groups])
+
+    def _category(self, combo_name):
+        cat = self._pick(combo_name)
+        if cat is None:
+            raise _InputError("Pick a part category in the options card, then run again.")
+        return cat
+
+    # ── Walls ──
+
+    def _plan_wall(self, ctx):
+        doc, level = self._doc, ctx["level"]
+        height = self._num(self.txt_wall_height, "Height", 3000, 1)
+        offset = self._num(self.txt_wall_offset, "Base offset", 0)
+        default_thk = self._num(self.txt_wall_thickness, "Unpaired thickness", 200, 1, 3000)
+        include = self._checked(self.chk_include_unpaired)
+        segs = self._segments(ctx["layers"], self._checked(self.chk_merge_collinear))
+        pairs, unpaired = geo.find_parallel_pairs(segs)
+        items = [(c[0], c[1], c[2], c[3], c[4]) for c in pairs]
+        if include:
+            items += [(s[0], s[1], s[2], s[3], geo.mm(default_thk)) for s in unpaired]
+        sizes = sorted(geo.group_by_size(items, lambda it: it[4]))
+        details = [u"Wall pairs found: {}".format(len(pairs)),
+                   u"Single lines: {} ({})".format(len(unpaired), "included" if include else "ignored"),
+                   u"Thicknesses (mm): {}".format(", ".join(str(s) for s in sizes[:12]) or "—"),
+                   u"Height {:g} mm · base offset {:g} mm".format(height, offset)]
+        empty = ("No two parallel lines lie within 610 mm of each other. Tick the layers that hold "
+                 "both faces of each wall, or turn on Include unpaired lines.")
+        n = len(items)
+        if self._checked(self.rb_wall_part_mode):
+            cat = self._category("cmb_wall_part_category")
+            profiles = []
+            for (x0, y0, x1, y1, t) in items:
+                rect = geo.centerline_rect(x0, y0, x1, y1, t / 2.0)
+                lp = geo.loop_from_polygon(rect) if rect else None
+                if lp:
+                    profiles.append((lp, [], level.Elevation + geo.mm(offset), geo.mm(height)))
+            details.append(u"Category: {}".format(cat["name"]))
+            return Plan(len(profiles), "wall parts",
+                        u"Create {} wall parts on {}?".format(len(profiles), ctx["level_name"]),
+                        u"Create {} Parts".format(len(profiles)), u"\n".join(details),
+                        lambda p: cr.create_parts(doc, profiles, cat["bic"],
+                                                  "T3Lab: CAD to Wall Parts", p), empty)
+        wtype = self._need("cmb_wall_type", "basic wall type")
+        match = self._checked(self.chk_wall_match_thickness)
+        details.append(u"Base type: {}{}".format(wtype["name"], " (copied per thickness)" if match else ""))
+        structural = self._checked(self.chk_structural)
+        return Plan(n, "walls", u"Create {} walls on {}?".format(n, ctx["level_name"]),
+                    u"Create {} Walls".format(n), u"\n".join(details),
+                    lambda p: cr.create_walls(doc, items, level, wtype["element"], geo.mm(height),
+                                              geo.mm(offset), structural, match, p), empty)
+
+    # ── Floors / Ceilings ──
+
+    def _plan_floor(self, ctx):
+        doc, level = self._doc, ctx["level"]
+        offset = self._num(self.txt_floor_offset, "Height offset", 0)
+        groups, _p, _h = self._outline_groups(ctx["layers"], self._checked(self.chk_floor_holes))
+        n = len(groups)
+        holes = sum(len(h) for _o, h in groups)
+        details = [u"Outlines: {} · openings: {}".format(n, holes),
+                   u"Height offset {:g} mm".format(offset)]
+        empty = ("The ticked layers hold no closed outline. Use closed polylines or lines whose "
+                 "ends meet, or tick the layer that holds the slab edges.")
+        if self._checked(self.rb_part_mode):
+            thk = self._num(self.txt_part_thickness, "Part thickness", 200, 1)
+            cat = self._category("cmb_part_category")
+            profiles = [(o, h, level.Elevation + geo.mm(offset), geo.mm(thk)) for o, h in groups]
+            details.append(u"Part thickness {:g} mm · category {}".format(thk, cat["name"]))
+            return Plan(n, "floor parts", u"Create {} floor parts on {}?".format(n, ctx["level_name"]),
+                        u"Create {} Parts".format(n), u"\n".join(details),
+                        lambda p: cr.create_parts(doc, profiles, cat["bic"],
+                                                  "T3Lab: CAD to Floor Parts", p), empty)
+        ftype = self._need("cmb_floor_type", "floor type")
+        structural = self._checked(self.chk_floor_structural)
+        details.append(u"Floor type: {}".format(ftype["name"]))
+        return Plan(n, "floors", u"Create {} floors on {}?".format(n, ctx["level_name"]),
+                    u"Create {} Floors".format(n), u"\n".join(details),
+                    lambda p: cr.create_floors(doc, groups, ftype["id"], level, geo.mm(offset),
+                                               structural, p), empty)
+
+    def _plan_ceiling(self, ctx):
+        doc, level = self._doc, ctx["level"]
+        offset = self._num(self.txt_ceiling_offset, "Height offset", 2700)
+        groups, _p, _h = self._outline_groups(ctx["layers"], self._checked(self.chk_ceiling_holes))
+        n = len(groups)
+        details = [u"Outlines: {} · openings: {}".format(n, sum(len(h) for _o, h in groups)),
+                   u"Height offset {:g} mm".format(offset)]
+        empty = ("The ticked layers hold no closed outline. Tick the layer that holds the ceiling "
+                 "outlines (closed polylines or lines whose ends meet).")
+        if self._checked(self.rb_ceiling_part_mode):
+            thk = self._num(self.txt_ceiling_part_thickness, "Part thickness", 25, 1)
+            cat = self._category("cmb_ceiling_part_category")
+            profiles = [(o, h, level.Elevation + geo.mm(offset), geo.mm(thk)) for o, h in groups]
+            details.append(u"Part thickness {:g} mm · category {}".format(thk, cat["name"]))
+            return Plan(n, "ceiling parts", u"Create {} ceiling parts on {}?".format(n, ctx["level_name"]),
+                        u"Create {} Parts".format(n), u"\n".join(details),
+                        lambda p: cr.create_parts(doc, profiles, cat["bic"],
+                                                  "T3Lab: CAD to Ceiling Parts", p), empty)
+        ctype = self._need("cmb_ceiling_type", "ceiling type")
+        details.append(u"Ceiling type: {}".format(ctype["name"]))
+        return Plan(n, "ceilings", u"Create {} ceilings on {}?".format(n, ctx["level_name"]),
+                    u"Create {} Ceilings".format(n), u"\n".join(details),
+                    lambda p: cr.create_ceilings(doc, groups, ctype["id"], level, geo.mm(offset), p),
+                    empty)
+
+    # ── Rooms ──
+
+    def _plan_room(self, ctx):
+        doc, level = self._doc, ctx["level"]
+        make_lines = not self._checked(self.rb_room_only)
+        make_rooms = not self._checked(self.rb_room_lines)
+        view = None
+        if make_lines:
+            item = self._pick("cmb_room_view")
+            if item is None:
+                raise _InputError(u"{} has no floor plan to hold room separation lines.\nCreate a "
+                                  u"floor plan for this level, or choose Rooms only."
+                                  .format(ctx["level_name"]))
+            view = item["element"]
+        edges = [e for lg in ctx["layers"] for e in lg.all_edges()] if make_lines else []
+        points, too_small = [], 0
+        if make_rooms:
+            _g, polys, _h = self._outline_groups(ctx["layers"], False)
+            points, too_small = geo.room_points(polys)
+        name = (self.txt_room_name.Text or "").strip()
+        skip = self._checked(self.chk_room_skip_existing)
+        if make_rooms:
+            n, noun = len(points), "rooms"
+            question = u"Create {} rooms on {}{}?".format(
+                n, ctx["level_name"],
+                u" with {} room separation lines".format(len(edges)) if make_lines else u"")
+            ok = u"Create {} Rooms".format(n)
+        else:
+            n, noun = len(edges), "room separation lines"
+            question = u"Draw {} room separation lines on {}?".format(n, ctx["level_name"])
+            ok = u"Draw {} Lines".format(n)
+        details = [u"Closed outlines (one room each): {}{}".format(
+                       len(points), u" · too small or too narrow for a room: {}".format(too_small)
+                       if too_small else u"") if make_rooms else u"Rooms: none (lines only)",
+                   u"Separation lines: {}{}".format(len(edges), u" in view " + view.Name if view else "")]
+        empty = ("The ticked layers hold no closed outline to put a room in. Tick the wall or room "
+                 "boundary layers, or choose Lines only.") if make_rooms else \
+            "The ticked layers hold no linework."
+        return Plan(n, noun, question, ok, u"\n".join(details),
+                    lambda p: cr.create_rooms(doc, level, view, edges, points, make_lines,
+                                              make_rooms, name, skip, p), empty)
+
+    # ── Columns ──
+
+    def _plan_column(self, ctx):
+        doc, level = self._doc, ctx["level"]
+        step = int(self._num(self.txt_column_rounding, "Size rounding", 10, 1, 500))
+        height = self._num(self.txt_column_height, "Height", 3000, 1)
+        rect_item = self._pick("cmb_column_type")
+        round_item = self._pick("cmb_column_round_type")
+        rect_sym = rect_item["element"] if rect_item else None
+        round_sym = round_item["element"] if round_item else None
+        fps = geo.filter_footprints([fp for lg in ctx["layers"] for fp in lg.footprints()])
+        rects = [f for f in fps if f["shape"] == "rect"]
+        rounds = [f for f in fps if f["shape"] == "round"]
+        if rects and rect_sym is None:
+            raise _InputError("No column type is loaded for rectangles.\nLoad a column family "
+                              "(for example Concrete-Rectangular-Column), then run again.")
+        items = (rects if rect_sym is not None else []) + (rounds if round_sym is not None else [])
+        top = self._pick("cmb_column_top_level")
+        top_level = top["element"] if top else None
+        sizes = {}
+        for f in items:
+            nm = geo.footprint_type_name(f, step)
+            sizes[nm] = sizes.get(nm, 0) + 1
+        details = [u"Rectangles: {} · circles: {}{}".format(
+            len(rects), len(rounds), u" (skipped — no round type chosen)" if rounds and round_sym is None else u""),
+            u"Sizes: {}".format(u", ".join(u"{} ×{}".format(k, v) for k, v in sorted(sizes.items())[:8]) or u"—"),
+            u"Top: {}".format(top["name"] if top_level is not None else u"unconnected, {:g} mm".format(height))]
+        structural = self._checked(self.rb_column_structural)
+        match = self._checked(self.chk_column_match_size)
+        rotate = self._checked(self.chk_column_rotate)
+        n = len(items)
+        empty = ("The ticked layers hold no closed rectangle or circle 100–3000 mm across. Tick the "
+                 "layer that holds the column outlines.")
+        return Plan(n, "columns", u"Place {} columns on {}?".format(n, ctx["level_name"]),
+                    u"Place {} Columns".format(n), u"\n".join(details),
+                    lambda p: cr.create_columns(doc, items, level, top_level, geo.mm(height),
+                                                rect_sym, round_sym, structural, match, rotate,
+                                                step, p), empty)
+
+    # ── Beams ──
+
+    def _plan_beam(self, ctx):
+        doc, level = self._doc, ctx["level"]
+        offset = self._num(self.txt_beam_offset, "Top offset", -50)
+        w_min = self._num(self.txt_beam_min_width, "Min width", 50, 1)
+        w_max = self._num(self.txt_beam_max_width, "Max width", 1500, w_min)
+        segs = self._segments(ctx["layers"], self._checked(self.chk_beam_merge))
+        pairs, _unpaired = geo.find_parallel_pairs(segs, max_sep=geo.mm(w_max),
+                                                   min_sep=geo.mm(w_min), min_overlap=0.7)
+        items = []
+        for (x0, y0, x1, y1, sep, _layer) in pairs:
+            w = max(50, geo.round_to(geo.to_mm(sep), 50))
+            items.append((x0, y0, x1, y1, w, geo.beam_height_for_width(w)))
+        sizes = sorted(set("{}x{}".format(w, h) for *_xy, w, h in items))
+        details = [u"Beam pairs found: {}".format(len(items)),
+                   u"Sizes (mm): {}".format(", ".join(sizes[:10]) or "—"),
+                   u"Top offset {:g} mm".format(offset)]
+        empty = ("No two parallel lines {:g}–{:g} mm apart overlap enough to be a beam. Tick the "
+                 "layer that holds both edges of each beam.".format(w_min, w_max))
+        n = len(items)
+        if self._checked(self.rb_beam_part_mode):
+            cat = self._category("cmb_beam_part_category")
+            top = level.Elevation + geo.mm(offset)
+            profiles = []
+            for (x0, y0, x1, y1, w, h) in items:
+                rect = geo.centerline_rect(x0, y0, x1, y1, geo.mm(w) / 2.0)
+                lp = geo.loop_from_polygon(rect) if rect else None
+                if lp:
+                    profiles.append((lp, [], top - geo.mm(h), geo.mm(h)))
+            details.append(u"Category: {}".format(cat["name"]))
+            return Plan(len(profiles), "beam parts",
+                        u"Create {} beam parts on {}?".format(len(profiles), ctx["level_name"]),
+                        u"Create {} Parts".format(len(profiles)), u"\n".join(details),
+                        lambda p: cr.create_parts(doc, profiles, cat["bic"],
+                                                  "T3Lab: CAD to Beam Parts", p), empty)
+        sym = self._need("cb_beam_types", "structural framing type")
+        match = self._checked(self.chk_beam_match_size)
+        details.append(u"Type: {}{}".format(sym["name"], " (copied per size)" if match else ""))
+        return Plan(n, "beams", u"Create {} beams on {}?".format(n, ctx["level_name"]),
+                    u"Create {} Beams".format(n), u"\n".join(details),
+                    lambda p: cr.create_beams(doc, items, level, sym["element"], geo.mm(offset),
+                                              match, p), empty)
+
+    # ── Grids ──
+
+    def _plan_grid(self, ctx):
+        doc = self._doc
+        extend = self._num(self.txt_grid_extend, "Extend ends", 0, 0, 100000)
+        min_len = self._num(self.txt_grid_min_length, "Min length", 1000, 0)
+        auto = self._checked(self.rb_grid_autoname)
+        start_number = int(self._num(self.txt_grid_start_number, "First number", 1, 0, 100000)) if auto else 1
+        start_letter = (self.txt_grid_start_letter.Text or "A").strip() or "A"
+        if auto and geo.letter_index(start_letter) == 0 and start_letter.upper() != "A":
+            raise _InputError(u"First letter is \"{}\", which is not a grid letter.\nUse letters "
+                              u"A–Z without I and O (for example A, C or AA).".format(start_letter))
+        axes = geo.collapse_axis_lines(self._segments(ctx["layers"], False), min_len=geo.mm(min_len))
+        skipped = 0
+        existing, taken = cr.existing_grid_lines(doc)
+        if self._checked(self.chk_grid_skip_existing):
+            kept = [a for a in axes if not any(geo.same_axis(a, ex) for ex in existing)]
+            skipped = len(axes) - len(kept)
+            axes = kept
+        names = geo.name_grids(axes, start_number, start_letter) if auto else None
+        lines = [geo.extend_line(a[0], a[1], a[2], a[3], geo.mm(extend)) for a in axes]
+        gtype = self._pick("cmb_grid_type")
+        type_id = gtype["id"] if gtype else None
+        numbers = [nm for nm in (names or []) if nm.isdigit()]
+        letters = [nm for nm in (names or []) if not nm.isdigit()]
+        details = [u"Axes found: {} · already in the model (skipped): {}".format(len(axes) + skipped, skipped)]
+        if auto:
+            if numbers:
+                details.append(u"Numbered {}–{}".format(numbers and min(numbers, key=int), max(numbers, key=int)))
+            if letters:
+                details.append(u"Lettered {}–{}".format(geo.grid_letter(geo.letter_index(start_letter)),
+                                                          geo.grid_letter(geo.letter_index(start_letter) + len(letters) - 1)))
+        n = len(lines)
+        empty = ("The ticked layers hold no straight axis line of at least {:g} mm{}. Tick the axis "
+                 "layer.".format(min_len, ", or every axis already has a grid" if skipped else ""))
+        return Plan(n, "grids", u"Create {} grids?".format(n), u"Create {} Grids".format(n),
+                    u"\n".join(details),
+                    lambda p: cr.create_grids(doc, lines, names, type_id, set(taken), p), empty)
+
+    # ── Lines ──
+
+    def _plan_lines(self, ctx):
+        doc, level = self._doc, ctx["level"]
+        detail = self._checked(self.rb_lines_detail)
+        view, z = None, level.Elevation
+        if detail:
+            view = doc.ActiveView
+            allowed = (DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan,
+                       DB.ViewType.EngineeringPlan, DB.ViewType.AreaPlan,
+                       DB.ViewType.DraftingView)
+            if view is None or view.ViewType not in allowed:
+                raise _InputError(u"Detail lines need a plan or drafting view, but the active view "
+                                  u"\"{}\" is not one.\nClose this window, open a floor plan or "
+                                  u"drafting view, and run again — or choose Model lines."
+                                  .format(view.Name if view is not None else "?"))
+            z = 0.0
+            try:
+                if view.GenLevel is not None:
+                    z = view.GenLevel.Elevation
             except Exception:
                 pass
+        else:
+            z = level.Elevation + geo.mm(self._num(self.txt_lines_offset, "Offset from level", 0))
+        merge = self._checked(self.chk_lines_merge)
+        edges = []
+        for lg in ctx["layers"]:
+            segs = geo.merge_collinear(lg.segments) if merge else lg.segments
+            edges.extend(("L", (s[0], s[1]), (s[2], s[3]), None) for s in segs)
+            edges.extend(lg.arc_edges)
+            edges.extend(lg.spline_edges)
+            for (cx, cy, r) in lg.circles:
+                edges.extend(geo.loop_from_circle(cx, cy, r))
+        style = self._pick("cmb_line_style")
+        gs = style["element"] if style else None
+        noun = "detail lines" if detail else "model lines"
+        where = u"in view {}".format(view.Name) if detail else u"on {}".format(ctx["level_name"])
+        n = len(edges)
+        details = [u"Curves: {}".format(n), u"Line style: {}".format(style["name"] if style else "default")]
+        return Plan(n, noun, u"Create {} {} {}?".format(n, noun, where),
+                    u"Create {} Lines".format(n), u"\n".join(details),
+                    lambda p: cr.create_lines(doc, edges, view, z, gs, p),
+                    "The ticked layers hold no linework.")
+
+    # ── MEP runs ──
+
+    def _plan_mep(self, ctx):
+        doc, level = self._doc, ctx["level"]
+        key = self._mep_key
+        cat = geo.mep_category(key)
+        tp = self._need("cmb_mep_type", cat["type_label"])
+        system_id = None
+        if cat["system"]:
+            system_id = self._need("cmb_mep_system", "{} system type".format(cat["label"].lower()))["id"]
+        width = self._num(self.txt_mep_width, cat["width_label"].title(), cat["width"], 1)
+        height = None
+        if cat["height"]:
+            height = self._num(self.txt_mep_height, "Height", cat["height_mm"], 1)
+        offset = self._num(self.txt_mep_offset, "Offset from level", cat["offset"])
+        double = cat["double"] and self.cmb_mep_line_mode.SelectedIndex == 1
+        segs = self._segments(ctx["layers"], self._checked(self.chk_mep_merge))
+        unpaired = []
+        if double:
+            pairs, unpaired = geo.find_parallel_pairs(segs, max_sep=geo.mm(2500))
+            segments = [(c[0], c[1], c[2], c[3], c[4]) for c in pairs]
+        else:
+            segments = [(s[0], s[1], s[2], s[3], None) for s in segs]
+        n = len(segments)
+        details = [u"{}: {}".format("Line pairs" if double else "Lines", n),
+                   u"Type: {}".format(tp["name"]),
+                   u"Size: {}".format("from the pair spacing" if double else u"{:g} mm".format(width)) +
+                   (u" × {:g} mm".format(height) if height else u""),
+                   u"Offset from level {:g} mm".format(offset)]
+        if double and unpaired:
+            details.append(u"Single lines ignored: {}".format(len(unpaired)))
+        auto_elbow = self._checked(self.chk_mep_elbows)
+        noun = cat["noun"]
+        return Plan(n, noun, u"Create {} {} on {}?".format(n, noun, ctx["level_name"]),
+                    u"Create {} {}".format(n, cat["verb"][len("Create "):]), u"\n".join(details),
+                    lambda p: cr.create_mep_runs(doc, key, segments, level, geo.mm(offset), tp["id"],
+                                                 system_id, geo.mm(width),
+                                                 geo.mm(height) if height else None, auto_elbow,
+                                                 noun, "T3Lab: CAD to {}".format(cat["label"] + "s"), p),
+                    "The ticked layers hold no straight line." if not double else
+                    "No parallel line pairs found. Switch to Single line or tick the layer with both edges.")
 
 
 # ===========================================================================
 # PUBLIC ENTRY POINT
 # ===========================================================================
 
-def show_cad_to_elements(script_dir, revit_app):
-    """
-    Public entry point called by the pushbutton script.py.
-
-    Parameters
-    ----------
-    script_dir : str
-        Directory of the calling script.py (kept for signature compatibility).
-    revit_app : object
-        The __revit__ application object passed from the pushbutton.
-        Not used here because revit.doc / revit.uidoc are accessed via pyRevit.
-    """
+def show_cad_to_elements(script_dir=None, revit_app=None):
+    """Called by the pushbutton script.py (arguments kept for compatibility)."""
     try:
         CADToElementsWindow().ShowDialog()
     except Exception as ex:
         import traceback
-        print("CAD to Elements error:")
-        print(traceback.format_exc())
-        forms.alert("Error launching CAD to Elements:\n{}".format(str(ex)),
-                    title="CAD to Elements")
+        show_error(u"CAD to Elements could not open.", title=TITLE,
+                   details=u"{}\n\n{}".format(ex, traceback.format_exc()))

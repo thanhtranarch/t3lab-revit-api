@@ -24,7 +24,9 @@ import math
 
 __all__ = [
     "search_boundaries", "primary_boundaries", "nearby_boundaries",
-    "overpass_boundaries", "geocode", "ring_key",
+    "overpass_boundaries", "geocode", "reverse_geocode", "ring_key",
+    "boundaries_from_places", "ServiceUnavailable", "describe_error",
+    "describe_http_status", "unavailable_message",
     "polygon_area_m2", "polygon_area_sqft", "polygon_centroid",
     "format_area_dual", "point_in_polygon", "close_ring", "demojibake",
     "metes_and_bounds", "format_metes_and_bounds", "format_bearing",
@@ -64,6 +66,7 @@ def _is_dotnet_setup_error(ex):
 
 OSM_SOURCE    = "OpenStreetMap"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 PHOTON_URL    = "https://photon.komoot.io/api"
 
 # The main overpass-api.de instance answers HTTP 406 to any User-Agent it does
@@ -76,7 +79,7 @@ OVERPASS_ENDPOINTS = (
     "https://overpass-api.de/api/interpreter",
 )
 
-USER_AGENT = ("T3Lab-PropertyLine/2.0 "
+USER_AGENT = ("T3Lab-PropertyLine/2.2 "
               "(pyRevit add-in; https://github.com/thanhtranarch/t3lab-revit-api)")
 
 SQM_TO_SQFT    = 10.763910416709722
@@ -117,19 +120,34 @@ def _log(msg):
             pass
 
 
+_TLS_DONE = [False]
+
+
 def _ensure_tls():
     """
-    Revit/.NET can still default to TLS 1.0, which every OSM endpoint refuses.
-    Force TLS 1.2 when running on .NET; no-op on CPython.
+    Make sure System.Net can speak TLS 1.2, which every OSM endpoint requires.
+
+    SystemDefault (0, the default on .NET 8 and on .NET Framework 4.7+ hosts)
+    already lets the OS negotiate TLS 1.2/1.3, so it is left alone - forcing
+    Tls13 on a Windows build that cannot do it breaks every handshake.  Only
+    an explicit legacy value (Ssl3/Tls/Tls11) gets Tls12 OR-ed in.  Runs once;
+    no-op off .NET.
     """
+    if _TLS_DONE[0]:
+        return
+    _TLS_DONE[0] = True
     try:
+        import System
         import System.Net as _net
-        wanted = _net.SecurityProtocolType.Tls12
+        spm = _net.ServicePointManager
+        current = spm.SecurityProtocol
+        if int(System.Convert.ToInt32(current)) == 0:
+            return                              # SystemDefault: OS decides
+        tls12 = _net.SecurityProtocolType.Tls12
         try:
-            wanted = _net.SecurityProtocolType.Tls12 | _net.SecurityProtocolType.Tls13
-        except AttributeError:
-            pass
-        _net.ServicePointManager.SecurityProtocol = wanted
+            spm.SecurityProtocol = current | tls12
+        except Exception:
+            spm.SecurityProtocol = tls12
     except Exception:
         pass
 
@@ -311,29 +329,28 @@ def http_request(url, data=None, headers=None, timeout=25):
     body = _to_bytes(data) if data is not None else None
 
     # Preferred path inside Revit: .NET with a known-UTF-8 decode.
+    dotnet_error = None
     if _HAS_DOTNET:
         try:
             return _http_dotnet(url, data=data, headers=hdrs, timeout=timeout)
         except ImportError:
             pass
         except Exception as ex:
-            # A real transport failure must still surface; only fall through
-            # to urllib when .NET could not be used at all.
             if not _is_dotnet_setup_error(ex):
-                raise
-            _log("System.Net path unusable, falling back to urllib: {}".format(ex))
+                # A real transport failure.  A timeout would only time out
+                # again, but a TLS / proxy refusal from the .NET stack is
+                # worth one try through Python's own ssl + cert store.
+                if _is_timeout(ex) or _urq is None:
+                    raise
+                dotnet_error = ex
+            _log("System.Net request failed, retrying with urllib: {}".format(ex))
 
     if _urq is not None:
-        req = _urq.Request(url, data=body, headers=hdrs)
         try:
-            resp = _urq.urlopen(req, timeout=timeout)
-            return resp.getcode(), _to_text(resp.read())
-        except Exception as err:
-            if hasattr(err, "code"):
-                try:
-                    return err.code, _to_text(err.read())
-                except Exception:
-                    return err.code, u""
+            return _urllib_request(url, body, hdrs, timeout)
+        except Exception:
+            if dotnet_error is not None:
+                raise dotnet_error      # the .NET message is the clearer one
             raise
 
     if _u2 is not None:
@@ -350,6 +367,91 @@ def http_request(url, data=None, headers=None, timeout=25):
                 return err.code, u""
 
     raise RuntimeError("No HTTP library available (urllib.request / urllib2)")
+
+
+def _is_timeout(ex):
+    text = u"{}".format(ex).lower()
+    return "timed out" in text or "timeout" in text
+
+
+def _urllib_request(url, body, hdrs, timeout):
+    """CPython urllib path.  Non-2xx responses are returned, never raised."""
+    req = _urq.Request(url, data=body, headers=hdrs)
+    try:
+        resp = _urq.urlopen(req, timeout=timeout)
+        return resp.getcode(), _to_text(resp.read())
+    except Exception as err:
+        if hasattr(err, "code"):
+            try:
+                return err.code, _to_text(err.read())
+            except Exception:
+                return err.code, u""
+        raise
+
+
+# ── failure reporting ────────────────────────────────────────────────────────
+
+class ServiceUnavailable(Exception):
+    """
+    Every geocoder failed at the network / HTTP level - as opposed to
+    answering "no such place".  The message is user-facing: what failed,
+    where, and what to do next.
+    """
+
+
+def describe_http_status(status):
+    """HTTP status -> short plain-English reason."""
+    if status in (401, 403):
+        return u"access refused (HTTP {}) - the service blocked this request".format(status)
+    if status == 407:
+        return u"the proxy asks for a login (HTTP 407)"
+    if status == 429:
+        return u"too many requests (HTTP 429) - wait a minute"
+    if status and 500 <= status < 600:
+        return u"service is down or overloaded (HTTP {})".format(status)
+    return u"unexpected answer (HTTP {})".format(status)
+
+
+def describe_error(ex):
+    """Transport exception (urllib or System.Net) -> short plain-English reason."""
+    text = _u(ex).lower()
+    if _is_timeout(ex):
+        return u"no answer in time (timed out)"
+    if any(k in text for k in ("ssl", "tls", "certificate", "trust relationship",
+                               "secure channel")):
+        return (u"secure connection (HTTPS/TLS) failed - a proxy or firewall "
+                u"may be intercepting HTTPS")
+    if any(k in text for k in ("getaddrinfo", "name or service", "could not be resolved",
+                               "nodename", "no such host", "name resolution")):
+        return u"server name could not be resolved - no internet or DNS blocked"
+    if "407" in text or "proxy" in text:
+        return u"the proxy refused the connection"
+    if any(k in text for k in ("refused", "reset", "unreachable", "aborted",
+                               "forcibly closed")):
+        return u"connection refused or dropped"
+    short = _u(ex).strip().splitlines()[0] if _u(ex).strip() else type(ex).__name__
+    return short[:160]
+
+
+def unavailable_message(failures):
+    """[(service, reason), ...] -> the user-facing ServiceUnavailable text."""
+    detail = u"; ".join(u"{}: {}".format(name, why) for name, why in failures)
+    return (u"Could not reach the map data service ({}). Check the internet "
+            u"connection or proxy settings, wait a moment, then search "
+            u"again.".format(detail))
+
+
+# Nominatim's usage policy allows one request per second per application.
+NOMINATIM_MIN_INTERVAL_S = 1.0
+_last_nominatim = [0.0]
+
+
+def _nominatim_throttle():
+    import time
+    wait = NOMINATIM_MIN_INTERVAL_S - (time.time() - _last_nominatim[0])
+    if wait > 0:
+        time.sleep(min(wait, NOMINATIM_MIN_INTERVAL_S))
+    _last_nominatim[0] = time.time()
 
 
 # ── geometry helpers (equirectangular - exact enough at parcel scale) ────────
@@ -556,71 +658,122 @@ def geocode(address, limit=8, language=None):
     matched object's polygon), Photon as failover.
 
     Each place: {lat, lon, display_name, name, address{}, geojson, boundingbox,
-                 osm_type, osm_id, category, type, source}
+                 osm_type, osm_id, category, type, country_code, source}
+
+    Returns [] when the services answered but know no such place.  Raises
+    ServiceUnavailable when no geocoder could be reached at all, so a dead
+    network is never reported to the user as "address not found".
     """
     address = _u(address).strip()
     if not address:
         return []
-    places = _geocode_nominatim(address, limit, language)
-    if not places:
-        places = _geocode_photon(address, limit, language)
-    return places
+    failures = []
+    places = _geocode_nominatim(address, limit, language, failures)
+    if places:
+        return places
+    places = _geocode_photon(address, limit, language, failures)
+    if places:
+        return places
+    if len(failures) >= 2:
+        raise ServiceUnavailable(unavailable_message(failures))
+    return []
 
 
-def _geocode_nominatim(address, limit, language):
-    url = ("{}?q={}&format=jsonv2&polygon_geojson=1&addressdetails=1"
-           "&extratags=1&limit={}".format(NOMINATIM_URL,
-                                          url_quote(address), int(limit)))
+def _place_from_nominatim(item):
+    """One Nominatim jsonv2 record -> place dict (raises on a bad lat/lon)."""
+    address = item.get("address") or {}
+    return {
+        "lat":          float(item.get("lat")),
+        "lon":          float(item.get("lon")),
+        "display_name": _u(item.get("display_name")),
+        "name":         _u(item.get("name")),
+        "address":      address,
+        "geojson":      item.get("geojson") or {},
+        "boundingbox":  item.get("boundingbox") or [],
+        "osm_type":     _u(item.get("osm_type")),
+        "osm_id":       _u(item.get("osm_id")),
+        "category":     _u(item.get("category")),
+        "type":         _u(item.get("type")),
+        "country_code": _u(address.get("country_code")).lower(),
+        "source":       "Nominatim",
+    }
+
+
+def _nominatim_get(url, language, failures):
+    """GET a Nominatim URL -> parsed JSON, or None (reason appended to failures)."""
     headers = {}
     if language:
         headers["Accept-Language"] = language
+    _nominatim_throttle()
     try:
         status, text = http_request(url, headers=headers)
     except Exception as ex:
         _log("Nominatim network error: {}".format(ex))
-        return []
+        failures.append((u"OpenStreetMap Nominatim", describe_error(ex)))
+        return None
     if status != 200:
-        _log("Nominatim HTTP {}: {}".format(status, text[:200]))
-        return []
+        _log("Nominatim HTTP {}: {}".format(status, _u(text)[:200]))
+        failures.append((u"OpenStreetMap Nominatim", describe_http_status(status)))
+        return None
     try:
-        raw = json.loads(text)
+        return json.loads(text)
     except Exception as ex:
         _log("Nominatim bad JSON: {}".format(ex))
-        return []
+        failures.append((u"OpenStreetMap Nominatim", u"unreadable answer"))
+        return None
 
+
+def _geocode_nominatim(address, limit, language, failures=None):
+    failures = failures if failures is not None else []
+    url = ("{}?q={}&format=jsonv2&polygon_geojson=1&addressdetails=1"
+           "&extratags=1&limit={}".format(NOMINATIM_URL,
+                                          url_quote(address), int(limit)))
+    raw = _nominatim_get(url, language, failures)
     places = []
     for item in raw or []:
         try:
-            places.append({
-                "lat":          float(item.get("lat")),
-                "lon":          float(item.get("lon")),
-                "display_name": _u(item.get("display_name")),
-                "name":         _u(item.get("name")),
-                "address":      item.get("address") or {},
-                "geojson":      item.get("geojson") or {},
-                "boundingbox":  item.get("boundingbox") or [],
-                "osm_type":     _u(item.get("osm_type")),
-                "osm_id":       _u(item.get("osm_id")),
-                "category":     _u(item.get("category")),
-                "type":         _u(item.get("type")),
-                "source":       "Nominatim",
-            })
-        except (TypeError, ValueError):
+            places.append(_place_from_nominatim(item))
+        except (TypeError, ValueError, AttributeError):
             continue
     return places
 
 
-def _geocode_photon(address, limit, language):
+def reverse_geocode(lat, lon, language=None):
+    """
+    (lat, lon) -> the place OpenStreetMap has at that point, or None.
+    Never raises: a coordinate query must still work with no geocoder.
+    """
+    url = ("{}?lat={:.7f}&lon={:.7f}&format=jsonv2&polygon_geojson=1"
+           "&addressdetails=1&zoom=18".format(NOMINATIM_REVERSE_URL,
+                                              float(lat), float(lon)))
+    raw = _nominatim_get(url, language, [])
+    if not isinstance(raw, dict) or raw.get("error"):
+        return None
+    try:
+        return _place_from_nominatim(raw)
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _geocode_photon(address, limit, language, failures=None):
+    failures = failures if failures is not None else []
     url = "{}?q={}&limit={}".format(PHOTON_URL, url_quote(address), int(limit))
     if language:
         url += "&lang={}".format(url_quote(language))
     try:
         status, text = http_request(url)
-        if status != 200:
-            return []
-        raw = json.loads(text)
     except Exception as ex:
         _log("Photon failed: {}".format(ex))
+        failures.append((u"Photon", describe_error(ex)))
+        return []
+    if status != 200:
+        failures.append((u"Photon", describe_http_status(status)))
+        return []
+    try:
+        raw = json.loads(text)
+    except Exception as ex:
+        _log("Photon bad JSON: {}".format(ex))
+        failures.append((u"Photon", u"unreadable answer"))
         return []
 
     places = []
@@ -645,6 +798,7 @@ def _geocode_photon(address, limit, language):
             "osm_id":       _u(props.get("osm_id")),
             "category":     _u(props.get("osm_key")),
             "type":         _u(props.get("osm_value")),
+            "country_code": _u(props.get("countrycode")).lower(),
             "source":       "Photon",
         })
     return places
@@ -890,12 +1044,25 @@ def primary_boundaries(address, limit=8, language=None):
             u"No location found for '{}'. Try adding the city and country, "
             u"e.g. '25 Le Duan, District 1, Ho Chi Minh City, Vietnam'."
             .format(_u(address)))
+    return places, boundaries_from_places(places, limit=limit)
 
+
+def boundaries_from_places(places, limit=8, must_contain=None):
+    """
+    The polygons the geocoder already carries for *places*, as parcel dicts.
+
+    *must_contain* = (lat, lon) keeps only rings that enclose that point - a
+    reverse-geocoded coordinate can land on the nearest road, whose line
+    must never be closed into a fake plot.
+    """
     results, seen = [], set()
-    for index, place in enumerate(places):
+    for index, place in enumerate(places or []):
         if len(results) >= limit:
             break
         for ring in _rings_from_geojson(place.get("geojson")):
+            if must_contain is not None and not point_in_polygon(
+                    must_contain[1], must_contain[0], ring):
+                continue
             key = ring_key(ring)
             if key in seen:
                 continue
@@ -905,7 +1072,7 @@ def primary_boundaries(address, limit=8, language=None):
                                         feature_name=place.get("name")))
             if index:
                 break        # one shape per alternative match is plenty
-    return places, results
+    return results
 
 
 def nearby_boundaries(place, limit=8, radius_m=DEFAULT_RADIUS_M,

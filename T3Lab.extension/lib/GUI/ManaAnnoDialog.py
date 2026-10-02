@@ -333,6 +333,10 @@ def _txt_name(tt, origin):
 
     return NAMING_TEMPLATES["TextNote"]["Separator"].join(parts)
 
+# Fixed behaviour (formerly the Settings page, removed 2026-10-02).
+INCLUDE_GROUPED_ANNOTATIONS = False
+AUTO_SELECT_ON_ROW_CLICK = True
+
 # ============================================================
 # XAML PATH
 # ============================================================
@@ -403,20 +407,8 @@ class AnnotationManagerWindow(T3WPFWindow):
             self.dg_dim.SelectionChanged += self._dim_grid_selection_changed
             self.dg_txt.SelectionChanged += self._txt_grid_selection_changed
 
-            include_groups = getattr(self, 'chk_include_groups', None)
-            if include_groups is not None:
-                include_groups.Click += self.settings_filter_changed
-
             # DimText state
             self._dimtext_rules = []
-
-            # Register utility button click events
-            self.btn_util_copy_anno.Click += self._on_launch_copier
-            self.btn_util_renumber_spline.Click += self._on_launch_renumber
-            self.btn_util_upper_all.Click += self._on_launch_upper_all
-            tag_button = getattr(self, 'btn_util_tag_checker', None)
-            if tag_button is not None:
-                tag_button.Click += self._on_launch_tag_checker
 
             # Force initial tab content to render: nav_dim.IsChecked was already
             # True when the XAML was parsed, so no explicit SelectedIndex was ever
@@ -511,20 +503,17 @@ class AnnotationManagerWindow(T3WPFWindow):
     def _status(self, msg):
         self.status.Text = msg
 
-    def _setting_enabled(self, control_name, default):
-        control = getattr(self, control_name, None)
-        if control is None or control.IsChecked is None:
-            return default
-        return bool(control.IsChecked)
+    # The Settings page was removed (2026-10-02); these behaviours are now
+    # fixed at the defaults that page shipped with.
+    @staticmethod
+    def _include_grouped():
+        """Annotations inside groups are left out of search results."""
+        return INCLUDE_GROUPED_ANNOTATIONS
 
-    def _include_grouped(self):
-        return self._setting_enabled('chk_include_groups', False)
-
-    def _auto_select_enabled(self):
-        return self._setting_enabled('chk_auto_select', True)
-
-    def _confirm_delete_enabled(self):
-        return self._setting_enabled('chk_confirm_delete', True)
+    @staticmethod
+    def _auto_select_enabled():
+        """Clicking a row selects the matching element(s) in Revit."""
+        return AUTO_SELECT_ON_ROW_CLICK
 
     @staticmethod
     def _view_name(owner_view_id, cache):
@@ -652,8 +641,6 @@ class AnnotationManagerWindow(T3WPFWindow):
             control.IsChecked = value
 
     def _confirm_delete(self, count, label):
-        if not self._confirm_delete_enabled():
-            return True
         return T3Dialog.confirm(
             "Delete {} selected {}?".format(count, label),
             title="Confirm Delete",
@@ -670,12 +657,6 @@ class AnnotationManagerWindow(T3WPFWindow):
 
     def _run_queued_txt_search(self, sender, args):
         self._txt_search_timer.Stop()
-        self.txt_search(None, None)
-
-    def settings_filter_changed(self, sender, args):
-        self._dim_search_timer.Stop()
-        self._txt_search_timer.Stop()
-        self.dim_search(None, None)
         self.txt_search(None, None)
 
     def _set_revit_selection(self, element_ids):
@@ -1457,7 +1438,7 @@ class AnnotationManagerWindow(T3WPFWindow):
     # ── Top Horizontal Navigation Tab Event Handlers ─────────────────────────
 
     def _update_nav_states(self, active_btn):
-        for btn in (self.nav_dim, self.nav_txt, self.nav_dimtext, self.nav_utils, self.nav_settings):
+        for btn in (self.nav_dim, self.nav_txt, self.nav_dimtext):
             try:
                 btn.IsChecked = (btn == active_btn)
             except Exception:
@@ -1477,63 +1458,6 @@ class AnnotationManagerWindow(T3WPFWindow):
         self._update_nav_states(self.nav_dimtext)
         if hasattr(self, 'main_tabs'):
             self.main_tabs.SelectedIndex = 2
-
-    def nav_utils_checked(self, sender, args):
-        self._update_nav_states(self.nav_utils)
-        if hasattr(self, 'main_tabs'):
-            self.main_tabs.SelectedIndex = 3
-
-    def nav_settings_checked(self, sender, args):
-        self._update_nav_states(self.nav_settings)
-        if hasattr(self, 'main_tabs'):
-            self.main_tabs.SelectedIndex = 4
-
-    def _launch_utility(self, callback, label, refresh_annotations=True):
-        self.Hide()
-        succeeded = False
-        try:
-            callback()
-            succeeded = True
-        except SystemExit:
-            self._status("{} was cancelled or is unavailable in the active view.".format(label))
-        except Exception as ex:
-            logger.exception("{} failed".format(label))
-            self._status("{} failed: {}".format(label, ex))
-        finally:
-            self.Show()
-        if succeeded and refresh_annotations:
-            self._refresh_dim_cache()
-            self._refresh_txt_cache()
-            self.dim_search(None, None)
-            self.txt_search(None, None)
-            self._load_sidebar_lists()
-
-    def _on_launch_copier(self, sender, e):
-        # Keep CLR interface implementations on one canonical module identity.
-        # Importing this module as both GUI.CopyAnnotationDialog and
-        # CopyAnnotationDialog creates duplicate PythonNet wrapper types.
-        def run():
-            from GUI import CopyAnnotationDialog
-            CopyAnnotationDialog.show_dialog()
-        self._launch_utility(run, "Annotation Copier")
-
-    def _on_launch_renumber(self, sender, e):
-        def run():
-            from Utils import RenumberAlongSpline
-            RenumberAlongSpline.run()
-        self._launch_utility(run, "Renumber Along Spline")
-
-    def _on_launch_upper_all(self, sender, e):
-        def run():
-            from Utils import UpperAll
-            UpperAll.run()
-        self._launch_utility(run, "Uppercase Converter")
-
-    def _on_launch_tag_checker(self, sender, e):
-        def run():
-            from GUI import TagCheckerDialog
-            TagCheckerDialog.show_dialog()
-        self._launch_utility(run, "Tag Checker", False)
 
     # ── DimText tab handlers ─────────────────────────────────────────────────
 

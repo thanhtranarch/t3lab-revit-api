@@ -500,7 +500,8 @@ class HealthDashboardTests(unittest.TestCase):
         # which is exactly how CURRENT VALUE and HEALTH went blank in Revit.
         for row in rows:
             for field in ('label', 'value_display', 'status', 'weight_stars',
-                          'thresholds_text', 'select_visibility'):
+                          'band_index', 'band_tick_0', 'band_tick_4',
+                          'thresholds_tooltip', 'select_visibility'):
                 self.assertTrue(getattr(row, field, None) not in (None, ''),
                                 '{} is empty on {}'.format(field, row.label))
             self.assertIn(row.status, MOD._STATUS_ORDER)
@@ -608,6 +609,72 @@ class HealthDashboardTests(unittest.TestCase):
         for field in set(re.findall(r'\{Binding (\w+)\}', block)):
             self.assertTrue(hasattr(rec, field),
                             'XAML binds {} but the row never sets it'.format(field))
+
+
+class ThresholdBandTests(unittest.TestCase):
+    """The THRESHOLDS column: six bands, five cut-offs, one current band.
+
+    It used to print "100 | 250 | 500 | 750 | 1000" — nobody could tell which
+    number bounded which band or where the current value sat.
+    """
+
+    CUTS = [100, 500, 1000, 2000, 5000]
+
+    def test_band_index_matches_the_health_status(self):
+        for value in (0, 100, 101, 500, 999, 1000, 1227, 2000, 4999, 5000, 5001, 10 ** 6):
+            band = MOD._threshold_bands(value, self.CUTS)
+            self.assertEqual(MOD._STATUS_ORDER[band['index']],
+                             MOD._status_for(value, self.CUTS), value)
+            self.assertEqual(band['status'], MOD._status_for(value, self.CUTS))
+
+    def test_upper_limit_belongs_to_the_band(self):
+        self.assertEqual(MOD._threshold_bands(100, self.CUTS)['status'], 'Good')
+        self.assertEqual(MOD._threshold_bands(101, self.CUTS)['status'], 'Acceptable')
+        self.assertEqual(MOD._threshold_bands(5001, self.CUTS)['status'], 'Severe')
+
+    def test_tooltip_names_every_band_and_the_current_one(self):
+        band = MOD._threshold_bands(1227, self.CUTS)
+        tip = band['tooltip']
+        for name in MOD._STATUS_ORDER:
+            self.assertIn(name + ':', tip)
+        self.assertIn('Good: up to 100', tip)
+        self.assertIn('Concerning: over 1,000 up to 2,000   (current)', tip)
+        self.assertIn('Severe: over 5,000', tip)
+        self.assertIn('Current 1,227 is in Concerning (over 1,000 up to 2,000).', tip)
+        self.assertEqual(tip.count('(current)'), 1)
+
+    def test_units_reach_the_words(self):
+        band = MOD._threshold_bands(312.5, [100, 250, 500, 750, 1000], 'MB')
+        self.assertEqual(band['status'], 'Warning')
+        self.assertIn('Current 312.5 MB is in Warning (over 250 up to 500 MB).', band['tooltip'])
+        self.assertTrue(band['summary'].endswith('Severe > 1,000 MB'))
+
+    def test_zero_cut_reads_as_zero_not_up_to_zero(self):
+        band = MOD._threshold_bands(0, [0, 2, 5, 7, 10])
+        self.assertEqual(band['bands'][0], ('Good', '0'))
+        self.assertEqual(band['status'], 'Good')
+
+    def test_repeated_limit_is_called_out_not_inverted(self):
+        band = MOD._threshold_bands(3, [5, 5, 8, 15, 20])
+        self.assertEqual(band['bands'][1][1], 'not used (same limit as Good)')
+
+    def test_ticks_fit_the_slot(self):
+        ticks = MOD._threshold_bands(0, [1000, 5000, 10000, 25000, 50000])['ticks']
+        self.assertEqual(ticks, ['1000', '5000', '10k', '25k', '50k'])
+        self.assertEqual(MOD._fmt_tick(12500), '12.5k')
+        self.assertEqual(MOD._fmt_tick(312.5), '312.5')
+        for cuts in [info['thresholds'] for info in MOD.METRIC_THRESHOLDS.values()]:
+            for tick in MOD._threshold_bands(0, cuts)['ticks']:
+                self.assertLessEqual(len(tick), 5, tick)
+
+    def test_xaml_raises_the_band_from_a_string_index(self):
+        """band_index drives DataTriggers — it must be a string like severity."""
+        grid = XAML_SOURCE[XAML_SOURCE.index('x:Name="dg_health_metrics"'):]
+        grid = grid[:grid.index('</DataGrid>')]
+        for i in range(6):
+            self.assertIn('<DataTrigger Binding="{Binding band_index}" Value="%d">' % i, grid)
+            self.assertIn('x:Name="band_seg_%d"' % i, grid)
+        self.assertIn('ToolTip="{Binding thresholds_tooltip}"', grid)
 
 
 class MetricDetailTests(unittest.TestCase):

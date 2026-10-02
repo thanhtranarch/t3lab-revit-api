@@ -17,17 +17,16 @@ def load(file, name, env=None):
 
 
 class RuntimeUI(unittest.TestCase):
-    def test_select_sidebar_all_modes_with_fresh_wrappers(self):
-        env = dict(MODE_EXPLORE=0, MODE_QUICK=1, MODE_SIMILAR=2, MODE_SHEETS=3, MODE_WARNINGS=4)
-        handler = load('ManaSelectDialog.py', '_on_nav_toggle_clicked', env)
-        modes = []
-        window = NS(_mode=3, _apply_mode=modes.append)
-        for name in ('explore', 'quick_select', 'select_similar', 'select_sheets', 'warnings'):
-            setattr(window, 'nav_toggle_' + name, NS(Name='nav_toggle_' + name))
-            handler(window, NS(Name='nav_toggle_' + name), None)
-        self.assertEqual(modes, list(range(5)))
-        handler(window, NS(Name='other'), None)
-        self.assertEqual(modes[-1], 3)
+    def test_select_primary_button_shows_checked_count(self):
+        # ManaSelect chỉ còn Explore (2026-10-02): nút primary mang số đã tick
+        # để người dùng biết Select sẽ chọn bao nhiêu trước khi bấm.
+        handler = load('ManaSelectDialog.py', '_update_selected_count')
+        window = NS(txt_explore_tally_checked=NS(), btn_apply=NS())
+        for ids, label in (([], 'Select'), ([1, 2, 3], 'Select (3)')):
+            window._checked_ids = lambda ids=ids: ids
+            handler(window)
+            self.assertEqual(window.btn_apply.Content, label)
+            self.assertEqual(window.txt_explore_tally_checked.Text, '%d checked' % len(ids))
 
     def test_property_status_resource_and_label_semantics(self):
         handler = load('PropertyLineDialog.py', '_set_status')
