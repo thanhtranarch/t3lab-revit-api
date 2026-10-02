@@ -43,21 +43,6 @@ from System.Windows.Input import Key
 from System.Windows.Media import SolidColorBrush, Color
 from System.Windows.Threading import Dispatcher, DispatcherPriority
 
-# CPython / IronPython 3 HTTP
-try:
-    import urllib.request as urllib_request
-    import urllib.parse as urllib_parse
-    HAS_URLLIB3 = True
-except ImportError:
-    HAS_URLLIB3 = False
-
-# IronPython HTTP (urllib2 available in IronPython 2.x)
-try:
-    import urllib2
-    HAS_URLLIB2 = True
-except ImportError:
-    HAS_URLLIB2 = False
-
 from pyrevit import revit, DB, forms, script
 from GUI.WPF_Base import T3WPFWindow
 from Snippets._compat import disposing
@@ -70,13 +55,13 @@ except ImportError:
     geoparcel = None
     HAS_GEOPARCEL = False
 
-# VN-2000 Vietnamese Cadastral Coordinate System
+# Automatic worldwide search pipeline (source selection, coordinates, VN-2000)
 try:
-    from Snippets import _vn2000 as vn2000
-    HAS_VN2000 = True
+    from Snippets import _parcel_search as parcel_search
+    HAS_PARCEL_SEARCH = True
 except ImportError:
-    vn2000 = None
-    HAS_VN2000 = False
+    parcel_search = None
+    HAS_PARCEL_SEARCH = False
 
 # ╦  ╦╔═╗╦═╗╦╔═╗╔╗ ╦  ╔═╗╔═╗
 # ╚╗╔╝╠═╣╠╦╝║╠═╣╠╩╗║  ║╣ ╚═╗
@@ -98,13 +83,6 @@ LIGHTBOX_PARCELS_ENDPOINT  = "/v1/parcels/us"
 
 # Earth radius in feet (for coordinate conversion)
 EARTH_RADIUS_FT = 20902231.0
-
-# ── Data sources ─────────────────────────────────────────────────────────────
-# These strings must match the ComboBoxItem contents in PropertyLine.xaml.
-SOURCE_AUTO     = "Auto (recommended)"
-SOURCE_OSM      = "OpenStreetMap (worldwide, no key)"
-SOURCE_LIGHTBOX = "LightBox (US parcels, API key)"
-SOURCE_VN2000   = "VN-2000 (Vietnam Cadastral)"
 
 # Elevation input units -> feet.  Must match cmb_elev_unit in the XAML.
 ELEV_UNITS = {
@@ -128,6 +106,8 @@ LINE_CAT_PROPERTY = "Property Line"
 
 if HAS_GEOPARCEL:
     geoparcel.set_logger(logger)
+if HAS_PARCEL_SEARCH:
+    parcel_search.set_logger(logger)
 
 
 # ╔═╗╔═╗╔╗╔╔═╗╦╔═╗
@@ -281,71 +261,17 @@ def parse_wkt_polygon(wkt):
 # ==================================================
 
 def _url_quote(text, safe=''):
-    """
-    URL-encode *text*, compatible with both IronPython 2.x (urllib2.quote)
-    and CPython / IronPython 3.x (urllib.parse.quote).
-    Falls back to a manual encoder if neither is available.
-    """
-    if HAS_URLLIB3:
-        return urllib_parse.quote(text, safe=safe)
-    if HAS_URLLIB2:
-        try:
-            if isinstance(text, str):
-                text = text.encode('utf-8')
-        except Exception:
-            pass
-        return urllib2.quote(text, safe=safe)
-    # Last-resort manual percent-encoding
-    safe_set = set(safe)
-    result = []
-    for ch in text:
-        if ch.isalnum() or ch in '-_.~' or ch in safe_set:
-            result.append(ch)
-        else:
-            result.append('%{:02X}'.format(ord(ch)))
-    return ''.join(result)
+    """Percent-encode *text* as UTF-8."""
+    return geoparcel.url_quote(text, safe=safe)
 
 
 def http_get(url, headers=None):
     """
-    Perform a GET request.
-    Returns (status_code, response_body_str).
-    Non-2xx responses are returned as (code, body) — NOT raised.
+    GET through the shared HTTP layer (User-Agent, TLS 1.2, System.Net with a
+    urllib fallback, timeout).  Returns (status_code, body_text); non-2xx
+    responses are returned, not raised.
     """
-    headers = headers or {}
-
-    if HAS_URLLIB3:
-        req = urllib_request.Request(url, headers=headers)
-        try:
-            with urllib_request.urlopen(req, timeout=15) as resp:
-                return resp.status, resp.read()
-        except Exception as e:
-            if hasattr(e, 'code'):
-                try:
-                    body = e.read()
-                except Exception:
-                    body = b""
-                return e.code, body
-            raise
-
-    if HAS_URLLIB2:
-        req = urllib2.Request(url)
-        for k, v in headers.items():
-            req.add_header(k, v)
-        try:
-            resp = urllib2.urlopen(req, timeout=15)
-            body = resp.read()
-            return resp.getcode(), body
-        except urllib2.HTTPError as e:
-            try:
-                body = e.read()
-            except Exception:
-                body = b""
-            return e.code, body
-        except Exception as ex:
-            raise
-
-    raise RuntimeError("No HTTP library available (urllib2 / urllib.request)")
+    return geoparcel.http_request(url, headers=headers, timeout=20)
 
 
 def search_parcels(api_key, address, limit=10):
@@ -406,25 +332,8 @@ def search_parcels(api_key, address, limit=10):
 
 # ── Address normalisation / AI fuzzy correction ──────────────────────────────
 
-_STATE_MAP = {
-    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
-    "california": "CA", "colorado": "CO", "connecticut": "CT",
-    "delaware": "DE", "florida": "FL", "georgia": "GA", "hawaii": "HI",
-    "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA",
-    "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME",
-    "maryland": "MD", "massachusetts": "MA", "michigan": "MI",
-    "minnesota": "MN", "mississippi": "MS", "missouri": "MO",
-    "montana": "MT", "nebraska": "NE", "nevada": "NV",
-    "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM",
-    "new york": "NY", "north carolina": "NC", "north dakota": "ND",
-    "ohio": "OH", "oklahoma": "OK", "oregon": "OR",
-    "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
-    "south dakota": "SD", "tennessee": "TN", "texas": "TX",
-    "utah": "UT", "vermont": "VT", "virginia": "VA",
-    "washington": "WA", "west virginia": "WV", "wisconsin": "WI",
-    "wyoming": "WY", "district of columbia": "DC",
-}
-_STATE_CODES = set(_STATE_MAP.values())
+_STATE_MAP = parcel_search.STATE_MAP if HAS_PARCEL_SEARCH else {}
+_STATE_CODES = parcel_search.STATE_CODES if HAS_PARCEL_SEARCH else set()
 
 _STREET_TYPES = {
     "st": "St", "str": "St", "street": "St",
@@ -744,133 +653,6 @@ def get_polygon_coords(geometry):
                 best = poly[0]
         return best
     return []
-
-
-# ╦ ╦╔═╗╦═╗╦  ╔╦╗╦ ╦╦╔╦╗╔═╗
-# ║║║║ ║╠╦╝║   ║║║║║║ ║║║╣
-# ╚╩╝╚═╝╩╚═╩═╝═╩╝╚╩╝╩═╩╝╚═╝ SOURCE DISPATCH
-# ==================================================
-
-_US_MARKERS = ("usa", "u.s.a", "united states", "us")
-
-
-def looks_like_us_address(address):
-    """
-    True when the address plausibly sits in the United States - i.e. it carries
-    a US state code/name or names the country.  Used only to decide whether the
-    LightBox parcel API is worth a call before falling back to OpenStreetMap.
-    """
-    text = (address or u"").strip().lower()
-    if not text:
-        return False
-    tail = [p.strip() for p in text.split(",")]
-    if tail and tail[-1] in _US_MARKERS:
-        return True
-    for token in text.replace(",", " ").split():
-        if token.upper() in _STATE_CODES:
-            return True
-        if token in _STATE_MAP:
-            return True
-    for name in _STATE_MAP:
-        if " " in name and name in text:
-            return True
-    return False
-
-
-def search_primary(address, api_key=None, source=SOURCE_AUTO, language=None):
-    """
-    First, fast pass of a boundary search.
-
-    Returns (parcels, context) where *context* carries whatever the slow second
-    pass needs (``None`` when there is no second pass - the LightBox path
-    returns cadastral parcels outright and needs no enrichment).
-
-    Raises ValueError with a user-facing message when nothing can be resolved.
-    """
-    address = (address or u"").strip()
-    if not address:
-        raise ValueError(u"Please enter an address.")
-
-    # ── VN-2000 Cadastral Coordinate Parsing ──────────────────────────────────
-    if HAS_VN2000:
-        pts = []
-        clean_addr = address.strip('\"\'')
-        if os.path.isfile(clean_addr):
-            try:
-                with open(clean_addr, 'r', encoding='utf-8', errors='ignore') as f:
-                    file_content = f.read()
-                pts = vn2000.parse_coordinate_table(file_content)
-            except Exception as ex:
-                logger.warning("Failed to read file as VN-2000: {}".format(ex))
-        if not pts:
-            pts = vn2000.parse_coordinate_table(address)
-
-        is_vn_source = (source == SOURCE_VN2000 or "VN-2000" in source)
-        if len(pts) >= 3 or is_vn_source:
-            if len(pts) < 3:
-                raise ValueError(
-                    u"VN-2000 format requires at least 3 coordinate points (ID, X, Y).\n"
-                    u"Example: 1 1185420.25 594230.12; 2 1185450.10 594235.40; 3 1185445.00 594280.00"
-                )
-            detected_province = "Hà Nội"
-            for prov in vn2000.PROVINCE_MERIDIANS:
-                if prov.lower() in address.lower():
-                    detected_province = prov
-                    break
-            parcel_name = os.path.basename(clean_addr) if os.path.isfile(clean_addr) else "Thửa đất VN-2000"
-            parcel = vn2000.create_vn2000_parcel(pts, name=parcel_name, province=detected_province)
-            if parcel:
-                return [parcel], None
-
-    use_lightbox = (source == SOURCE_LIGHTBOX or "LightBox" in source or
-                    ((source == SOURCE_AUTO or "Auto" in source) and api_key and
-                     looks_like_us_address(address)))
-
-    if use_lightbox:
-        if not api_key:
-            raise ValueError(
-                u"Set lightbox_api_key in the T3Lab config to use LightBox, or "
-                u"switch the source to OpenStreetMap.")
-        try:
-            parcels = search_parcels(api_key, address)
-            if parcels:
-                return parcels, None
-            if source == SOURCE_LIGHTBOX:
-                return [], None
-            logger.info("LightBox returned no parcels; falling back to OSM.")
-        except Exception as ex:
-            if source == SOURCE_LIGHTBOX:
-                raise
-            logger.warning("LightBox failed, falling back to OSM: {}".format(ex))
-
-    if not HAS_GEOPARCEL:
-        raise ValueError(
-            u"Worldwide lookup is unavailable: lib/Snippets/_geoparcel.py "
-            u"could not be imported.")
-
-    places, parcels = geoparcel.primary_boundaries(
-        address, limit=MAX_RESULTS, language=language)
-    seen = set(geoparcel.ring_key(p["geometry"]["coordinates"][0])
-               for p in parcels)
-    return parcels, {"place": places[0], "seen": seen}
-
-
-def search_more(context):
-    """
-    Slow second pass: everything OpenStreetMap has mapped around the geocoded
-    point.  Never raises - a dead Overpass mirror just means fewer choices.
-    """
-    if not context or not HAS_GEOPARCEL:
-        return []
-    try:
-        return geoparcel.nearby_boundaries(
-            context["place"],
-            limit=max(0, MAX_RESULTS - len(context.get("seen") or ())),
-            exclude=context.get("seen"),
-            include_fallback=True)
-    except Exception as ex:
-        logger.warning("Overpass enrichment failed: {}".format(ex))
-        return []
 
 
 # ╔═╗╔═╗╦═╗╔═╗╔═╗╦    ╔╦╗╔═╗╔═╗
@@ -1358,8 +1140,10 @@ class ParcelItem(object):
         self.lot_width         = data.get("lot_width", "")
         self.lot_depth         = data.get("lot_depth", "")
         self.setbacks          = data.get("setbacks", {})
-        # Worldwide fields (present for every source; see search_primary)
+        # Worldwide fields (present for every source; see
+        # Snippets._parcel_search.search_primary)
         self.source            = data.get("source", "LightBox")
+        self.source_label      = data.get("source_label") or self.source
         self.boundary_kind     = data.get("boundary_kind", u"Cadastral parcel")
         self.country           = data.get("country", "")
         self.is_approximate    = bool(data.get("is_approximate", False))
@@ -1390,21 +1174,11 @@ class PropertyLineDialog(T3WPFWindow):
         self._search_seq = 0
 
 
-        config = load_config()
-
-        # Restore the last used data source
-        saved_source = config.get("data_source", SOURCE_AUTO)
-        combo = getattr(self, "cmb_source", None)
-        if combo is not None:
-            for entry in combo.Items:
-                if entry.Content == saved_source:
-                    combo.SelectedItem = entry
-                    break
-
-        if not HAS_GEOPARCEL:
+        if not (HAS_GEOPARCEL and HAS_PARCEL_SEARCH):
             self._set_status(
-                u"Worldwide search unavailable — lib/Snippets/_geoparcel.py "
-                u"failed to import. LightBox (US) only.", error=True)
+                u"Search is unavailable: lib/Snippets/_geoparcel.py or "
+                u"_parcel_search.py failed to import. Reinstall the T3Lab "
+                u"extension, then restart Revit.", error=True)
 
     # ───────────────────────────────────── GUI EVENTS
 
@@ -1426,22 +1200,26 @@ class PropertyLineDialog(T3WPFWindow):
         if e.Key == Key.Return:
             self.btn_search_Click(sender, e)
 
-    def _selected_source(self):
-        combo = getattr(self, "cmb_source", None)
-        item = combo.SelectedItem if combo is not None else None
-        return item.Content if item else SOURCE_AUTO
-
     def btn_search_Click(self, sender, e):
-        address = self.txt_address.Text.strip()
-        if not address:
+        query = self.txt_address.Text.strip()
+        if not query:
             self._show_address_warning(
-                u"Please enter a property address — anywhere in the world.")
+                u"Enter an address, place name or coordinates — anywhere in "
+                u"the world.")
             return
-        if len(address) < 4:
+        is_coords = bool(HAS_PARCEL_SEARCH and
+                         parcel_search.parse_coordinates(query))
+        if len(query) < 4 and not is_coords:
             self._show_address_warning(
                 u"Address looks too short — include the street, city and "
                 u"country. Example: 268 Ly Thuong Kiet, District 10, "
                 u"Ho Chi Minh City, Vietnam")
+            return
+        if not HAS_PARCEL_SEARCH:
+            self._set_status(
+                u"Search is unavailable: lib/Snippets/_parcel_search.py failed "
+                u"to import. Reinstall the T3Lab extension, then restart Revit.",
+                error=True)
             return
         self._hide_address_warning()
         try:
@@ -1449,15 +1227,10 @@ class PropertyLineDialog(T3WPFWindow):
         except Exception:
             pass
 
-        source = self._selected_source()
-        # Tab API Settings đã gỡ (2026-09-06): key LightBox chỉ còn đọc từ config.
+        # No source picker: the pipeline geocodes worldwide and picks the
+        # best parcel source for the location.  LightBox is only used for US
+        # locations when a key is set in the T3Lab config (lightbox_api_key).
         api_key = load_config().get("lightbox_api_key", "")
-        if source == SOURCE_LIGHTBOX and not api_key:
-            self._set_status(
-                u"LightBox needs an API key — switch the source to OpenStreetMap.", error=True)
-            return
-
-        save_config({"data_source": source})
 
         self._set_status(u"Searching for property boundaries...", busy=True)
         self._show_results_message(u"Searching for property boundaries...")
@@ -1470,15 +1243,27 @@ class PropertyLineDialog(T3WPFWindow):
         # so the first batch is painted as soon as it lands.
         def search_thread():
             try:
-                parcels, context = search_primary(address, api_key, source)
+                outcome = parcel_search.search_primary(
+                    query, lightbox_search=search_parcels,
+                    lightbox_key=api_key, limit=MAX_RESULTS)
+            except parcel_search.SearchError as ex:
+                error_msg = u"{}".format(ex)
+                self.Dispatcher.Invoke(
+                    DispatcherPriority.Normal,
+                    Action(lambda: self._on_search_error(error_msg, seq, True))
+                )
+                return
             except Exception as ex:
-                error_msg = str(ex)
+                error_msg = u"{}".format(ex)
+                logger.error(traceback.format_exc())
                 self.Dispatcher.Invoke(
                     DispatcherPriority.Normal,
                     Action(lambda: self._on_search_error(error_msg, seq))
                 )
                 return
 
+            parcels = outcome["parcels"]
+            context = outcome["context"]
             has_more = bool(context)
             self.Dispatcher.Invoke(
                 DispatcherPriority.Normal,
@@ -1487,7 +1272,7 @@ class PropertyLineDialog(T3WPFWindow):
             if not has_more:
                 return
 
-            extra = search_more(context)
+            extra = parcel_search.search_more(context)
             self.Dispatcher.Invoke(
                 DispatcherPriority.Background,
                 Action(lambda: self._on_search_more(extra, seq))
@@ -1519,11 +1304,13 @@ class PropertyLineDialog(T3WPFWindow):
             if more:
                 # The geocoder located the address but carried no polygon;
                 # Overpass may still turn one up, so do not declare failure.
-                msg = u"Location found. Looking for mapped boundaries..."
+                msg = (u"Location found. Looking for mapped boundaries on "
+                       u"OpenStreetMap...")
                 self._set_status(msg, busy=True)
             else:
                 msg = (u"No property boundary found. Try a more specific "
-                       u"address, or add the city and country.")
+                       u"address, add the city and country, or type the "
+                       u"coordinates.")
                 self._set_status(msg)
             self._show_results_message(msg)
             return
@@ -1531,18 +1318,21 @@ class PropertyLineDialog(T3WPFWindow):
         self.lv_parcels.Visibility = Visibility.Visible
         self.border_no_results.Visibility = Visibility.Collapsed
 
+        found = u"Found {} boundar{}".format(
+            len(parcels), u"y" if len(parcels) == 1 else u"ies")
+        origin = parcel_search.describe_sources(parcels)
+        if origin:
+            found += u" — " + origin[0].lower() + origin[1:]
+
         # Surface auto-correction hint if address was normalised
         corrected_from = parcels[0].get("_corrected_from") if parcels else None
         if corrected_from:
-            msg = (u"Found {} boundary(ies). \u2728 Address auto-corrected: "
-                   u"'{}' \u2192 '{}'".format(len(parcels), corrected_from,
-                                              self.txt_address.Text))
+            msg = u"{}. Address auto-corrected from '{}'.".format(
+                found, corrected_from)
         elif more:
-            msg = (u"Found {} boundary(ies) \u2014 searching OpenStreetMap "
-                   u"for more...".format(len(parcels)))
+            msg = u"{}. Searching OpenStreetMap for more...".format(found)
         else:
-            msg = u"Found {} boundary(ies). Select one to continue.".format(
-                len(parcels))
+            msg = u"{}. Select one to continue.".format(found)
         self._set_status(msg, busy=bool(more))
 
     def _on_search_more(self, parcels, seq=None):
@@ -1555,17 +1345,20 @@ class PropertyLineDialog(T3WPFWindow):
             self.lv_parcels.Items.Add(ParcelItem(p))
 
         if not self._parcels:
-            msg = (u"No mapped boundary at that address. Try a nearby address, "
-                   u"or a different data source.")
+            msg = (u"No mapped boundary at that address. Try a nearby "
+                   u"address, or type the coordinates of the plot.")
             self._set_status(msg)
             self._show_results_message(msg)
             return
 
         self.lv_parcels.Visibility = Visibility.Visible
         self.border_no_results.Visibility = Visibility.Collapsed
-        self._set_status(
-            u"Found {} boundary(ies). Select one to continue.".format(
-                len(self._parcels)))
+        count = len(self._parcels)
+        found = u"Found {} boundar{}".format(count, u"y" if count == 1 else u"ies")
+        origin = parcel_search.describe_sources(self._parcels)
+        if origin:
+            found += u" — " + origin[0].lower() + origin[1:]
+        self._set_status(u"{}. Select one to continue.".format(found))
 
     def _show_results_message(self, msg):
         """Hide the parcel list and show `msg` as its single empty state."""
@@ -1580,26 +1373,31 @@ class PropertyLineDialog(T3WPFWindow):
     def _hide_address_warning(self):
         self.txt_address_warning.Visibility = Visibility.Collapsed
 
-    def _on_search_error(self, error_msg, seq=None):
+    def _on_search_error(self, error_msg, seq=None, user_facing=False):
         if not self._is_current(seq):
             return
         self.btn_search.IsEnabled = True
-        # Suppress raw network / connection errors from the status bar;
-        # log them and show a friendly neutral message instead.
-        err_lower = error_msg.lower()
-        is_network = any(k in err_lower for k in (
-            "connection", "connect", "timeout", "network", "socket",
-            "ssl", "certificate", "unreachable", "refused", "reset",
-            "httperror", "urlerror", "ioerror", "errno"))
-        if is_network:
-            logger.warning("Boundary lookup network error: {}".format(error_msg))
-            msg = (u"Could not reach the map data service — check your internet "
-                   u"connection (and proxy settings) and try again.")
-            self._set_status(msg)
+        if user_facing:
+            # Already says what failed, where, and what to do next.
+            msg = error_msg
+            logger.warning("Boundary search stopped: {}".format(error_msg))
         else:
-            msg = u"Search error: {}".format(error_msg)
-            self._set_status(msg, error=True)
-            logger.error("Boundary search error: {}".format(error_msg))
+            err_lower = error_msg.lower()
+            is_network = any(k in err_lower for k in (
+                "connection", "connect", "timeout", "timed out", "network",
+                "socket", "ssl", "certificate", "unreachable", "refused",
+                "reset", "httperror", "urlerror", "ioerror", "errno",
+                "resolve", "proxy"))
+            if is_network:
+                logger.warning("Boundary lookup network error: {}".format(error_msg))
+                msg = (u"Could not reach the map data service — check the "
+                       u"internet connection (and proxy settings), then "
+                       u"search again.")
+            else:
+                logger.error("Boundary search error: {}".format(error_msg))
+                msg = (u"Search failed: {}. Try again; if it keeps failing, "
+                       u"send the pyRevit log to T3Lab.".format(error_msg))
+        self._set_status(msg, error=True)
         self._show_results_message(msg)
 
     def lv_parcels_SelectionChanged(self, sender, e):

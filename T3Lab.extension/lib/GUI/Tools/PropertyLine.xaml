@@ -1736,8 +1736,9 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBox x:Name="txt_address" Style="{StaticResource T3.TextBox}" Height="28"
+                                                     ToolTip="Any address, place name or coordinates worldwide, e.g. 1.2903, 103.8519"
                                                      KeyDown="txt_address_KeyDown"/>
-                                            <Button x:Name="btn_search" Grid.Column="2" Content="Search Parcels"
+                                            <Button x:Name="btn_search" Grid.Column="2" Content="Search"
                                                     Style="{StaticResource T3.Button.Secondary}" Height="28" Padding="16,0"
                                                     Click="btn_search_Click"/>
                                         </Grid>
@@ -1747,22 +1748,11 @@
                                                    Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.Danger.Text}"
                                                    Margin="0,0,0,8"/>
 
-                                        <!-- Data source selector -->
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="8"/>
-                                                <ColumnDefinition Width="230"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Data Source:" Style="{StaticResource T3.Caption}" VerticalAlignment="Center"/>
-                                            <ComboBox x:Name="cmb_source" Grid.Column="2" Style="{StaticResource T3.ComboBox}" Height="26" SelectedIndex="0">
-                                                <ComboBoxItem Content="Auto (US: LightBox, else OSM)"/>
-                                                <ComboBoxItem Content="VN-2000 (Vietnam Cadastral)"/>
-                                                <ComboBoxItem Content="OpenStreetMap (Worldwide)"/>
-                                                <ComboBoxItem Content="LightBox RE (US only)"/>
-                                            </ComboBox>
-                                        </Grid>
+                                        <!-- No source picker: the search geocodes worldwide and picks the
+                                             best parcel source for the location (Snippets/_parcel_search.py).
+                                             Each result shows the source it came from. -->
+                                        <TextBlock Style="{StaticResource T3.Caption}" TextWrapping="Wrap"
+                                                   Text="Type any address, place name or coordinates (e.g. 1.2903, 103.8519). The best data source for the location is picked automatically."/>
                                     </StackPanel>
                                 </Border>
 
@@ -1804,7 +1794,7 @@
                                                 <Border x:Name="border_no_results" Background="Transparent" Padding="16,0"
                                                         VerticalAlignment="Center" HorizontalAlignment="Center">
                                                     <TextBlock x:Name="txt_no_results"
-                                                               Text="Enter an address above and click Search to find parcels."
+                                                               Text="Enter any address or coordinates worldwide and press Search"
                                                                Style="{StaticResource T3.Empty}"/>
                                                 </Border>
 
@@ -1821,6 +1811,7 @@
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="Auto"/>
                                                                     <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
                                                                 </Grid.ColumnDefinitions>
                                                                 <Ellipse Grid.Column="0" Width="8" Height="8" Margin="0,0,8,0"
                                                                          Fill="{StaticResource T3.Ink}" VerticalAlignment="Center"/>
@@ -1828,6 +1819,13 @@
                                                                     <TextBlock Text="{Binding display_address}" Style="{StaticResource T3.BodyStrong}" TextWrapping="Wrap"/>
                                                                     <TextBlock Text="{Binding subtitle}" Style="{StaticResource T3.Caption}" TextWrapping="Wrap"/>
                                                                 </StackPanel>
+                                                                <!-- Source pill: which provider supplied this boundary -->
+                                                                <Border Grid.Column="2" Margin="8,0,0,0" Padding="4,0" VerticalAlignment="Top"
+                                                                        CornerRadius="{StaticResource T3.R.Pill}" BorderThickness="1"
+                                                                        Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
+                                                                        ToolTip="Data source of this boundary">
+                                                                    <TextBlock Text="{Binding source_label}" Style="{StaticResource T3.Caption}"/>
+                                                                </Border>
                                                             </Grid>
                                                         </DataTemplate>
                                                     </ListView.ItemTemplate>

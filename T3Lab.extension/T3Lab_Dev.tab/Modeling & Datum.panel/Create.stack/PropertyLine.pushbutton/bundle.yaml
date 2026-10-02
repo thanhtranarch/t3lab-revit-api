@@ -1,10 +1,12 @@
 title: "Property\nLine"
-tooltip: "Draw property lines anywhere in the world - just type the address."
+tooltip: "Draw property lines anywhere in the world - type any address or coordinates and press Search."
 description: |
-  Type any address on earth and pick the matching boundary
-  Uses OpenStreetMap worldwide (no API key) and LightBox cadastral parcels for US addresses
+  Type any address, place name or coordinates (e.g. 1.2903, 103.8519) - no data source to pick
+  Searches worldwide and picks the best boundary source for the location automatically:
+  LightBox cadastral parcels for US addresses (when an API key is configured), otherwise OpenStreetMap
+  Each result shows which source supplied it; pasted VN-2000 coordinate tables are recognised too
   Draws a closed loop on a dedicated Property Line style at the base point, survey point or world origin
   Lists distances and bearings for every segment, ready for Revit's native Property Line dialog
   Optionally writes the site latitude/longitude into the project location
 author: "Tran Tien Thanh"
-version: "2.1.0"
+version: "2.2.0"
