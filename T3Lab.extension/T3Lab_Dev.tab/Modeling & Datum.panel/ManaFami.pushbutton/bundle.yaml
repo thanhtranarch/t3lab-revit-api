@@ -1,9 +1,9 @@
 title: "Mana\nFami"
-tooltip: "Family Manager - Manage families and load new families in one dialog."
+tooltip: "Family Manager - Batch rename families and types, and load new families, in one dialog."
 description: |
-  Browse all loaded families by category with type count
-  Search and filter by name, category, or parameter
-  Load new families from disk directly into the project
-  Delete unused family types to keep the model clean
+  Batch Operations (opens first): list families, system types, model groups or assemblies
+  Find and replace, add a prefix or suffix, and change case of family and type names
+  Review every staged change in the grid, then apply it in one undoable step
+  Family Loader: load new families from a local folder directly into the project
 author: "Tran Tien Thanh & Dang Quoc Truong"
 version: "1.0.0"

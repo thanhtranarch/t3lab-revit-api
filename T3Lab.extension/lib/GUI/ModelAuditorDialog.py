@@ -339,6 +339,95 @@ def _status_for(value, thresholds):
     return _STATUS_ORDER[-1]
 
 
+# ----------------------------------------------------------------------------
+# THRESHOLD BANDS — cột THRESHOLDS của bảng Health
+# ----------------------------------------------------------------------------
+# Năm ngưỡng cắt ra sáu dải (Good … Severe) theo đúng luật của _status_for:
+# dải N chứa mọi giá trị <= thresholds[N] và > thresholds[N-1]. Trước đây cột
+# chỉ in "100 | 250 | 500 | 750 | 1000" — người dùng không biết số nào là ranh
+# giới của dải nào, cũng không biết giá trị hiện tại nằm đâu. Hàm dưới đây là
+# logic thuần (không Revit, không WPF) để dev/test_model_auditor.py kiểm được.
+
+def _fmt_number(value):
+    """Full-precision number for sentences: 1000 -> '1,000', 312.5 -> '312.5'."""
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if num.is_integer():
+        return "{:,}".format(int(num))
+    return "{:,g}".format(num)
+
+
+def _fmt_tick(value):
+    """Short cut-off label that fits a 32px tick slot (at most 5 characters):
+    1000 -> '1000', 25000 -> '25k', 12500 -> '12.5k', 312.5 -> '312.5'."""
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if abs(num) >= 10000:
+        return "{:g}k".format(num / 1000.0)
+    if num.is_integer():
+        return str(int(num))
+    return "{:g}".format(num)
+
+
+def _threshold_bands(value, thresholds, unit=""):
+    """Describe where `value` sits among the six health bands.
+
+    Returns a dict:
+      index    -- band of the value, 0 (Good) .. 5 (Severe); same as _status_for
+      status   -- that band's name
+      ticks    -- the five cut-offs as short labels, for the tick slots
+      bands    -- [(name, range text)] for all six bands, best to worst
+      summary  -- one line: 'Good ≤ 100 · … · Severe > 1,000 MB'
+      tooltip  -- every band in words + which one the current value is in
+    """
+    status = _status_for(value, thresholds)
+    index = _STATUS_ORDER.index(status)
+    suffix = " " + unit if unit else ""
+    cuts = list(thresholds)
+
+    bands = []
+    short = []
+    for idx, name in enumerate(_STATUS_ORDER):
+        if idx == 0:
+            hi = cuts[0]
+            text = "0" if float(hi) <= 0 else "up to " + _fmt_number(hi)
+            short.append("{} ≤ {}".format(name, _fmt_number(hi)))
+        elif idx < len(cuts):
+            lo, hi = cuts[idx - 1], cuts[idx]
+            if float(hi) <= float(lo):
+                # A hand-edited config can repeat a limit; the band is then empty.
+                text = "not used (same limit as {})".format(_STATUS_ORDER[idx - 1])
+            else:
+                text = "over {} up to {}".format(_fmt_number(lo), _fmt_number(hi))
+            short.append("{} ≤ {}".format(name, _fmt_number(hi)))
+        else:
+            text = "over " + _fmt_number(cuts[-1])
+            short.append("{} > {}".format(name, _fmt_number(cuts[-1])))
+        if not text.startswith("not used"):
+            text += suffix
+        bands.append((name, text))
+
+    lines = ["Health bands, best to worst:"]
+    for idx, (name, text) in enumerate(bands):
+        lines.append("{}: {}{}".format(name, text, "   (current)" if idx == index else ""))
+    lines.append("")
+    lines.append("Current {}{} is in {} ({}).".format(
+        _fmt_number(value), suffix, status, bands[index][1]))
+
+    return {
+        "index": index,
+        "status": status,
+        "ticks": [_fmt_tick(cut) for cut in cuts],
+        "bands": bands,
+        "summary": " · ".join(short) + suffix,
+        "tooltip": "\n".join(lines),
+    }
+
+
 def _rag_status(score):
     """Red/Amber/Green classification matching Autodesk Model Analytics'
     health-check indicators. Returns (label, fill token, text token)."""
@@ -744,8 +833,10 @@ class MetricDetailWindow(T3WPFWindow):
             "recommendation", "No recommendation recorded for this metric.")
         thresholds = info.get("thresholds")
         if thresholds:
+            # Same band wording as the THRESHOLDS tooltip in the Health table.
+            summary = _threshold_bands(0, thresholds, info.get("unit", ""))["summary"]
             self.txt_detail_thresholds.Text = (
-                "Thresholds: " + " | ".join(str(x) for x in thresholds) +
+                "Thresholds: " + summary +
                 "   ·   Weight: {}/5".format(info.get("weight", 1)))
 
         fill, text = brushes
@@ -1183,6 +1274,9 @@ class ModelAuditorWindow(T3WPFWindow):
             value_display = "{}{}".format(value, " " + unit if unit else "")
             stars = u"★" * m_info["weight"] + u"☆" * (5 - m_info["weight"])
 
+            band = _threshold_bands(value, thresholds, unit)
+            ticks = band["ticks"]
+
             # Element selectability
             has_elements = len(self.health_analyzer.element_ids.get(key, [])) > 0
             selectable = m_info["selectable"] and has_elements
@@ -1198,7 +1292,18 @@ class ModelAuditorWindow(T3WPFWindow):
                 # Bare values: the column headers already say WEIGHT and
                 # THRESHOLDS, and each cell is one 26px line high.
                 weight_stars="{} {}/5".format(stars, m_info["weight"]),
-                thresholds_text=" | ".join(str(x) for x in thresholds),
+                # THRESHOLDS band bar. Every value is a STRING: the XAML picks
+                # the raised segment with DataTrigger on band_index (PythonNet
+                # does not carry ints/Brushes through a binding reliably —
+                # strings do, same as `severity`).
+                band_index=str(band["index"]),
+                band_tick_0=ticks[0],
+                band_tick_1=ticks[1],
+                band_tick_2=ticks[2],
+                band_tick_3=ticks[3],
+                band_tick_4=ticks[4],
+                band_unit=unit,
+                thresholds_tooltip=band["tooltip"],
                 select_visibility="Visible" if selectable else "Collapsed",
                 recommendation=m_info["recommendation"],
             ))

@@ -2017,7 +2017,8 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="WEIGHT shows how much a metric moves the score"
+                                    <TextBlock Grid.Column="1" Text="Raised band = current value  ·  Weight = effect on score"
+                                               TextTrimming="CharacterEllipsis"
                                                Style="{StaticResource T3.Caption}" Foreground="{StaticResource T3.TextDisabled}"
                                                HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                 </Grid>
@@ -2086,10 +2087,91 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="THRESHOLDS" Binding="{Binding thresholds_text}" Width="*"
-                                                            ElementStyle="{StaticResource T3.Cell.Mono}"/>
-                                        <DataGridTemplateColumn Header="ACTION" Width="90"
-                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Center}">
+                                        <!-- THRESHOLDS: thanh 6 dải Good → Severe, đọc như một trục số.
+                                             Ô màu = dải (họ màu giống cột HEALTH: 2 Success · 2 Warning · 2 Danger),
+                                             số nằm GIỮA hai ô = ngưỡng cắt giữa hai dải đó. Dải chứa giá trị hiện tại
+                                             được tô đậm Accent và cao hơn (dấu hình dạng, không chỉ dựa vào màu).
+                                             band_index là CHUỖI "0".."5" → DataTrigger, không bind Brush/int từ Python.
+                                             Slot cố định (ô 14px, số 36px) nên các dòng thẳng hàng; cột Width="Auto". -->
+                                        <DataGridTemplateColumn Width="Auto">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="THRESHOLDS"
+                                                           ToolTip="Six health bands, best (left) to worst (right): Good, Acceptable, Warning, Concerning, Critical, Severe.&#x0a;The numbers are the cut-offs between neighbouring bands; each band includes its upper limit.&#x0a;The raised, solid segment is the band the current value falls in.&#x0a;Hover a row for its full ranges."/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Grid Background="Transparent" ToolTip="{Binding thresholds_tooltip}"
+                                                          ToolTipService.ShowDuration="30000" VerticalAlignment="Center">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="14"/>
+                                                            <ColumnDefinition Width="36"/>
+                                                            <ColumnDefinition Width="14"/>
+                                                            <ColumnDefinition Width="36"/>
+                                                            <ColumnDefinition Width="14"/>
+                                                            <ColumnDefinition Width="36"/>
+                                                            <ColumnDefinition Width="14"/>
+                                                            <ColumnDefinition Width="36"/>
+                                                            <ColumnDefinition Width="14"/>
+                                                            <ColumnDefinition Width="36"/>
+                                                            <ColumnDefinition Width="14"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border x:Name="band_seg_0" Grid.Column="0" Height="6" CornerRadius="2" VerticalAlignment="Center"
+                                                                Background="{StaticResource T3.Success.Fill}" BorderBrush="{StaticResource T3.Success.Accent}" BorderThickness="1"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding band_tick_0}" Style="{StaticResource T3.Caption}"
+                                                                   FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <Border x:Name="band_seg_1" Grid.Column="2" Height="6" CornerRadius="2" VerticalAlignment="Center"
+                                                                Background="{StaticResource T3.Success.Fill}" BorderBrush="{StaticResource T3.Success.Accent}" BorderThickness="1"/>
+                                                        <TextBlock Grid.Column="3" Text="{Binding band_tick_1}" Style="{StaticResource T3.Caption}"
+                                                                   FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <Border x:Name="band_seg_2" Grid.Column="4" Height="6" CornerRadius="2" VerticalAlignment="Center"
+                                                                Background="{StaticResource T3.Warning.Fill}" BorderBrush="{StaticResource T3.Warning.Accent}" BorderThickness="1"/>
+                                                        <TextBlock Grid.Column="5" Text="{Binding band_tick_2}" Style="{StaticResource T3.Caption}"
+                                                                   FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <Border x:Name="band_seg_3" Grid.Column="6" Height="6" CornerRadius="2" VerticalAlignment="Center"
+                                                                Background="{StaticResource T3.Warning.Fill}" BorderBrush="{StaticResource T3.Warning.Accent}" BorderThickness="1"/>
+                                                        <TextBlock Grid.Column="7" Text="{Binding band_tick_3}" Style="{StaticResource T3.Caption}"
+                                                                   FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <Border x:Name="band_seg_4" Grid.Column="8" Height="6" CornerRadius="2" VerticalAlignment="Center"
+                                                                Background="{StaticResource T3.Danger.Fill}" BorderBrush="{StaticResource T3.Danger.Accent}" BorderThickness="1"/>
+                                                        <TextBlock Grid.Column="9" Text="{Binding band_tick_4}" Style="{StaticResource T3.Caption}"
+                                                                   FontFamily="Consolas" TextAlignment="Center" HorizontalAlignment="Center"/>
+                                                        <Border x:Name="band_seg_5" Grid.Column="10" Height="6" CornerRadius="2" VerticalAlignment="Center"
+                                                                Background="{StaticResource T3.Danger.Fill}" BorderBrush="{StaticResource T3.Danger.Accent}" BorderThickness="1"/>
+                                                        <TextBlock Grid.Column="11" Text="{Binding band_unit}" Style="{StaticResource T3.Caption}" Margin="8,0,0,0"/>
+                                                    </Grid>
+                                                    <DataTemplate.Triggers>
+                                                        <DataTrigger Binding="{Binding band_index}" Value="0">
+                                                            <Setter TargetName="band_seg_0" Property="Background" Value="{StaticResource T3.Success.Accent}"/>
+                                                            <Setter TargetName="band_seg_0" Property="Height" Value="16"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding band_index}" Value="1">
+                                                            <Setter TargetName="band_seg_1" Property="Background" Value="{StaticResource T3.Success.Accent}"/>
+                                                            <Setter TargetName="band_seg_1" Property="Height" Value="16"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding band_index}" Value="2">
+                                                            <Setter TargetName="band_seg_2" Property="Background" Value="{StaticResource T3.Warning.Accent}"/>
+                                                            <Setter TargetName="band_seg_2" Property="Height" Value="16"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding band_index}" Value="3">
+                                                            <Setter TargetName="band_seg_3" Property="Background" Value="{StaticResource T3.Warning.Accent}"/>
+                                                            <Setter TargetName="band_seg_3" Property="Height" Value="16"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding band_index}" Value="4">
+                                                            <Setter TargetName="band_seg_4" Property="Background" Value="{StaticResource T3.Danger.Accent}"/>
+                                                            <Setter TargetName="band_seg_4" Property="Height" Value="16"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding band_index}" Value="5">
+                                                            <Setter TargetName="band_seg_5" Property="Background" Value="{StaticResource T3.Danger.Accent}"/>
+                                                            <Setter TargetName="band_seg_5" Property="Height" Value="16"/>
+                                                        </DataTrigger>
+                                                    </DataTemplate.Triggers>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <!-- ACTION là cột cuối và là cột "*": nó ăn phần rộng còn lại nên bảng kín mép
+                                             phải (luật 19), nút Detail canh trái ngay sau thanh ngưỡng. -->
+                                        <DataGridTemplateColumn Header="ACTION" Width="*" MinWidth="90">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -2099,7 +2181,7 @@
                                                                 Style="{StaticResource T3.Button.Ghost}"
                                                                 Height="22" Padding="8,0" MinWidth="0" FontSize="11"
                                                                 ToolTip="Select the elements behind this metric"
-                                                                VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                                VerticalAlignment="Center" HorizontalAlignment="Left"/>
                                                     </Grid>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
