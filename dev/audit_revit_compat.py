@@ -82,6 +82,20 @@ RULES = [
          fix="GetUnitTypeId()"),
     dict(name="DisplayUnits", kind="member", removed=2022,
          fix="FormatOptions.GetUnitTypeId()"),
+    # Rebar (2026-10-02, panel Rebar & Assembly) — theo Revit 2026/2027 API
+    # What's New, xem dev/plan/rebar-tekla-implementation-spec.md §2.3.
+    dict(name="RebarHookOrientation", kind="type", removed=2027,
+         fix="Snippets._compat.create_rebar_from_curves()"),
+    dict(name="BarTerminationsData", kind="type", added=2026,
+         fix="Snippets._compat.create_rebar_from_curves()"),
+    dict(name="NumberingSchemaType", kind="type", removed=2027,
+         fix="NumberingSchema.GetNumberingSchema(doc, name) / GetSchemasInDocument"),
+    dict(name="BarMassPerUnitLength", kind="member", added=2027,
+         fix="Snippets._compat.bar_mass_per_metre()"),
+    dict(name="Mass", kind="member", added=2027, receiver=re.compile(r"(?i)rebar|bar$"),
+         fix="Snippets._compat.bar_mass_per_metre()"),
+    dict(name="SetLayoutAsCustomSpacing", kind="member", added=2027,
+         fix="SetLayoutAsMaximumSpacing (all releases)"),
 ]
 
 # String filter rule có tham số caseSensitive — mất trên 2026 (đã đo).
