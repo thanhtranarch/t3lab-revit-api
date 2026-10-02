@@ -29,12 +29,9 @@ clr.AddReference("System")
 clr.AddReference("PresentationFramework")
 clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
-clr.AddReference("System.Drawing")   # bitmap / graphics for parcel map
 
 import System
 import System.IO as IO
-import System.Drawing as Drawing
-import System.Drawing.Imaging as Imaging
 import System.Diagnostics as Diagnostics
 from System import Uri, Action
 from System.Collections.ObjectModel import ObservableCollection
@@ -62,6 +59,14 @@ try:
 except ImportError:
     parcel_search = None
     HAS_PARCEL_SEARCH = False
+
+# Boundary map preview: Web Mercator maths + OSM basemap tiles
+try:
+    from Snippets import _parcel_map as parcel_map
+    HAS_PARCEL_MAP = True
+except ImportError:
+    parcel_map = None
+    HAS_PARCEL_MAP = False
 
 # ╦  ╦╔═╗╦═╗╦╔═╗╔╗ ╦  ╔═╗╔═╗
 # ╚╗╔╝╠═╣╠╦╝║╠═╣╠╩╗║  ║╣ ╚═╗
@@ -108,6 +113,8 @@ if HAS_GEOPARCEL:
     geoparcel.set_logger(logger)
 if HAS_PARCEL_SEARCH:
     parcel_search.set_logger(logger)
+if HAS_PARCEL_MAP:
+    parcel_map.set_logger(logger)
 
 
 # ╔═╗╔═╗╔╗╔╔═╗╦╔═╗
@@ -660,159 +667,99 @@ def get_polygon_coords(geometry):
 # ╩  ╩ ╩╩╚═╚═╝╚═╝╩═╝  ╩ ╩╩ ╩╩   PARCEL MAP
 # ==================================================
 
-# OSM tile server — free, no API key, requires User-Agent header
-_OSM_TILE_URL   = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-_OSM_USER_AGENT = "T3Lab-PropertyLine-Tool/1.0 (pyRevit add-in; contact t3lab)"
-_TILE_SIZE      = 256   # pixels per OSM tile
+# The preview is drawn with WPF (Canvas + Path + Image), never System.Drawing:
+# GDI+ under pythonnet on .NET 8 was the fragile half of the old PNG pipeline,
+# and the boundary must show even when no basemap tile can be fetched.
+# Projection, fit, tile layout and tile download: Snippets/_parcel_map.py.
+MAP_PADDING_PX = 32          # clear space round the boundary (street context)
+MAP_VERTEX_RADIUS = 3.0      # vertex dot radius, preview pixels
+MAP_SCALE_BAR_PX = 96        # longest scale bar, preview pixels
+MAP_RENDER_DELAY_MS = 200    # resize debounce before redrawing the map
+MAP_SAVE_SCALE = 2.0         # Save Map renders the preview at 2x (192 dpi)
 
 
-def _latlon_to_tile_float(lat, lon, zoom):
-    """Return fractional OSM tile (x, y) for the given lat/lon at *zoom*."""
-    n   = 2.0 ** zoom
-    tx  = (lon + 180.0) / 360.0 * n
-    lat_r = math.radians(lat)
-    ty  = (1.0 - math.log(math.tan(lat_r) + 1.0 / math.cos(lat_r)) / math.pi) / 2.0 * n
-    return tx, ty
+def _net_bytes(data):
+    """Python bytes -> System.Byte[] in one hop (no per-byte conversion)."""
+    import base64
+    return System.Convert.FromBase64String(
+        base64.b64encode(bytes(data)).decode("ascii"))
 
 
-def _choose_zoom(area_sqft):
-    """Pick an OSM zoom level appropriate for the parcel area."""
-    if   area_sqft <   5000: return 20
-    elif area_sqft <  20000: return 19
-    elif area_sqft < 100000: return 18
-    elif area_sqft < 500000: return 17
-    else:                     return 16
-
-
-def generate_parcel_map(coordinates, output_path, area_sqft=0):
+def _frozen_bitmap(data):
     """
-    Build a PNG file showing the parcel boundary overlaid on an OpenStreetMap
-    base map.
-
-    Parameters
-    ----------
-    coordinates : list of [lon, lat]
-        Outer-ring polygon from the Lightbox API / parcel data.
-    output_path : str
-        Full path where the .png should be written.
-    area_sqft : float
-        Used to select an appropriate zoom level.
-
-    Returns
-    -------
-    str
-        *output_path* on success.  Raises on failure.
+    PNG/JPEG bytes -> frozen BitmapImage.  CacheOption.OnLoad decodes now so
+    the stream can be closed; Freeze makes it safe to hand to any element.
     """
-    if not coordinates or len(coordinates) < 3:
-        raise ValueError("Need at least 3 coordinate pairs to draw a parcel map")
-
-    lats = [c[1] for c in coordinates]
-    lons = [c[0] for c in coordinates]
-
-    zoom = _choose_zoom(area_sqft)
-
-    # ── Compute the tile bounding box with 1-tile padding ────────────────────
-    tx_min_f, ty_min_f = _latlon_to_tile_float(max(lats), min(lons), zoom)
-    tx_max_f, ty_max_f = _latlon_to_tile_float(min(lats), max(lons), zoom)
-
-    PAD = 1
-    tx0 = int(tx_min_f) - PAD
-    ty0 = int(ty_min_f) - PAD
-    tx1 = int(tx_max_f) + PAD + 1
-    ty1 = int(ty_max_f) + PAD + 1
-
-    # Cap at 5×5 so the image stays reasonable
-    if tx1 - tx0 > 5:
-        ctr = int((tx_min_f + tx_max_f) / 2)
-        tx0, tx1 = ctr - 2, ctr + 3
-    if ty1 - ty0 > 5:
-        ctr = int((ty_min_f + ty_max_f) / 2)
-        ty0, ty1 = ctr - 2, ctr + 3
-
-    n_cols = tx1 - tx0
-    n_rows = ty1 - ty0
-    canvas_w = n_cols * _TILE_SIZE
-    canvas_h = n_rows * _TILE_SIZE
-
-    canvas = Drawing.Bitmap(canvas_w, canvas_h)
-    g      = Drawing.Graphics.FromImage(canvas)
-    g.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias
-    g.Clear(Drawing.Color.FromArgb(220, 220, 220))   # fallback colour
-
-    # ── Fetch and blit OSM tiles ─────────────────────────────────────────────
-    # Trust the OSM server cert (Revit environment may lack root CA store)
+    from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
+    stream = IO.MemoryStream(_net_bytes(data))
     try:
-        import System.Net as Net
-        Net.ServicePointManager.ServerCertificateValidationCallback = \
-            System.Net.Security.RemoteCertificateValidationCallback(lambda *a: True)
-    except Exception:
-        pass
+        bmp = BitmapImage()
+        bmp.BeginInit()
+        bmp.CacheOption = BitmapCacheOption.OnLoad
+        bmp.StreamSource = stream
+        bmp.EndInit()
+        bmp.Freeze()
+        return bmp
+    finally:
+        stream.Dispose()
 
-    headers = {"User-Agent": _OSM_USER_AGENT}
-    for tx in range(tx0, tx1):
-        for ty in range(ty0, ty1):
-            url = "https://tile.openstreetmap.org/{}/{}/{}.png".format(zoom, tx, ty)
-            try:
-                status, body = http_get(url, headers)
-                if status == 200 and body:
-                    raw = body if isinstance(body, (bytes, bytearray)) else body.encode('latin-1')
-                    ms = IO.MemoryStream(System.Array[System.Byte](bytearray(raw)))
-                    tile_bmp = Drawing.Bitmap.FromStream(ms)
-                    g.DrawImage(tile_bmp,
-                                (tx - tx0) * _TILE_SIZE,
-                                (ty - ty0) * _TILE_SIZE)
-                    tile_bmp.Dispose()
-            except Exception as ex:
-                logger.debug("Tile {}/{}/{} skipped: {}".format(zoom, tx, ty, ex))
 
-    # ── Helper: lat/lon → canvas pixel ───────────────────────────────────────
-    def _to_px(lat, lon):
-        tf_x, tf_y = _latlon_to_tile_float(lat, lon, zoom)
-        px = int((tf_x - tx0) * _TILE_SIZE)
-        py = int((tf_y - ty0) * _TILE_SIZE)
-        return Drawing.Point(px, py)
+def _parse_geometry(markup):
+    """WPF path markup -> frozen Geometry, or None for an empty string."""
+    if not markup:
+        return None
+    from System.Windows.Media import Geometry
+    geom = Geometry.Parse(markup)
+    if geom.CanFreeze:
+        geom.Freeze()
+    return geom
 
-    pts = [_to_px(c[1], c[0]) for c in coordinates]
-    # Remove closing duplicate
-    if pts and pts[0].X == pts[-1].X and pts[0].Y == pts[-1].Y:
-        pts = pts[:-1]
 
-    if len(pts) >= 3:
-        pts_arr = System.Array[Drawing.Point](pts)
+def save_element_png(element, path, scale=MAP_SAVE_SCALE, background=None):
+    """
+    Render a laid-out WPF element to a PNG file at `scale` x its size.
 
-        # Semi-transparent red fill
-        fill = Drawing.SolidBrush(Drawing.Color.FromArgb(70, 220, 30, 30))
-        g.FillPolygon(fill, pts_arr)
-        fill.Dispose()
+    Drawn through a VisualBrush so the element's position inside its parent
+    does not shift the picture (RenderTargetBitmap.Render(element) would).
+    Returns (width_px, height_px).
+    """
+    from System.Windows import Rect
+    from System.Windows.Media import (DrawingVisual, VisualBrush, PixelFormats,
+                                      BrushMappingMode, Stretch)
+    from System.Windows.Media.Imaging import (RenderTargetBitmap,
+                                              PngBitmapEncoder, BitmapFrame)
+    width = float(element.ActualWidth)
+    height = float(element.ActualHeight)
+    if width < 1 or height < 1:
+        raise ValueError("the map preview has no size yet")
+    px_w = int(math.ceil(width * scale))
+    px_h = int(math.ceil(height * scale))
 
-        # Bold red outline
-        pen = Drawing.Pen(Drawing.Color.FromArgb(230, 200, 0, 0), 3)
-        g.DrawPolygon(pen, pts_arr)
-        pen.Dispose()
+    brush = VisualBrush(element)
+    brush.ViewboxUnits = BrushMappingMode.Absolute
+    brush.Viewbox = Rect(0.0, 0.0, width, height)
+    brush.Stretch = Stretch.Fill
 
-        # Yellow centroid dot
-        cx = sum(p.X for p in pts) // len(pts)
-        cy = sum(p.Y for p in pts) // len(pts)
-        dot_brush = Drawing.SolidBrush(Drawing.Color.Yellow)
-        g.FillEllipse(dot_brush, cx - 6, cy - 6, 12, 12)
-        dot_brush.Dispose()
-
-    # ── Attribution label (OSM requires it) ──────────────────────────────────
+    visual = DrawingVisual()
+    ctx = visual.RenderOpen()
     try:
-        font  = Drawing.Font("Arial", 9)
-        brush = Drawing.SolidBrush(Drawing.Color.FromArgb(180, 0, 0, 0))
-        label = u"© OpenStreetMap contributors"
-        g.DrawString(label, font, brush,
-                     Drawing.PointF(4, canvas_h - 18))
-        font.Dispose()
-        brush.Dispose()
-    except Exception:
-        pass
+        if background is not None:
+            ctx.DrawRectangle(background, None, Rect(0.0, 0.0, width, height))
+        ctx.DrawRectangle(brush, None, Rect(0.0, 0.0, width, height))
+    finally:
+        ctx.Close()
 
-    g.Dispose()
-    canvas.Save(output_path, Imaging.ImageFormat.Png)
-    canvas.Dispose()
-    return output_path
+    target = RenderTargetBitmap(px_w, px_h, 96.0 * scale, 96.0 * scale,
+                                PixelFormats.Pbgra32)
+    target.Render(visual)
+    encoder = PngBitmapEncoder()
+    encoder.Frames.Add(BitmapFrame.Create(target))
+    stream = IO.FileStream(path, IO.FileMode.Create, IO.FileAccess.Write)
+    try:
+        encoder.Save(stream)
+    finally:
+        stream.Close()
+    return px_w, px_h
 
 
 # ╔═╗╔═╗╔╦╗╔╗ ╔═╗╔═╗╦╔═  ╔═╗╔═╗╦
@@ -1173,6 +1120,19 @@ class PropertyLineDialog(T3WPFWindow):
         # cannot append its results onto a newer one.
         self._search_seq = 0
 
+        # Map preview.  _map_token is a plain dict the tile thread polls: a
+        # newer render flips "live" off so stale tiles are dropped, without
+        # the worker thread ever touching the window.
+        self._map_parcel = None
+        self._map_view = None
+        self._map_state = "empty"       # empty | loading | ready | partial | offline
+        self._map_token = {"live": False}
+        self._map_size = (0, 0)
+        self._map_timer = None
+        try:
+            self.Closed += self._stop_map_preview
+        except Exception as ex:
+            logger.debug("Map preview close hook not set: {}".format(ex))
 
         if not (HAS_GEOPARCEL and HAS_PARCEL_SEARCH):
             self._set_status(
@@ -1222,10 +1182,7 @@ class PropertyLineDialog(T3WPFWindow):
                 error=True)
             return
         self._hide_address_warning()
-        try:
-            self.img_map_preview.Source = None
-        except Exception:
-            pass
+        self._clear_map_preview(u"Searching for boundaries...")
 
         # No source picker: the pipeline geocodes worldwide and picks the
         # best parcel source for the location.  LightBox is only used for US
@@ -1272,11 +1229,23 @@ class PropertyLineDialog(T3WPFWindow):
             if not has_more:
                 return
 
-            extra = parcel_search.search_more(context)
-            self.Dispatcher.Invoke(
-                DispatcherPriority.Background,
-                Action(lambda: self._on_search_more(extra, seq))
-            )
+            # The second pass must ALWAYS report back, or the footer stays on
+            # "Working..." for good: search_more() is meant never to raise,
+            # but anything that escapes it still ends the busy state.
+            try:
+                extra = parcel_search.search_more(context)
+            except Exception:
+                logger.warning("Boundary second pass failed: {}".format(
+                    traceback.format_exc()))
+                extra = []
+            try:
+                self.Dispatcher.Invoke(
+                    DispatcherPriority.Background,
+                    Action(lambda: self._on_search_more(extra, seq))
+                )
+            except Exception:
+                logger.warning("Could not post the second-pass results: "
+                               "{}".format(traceback.format_exc()))
 
         t = threading.Thread(target=search_thread)
         t.daemon = True
@@ -1317,6 +1286,9 @@ class PropertyLineDialog(T3WPFWindow):
 
         self.lv_parcels.Visibility = Visibility.Visible
         self.border_no_results.Visibility = Visibility.Collapsed
+        # Best match selected straight away: details and the map preview
+        # follow from SelectionChanged, so the boundary shows without a click.
+        self.lv_parcels.SelectedIndex = 0
 
         found = u"Found {} boundar{}".format(
             len(parcels), u"y" if len(parcels) == 1 else u"ies")
@@ -1330,9 +1302,13 @@ class PropertyLineDialog(T3WPFWindow):
             msg = u"{}. Address auto-corrected from '{}'.".format(
                 found, corrected_from)
         elif more:
-            msg = u"{}. Searching OpenStreetMap for more...".format(found)
+            msg = (u"{}. Looking for more nearby boundaries on OpenStreetMap "
+                   u"(can take up to a minute) — you can carry on.".format(found))
+        elif len(parcels) == 1:
+            msg = u"{}. Check it on the map, then create the lines.".format(found)
         else:
-            msg = u"{}. Select one to continue.".format(found)
+            msg = (u"{}. The best match is selected — pick another to "
+                   u"compare.".format(found))
         self._set_status(msg, busy=bool(more))
 
     def _on_search_more(self, parcels, seq=None):
@@ -1341,8 +1317,13 @@ class PropertyLineDialog(T3WPFWindow):
             return
         self.btn_search.IsEnabled = True
         for p in parcels or []:
+            try:
+                row = ParcelItem(p)
+            except Exception as ex:         # one malformed record, not the batch
+                logger.warning("Skipping boundary record: {}".format(ex))
+                continue
             self._parcels.append(p)
-            self.lv_parcels.Items.Add(ParcelItem(p))
+            self.lv_parcels.Items.Add(row)
 
         if not self._parcels:
             msg = (u"No mapped boundary at that address. Try a nearby "
@@ -1353,12 +1334,18 @@ class PropertyLineDialog(T3WPFWindow):
 
         self.lv_parcels.Visibility = Visibility.Visible
         self.border_no_results.Visibility = Visibility.Collapsed
+        if getattr(self.lv_parcels, "SelectedItem", None) is None:
+            self.lv_parcels.SelectedIndex = 0       # first pass had nothing
         count = len(self._parcels)
         found = u"Found {} boundar{}".format(count, u"y" if count == 1 else u"ies")
         origin = parcel_search.describe_sources(self._parcels)
         if origin:
             found += u" — " + origin[0].lower() + origin[1:]
-        self._set_status(u"{}. Select one to continue.".format(found))
+        if count == 1:
+            self._set_status(u"{}. Check it on the map, then create the "
+                             u"lines.".format(found))
+        else:
+            self._set_status(u"{}. Pick one to see it on the map.".format(found))
 
     def _show_results_message(self, msg):
         """Hide the parcel list and show `msg` as its single empty state."""
@@ -1411,10 +1398,7 @@ class PropertyLineDialog(T3WPFWindow):
             panel = getattr(self, "grp_metes", None)
             if panel is not None:
                 panel.Visibility = Visibility.Collapsed
-            try:
-                self.img_map_preview.Source = None
-            except Exception:
-                pass
+            self._clear_map_preview()
             return
 
         self._selected_parcel = item
@@ -1430,56 +1414,252 @@ class PropertyLineDialog(T3WPFWindow):
         else:
             self.grp_setback.Visibility = Visibility.Collapsed
 
-        # Async load map preview in search results card
-        self._load_map_preview(item)
+        # Boundary map: the polygon is drawn at once, the basemap tiles fill
+        # in behind it as they arrive.
+        self._show_map_preview(item)
 
-    def _load_map_preview(self, item):
-        """Async load map preview tiles and overlay boundary, then display in dialog."""
+    # ───────────────────────────────────── MAP PREVIEW
+    # Layers (PropertyLine.xaml, grid_map_host): cnv_map_tiles (OSM tiles,
+    # added here) under path_map_fill / path_map_boundary / path_map_vertices,
+    # then grid_map_overlay (scale bar + north arrow), border_map_note
+    # (basemap state) and border_map_attrib (OSM attribution).
+
+    def _show_map_preview(self, item):
+        """Preview `item`: boundary immediately, basemap in the background."""
+        self._map_parcel = item
         try:
-            self.img_map_preview.Source = None
-        except Exception:
-            pass
+            # The details column may have opened in this same handler and
+            # narrowed the map: lay out now so the fit uses the real size.
+            self.UpdateLayout()
+        except Exception as ex:
+            logger.debug("Layout before map render skipped: {}".format(ex))
+        self._render_map_preview()
 
-        coords = get_polygon_coords(item.geometry)
-        if not coords:
+    def _clear_map_preview(self, message=None):
+        """Back to the empty state; a tile download still running is dropped."""
+        self._map_token["live"] = False
+        self._map_parcel = None
+        self._map_view = None
+        self._reset_map_layers()
+        self._map_message(message or
+                          u"Search, then pick a result to preview its boundary")
+
+    def _map_message(self, message):
+        """Show `message` as the map's empty state (no boundary drawn)."""
+        self._map_state = "empty"
+        self.grid_map_overlay.Visibility = Visibility.Collapsed
+        self.border_map_note.Visibility = Visibility.Collapsed
+        self.txt_map_empty.Text = message
+        self.pnl_map_empty.Visibility = Visibility.Visible
+
+    def _reset_map_layers(self):
+        self.cnv_map_tiles.Children.Clear()
+        self.path_map_fill.Data = None
+        self.path_map_boundary.Data = None
+        self.path_map_vertices.Data = None
+        self.border_map_attrib.Visibility = Visibility.Collapsed
+
+    def _set_map_note(self, state, note=None, detail=None):
+        """Basemap state badge: shown while loading or when tiles failed."""
+        self._map_state = state
+        if note:
+            self.txt_map_note.Text = note
+            self.border_map_note.ToolTip = detail or note
+            self.border_map_note.Visibility = Visibility.Visible
+        else:
+            self.border_map_note.ToolTip = None
+            self.border_map_note.Visibility = Visibility.Collapsed
+
+    def grid_map_host_SizeChanged(self, sender, e):
+        """Refit after a resize - debounced, so dragging does not redraw per pixel."""
+        # getattr: the handler is wired inside T3WPFWindow.__init__, before
+        # this dialog's own __init__ has set the map state.
+        if getattr(self, "_map_parcel", None) is None:
+            return
+        size = (int(self.grid_map_host.ActualWidth),
+                int(self.grid_map_host.ActualHeight))
+        if size == self._map_size:
+            return
+        if self._map_timer is None:
+            from System import TimeSpan
+            from System.Windows.Threading import DispatcherTimer
+            self._map_timer = DispatcherTimer()
+            self._map_timer.Interval = TimeSpan.FromMilliseconds(
+                MAP_RENDER_DELAY_MS)
+            self._map_timer.Tick += self._map_timer_tick
+        self._map_timer.Stop()
+        self._map_timer.Start()
+
+    def _map_timer_tick(self, sender, e):
+        self._map_timer.Stop()
+        size = (int(self.grid_map_host.ActualWidth),
+                int(self.grid_map_host.ActualHeight))
+        if size == self._map_size:
+            return                  # already drawn at this size
+        try:
+            self._render_map_preview()
+        except Exception:
+            logger.warning("Map preview redraw failed: {}".format(
+                traceback.format_exc()))
+
+    def _stop_map_preview(self, sender=None, e=None):
+        """Window closed: stop the tile thread from posting back."""
+        self._map_token["live"] = False
+        if self._map_timer is not None:
+            self._map_timer.Stop()
+
+    def _render_map_preview(self):
+        """
+        Draw the selected boundary to fit the preview, then start the basemap.
+
+        The boundary, vertex dots, scale bar and north arrow come from the
+        polygon alone, so they show even offline; tiles are a bonus.
+        """
+        item = self._map_parcel
+        if item is None:
+            return
+        self._map_token["live"] = False           # orphan the previous run
+        token = {"live": True}
+        self._map_token = token
+        self._reset_map_layers()
+
+        if not HAS_PARCEL_MAP:
+            self._map_message(
+                u"Map preview is unavailable: lib/Snippets/_parcel_map.py "
+                u"failed to import. Reinstall the T3Lab extension, then "
+                u"restart Revit.")
             return
 
-        # Prepare a temp path for preview PNG
-        import tempfile
-        temp_dir = tempfile.gettempdir()
-        safe_apn = item.parcel_id.replace("/", "_").replace("\\", "_")
-        temp_path = os.path.join(temp_dir, "t3lab_map_preview_{}.png".format(safe_apn))
-        area = item.area_sqft_raw or 0
+        ring = get_polygon_coords(item.geometry)
+        width = float(self.grid_map_host.ActualWidth or 0)
+        height = float(self.grid_map_host.ActualHeight or 0)
+        self._map_size = (int(width), int(height))
+        if width < 16 or height < 16:
+            return                  # not laid out yet; SizeChanged calls back
+        view = parcel_map.fit_view(ring, width, height, padding=MAP_PADDING_PX)
+        if view is None:
+            self._map_view = None
+            self._map_message(u"This result has no boundary geometry to "
+                              u"preview. Pick another result.")
+            return
+        self._map_view = view
 
-        def bg_map_preview():
+        # 1 · the boundary - never waits for the network
+        points = view.screen_ring(ring)
+        outline = _parse_geometry(parcel_map.path_data(points))
+        self.path_map_fill.Data = outline
+        self.path_map_boundary.Data = outline
+        self.path_map_vertices.Data = _parse_geometry(
+            parcel_map.markers_data(points, MAP_VERTEX_RADIUS))
+        self._draw_scale_bar(view)
+        self.pnl_map_empty.Visibility = Visibility.Collapsed
+        self.grid_map_overlay.Visibility = Visibility.Visible
+
+        # 2 · basemap: cached tiles now, the rest off the UI thread
+        missing = []
+        for spec in view.tiles():
+            data = parcel_map.cached_tile(spec.key)
+            if data is None:
+                missing.append(spec)
+            else:
+                self._add_map_tile(spec, data)
+        if not missing:
+            self._set_map_note("ready")
+            return
+        self._set_map_note("loading", u"Loading basemap...",
+                           u"Downloading map tiles from OpenStreetMap.")
+        self._fetch_map_tiles(missing, token)
+
+    def _draw_scale_bar(self, view):
+        bar = parcel_map.scale_bar(view.metres_per_pixel(),
+                                   min(MAP_SCALE_BAR_PX, view.width * 0.3))
+        if bar is None:
+            self.txt_map_scale.Text = u""
+            self.bar_map_scale.Width = 0.0
+            return
+        _length_m, length_px, label = bar
+        self.txt_map_scale.Text = label
+        self.bar_map_scale.Width = max(4.0, float(length_px))
+
+    def _add_map_tile(self, spec, data):
+        """Place one basemap tile; False when its bytes do not decode."""
+        try:
+            bitmap = _frozen_bitmap(data)
+        except Exception as ex:
+            logger.debug("Map tile {} not decoded: {}".format(spec.key, ex))
+            return False
+        from System.Windows.Controls import Canvas, Image
+        from System.Windows.Media import Stretch, RenderOptions, BitmapScalingMode
+        img = Image()
+        img.Source = bitmap
+        img.Width = float(spec.size_x)
+        img.Height = float(spec.size_y)
+        img.Stretch = Stretch.Fill
+        img.IsHitTestVisible = False
+        RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality)
+        Canvas.SetLeft(img, float(spec.left))
+        Canvas.SetTop(img, float(spec.top))
+        self.cnv_map_tiles.Children.Add(img)
+        self.border_map_attrib.Visibility = Visibility.Visible
+        return True
+
+    def _fetch_map_tiles(self, specs, token):
+        """Download `specs` on a worker thread; tiles are placed as they land."""
+        dispatcher = self.Dispatcher        # read on the UI thread
+
+        def is_live():
+            return token["live"]
+
+        def on_tile(spec, data):
+            dispatcher.Invoke(
+                DispatcherPriority.Background,
+                Action(lambda: self._on_map_tile(token, spec, data)))
+
+        def worker():
             try:
-                # Generate map PNG (OSM tiles + boundary)
-                generate_parcel_map(coords, temp_path, area_sqft=area)
-
-                def update_ui():
-                    try:
-                        if os.path.exists(temp_path):
-                            from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
-                            from System import Uri
-                            bi = BitmapImage()
-                            bi.BeginInit()
-                            bi.UriSource = Uri(temp_path)
-                            bi.CacheOption = BitmapCacheOption.OnLoad
-                            bi.EndInit()
-                            self.img_map_preview.Source = bi
-                    except Exception as ui_ex:
-                        logger.warning("Failed to display map preview: {}".format(ui_ex))
-
-                self.Dispatcher.Invoke(
-                    DispatcherPriority.Normal,
-                    Action(update_ui)
-                )
+                result = parcel_map.fetch_tiles(specs, on_tile=on_tile,
+                                                is_live=is_live)
             except Exception as ex:
-                logger.warning("Background map preview failed: {}".format(ex))
+                logger.warning("Basemap download failed: {}".format(
+                    traceback.format_exc()))
+                result = (0, len(specs), u"{}".format(ex))
+            if result is None or not token["live"]:
+                return                      # superseded or window closed
+            failed, error = result[1], result[2]
+            try:
+                dispatcher.Invoke(
+                    DispatcherPriority.Background,
+                    Action(lambda: self._on_map_tiles_done(token, failed, error)))
+            except Exception:
+                logger.warning("Could not finish the basemap: {}".format(
+                    traceback.format_exc()))
 
-        t = threading.Thread(target=bg_map_preview)
+        t = threading.Thread(target=worker)
         t.daemon = True
         t.start()
+
+    def _on_map_tile(self, token, spec, data):
+        if token["live"]:
+            self._add_map_tile(spec, data)
+
+    def _on_map_tiles_done(self, token, failed, error):
+        if not token["live"]:
+            return
+        if self.cnv_map_tiles.Children.Count == 0:
+            reason = error or u"no tile could be decoded"
+            logger.warning("Basemap unavailable: {}".format(reason))
+            self._set_map_note(
+                "offline", u"Basemap unavailable",
+                u"No map tiles from tile.openstreetmap.org ({}). The boundary "
+                u"is drawn from its own coordinates, so it is still correct. "
+                u"Check the internet connection or proxy, then select the "
+                u"result again.".format(reason))
+        elif failed:
+            self._set_map_note("partial")
+            logger.debug("Basemap incomplete: {} tile(s) missing ({})".format(
+                failed, error))
+        else:
+            self._set_map_note("ready")
 
     def _show_parcel_details(self, item):
         self.grp_parcel_details.Visibility = Visibility.Visible
@@ -1602,17 +1782,27 @@ class PropertyLineDialog(T3WPFWindow):
     # ───────────────────────────────────── PARCEL MAP
 
     def btn_download_map_Click(self, sender, e):
-        if not self._selected_parcel:
+        """Save the map preview - boundary, basemap, scale, north - as a PNG."""
+        parcel = self._selected_parcel
+        if not parcel:
             return
-
-        coords = get_polygon_coords(self._selected_parcel.geometry)
-        if not coords:
-            self._set_status("No geometry available for this parcel.", error=True)
+        if self._map_view is None or self._map_parcel is not parcel:
+            self._set_status(
+                u"The map preview of this boundary is not drawn yet — select "
+                u"it in the results list, then press Save Map again.",
+                error=True)
+            return
+        if self._map_state == "loading":
+            self._set_status(
+                u"The basemap is still loading — wait until the map fills in, "
+                u"then press Save Map again.")
             return
 
         # ── Ask the user where to save ────────────────────────────────────────
-        safe_apn = self._selected_parcel.parcel_id.replace("/", "_").replace("\\", "_")
-        default_name = "parcel_map_{}.png".format(safe_apn)
+        safe_apn = u"".join(
+            ch if (ch.isalnum() or ch in u" -_.") else u"_"
+            for ch in u"{}".format(parcel.parcel_id or u"boundary")).strip()
+        default_name = u"parcel_map_{}.png".format(safe_apn or u"boundary")
 
         try:
             from Microsoft.Win32 import SaveFileDialog
@@ -1629,41 +1819,38 @@ class PropertyLineDialog(T3WPFWindow):
             import tempfile
             out = os.path.join(tempfile.gettempdir(), default_name)
 
-        self._set_status("Downloading parcel map tiles...", busy=True)
-        self.btn_download_map.IsEnabled = False
-
-        area = self._selected_parcel.area_sqft_raw or 0
-
-        def map_thread():
-            try:
-                generate_parcel_map(coords, out, area_sqft=area)
-                self.Dispatcher.Invoke(
-                    DispatcherPriority.Normal,
-                    Action(lambda: self._on_map_complete(out))
-                )
-            except Exception as ex:
-                err = str(ex)
-                self.Dispatcher.Invoke(
-                    DispatcherPriority.Normal,
-                    Action(lambda: self._on_map_error(err))
-                )
-
-        t = threading.Thread(target=map_thread)
-        t.daemon = True
-        t.start()
-
-    def _on_map_complete(self, path):
-        self.btn_download_map.IsEnabled = True
-        self._set_status(u"Parcel map saved: {}".format(path), success=True)
         try:
-            Diagnostics.Process.Start(path)   # open in default image viewer
-        except Exception:
-            pass
+            background = None
+            try:
+                background = self.FindResource("T3.SurfaceSunken")
+            except Exception:
+                pass
+            px_w, px_h = save_element_png(self.grid_map_host, out,
+                                          scale=MAP_SAVE_SCALE,
+                                          background=background)
+        except Exception as ex:
+            logger.error("Parcel map save failed: {}".format(
+                traceback.format_exc()))
+            self._set_status(
+                u"Could not save the map to {}: {}. Pick another folder and "
+                u"try again.".format(out, ex), error=True)
+            return
+        self._on_map_complete(out, px_w, px_h)
 
-    def _on_map_error(self, error_msg):
-        self.btn_download_map.IsEnabled = True
-        self._set_status("Map generation failed: {}".format(error_msg), error=True)
-        logger.error("Parcel map error: {}".format(error_msg))
+    def _on_map_complete(self, path, px_w=0, px_h=0):
+        size = u" ({} x {} px)".format(px_w, px_h) if px_w and px_h else u""
+        note = (u" Saved without basemap — the tiles could not be loaded."
+                if self._map_state == "offline" else u"")
+        self._set_status(u"Parcel map saved{}: {}.{}".format(size, path, note),
+                         success=True)
+        try:
+            # UseShellExecute is off by default on .NET 8 (Revit 2025+), and
+            # a .png is not an executable - open it in the default viewer.
+            psi = Diagnostics.ProcessStartInfo(path)
+            psi.UseShellExecute = True
+            Diagnostics.Process.Start(psi)
+        except Exception as ex:
+            logger.debug("Could not open the saved map: {}".format(ex))
 
     def btn_google_maps_Click(self, sender, e):
         if not self._selected_parcel:

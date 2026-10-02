@@ -25,6 +25,7 @@ import math
 __all__ = [
     "search_boundaries", "primary_boundaries", "nearby_boundaries",
     "overpass_boundaries", "geocode", "reverse_geocode", "ring_key",
+    "http_request", "http_get_bytes",
     "boundaries_from_places", "ServiceUnavailable", "describe_error",
     "describe_http_status", "unavailable_message",
     "polygon_area_m2", "polygon_area_sqft", "polygon_centroid",
@@ -367,6 +368,115 @@ def http_request(url, data=None, headers=None, timeout=25):
                 return err.code, u""
 
     raise RuntimeError("No HTTP library available (urllib.request / urllib2)")
+
+
+def _http_dotnet_bytes(url, headers=None, timeout=25):
+    """
+    GET through System.Net returning the body as raw bytes.
+
+    http_request() decodes every body as UTF-8 text, which is right for JSON
+    and fatal for a PNG: the very first byte of the signature (0x89) is not
+    valid UTF-8, so a map tile comes back as text full of U+FFFD and can never
+    be decoded again.  Images go through here instead.
+    """
+    import base64
+    import System
+    import System.Net as Net
+    import System.IO as IO
+
+    req = Net.WebRequest.Create(url)
+    req.Timeout = int(timeout * 1000)
+    try:
+        req.ReadWriteTimeout = int(timeout * 1000)
+    except Exception:
+        pass
+
+    rest = dict(headers or {})
+    user_agent = rest.pop("User-Agent", None)
+    accept = rest.pop("Accept", None)
+    rest.pop("Content-Type", None)
+    if user_agent:
+        req.UserAgent = user_agent
+    if accept:
+        req.Accept = accept
+    for key, val in rest.items():
+        req.Headers.Add(key, val)
+    req.Method = "GET"
+
+    try:
+        resp = req.GetResponse()
+    except Net.WebException as wex:
+        resp = wex.Response
+        if resp is None:
+            raise           # DNS failure, timeout, TLS refusal - let it bubble
+
+    try:
+        try:
+            status = int(System.Convert.ToInt32(resp.StatusCode))
+        except Exception:
+            status = 200
+        source = resp.GetResponseStream()
+        buffer = IO.MemoryStream()
+        try:
+            source.CopyTo(buffer)
+        finally:
+            source.Close()
+        raw = buffer.ToArray()
+        if isinstance(raw, (bytes, bytearray)):
+            return status, bytes(raw)       # a codec already converted it
+        if raw is None or len(raw) == 0:
+            return status, b""
+        # One managed->Python hop via base64 instead of a per-byte loop over
+        # the .NET array (a tile is ~10-40 KB).
+        return status, base64.b64decode(System.Convert.ToBase64String(raw))
+    finally:
+        resp.Close()
+
+
+def http_get_bytes(url, headers=None, timeout=25):
+    """
+    GET a binary resource (map tile, image).  Returns (status_code, bytes).
+    Non-2xx responses are returned with whatever body came back, never raised;
+    transport failures (DNS, timeout, TLS, proxy) raise.
+
+    Same transport policy as http_request(): System.Net first inside Revit,
+    one retry through urllib for a non-timeout .NET failure.
+    """
+    _ensure_tls()
+    hdrs = {"User-Agent": USER_AGENT, "Accept": "*/*"}
+    if headers:
+        hdrs.update(headers)
+
+    dotnet_error = None
+    if _HAS_DOTNET:
+        try:
+            return _http_dotnet_bytes(url, headers=hdrs, timeout=timeout)
+        except ImportError:
+            pass
+        except Exception as ex:
+            if not _is_dotnet_setup_error(ex):
+                if _is_timeout(ex) or _urq is None:
+                    raise
+                dotnet_error = ex
+            _log("System.Net binary request failed, retrying with urllib: "
+                 "{}".format(ex))
+
+    if _urq is not None:
+        req = _urq.Request(url, headers=hdrs)
+        try:
+            resp = _urq.urlopen(req, timeout=timeout)
+            return resp.getcode(), resp.read()
+        except Exception as err:
+            if hasattr(err, "code"):
+                try:
+                    return err.code, err.read()
+                except Exception:
+                    return err.code, b""
+            if dotnet_error is not None:
+                raise dotnet_error      # the .NET message is the clearer one
+            raise
+
+    raise RuntimeError("No HTTP library available (urllib.request)")
 
 
 def _is_timeout(ex):

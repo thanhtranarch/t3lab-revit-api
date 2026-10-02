@@ -1777,22 +1777,68 @@
                                                 <ColumnDefinition Width="1.8*"/>
                                             </Grid.ColumnDefinitions>
 
-                                            <!-- Col 0: Map Container -->
+                                            <!-- Col 0: Boundary map. PropertyLineDialog._render_map_preview draws
+                                                 the boundary from the polygon itself (always), then lays OSM tiles
+                                                 under it when the network allows (Snippets/_parcel_map.py).
+                                                 Layers, back to front: tiles · boundary · map furniture · notes. -->
                                             <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
                                                     BorderThickness="1" CornerRadius="4" ClipToBounds="True">
-                                                <Grid>
-                                                    <!-- Dynamic Map Image -->
-                                                    <Image x:Name="img_map_preview" Stretch="UniformToFill"/>
+                                                <Grid x:Name="grid_map_host" ClipToBounds="True" SizeChanged="grid_map_host_SizeChanged">
+                                                    <!-- Basemap tiles (Image elements added by code) -->
+                                                    <Canvas x:Name="cnv_map_tiles" IsHitTestVisible="False"/>
 
-                                                    <!-- Location Pin -->
-                                                    <TextBlock Text="&#xE707;" Style="{StaticResource T3.Icon.Lg}" Foreground="{StaticResource T3.Ink}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                                    <!-- Boundary: tinted fill, outline, vertex dots -->
+                                                    <Canvas IsHitTestVisible="False">
+                                                        <Path x:Name="path_map_fill" Fill="{StaticResource T3.Plot.4}" Opacity="0.16"/>
+                                                        <Path x:Name="path_map_boundary" Stroke="{StaticResource T3.Plot.4}"
+                                                              StrokeThickness="2" StrokeLineJoin="Round"/>
+                                                        <Path x:Name="path_map_vertices" Fill="{StaticResource T3.Surface}"
+                                                              Stroke="{StaticResource T3.Plot.4}" StrokeThickness="1.5"/>
+                                                    </Canvas>
 
-                                                    <!-- Map label badge -->
-                                                    <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
-                                                            BorderThickness="1" CornerRadius="2" Padding="8,4" Margin="8"
-                                                            HorizontalAlignment="Left" VerticalAlignment="Bottom">
-                                                        <TextBlock Text="Map Preview" Style="{StaticResource T3.Caption}"/>
+                                                    <!-- Map furniture: scale bar (top-left), north arrow (top-right) -->
+                                                    <Grid x:Name="grid_map_overlay" Visibility="Collapsed" IsHitTestVisible="False">
+                                                        <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
+                                                                BorderThickness="1" CornerRadius="2" Padding="8,4" Margin="8"
+                                                                HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                            <StackPanel>
+                                                                <TextBlock x:Name="txt_map_scale" Style="{StaticResource T3.Caption}"/>
+                                                                <Border x:Name="bar_map_scale" Height="4" Width="48" HorizontalAlignment="Left"
+                                                                        BorderBrush="{StaticResource T3.Ink}" BorderThickness="1,0,1,1"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
+                                                                BorderThickness="1" CornerRadius="2" Padding="4" Margin="8"
+                                                                HorizontalAlignment="Right" VerticalAlignment="Top">
+                                                            <StackPanel>
+                                                                <TextBlock Text="&#xE74A;" Style="{StaticResource T3.Icon}" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="N" Style="{StaticResource T3.Caption}" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <!-- Basemap state (bottom-left, above the attribution line): loading /
+                                                         unavailable. Tooltip carries the reason. -->
+                                                    <Border x:Name="border_map_note" Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
+                                                            BorderThickness="1" CornerRadius="2" Padding="8,4" Margin="8,8,8,24"
+                                                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Visibility="Collapsed">
+                                                        <TextBlock x:Name="txt_map_note" Style="{StaticResource T3.Caption}"/>
                                                     </Border>
+
+                                                    <!-- OSM attribution, required whenever its tiles are on screen (bottom-right) -->
+                                                    <Border x:Name="border_map_attrib" Background="{DynamicResource T3.Surface}"
+                                                            Padding="4,0" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                            Visibility="Collapsed" IsHitTestVisible="False">
+                                                        <TextBlock Text="© OpenStreetMap contributors" Style="{StaticResource T3.Caption}"/>
+                                                    </Border>
+
+                                                    <!-- Empty state until a boundary is selected -->
+                                                    <StackPanel x:Name="pnl_map_empty" Margin="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                        <TextBlock Text="&#xE707;" Style="{StaticResource T3.Icon.Lg}" Foreground="{StaticResource T3.TextDisabled}"
+                                                                   HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                                        <TextBlock x:Name="txt_map_empty" Text="Search, then pick a result to preview its boundary"
+                                                                   Style="{StaticResource T3.Empty}"/>
+                                                    </StackPanel>
                                                 </Grid>
                                             </Border>
 
@@ -1807,14 +1853,19 @@
                                                                Style="{StaticResource T3.Empty}"/>
                                                 </Border>
 
-                                                <ListView x:Name="lv_parcels"
-                                                          Height="250"
-                                                          Style="{StaticResource T3.ListView}"
-                                                          VirtualizingPanel.IsVirtualizing="True"
-                                                          SelectionMode="Single"
-                                                          Visibility="Collapsed"
-                                                          SelectionChanged="lv_parcels_SelectionChanged">
-                                                    <ListView.ItemTemplate>
+                                                <!-- ListBox, not ListView: T3.ListViewItem draws a GridViewRowPresenter,
+                                                     which only renders GridView columns, so an ItemTemplate row came out
+                                                     blank. T3.ListBoxItem.Multiline presents the template and lets the
+                                                     two-line row grow past the 26px row height. -->
+                                                <ListBox x:Name="lv_parcels"
+                                                         Height="250"
+                                                         Style="{StaticResource T3.ListBox}"
+                                                         ItemContainerStyle="{StaticResource T3.ListBoxItem.Multiline}"
+                                                         VirtualizingPanel.IsVirtualizing="True"
+                                                         SelectionMode="Single"
+                                                         Visibility="Collapsed"
+                                                         SelectionChanged="lv_parcels_SelectionChanged">
+                                                    <ListBox.ItemTemplate>
                                                         <DataTemplate>
                                                             <Grid Margin="0,4">
                                                                 <Grid.ColumnDefinitions>
@@ -1837,8 +1888,8 @@
                                                                 </Border>
                                                             </Grid>
                                                         </DataTemplate>
-                                                    </ListView.ItemTemplate>
-                                                </ListView>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
 
                                             </Grid>
                                         </Grid>
