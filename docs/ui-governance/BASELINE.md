@@ -59,7 +59,7 @@ PASS là kết quả kiểm tra cấu trúc và nạp WPF ngoài Revit. Mọi d�
 | `T3Lab.extension/lib/GUI/Tools/ManaLoca.xaml` | Window | 1200 x 740 | PASS | NEEDS VERIFICATION |
 | `T3Lab.extension/lib/GUI/Tools/ManaPara.xaml` | Window | 1100 x 750 | PASS | NEEDS VERIFICATION |
 | `T3Lab.extension/lib/GUI/Tools/ManaSched.xaml` | Window | 1160 x 780 | PASS | NEEDS VERIFICATION |
-| `T3Lab.extension/lib/GUI/Tools/ManaSelect.xaml` | Window | 560 x 840 | PASS | NEEDS VERIFICATION |
+| `T3Lab.extension/lib/GUI/Tools/ManaSelect.xaml` | Window | 560 x 560 | PASS | NEEDS VERIFICATION |
 | `T3Lab.extension/lib/GUI/Tools/ManaSheets.xaml` | Window | 1200 x 720 | PASS | NEEDS VERIFICATION |
 | `T3Lab.extension/lib/GUI/Tools/ManaStyles.xaml` | Window | 1260 x 780 | PASS | NEEDS VERIFICATION |
 | `T3Lab.extension/lib/GUI/Tools/ManaTabs.xaml` | Window | 460 x 560 | PASS | NEEDS VERIFICATION |

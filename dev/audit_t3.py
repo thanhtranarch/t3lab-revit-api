@@ -58,6 +58,24 @@ UI_LOCKED = set()
 COPYRIGHT_EXEMPT = set()  # CadtoFloorLayerItem.xaml was deleted 2026-10-02
 COPYRIGHT_TEXT = "© Copyright by T3Lab"
 
+# ── Luật 26 · Chrome bo góc ──────────────────────────────────────────────
+# Mọi <Window WindowStyle="None"> vẽ góc giống hệt nhau: Window trong suốt, outer
+# Border 1px T3.BorderStrong bo T3.R.Window. Bản cũ lệch 5 kiểu (bo 8 / 12, viền
+# 1 / 1.5, T3.Border nhạt, Window nền Canvas lòi góc vuông HWND) — BatchOut lòi
+# góc xám 2026-10-02. Grip resize của WPF vẽ chấm đè lên góc bo nên cũng bị cấm;
+# WindowChrome.ResizeBorderThickness vẫn cho kéo giãn từ mép.
+CHROME_BORDER = {
+    "BorderBrush": "{StaticResource T3.BorderStrong}",
+    "BorderThickness": "1",
+    "CornerRadius": "{StaticResource T3.R.Window}",
+    "ClipToBounds": "True",
+}
+# File UI-LOCKED theo CLAUDE.md — giữ nguyên chrome riêng của chúng.
+CHROME_EXEMPT = {
+    "DWGManagement.xaml",   # thiết kế chốt, UI locked
+    "T3LabAssistant.xaml",  # bề mặt chat theo theme Revit, đổi bo 12 ↔ 0 khi dock
+}
+
 # ── Luật 23 · Select-all ở header cột checkbox ───────────────────────────
 # Miễn trừ: cột KHÔNG phải để chọn dòng mà là thuộc tính của chính dòng đó.
 # ManaWorkset ACTIVE/OPEN/EDITABLE là trạng thái từng workset trong Revit —
@@ -612,8 +630,31 @@ def audit(src, base, keys):
         if not merges_sheet:
             issues.append(("P1", "chưa nhúng stylesheet T3 — chạy "
                              "`python3 dev/sync_t3_styles.py`"))
+        if wattrs.get("WindowStyle") == "None" and base not in CHROME_EXEMPT:
+            issues.extend(chrome_issues(root, wattrs))
 
     return issues, declared, debt, must
+
+
+def chrome_issues(root, wattrs):
+    """Luật 26: Window trong suốt + outer Border chuẩn, không grip ở góc."""
+    want = []
+    if wattrs.get("AllowsTransparency") != "True":
+        want.append('<Window AllowsTransparency="True">')
+    if wattrs.get("Background") != "Transparent":
+        want.append('<Window Background="Transparent">')
+    if wattrs.get("ResizeMode") == "CanResizeWithGrip":
+        want.append('<Window ResizeMode="CanResize"> (grip vẽ đè góc bo)')
+    content = [c for c in root if "." not in local(c.tag)]
+    if len(content) != 1 or local(content[0].tag) != "Border":
+        want.append("nội dung Window là đúng MỘT outer <Border>")
+    else:
+        oattrs = {local(k): v for k, v in content[0].attrib.items()}
+        want += ['outer <Border %s="%s">' % (k, v)
+                 for k, v in CHROME_BORDER.items() if oattrs.get(k) != v]
+    if not want:
+        return []
+    return [("P1", "luật 26 chrome bo góc lệch chuẩn — cần " + ", ".join(want))]
 
 
 def main():

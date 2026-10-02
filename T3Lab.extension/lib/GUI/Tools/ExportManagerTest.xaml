@@ -8,7 +8,7 @@
         MinWidth="1200" MinHeight="650"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="True"
-        ResizeMode="CanResizeWithGrip"
+        ResizeMode="CanResize"
         ShowInTaskbar="True"
         Background="Transparent"
         FontFamily="Segoe UI" FontSize="13"
@@ -1708,7 +1708,7 @@
     </Window.Resources>
 
     <!-- ═══ Outer Border: CornerRadius + ClipToBounds (T3 standard) ═══ -->
-    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1" CornerRadius="12" ClipToBounds="True" Background="{StaticResource T3.Canvas}">
+    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1" CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True" Background="{StaticResource T3.Canvas}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Full-width Title bar -->

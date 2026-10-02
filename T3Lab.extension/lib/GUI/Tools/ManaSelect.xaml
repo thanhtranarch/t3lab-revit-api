@@ -6,8 +6,8 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="Selection Manager"
-        Width="680" Height="780"
-        MinWidth="520" MinHeight="560"
+        Width="560" Height="560"
+        MinWidth="560" MinHeight="560"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="True"
         Background="Transparent"
@@ -1712,7 +1712,7 @@
          TabControl 5 tab đã bỏ — Quick Select / Select Similar / On Sheets trùng
          với Explore + Revit "Select All Instances", Warnings trùng ModelAuditor. -->
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
-            CornerRadius="12" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
+            CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Title Bar -->
@@ -1808,7 +1808,8 @@
                 <!-- ── Action bar: icon + NHÃN CHỮ. Bản cũ chỉ có icon 11px nên
                      người dùng không đoán được nút nào làm gì (Pick trông như bàn
                      tay, Delete đỏ trông như clipboard). WrapPanel để cửa sổ hẹp
-                     thì xuống dòng thay vì cắt nút. ── -->
+                     thì xuống dòng thay vì cắt nút. Padding 4 (không phải 8) để cả
+                     8 nút vừa MỘT hàng ở cỡ mặc định 560 = cỡ nhỏ nhất (2026-10-02). ── -->
                 <Grid Grid.Row="1" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -1817,7 +1818,7 @@
 
                     <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="btn_explore_refresh" Style="{StaticResource T3.Button.Ghost}"
-                                MinWidth="0" Height="28" Padding="8,0"
+                                MinWidth="0" Height="28" Padding="4,0"
                                 ToolTip="Re-read the model for the current Display and Filter">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE72C;" Style="{StaticResource T3.Icon.Lead}"/>
@@ -1825,7 +1826,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="btn_explore_pick" Style="{StaticResource T3.Button.Ghost}"
-                                MinWidth="0" Height="28" Padding="8,0"
+                                MinWidth="0" Height="28" Padding="4,0"
                                 ToolTip="Pick elements in the model, then browse just those">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE7C9;" Style="{StaticResource T3.Icon.Lead}"/>
@@ -1837,7 +1838,7 @@
                                 Background="{StaticResource T3.Border}"/>
 
                         <Button x:Name="btn_explore_zoom" Style="{StaticResource T3.Button.Ghost}"
-                                MinWidth="0" Height="28" Padding="8,0"
+                                MinWidth="0" Height="28" Padding="4,0"
                                 ToolTip="Zoom the active view to the checked elements">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE8A3;" Style="{StaticResource T3.Icon.Lead}"/>
@@ -1845,7 +1846,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="btn_explore_isolate" Style="{StaticResource T3.Button.Ghost}"
-                                MinWidth="0" Height="28" Padding="8,0"
+                                MinWidth="0" Height="28" Padding="4,0"
                                 ToolTip="Temporarily isolate the checked elements in the active view">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE7B3;" Style="{StaticResource T3.Icon.Lead}"/>
@@ -1853,7 +1854,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="btn_explore_hide" Style="{StaticResource T3.Button.Ghost}"
-                                MinWidth="0" Height="28" Padding="8,0"
+                                MinWidth="0" Height="28" Padding="4,0"
                                 ToolTip="Temporarily hide the checked elements in the active view">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xF140;" Style="{StaticResource T3.Icon.Lead}"/>
@@ -1861,7 +1862,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="btn_explore_reset" Style="{StaticResource T3.Button.Ghost}"
-                                MinWidth="0" Height="28" Padding="8,0"
+                                MinWidth="0" Height="28" Padding="4,0"
                                 ToolTip="Reset temporary Hide/Isolate in the active view">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE7A7;" Style="{StaticResource T3.Icon.Lead}"/>
@@ -1872,7 +1873,7 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="btn_explore_export" Style="{StaticResource T3.Button.Ghost}"
-                                MinWidth="0" Height="28" Padding="8,0" Margin="0,0,4,0"
+                                MinWidth="0" Height="28" Padding="4,0" Margin="0,0,4,0"
                                 ToolTip="Save one row per element to CSV — the checked ones, or the whole tree if nothing is checked">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE74E;" Style="{StaticResource T3.Icon.Lead}"/>
@@ -1880,7 +1881,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="btn_explore_delete" Style="{StaticResource T3.Button.Danger}"
-                                MinWidth="0" Height="28" Padding="8,0"
+                                MinWidth="0" Height="28" Padding="4,0"
                                 ToolTip="Delete the checked elements from the model (asks first)">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE74D;" Style="{StaticResource T3.Icon.Lead}"/>
@@ -1984,6 +1985,7 @@
                         <TextBlock Grid.Column="2" x:Name="status_text" Text="Ready"
                                    Style="{StaticResource T3.Body.Secondary}"
                                    TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
                     </Grid>
 

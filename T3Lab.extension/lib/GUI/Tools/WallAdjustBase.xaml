@@ -5,8 +5,8 @@
         Title="Auto Adjust Base Offset"
         Width="480" Height="430" MinWidth="440" MinHeight="400"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="None" AllowsTransparency="False"
-        Background="{DynamicResource T3.Canvas}"
+        WindowStyle="None" AllowsTransparency="True"
+        Background="Transparent"
         FontFamily="Segoe UI"
         FontSize="13"
         UseLayoutRounding="True"
@@ -1704,7 +1704,7 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <Border BorderBrush="{DynamicResource T3.Border}" BorderThickness="1">
+    <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1" CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True" Background="{DynamicResource T3.Canvas}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

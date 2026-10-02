@@ -1708,7 +1708,7 @@
     </Window.Resources>
 
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
-            CornerRadius="12" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
+            CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True" Background="{DynamicResource T3.Surface}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>      <!-- Row 0: Title Bar -->

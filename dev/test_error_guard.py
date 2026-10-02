@@ -243,9 +243,86 @@ class WpfBaseWiring(unittest.TestCase):
         self.assertIn('descriptor.AddValueChanged', install_src)
         self.assertIn('RectangleGeometry', refresh_src)
         self.assertIn('WindowState.Maximized', refresh_src)
-        self.assertIn("corner = getattr(root, 'CornerRadius', None)", refresh_src)
+        self.assertIn('rounded_window_inner_radius(root)', refresh_src)
         self.assertIn('if radius <= 0.0:', refresh_src)
+        # The clip sits on the root's CHILD: clipping the root shaves its own
+        # 1px outline at the corners.
         self.assertIn('root.Clip = None', refresh_src)
+        self.assertIn('child.Clip = RectangleGeometry', refresh_src)
+        self.assertNotIn('root.Clip = RectangleGeometry', refresh_src)
+
+    def _clip_scope(self):
+        """Exec rounded_window_inner_radius + _refresh_rounded_window_clip
+        from the shipped source, with stand-ins for the WPF types."""
+        tree = ast.parse(self.src)
+        func = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                    and n.name == 'rounded_window_inner_radius')
+        cls = next(n for n in tree.body
+                   if isinstance(n, ast.ClassDef) and n.name == 'T3WPFWindow')
+        cls.bases = []
+        cls.body = [n for n in cls.body if isinstance(n, ast.FunctionDef)
+                    and n.name == '_refresh_rounded_window_clip']
+        state = SimpleNamespace(Maximized='max', Normal='normal')
+        scope = {'WindowState': state}
+        exec(compile(ast.Module(body=[func, cls], type_ignores=[]),
+                     WPF_BASE, 'exec'), scope)
+        fake_windows = SimpleNamespace(
+            Rect=lambda x, y, w, h: (x, y, w, h))
+        fake_media = SimpleNamespace(
+            RectangleGeometry=lambda rect, rx, ry: ('rounded', rect, rx, ry))
+        modules = {'System': SimpleNamespace(),
+                   'System.Windows': fake_windows,
+                   'System.Windows.Media': fake_media}
+        patcher = mock.patch.dict(sys.modules, modules)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return scope, state
+
+    @staticmethod
+    def _sides(v):
+        return SimpleNamespace(Left=v, Top=v, Right=v, Bottom=v)
+
+    def _root(self, radius=12.0, stroke=1.0, padding=0.0):
+        corner = SimpleNamespace(TopLeft=radius, TopRight=radius,
+                                 BottomRight=radius, BottomLeft=radius)
+        child = SimpleNamespace(ActualWidth=558.0, ActualHeight=558.0,
+                                Clip='stale')
+        return SimpleNamespace(CornerRadius=corner,
+                               BorderThickness=self._sides(stroke),
+                               Padding=self._sides(padding),
+                               Child=child, Clip='stale-root',
+                               InvalidateVisual=lambda: None)
+
+    def test_inner_radius_follows_the_inside_of_the_outline(self):
+        scope, _ = self._clip_scope()
+        radius = scope['rounded_window_inner_radius']
+        # WPF strokes along a centre line of radius CornerRadius.
+        self.assertEqual(radius(self._root(12.0, 1.0)), 11.5)
+        self.assertEqual(radius(self._root(12.0, 2.0)), 11.0)
+        self.assertEqual(radius(self._root(12.0, 1.0, padding=4.0)), 7.5)
+        self.assertEqual(radius(self._root(0.0, 1.0)), 0.0)
+        self.assertEqual(radius(self._root(2.0, 1.0, padding=8.0)), 0.0)
+
+    def test_refresh_clips_the_child_and_never_the_outline(self):
+        scope, state = self._clip_scope()
+        root = self._root()
+        win = scope['T3WPFWindow']()
+        win._t3_rounded_window_root = root
+        win.WindowState = state.Normal
+        win._refresh_rounded_window_clip()
+        self.assertIsNone(root.Clip)
+        self.assertEqual(root.Child.Clip,
+                         ('rounded', (0.0, 0.0, 558.0, 558.0), 11.5, 11.5))
+
+        win.WindowState = state.Maximized
+        win._refresh_rounded_window_clip()
+        self.assertIsNone(root.Child.Clip)
+
+        win.WindowState = state.Normal
+        root.CornerRadius = SimpleNamespace(TopLeft=0.0, TopRight=0.0,
+                                            BottomRight=0.0, BottomLeft=0.0)
+        win._refresh_rounded_window_clip()       # docked Assistant
+        self.assertIsNone(root.Child.Clip)
 
     def test_handler_marks_owned_exceptions_handled(self):
         tree = ast.parse(self.src)

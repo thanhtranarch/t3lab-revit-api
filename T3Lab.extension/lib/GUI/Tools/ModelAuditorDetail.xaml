@@ -6,7 +6,7 @@
         MinWidth="720" MinHeight="460"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None" AllowsTransparency="True"
-        ResizeMode="CanResizeWithGrip"
+        ResizeMode="CanResize"
         ShowInTaskbar="False"
         Background="Transparent"
         FontFamily="Segoe UI" FontSize="13"
@@ -1707,7 +1707,7 @@
     <Border Background="{StaticResource T3.Surface}"
             BorderBrush="{StaticResource T3.BorderStrong}"
             BorderThickness="1"
-            CornerRadius="12" ClipToBounds="True">
+            CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="48"/>     <!-- title bar -->

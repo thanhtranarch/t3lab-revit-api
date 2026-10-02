@@ -1710,7 +1710,7 @@
 
     <!-- ═══ Outer Window Border ═══ -->
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
-            CornerRadius="8" ClipToBounds="True"
+            CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True"
             Background="{StaticResource T3.Surface}">
         <Grid>
             <Grid.RowDefinitions>

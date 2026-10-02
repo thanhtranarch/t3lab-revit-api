@@ -81,9 +81,15 @@ Window có nền `T3.Canvas`/`T3.Surface`, bốn góc vuông của HWND sẽ lò
 Border dù Border đã có `CornerRadius`.
 
 `ClipToBounds` của WPF chỉ cắt theo hình chữ nhật, không theo `CornerRadius`.
-`T3WPFWindow` vì vậy tự gắn `RectangleGeometry` theo kích thước outer Border và
-tự cập nhật khi resize; mọi cửa sổ này phải đi qua `T3WPFWindow`, không nạp XAML
-trực tiếp.
+`T3WPFWindow` vì vậy tự gắn `RectangleGeometry` lên **con** của outer Border, bo
+theo mép TRONG của nét viền (`T3.R.Window` − ½ nét) và tự cập nhật khi resize;
+mọi cửa sổ này phải đi qua `T3WPFWindow`, không nạp XAML trực tiếp. Không bao giờ
+cắt chính outer Border: hình cắt trùng mép ngoài sẽ gọt mất nét viền ở bốn góc, và
+title/footer bar vuông sẽ phủ lên cung viền.
+
+Không dùng `ResizeMode="CanResizeWithGrip"`: grip của WPF vẽ chấm đè lên góc bo
+dưới-phải. `ResizeMode="CanResize"` + `WindowChrome.ResizeBorderThickness` vẫn cho
+kéo giãn từ mép. `dev/audit_t3.py` (luật 26) bắt mọi lệch chuẩn ở khung này.
 
 ```xml
 <Window WindowStyle="None" AllowsTransparency="True" Background="Transparent" ...>
