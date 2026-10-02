@@ -487,9 +487,6 @@ class CADToElementsWindow(T3WPFWindow):
             self._rescan()
             e.Handled = True
 
-    def close_bar_clicked(self, sender, e):
-        self.Close()
-
     # ------------------------------------------------------------------
     # Layer list (shared by every mode)
     # ------------------------------------------------------------------

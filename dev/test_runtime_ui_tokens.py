@@ -85,32 +85,30 @@ class RuntimeUI(unittest.TestCase):
 
     def test_mcp_footer_names_first_unfinished_step(self):
         # MCP Control (2026-10-02): the footer states the first setup step that
-        # is not done yet, and the one Primary says "Start Server" only while
-        # starting can work — otherwise "Done".
+        # is not done yet. It has no button since 2026-10-02 — Start/Stop Server
+        # is Step 1's button and the title-bar X closes the window.
         env = {'HAS_SERVICE': True, '_SVC_ERR_MSG': '', 'CLIENT_KEYS': ['a', 'b'],
                'DEFAULT_PORT': 48884}
         footer = load('MCPControlDialog.py', '_refresh_footer', env)
-        can_start = load('MCPControlDialog.py', '_can_start_server', env)
         ok = {'configured': True}
         cases = (
-            ({}, {}, False, None, ('T3.TextMuted', 'Server stopped', 'Start Server')),
-            ({'error': 'boom'}, {}, False, None, ('T3.Danger.Accent', 'Server error', 'Done')),
-            ({}, {}, False, 'port busy', ('T3.Danger.Accent', 'Server error', 'Start Server')),
+            ({}, {}, False, None, ('T3.TextMuted', 'Server stopped')),
+            ({'error': 'boom'}, {}, False, None, ('T3.Danger.Accent', 'Server error')),
+            ({}, {}, False, 'port busy', ('T3.Danger.Accent', 'Server error')),
             ({'running': True}, {'a': {}}, False, None,
-             ('T3.Warning.Accent', 'No AI app connected', 'Done')),
+             ('T3.Warning.Accent', 'No AI app connected')),
             ({'running': True}, {'a': ok}, False, None,
-             ('T3.Warning.Accent', 'No active model', 'Done')),
+             ('T3.Warning.Accent', 'No active model')),
             ({'running': True, 'port': 48885}, {'a': ok, 'b': {}}, True, None,
-             ('T3.Success.Accent', 'Ready · port 48885', 'Done')),
+             ('T3.Success.Accent', 'Ready · port 48885')),
         )
         for server, clients, doc_ok, err, expected in cases:
             dots = []
             window = NS(_server_state=server, _client_states=clients, _active_doc_ok=doc_ok,
-                        _server_error=err, _footer_dot=NS(), _footer_status=NS(), _next_btn=NS())
+                        _server_error=err, _footer_dot=NS(), _footer_status=NS())
             window._set_dot = lambda dot, key, dots=dots: dots.append(key)
-            window._can_start_server = lambda w=window: can_start(w)
             footer(window)
-            self.assertEqual((dots[-1], window._footer_status.Text, window._next_btn.Content), expected)
+            self.assertEqual((dots[-1], window._footer_status.Text), expected)
         self.assertIn('1 of 2', window._footer_status.ToolTip)
 
     def test_mcp_target_resources_and_missing_brush(self):

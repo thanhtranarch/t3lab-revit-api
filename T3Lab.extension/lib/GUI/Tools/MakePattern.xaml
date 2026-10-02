@@ -1751,7 +1751,7 @@
                         <Button x:Name="btn_maximize" Style="{StaticResource T3.WinCtrl}" ToolTip="Maximize">
                             <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
                         </Button>
-                        <Button x:Name="btn_close_chrome" Style="{StaticResource T3.WinClose}" ToolTip="Close">
+                        <Button x:Name="btn_close_chrome" Style="{StaticResource T3.WinClose}" ToolTip="Close" IsCancel="True">
                             <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>
@@ -1988,8 +1988,6 @@
                         <CheckBox x:Name="chk_create_filled_region" Content="Create Filled Region"
                                   Style="{StaticResource T3.CheckBox}" IsChecked="True"
                                   Margin="0,0,16,0" VerticalAlignment="Center"/>
-                        <Button x:Name="btn_cancel" Content="Cancel" Style="{StaticResource T3.Button.Secondary}"
-                                Margin="0,0,8,0" IsCancel="True" Click="close_button_clicked"/>
                         <Button x:Name="btn_export_pat" Content="Export .pat…" Style="{StaticResource T3.Button.Secondary}"
                                 Margin="0,0,8,0"/>
                         <Button x:Name="btn_create_pattern" Content="Create Pattern" Style="{StaticResource T3.Button.Primary}"

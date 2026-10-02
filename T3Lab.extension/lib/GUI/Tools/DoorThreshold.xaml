@@ -1886,8 +1886,6 @@
 
                         <!-- Action Button -->
                         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="btn_cancel" Content="Cancel" Style="{StaticResource T3.Button.Ghost}"
-                                    Margin="0,0,8,0" Click="close_button_clicked" Height="28" Padding="12,0"/>
                             <Button x:Name="btn_create" Content="Create Thresholds" Style="{StaticResource T3.Button.Primary}"
                                     Click="create_thresholds_clicked" Height="28" Padding="16,0" IsDefault="True"/>
                         </StackPanel>

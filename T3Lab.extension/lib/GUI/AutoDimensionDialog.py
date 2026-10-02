@@ -944,9 +944,6 @@ class AutoDimensionWindow(T3WPFWindow):
     def close_button_clicked(self, sender, args):
         self.Close()
 
-    def close_clicked(self, sender, args):
-        self.Close()
-
     # ── Run handler ───────────────────────────────────────────────────────
 
     def run_clicked(self, sender, args):

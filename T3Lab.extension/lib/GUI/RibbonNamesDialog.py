@@ -48,7 +48,6 @@ class RibbonNameWindow(T3WPFWindow):
         self.BtnFull.Click += self._on_restore_full
         self.BtnSave.Click += self._on_save
         self.BtnReset.Click += self._on_reset
-        self.BtnClose.Click += self._on_close
         if self._identity_errors or self._identity_warnings:
             self._update_sub(" ".join(self._identity_errors + self._identity_warnings))
 
@@ -270,9 +269,6 @@ class RibbonNameWindow(T3WPFWindow):
             full = self._cell(row, "CurrentName")
             row["ShortName"] = self.default_map.get(full, full)
         self._update_sub("Short names reset to defaults (not yet applied).")
-
-    def _on_close(self, sender, args):
-        self.Close()
 
     def _update_sub(self, text):
         self.message = text

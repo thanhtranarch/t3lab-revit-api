@@ -2081,8 +2081,6 @@ Binding="{Binding sheet_number}" Width="90" IsReadOnly="True"
                                                 Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                         <Button x:Name="views_del_btn" Content="Delete Views"
                                                 Style="{StaticResource T3.Button.Danger}" Margin="0,0,8,0"/>
-                                        <Button x:Name="views_close_btn" Content="Close"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                         <Button x:Name="views_rename_btn" Content="Batch Rename"
                                                 Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                         <Button x:Name="views_apply_btn" Content="Apply Changes"
@@ -2314,8 +2312,6 @@ Binding="{Binding usage_percentage}" Width="80" IsReadOnly="True"
                                                 Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                         <Button x:Name="tmpl_del_btn" Content="Delete Unused"
                                                 Style="{StaticResource T3.Button.Danger}" Margin="0,0,8,0"/>
-                                        <Button x:Name="tmpl_close_btn" Content="Close"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                         <!-- Secondary, not Primary: the window already carries its one
                                              T3.Button.Primary on the Views tab footer. -->
                                         <Button x:Name="tmpl_apply_btn" Content="Apply Changes"

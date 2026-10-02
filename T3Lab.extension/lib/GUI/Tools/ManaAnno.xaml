@@ -1763,7 +1763,7 @@
                             <TextBlock Text="&#xE922;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                         <Button x:Name="btn_close" Style="{StaticResource T3.WinClose}" ToolTip="Close"
-                                Click="close_button_clicked">
+                                Click="close_button_clicked" IsCancel="True">
                             <TextBlock x:Name="close_text" Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>
@@ -2314,11 +2314,6 @@
                         <Ellipse x:Name="status_dot" Style="{StaticResource T3.Dot}"
                                  Fill="{StaticResource T3.TextDisabled}"/>
                         <TextBlock x:Name="status" Text="Ready." Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"/>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="Close" Style="{StaticResource T3.Button.Secondary}"
-                                Click="close_button_clicked" IsCancel="True"/>
                     </StackPanel>
                 </Grid>
             </Border>

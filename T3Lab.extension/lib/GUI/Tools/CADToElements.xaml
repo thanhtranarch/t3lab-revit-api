@@ -2485,8 +2485,6 @@
                                    TextTrimming="CharacterEllipsis" MaxWidth="560" Text="Ready"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btn_close_bar" Content="Close" Style="{StaticResource T3.Button.Ghost}"
-                                Margin="0,0,8,0" Click="close_bar_clicked" ToolTip="Close without creating anything"/>
                         <Button x:Name="btn_refresh" Content="Rescan" Style="{StaticResource T3.Button.Secondary}"
                                 Margin="0,0,8,0" Click="refresh_clicked"
                                 ToolTip="Reload CAD files, levels, types and layers (F5)"/>

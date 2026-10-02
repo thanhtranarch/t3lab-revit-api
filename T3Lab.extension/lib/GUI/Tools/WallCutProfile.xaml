@@ -1854,8 +1854,6 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <Button x:Name="btn_cancel" Content="Cancel" Style="{StaticResource T3.Button.Secondary}"
-                                Margin="0,0,8,0" IsCancel="True" Click="btn_cancel_clicked"/>
                         <Button x:Name="btn_apply" Content="Create Openings" Style="{StaticResource T3.Button.Primary}"
                                 IsDefault="True" Click="btn_apply_clicked"/>
                     </StackPanel>

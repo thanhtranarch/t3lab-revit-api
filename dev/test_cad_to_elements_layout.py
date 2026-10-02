@@ -110,8 +110,10 @@ class OneShell(unittest.TestCase):
         src = read(XAML)
         for name in ("grid_layers", "txt_layer_search", "btn_ai_select", "btn_layers_all",
                      "btn_layers_clear", "txt_layer_tally", "txt_layers_empty",
-                     "cmb_cad_files", "cmb_levels", "btn_run", "btn_refresh", "btn_close_bar"):
+                     "cmb_cad_files", "cmb_levels", "btn_run", "btn_refresh"):
             self.assertEqual(src.count('x:Name="%s"' % name), 1, name)
+        # The title-bar X is the only close control (2026-10-02): no footer Close.
+        self.assertNotIn('x:Name="btn_close_bar"', src)
         self.assertEqual(len(list(self.root.iter(P + "DataGrid"))), 1)
         self.assertNotIn("SizeToContent", src)
 

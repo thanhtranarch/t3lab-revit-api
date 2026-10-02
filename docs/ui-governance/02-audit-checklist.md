@@ -70,10 +70,10 @@ trong file tool — style mới phải thêm vào stylesheet (`MANUAL REVIEW REQ
 
 | # | Kiểm tra |
 |---|----------|
-| D1 | Button placement — footer: trái = trạng thái, phải = ghost huỷ → secondary → **một** primary, gap 8 |
+| D1 | Button placement — footer: trái = trạng thái, phải = secondary → **một** primary, gap 8; không nút Close/Cancel/Done nào chỉ để đóng cửa sổ (nút X làm việc đó) |
 | D2 | Primary vs secondary — phân biệt được bằng hình thức, không chỉ bằng vị trí |
-| D3 | Default action — có `IsDefault`; **trừ** P5 (nút phá huỷ không bao giờ `IsDefault`) |
-| D4 | Cancel action — có `IsCancel`; Esc đóng được cửa sổ |
+| D3 | Default action — có `IsDefault` trên primary khi cửa sổ có primary; **trừ** P5 (nút phá huỷ không bao giờ `IsDefault`, Cancel mới là) |
+| D4 | Cancel action — `IsCancel` trên nút X title bar (`T3.WinClose`); Esc đóng được cửa sổ |
 | D5 | Keyboard accessibility — Enter/Esc hoạt động; access key nếu form dài |
 | D6 | Tab order — `TabIndex` đi theo thứ tự đọc, không nhảy lung tung |
 | D7 | Selection behavior — chọn nhiều có Shift/Ctrl; có All/None |

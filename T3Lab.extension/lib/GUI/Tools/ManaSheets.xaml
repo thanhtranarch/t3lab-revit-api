@@ -2076,8 +2076,6 @@ Binding="{Binding drawn_by}" Width="110"
                                                 Style="{StaticResource T3.Button.Secondary}"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <Button x:Name="sheets_close_btn" Content="Close"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                         <Button x:Name="sheets_apply_btn" Content="Apply Changes"
                                                 Style="{StaticResource T3.Button.Primary}" IsDefault="True"/>
                                     </StackPanel>
@@ -2266,8 +2264,6 @@ Binding="{Binding drawn_by}" Width="110"
                                         <Button x:Name="renum_preview_btn" Content="Preview Changes"
                                                 Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                                         <Button x:Name="renum_run_btn" Content="Renumber Selected"
-                                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
-                                        <Button x:Name="renum_close_btn" Content="Close"
                                                 Style="{StaticResource T3.Button.Secondary}"/>
                                     </StackPanel>
                                 </Grid>

@@ -1744,7 +1744,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button x:Name="btn_close_chrome" Style="{StaticResource T3.WinClose}" ToolTip="Close">
+                        <Button x:Name="btn_close_chrome" Style="{StaticResource T3.WinClose}" ToolTip="Close" IsCancel="True">
                             <TextBlock Text="&#xE8BB;" Style="{StaticResource T3.Icon}"/>
                         </Button>
                     </StackPanel>

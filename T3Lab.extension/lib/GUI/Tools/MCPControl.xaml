@@ -2098,8 +2098,8 @@
 
             <!-- ══════════════════ ROW 3: FOOTER BAR ══════════════════
                  Left: copyright | overall readiness (dot + words).
-                 Right: ONE primary that names the next step (Refresh lives in the tab strip):
-                 "Start Server" while the server is down, "Done" once it runs. -->
+                 No footer button: Start/Stop Server lives in Step 1, Refresh in the
+                 tab strip, and the title-bar X closes the window. -->
             <Border Grid.Row="3" Style="{StaticResource T3.FooterBar}">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -2123,11 +2123,6 @@
                                    Style="{StaticResource T3.Body.Secondary}" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                     </Grid>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="next_btn" Content="Done"
-                                Style="{StaticResource T3.Button.Primary}" IsDefault="True"/>
-                    </StackPanel>
                 </Grid>
             </Border>
 

@@ -274,7 +274,6 @@ class ViewManagerWindow(T3WPFWindow):
         self.views_rename_btn.Click += self._on_views_batch_rename
         self.views_dup_btn.Click += self._on_views_duplicate
         self.views_del_btn.Click += self._on_views_delete
-        self.views_close_btn.Click += self._on_close
         
         self.views_apply_btn.Click += self._on_views_apply
         self.views_grid.SelectionChanged += self._on_views_selection_changed
@@ -294,7 +293,6 @@ class ViewManagerWindow(T3WPFWindow):
         self.tmpl_batch_btn.Click += self._on_tmpl_batch_rename
         self.tmpl_dup_btn.Click += self._on_tmpl_duplicate
         self.tmpl_del_btn.Click += self._on_tmpl_delete
-        self.tmpl_close_btn.Click += self._on_close
         
         self.tmpl_apply_btn.Click += self._on_tmpl_apply
         self.tmpl_grid.SelectionChanged += self._on_tmpl_selection_changed
@@ -436,9 +434,6 @@ class ViewManagerWindow(T3WPFWindow):
     def _close_chrome(self, sender, e):
         self.Close()
         
-    def _on_close(self, sender, args):
-        self.Close()
-
     def _on_tab_changed(self, sender, e):
         """Toggle active Tab based on RadioButton selection"""
         if not hasattr(self, 'tab_control'):

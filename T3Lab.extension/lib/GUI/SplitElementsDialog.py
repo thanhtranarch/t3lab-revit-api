@@ -37,8 +37,6 @@ class SplitElementsWindow(T3WPFWindow):
 
         if hasattr(self, 'btn_execute') and self.btn_execute:
             self.btn_execute.Click += self._on_execute
-        if hasattr(self, 'btn_cancel') and self.btn_cancel:
-            self.btn_cancel.Click += self._close_chrome
 
         if hasattr(self, 'btn_minimize') and self.btn_minimize:
             self.btn_minimize.Click += self._minimize

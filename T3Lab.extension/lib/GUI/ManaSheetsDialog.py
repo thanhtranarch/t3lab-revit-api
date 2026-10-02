@@ -226,7 +226,6 @@ class SheetManagerWindow(T3WPFWindow):
         self.sheets_excel_btn.Click += self._on_sheets_excel
         self.sheets_refresh_btn.Click += self._on_sheets_refresh
         self.sheets_apply_btn.Click += self._on_sheets_apply
-        self.sheets_close_btn.Click += self._on_close
         
         self.sheets_grid.SelectionChanged += self._on_sheets_selection_changed
         self.sheets_grid.CellEditEnding += self._on_sheets_cell_edit
@@ -236,7 +235,6 @@ class SheetManagerWindow(T3WPFWindow):
         self.renum_refresh_btn.Click += self._on_renum_refresh
         self.renum_preview_btn.Click += self._on_renum_preview
         self.renum_run_btn.Click += self._on_renum_run
-        self.renum_close_btn.Click += self._on_close
         self.renum_grid.ItemsSource = self.renumber_items
         for box in (self.renum_prefix_box, self.renum_start_box,
                     self.renum_step_box, self.renum_suffix_box):
@@ -361,9 +359,6 @@ class SheetManagerWindow(T3WPFWindow):
     def _close_chrome(self, sender, e):
         self.Close()
         
-    def _on_close(self, sender, args):
-        self.Close()
-
     def _on_tab_changed(self, sender, e):
         if not hasattr(self, 'tab_control'):
             return

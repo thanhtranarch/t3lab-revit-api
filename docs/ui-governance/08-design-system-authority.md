@@ -97,10 +97,10 @@ Không size ngoài danh sách. Không font khác Segoe UI / Consolas.
 | L3 | Mỗi grid chỉ **một** cột `*` (là Name). Cột khác fix px: ID 90 · Category 140 · Status 150–170 · số 70 |
 | L4 | `HorizontalScrollBarVisibility="Disabled"` mọi grid/list. Không đủ chỗ thì **bỏ bớt cột** |
 | L5 | Số căn phải (Consolas) · text căn trái · Element ID căn trái Consolas |
-| L6 | Footer cố định: trái = dot + câu trạng thái; phải = ghost huỷ → secondary → secondary → **MỘT** primary. Gap 8 |
+| L6 | Footer cố định: trái = dot + câu trạng thái; phải = secondary → secondary → **MỘT** primary. Gap 8. **Không nút nào chỉ để đóng cửa sổ** ngoài nút X title bar — Close / Cancel / Done chỉ gọi `Close()` là lặp việc của X (luật 29); giữ nút làm thêm việc (kết quả, dừng tác vụ, rollback, hỏi lại) và Cancel/No của dialog trả lời |
 | L7 | Panel lồng tối đa 2 cấp. Chia section bằng label uppercase + `Separator`, **không** bằng card |
 | L8 | `UseLayoutRounding="True"` · `SnapsToDevicePixels="True"` · `TextOptions.TextFormattingMode="Display"` trên Window. Luôn có `MinWidth`/`MinHeight`. Không set `Height` cho `TextBlock`. Không fix `Width` cho text dịch |
-| L9 | Mọi window có `IsDefault` **và** `IsCancel`. Focus = viền 1px `T3.Ink`, không dotted rectangle |
+| L9 | `IsCancel` trên nút X title bar (`T3.WinClose`). `IsDefault` bắt buộc khi có `T3.Button.Primary` (đặt trên nó); cửa sổ chỉ hiện trạng thái / cài đặt áp dụng ngay thì không cần. P5: `IsDefault` trên Cancel. Focus = viền 1px `T3.Ink`, không dotted rectangle |
 | L10 | Mọi list/grid có **empty state**: TextBlock canh giữa, `T3.TextDisabled`, nói thiếu gì và làm gì tiếp |
 
 ### 4.6 · 5 pattern — mọi tool phải là một trong số này
@@ -109,7 +109,7 @@ Không size ngoài danh sách. Không font khác Segoe UI / Consolas.
 |---------|------|--------------------|
 | **P1** Parameter input form | M | Form một cột · `Expander` cho Advanced · callout hệ quả **có số lượng** trên footer |
 | **P2** Element selection list | M | Filter pinned · `ListBox` virtualized · All/None ghost ở footer · primary **mang số đếm** |
-| **P3** Progress & log | M | Phase + `n / total` + item hiện tại · bar 8px cam · log `ListBox` Consolas màu theo severity **kèm chữ** (`ok`/`skipped`/`failed`) · dải tally · footer "đang chạy, đừng đóng Revit" · xong thì Cancel → Close, dot xanh |
+| **P3** Progress & log | M | Phase + `n / total` + item hiện tại · bar 8px cam · log `ListBox` Consolas màu theo severity **kèm chữ** (`ok`/`skipped`/`failed`) · dải tally · footer "đang chạy, đừng đóng Revit" · Cancel lúc chạy là Stop, xong thì ẩn (không đổi thành Close — nút X làm việc đó), dot xanh |
 | **P4** Results table | L | Dải summary 52px (số + label, chia bằng rule 1px) · chip filter · `DataGrid` row 26 · status pill nền tint + dot + chữ · primary trả người dùng về Revit ("Select in Revit") |
 | **P5** Confirmation | S | Headline là **câu hỏi có số** ("Delete 34 view templates?") · nút phá huỷ đỏ mang tên thao tác + số · nút đó **KHÔNG** `IsDefault` (Cancel mới là) · bản success dùng lại vỏ này ở thì quá khứ |
 
@@ -117,7 +117,8 @@ Không size ngoài danh sách. Không font khác Segoe UI / Consolas.
 
 Merge `T3Lab.Styles.xaml`, không tự định nghĩa brush · đúng một trong P1–P5 · size S/M/L
 · Segoe UI 13, không size lạ · margin chia hết 4 · đúng một primary, ngoài cùng phải
-· có `IsDefault` + `IsCancel` · grid một cột `*`, tắt scroll ngang · có empty state
+· `IsCancel` trên nút X, `IsDefault` trên primary · không nút Close/Cancel/Done nào chỉ để đóng
+· grid một cột `*`, tắt scroll ngang · có empty state
 · chụp màn hình 100% và 125% không cắt chữ · thao tác phá huỷ có P5 · status không bao
 giờ chỉ bằng màu.
 

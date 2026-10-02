@@ -36,14 +36,24 @@ Kích thước cửa sổ: S 420×260–320 (NoResize) · M 560×420–560 · L 
 3. Mỗi grid chỉ một cột `*` (là Name). Cột khác fix px: ID 90, Category 140, Status 150–170, số 70.
 4. `HorizontalScrollBarVisibility="Disabled"` mọi grid/list. Không đủ chỗ thì bỏ bớt cột.
 5. Số căn phải (Consolas), text căn trái, Element ID căn trái Consolas.
-6. Footer cố định: trái = dot + câu trạng thái; phải = ghost huỷ → secondary → secondary → MỘT primary. Gap 8.
+6. Footer cố định: trái = dot + câu trạng thái; phải = secondary → secondary → MỘT primary. Gap 8.
+   **Không nút nào chỉ để đóng cửa sổ** ngoài nút X title bar: nút footer/body Close / Cancel / Done /
+   Exit mà handler chỉ gọi `Close()` (hoặc dùng chung handler với nút X) lặp lại đúng việc của X → bỏ
+   (MCP Control "Done" 2026-10-02). Giữ nút khi nó làm thêm việc — đặt kết quả/`DialogResult` mà caller
+   đọc khác X, dừng tác vụ đang chạy, rollback, lưu, hỏi lại — và giữ Cancel/No của dialog trả lời
+   (P5, `T3Dialog`, dialog OK/Cancel kiểu `SelectFromDict`). Cửa sổ không có nút X thì nút đóng là
+   đường thoát duy nhất, giữ nó (luật 29, `audit_t3.py` bắt).
    Nút footer giữ kích thước của style (không tự đặt Height/Padding); nhãn trong nút kế thừa font/màu của
    nút (icon `T3.Icon` margin 8 + TextBlock trơn); Pause/Stop: thanh `T3.ProgressBar` 160px cao 8 (luật 27,
    `audit_t3.py` bắt).
 7. Panel lồng tối đa 2 cấp. Chia section bằng label uppercase + `Separator`, không bằng card.
 8. `UseLayoutRounding="True"`, `SnapsToDevicePixels="True"`, `TextOptions.TextFormattingMode="Display"`
    trên Window. Luôn có MinWidth/MinHeight. Không set Height cho TextBlock. Không fix Width cho text dịch.
-9. Mọi window có `IsDefault` và `IsCancel`. Focus = viền 1px `T3.Ink`, không dùng dotted rectangle.
+9. `IsCancel="True"` nằm trên nút X title bar (`T3.WinClose`) — Esc và nút X là một đường đóng.
+   `IsDefault="True"` bắt buộc khi cửa sổ có hành động (`T3.Button.Primary`) và đặt trên chính nút đó;
+   cửa sổ chỉ hiện trạng thái / cài đặt áp dụng ngay, không có Primary, thì không cần `IsDefault`.
+   P5 giữ luật riêng: `IsDefault` trên Cancel, không bao giờ trên nút phá huỷ.
+   Focus = viền 1px `T3.Ink`, không dùng dotted rectangle.
 10. Mọi list/grid có empty state: TextBlock canh giữa, `T3.TextDisabled`, nói thiếu gì và làm gì tiếp.
 11. **Copyright BẮT BUỘC.** Mọi cửa sổ tool có ĐÚNG MỘT dòng `© Copyright by T3Lab`,
     dùng `{StaticResource T3.Copyright}`, đặt ở footer **sát trái**, đứng trước câu
@@ -65,7 +75,8 @@ Kích thước cửa sổ: S 420×260–320 (NoResize) · M 560×420–560 · L 
 - **P2 Element selection list** (M) — filter pinned, ListBox virtualized, All/None ghost ở footer, primary mang số đếm.
 - **P3 Progress & log** (M) — phase + `n / total` + item hiện tại, bar 8px cam, log ListBox Consolas
   màu theo severity + chữ (`ok` / `skipped` / `failed`), dải tally, footer "đang chạy, đừng đóng Revit".
-  Xong thì Cancel → Close, dot chuyển xanh.
+  Cancel lúc đang chạy là Stop (dừng tác vụ); xong thì ẩn nó — không đổi thành Close, nút X đã làm việc
+  đó (luật 6) — dot chuyển xanh.
 - **P4 Results table** (L) — dải summary 52px (số + label, chia bằng rule 1px), chip filter, DataGrid 26px row,
   status pill nền tint + dot + chữ, primary trả người dùng về Revit ("Select in Revit").
 - **P5 Confirmation** (S) — headline là câu hỏi có số ("Delete 34 view templates?"), nút phá huỷ màu đỏ
@@ -502,7 +513,8 @@ không thêm.
 Nhúng `T3Lab.Styles.xaml` bằng `dev/sync_t3_styles.py`, không tự định nghĩa brush · đúng một trong P1–P5 · size S/M/L
 · có đúng một dòng copyright ở footer trái · mọi chữ hiển thị là tiếng Anh
 · Segoe UI 13, không size lạ · margin chia hết 4 · đúng một primary, ngoài cùng phải
-· có `IsDefault` + `IsCancel` · grid một cột `*`, tắt scroll ngang · có empty state
+· `IsCancel` trên nút X, `IsDefault` trên primary · không nút Close/Cancel/Done nào chỉ để đóng
+· grid một cột `*`, tắt scroll ngang · có empty state
 · chụp màn hình 100% và 125% không cắt chữ · thao tác phá huỷ có P5 · status không bao giờ chỉ bằng màu.
 
 ## Khi được nhờ viết tool mới

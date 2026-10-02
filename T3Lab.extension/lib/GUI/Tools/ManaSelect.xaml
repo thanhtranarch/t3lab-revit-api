@@ -1995,7 +1995,6 @@
                     </Grid>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btn_close_footer" Content="Close" Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"/>
                         <Button x:Name="btn_add_selection" Content="Add to Selection"
                                 Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
                                 ToolTip="Add the checked elements to what is already selected in Revit"/>

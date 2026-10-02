@@ -276,9 +276,6 @@ class WallCutProfileWindow(T3WPFWindow):
     def win_close_clicked(self, sender, e):
         self.Close()
 
-    def btn_cancel_clicked(self, sender, e):
-        self.Close()
-
     def btn_apply_clicked(self, sender, e):
         if not self._selected_link:
             forms.alert("Please select a valid linked model!", title="Wall Cut Profile")

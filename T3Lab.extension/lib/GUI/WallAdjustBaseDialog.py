@@ -176,9 +176,6 @@ class WallAdjustBaseWindow(T3WPFWindow):
             self.Show()
             self._update_selection_ui()
 
-    def btn_cancel_clicked(self, sender, e):
-        self.Close()
-
     def win_minimize_clicked(self, sender, e):
         self.WindowState = System.Windows.WindowState.Minimized
 

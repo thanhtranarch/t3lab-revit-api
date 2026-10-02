@@ -2223,9 +2223,6 @@
                     </Grid>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button x:Name="btn_cancel" Content="Cancel"
-                                Style="{StaticResource T3.Button.Secondary}" Margin="0,0,8,0"
-                                Click="close_button_clicked"/>
                         <Button x:Name="btn_create" Content="Create Plans"
                                 Style="{StaticResource T3.Button.Primary}" IsDefault="True"
                                 Click="create_plans_clicked"/>

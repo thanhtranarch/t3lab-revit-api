@@ -1003,10 +1003,6 @@ class PointCloudModelWindow(T3WPFWindow):
         finally:
             self.btn_generate.IsEnabled = True
 
-    def btn_cancel_clicked(self, sender, e):
-        self.result = None
-        self.Close()
-
     # ── Select-all o header cot checkbox ────────────────────────────────
     # toggle_all_rows() nam trong T3WPFWindow: no chay tren grid.Items nen chi
     # dong dang hien thi (sau filter/sort) bi doi, dung nhu nguoi dung thay.
