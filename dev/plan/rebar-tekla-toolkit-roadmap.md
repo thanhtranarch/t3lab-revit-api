@@ -1,7 +1,8 @@
 # Rebar Toolkit cho người dùng chuyển từ Tekla — Phương án xây dựng
 
 > Ngày lập: 2026-10-02 · Sửa lần 2 cùng ngày theo hai ràng buộc của chủ extension:
-> **(1) không tool nào trùng / lặp chức năng Revit đã có sẵn; (2) Revit đang dùng là 2027.**
+> **(1) không tool nào trùng / lặp chức năng Revit đã có sẵn; (2) Revit đang dùng là 2027;**
+> **(3) người Tekla sang không bị bỡ ngỡ và có đủ chức năng họ cần — hoặc một cách làm tối ưu hơn nhưng gần gũi.**
 > Trạng thái: **ĐỀ XUẤT — chưa có dòng code nào**
 > Panel mới: `T3Lab.extension/T3Lab_Dev.tab/Rebar & Assembly.panel/`
 > Mục tiêu: người quen Tekla Structures mở Revit là làm việc được ngay với từ vựng và thao tác quen,
@@ -22,6 +23,18 @@ Revit", không bọc lại bằng UI riêng. Mục 1 là bảng rà soát từng
 2022–2026 cho bộ tool này. Revit 2027 chạy .NET 8: mọi window modeless/ExternalEvent theo luật
 `__persistentengine__` + `detect_persistent_engine()`; sửa `lib/` thì restart Revit, không Reload.
 
+**N3 — Đủ cho người Tekla, bằng ba lớp.** "Không trùng Revit" không có nghĩa là bỏ mặc người dùng tự tìm lệnh.
+Mọi bước trong quy trình rebar của Tekla (mục 2) phải rơi vào đúng một trong ba lớp:
+- **Lớp 1 — Revit đã có**: tool *không* làm lại, nhưng **Tekla Bridge** (mục 4.0) đưa người dùng tới đúng lệnh
+  Revit bằng tên gọi Tekla, kèm một dòng giải thích khác biệt; tài liệu `docs/tekla-to-revit-2027.md` nói rõ
+  cách Revit làm việc đó và vì sao đôi khi tốt hơn.
+- **Lớp 2 — Revit thiếu**: tool T3Lab lấp đúng khoảng trống (Cast Unit Manager, Clone Drawing, Rebar Check,
+  BVBS Export, Rebar Wizard).
+- **Lớp 3 — Revit làm khác nhưng tốt hơn**: không bắt chước Tekla; tool/tài liệu chỉ *đặt tên quen* lên cách
+  làm của Revit (ví dụ: Tekla đánh số lại cả model, Revit đánh số tự động theo partition — người dùng chỉ cần
+  gán partition đúng, việc đó Cast Unit Manager làm theo quy tắc).
+Thước đo: bảng mục 2 **không còn ô nào trống** ở cột "Làm ở đâu trong Revit 2027".
+
 ---
 
 ## 1. Rà soát trùng chức năng với Revit 2027 (quyết định giữ / cắt)
@@ -41,35 +54,84 @@ Revit", không bọc lại bằng UI riêng. Mục 1 là bảng rà soát từng
 | Clone Drawing — Mode B nhân bản bản vẽ mẫu sang assembly khác | **Không có.** Revit không có cách nào mang view + sheet + dim + tag từ một assembly sang assembly khác; instance tách type là mất bản vẽ, làm lại từ đầu | **GIỮ — tool trọng tâm** |
 | Rebar Check | **Không có.** Interference Check chỉ va chạm hình học; không có kiểm tra rebar mồ côi, rebar chưa vào assembly, assembly chưa có bản vẽ, trùng số khác hình | **GIỮ** |
 | Rebar Wizard (system component dầm / cột / móng) | **Chưa thấy có** trong sản phẩm; Autodesk Rebar Extensions đã ngừng từ lâu **(xác minh ở 2027)** | **GIỮ, giai đoạn cuối**; nếu 2027 có auto-reinforcement thì cắt |
+| *(mới)* Tekla Bridge: bảng lệnh gọi theo tên Tekla → mở lệnh Revit tương ứng | **Không có.** Revit có Keyboard Shortcuts và search lệnh, nhưng không có lớp "tên Tekla → lệnh Revit" | **THÊM** — chỉ điều hướng (`PostCommand`) + tip, không làm lại lệnh nào |
+| *(mới)* BVBS Export: file `.abs` (BF2D / BF3D) cho máy uốn | **Không có** trong Revit; Tekla có sẵn, xưởng uốn ở VN / EU nhận BVBS **(xác minh 2027)** | **THÊM** — khoảng trống thật của người Tekla làm precast / thầu rebar |
 
-Kết quả: **8 → 4 tool**, trong đó 3 tool làm ngay, 1 tool làm sau.
+Kết quả: **8 → 6 tool** (4 làm ngay, BVBS sau khi Clone Drawing xong, Wizard sau cùng), cộng một trang tài liệu và một bộ phím tắt.
 
 ---
 
-## 2. Bảng ánh xạ thuật ngữ Tekla → Revit (dùng trong tooltip, docs onboarding)
+## 2. Bản đồ quy trình Tekla → Revit 2027 (thước đo "đủ")
 
 > UI tiếng Anh, nhãn dùng **thuật ngữ Revit**; thuật ngữ Tekla đặt trong tooltip dạng `Assembly (Tekla: cast unit)`.
-> Bảng này cũng là xương sống của một trang hướng dẫn "Tekla → Revit 2027" trong `docs/` — vì phần lớn
-> việc "quen tay" được giải quyết bằng *biết lệnh Revit nào tương ứng*, không phải bằng tool.
+> Bảng này là xương sống của `docs/tekla-to-revit-2027.md` (song ngữ EN/VI) và của danh sách lệnh trong Tekla Bridge.
+> Quy tắc: mỗi dòng phải có câu trả lời ở cột "Làm ở đâu"; ô ghi **Lớp 1** = lệnh Revit, **Lớp 2** = tool T3Lab, **Lớp 3** = Revit làm khác / tốt hơn.
 
-| Tekla | Revit 2027 | Tool T3Lab liên quan |
-|---|---|---|
-| Cast unit | `AssemblyInstance` + `AssemblyType` (instance giống hệt → cùng type, giống Tekla cùng mark) | Cast Unit Manager |
-| Main part | Element đặt tên (`NamingCategoryId`) | Cast Unit Manager |
-| Cast unit mark (C-1, B-12) | `AssemblyTypeName` | Cast Unit Manager (rename series) |
-| Numbering series | Rebar Partition + Reinforcement Numbering (**lệnh Revit**) | Cast Unit Manager (gán partition theo quy tắc) |
-| Reinforcing bar group | Rebar Set (Fixed Number / Maximum Spacing / Number with Spacing / Minimum Clear Spacing) | — |
-| Shape catalog | Rebar Shape family | — |
-| Pull-out picture | Rebar Bending Detail (**lệnh Revit**) | — |
-| Cover / hook / coupler | `RebarCoverType` / `RebarHookType` / `RebarCoupler` | — |
-| Cast unit drawing | Assembly → Create Views (**lệnh Revit**) | — |
-| Clone drawing | **không có** | Clone Drawing |
-| Report (bending schedule, weight) | Rebar Schedule + Bending Detail + template T3 (hướng dẫn) | — |
-| Numbering / clash check | Interference Check (hình học) · còn lại không có | Rebar Check |
-| System component | **không có** (xác minh 2027) | Rebar Wizard |
-| Phase / Organizer | Phase / Workset (`ManaWorkset` đã có) | — |
+### 2.1 Mô hình & cast unit
 
----
+| Bước Tekla | Làm ở đâu trong Revit 2027 | Lớp | Ghi chú cho người Tekla |
+|---|---|---|---|
+| Tạo part (beam, column, slab, footing) | Structural Framing / Column / Floor / Foundation | 1 | Part ↔ Family instance; profile ↔ Family Type |
+| Cast unit (in-situ / precast), main part | Assembly → Create Assembly (Naming Category = main part) | 1 (+2) | **Cast Unit Manager** khi làm hàng loạt hoặc cần tự gom rebar |
+| Add / remove part to cast unit | Edit Assembly | 1 | Rebar thêm sau phải add tay → **Sync rebar** (2) |
+| Cast unit numbering (prefix + number, cùng hình cùng số) | Revit tự gộp type giống hệt; mark = Assembly Type Name | 3 (+2) | **Rename series** của Cast Unit Manager đặt mark theo prefix/start/step |
+| Pour unit / pour break | Parts + Phases | 1 | ngoài phạm vi bộ tool |
+| Organizer (lọc theo thuộc tính) | Project Browser Organization + View Filters + Schedules | 3 | mạnh hơn Organizer cho lọc theo view |
+
+### 2.2 Rebar
+
+| Bước Tekla | Làm ở đâu trong Revit 2027 | Lớp | Ghi chú |
+|---|---|---|---|
+| Rebar đơn (Create rebar, polygon) | Structure → Rebar (sketch / place by shape / free form) | 1 | Shape-driven = catalog shape; Free Form = polygon tay |
+| Rebar group (spacing, exact number) | Rebar Set + layout rule (Fixed Number / Maximum Spacing / Number with Spacing / Minimum Clear Spacing) | 1 | tên khác, logic giống |
+| Rebar mesh | Fabric Sheet / Fabric Area | 1 | |
+| Area reinforcement (slab / wall) | Area Reinforcement · Path Reinforcement | 1 | |
+| Cover | Rebar Cover Settings + Cover per face (`RebarCoverType`) | 1 | Revit cover là **thuộc tính host**, không phải của thanh |
+| Hook / bend radius | Rebar Hook Type · Rebar Bar Type bend diameter | 1 | |
+| Splice / coupler / end anchor | Rebar Coupler (coupler family) · lap by overlapping bars | 1 | |
+| System component (Beam 63, Column 83, Pad footing 77) | **không có** | 2 | **Rebar Wizard** (sau cùng, G6) |
+| Copy special → to another object / Mirror | Copy / Paste Aligned / Mirror; rebar tự nhận host mới | 1 (+2) | rebar dán vào host trong assembly → **Sync rebar** (G5) |
+| Rebar visibility / representation | Rebar properties → View Visibility States; View Filters; Rebar Set presentation | 1 | mạnh hơn Tekla: theo từng view |
+| Clash check (rebar–rebar, rebar–part) | Collaborate → Interference Check | 1 | |
+
+### 2.3 Đánh số
+
+| Bước Tekla | Làm ở đâu trong Revit 2027 | Lớp | Ghi chú |
+|---|---|---|---|
+| Numbering series per part / assembly | Rebar Partition | 3 (+2) | Revit đánh số **tự động, liên tục** theo partition; chỉ cần gán partition đúng → **Partition by rule** |
+| Numbering settings / renumber / remove gaps | Reinforcement Numbering | 1 | |
+| Kiểm tra số trùng / chưa đánh số | **không có** | 2 | **Rebar Check** |
+
+### 2.4 Bản vẽ
+
+| Bước Tekla | Làm ở đâu trong Revit 2027 | Lớp | Ghi chú |
+|---|---|---|---|
+| Cast unit drawing (view set + sheet) | Assembly → Create Views (+ View Template, titleblock) | 1 | |
+| Clone drawing | **không có** | 2 | **Clone Drawing** |
+| GA drawing | Sheet + views thường | 1 | ngoài phạm vi |
+| Rebar marks / pull-out picture / dimension | Rebar Tag · Multi-Rebar Annotation · Rebar Bending Detail · Dimension | 1 | |
+| Drawing list | Sheet List schedule · cột *Views/Sheets* của Cast Unit Manager | 1 (+2) | |
+| Drawing not up-to-date flag | Revit view luôn live với model | 3 | khái niệm "update drawing" không tồn tại |
+
+### 2.5 Báo cáo & xuất
+
+| Bước Tekla | Làm ở đâu trong Revit 2027 | Lớp | Ghi chú |
+|---|---|---|---|
+| Bending schedule / rebar list | Rebar Schedule (Shape, A–F, Total Bar Length, Quantity) + Bending Detail | 1 | |
+| Weight report theo Ø | Schedule + shared parameter `T3_WeightPerMetre` trên Rebar Bar Type + calculated field — **template kèm docs** | 1 | không cần tool |
+| Cast unit list | Assembly schedule / Part List / Material Takeoff | 1 | |
+| BVBS (`.abs`) cho máy uốn | **không có** | 2 | **BVBS Export** (G9) |
+| IFC | Export IFC (panel IFC-SG đã có) | 1 | |
+| Unitechnik / PXML (precast machine) | không có | — | **ngoài phạm vi** V1, ghi nhận nhu cầu |
+
+### 2.6 Thao tác & môi trường
+
+| Thói quen Tekla | Làm ở đâu trong Revit 2027 | Lớp | Ghi chú |
+|---|---|---|---|
+| Phím tắt Tekla | Keyboard Shortcuts (Import XML) | 1 (+content) | bộ `KeyboardShortcuts_Tekla.xml` do T3Lab cung cấp, import bằng dialog Revit |
+| Tìm lệnh theo tên Tekla | **không có** | 2 | **Tekla Bridge** |
+| Attribute file (lưu thiết lập component) | Preset JSON của Rebar Wizard · View Template · Type | 3 | |
+| Phase manager | Phases / Worksets (`ManaWorkset`) | 1 | |
 
 ## 3. Luật "hoạt động tốt với Assembly" — áp cho MỌI tool trong bộ
 
@@ -86,14 +148,29 @@ Kết quả: **8 → 4 tool**, trong đó 3 tool làm ngay, 1 tool làm sau.
 
 ---
 
-## 4. Bộ tool sau rà soát (4 tool)
+## 4. Bộ tool sau rà soát (6 tool)
 
 | # | Tool | Khoảng trống Revit 2027 mà nó lấp | Pattern | Size | Sửa model | Ưu tiên |
 |---|---|---|---|---|---|---|
+| 0 | **Tekla Bridge** (`TeklaBridge`) | Gọi lệnh Revit theo tên Tekla + tip khác biệt; lối vào các tool 1–5 | P2 | S | Không | P1 (rẻ, làm cùng GĐ1) |
 | 1 | **Cast Unit Manager** (`CastUnit`) | Tạo assembly hàng loạt có tự gom rebar · Sync rebar · rename series · gán partition theo quy tắc · trạng thái bản vẽ | P2 + P4 | L | Có | P1 |
 | 2 | **Clone Drawing** (`CloneDrawing`) | Nhân bản bản vẽ assembly mẫu sang assembly khác | P2 + P3 + P5 | L | Có (view / sheet) | **P1 — trọng tâm** |
 | 3 | **Rebar Check** (`RebarCheck`) | Kiểm tra rebar / assembly ở mức dữ liệu | P4 | L | Không (select / isolate; Fix chỉ gọi 1 và 2) | P2 |
-| 4 | **Rebar Wizard** (`RebarWizard`) | System component dầm / cột / móng | P1 + P5 | L | Có | P3, sau cùng |
+| 4 | **BVBS Export** (`BVBSExport`) | File `.abs` BF2D / BF3D cho máy uốn | P2 + P4 | M | Không | P2 |
+| 5 | **Rebar Wizard** (`RebarWizard`) | System component dầm / cột / móng | P1 + P5 | L | Có | P3, sau cùng |
+
+### 4.0 Tekla Bridge — `TeklaBridge.pushbutton`
+
+Lớp "không bỡ ngỡ". Một cửa sổ nhỏ (S, NoResize), ô tìm kiếm + danh sách lệnh **đặt tên theo Tekla**,
+nhóm theo mục 2.1–2.6. Mỗi dòng: tên Tekla · tên Revit · một dòng "What is different" · nút *Open*.
+- *Open* với lệnh Revit: `UIApplication.PostCommand(RevitCommandId.LookupPostableCommandId(PostableCommand.X))`
+  — cửa sổ đóng rồi mới post (PostCommand chạy sau khi lệnh hiện tại kết thúc). Lệnh không có trong
+  `PostableCommand` thì hiện đường dẫn ribbon + tip, không giả lập.
+- *Open* với tool T3Lab: chạy pushbutton tương ứng.
+- Nguồn dữ liệu: `lib/data/tekla_bridge.json` sinh từ bảng mục 2 (một nguồn, docs và tool không lệch nhau).
+- Tuỳ chọn *Show tip once*: lần đầu mở một lệnh Revit từ Bridge thì hiện tip, lần sau mở thẳng.
+- Không sửa model; không phụ thuộc document (mở được khi chưa có model).
+
 
 ### 4.1 Cast Unit Manager — `CastUnit.pushbutton`
 
@@ -146,7 +223,19 @@ Tiền đề: bản vẽ mẫu đã làm **bằng lệnh Revit** (Assembly → C
 
 Mỗi dòng: *Select* / *Isolate in view*. Nút *Fix* chỉ cho hai mục an toàn, gọi lại logic tool 1: *Sync rebar into assembly* và *Assign partition*. Không có check va chạm — dùng Interference Check của Revit.
 
-### 4.4 Rebar Wizard — `RebarWizard.pushbutton` (sau cùng, xác minh 2027 trước)
+### 4.4 BVBS Export — `BVBSExport.pushbutton`
+
+Khoảng trống thật của người Tekla làm precast hoặc thầu rebar: máy uốn nhận BVBS (`.abs`), Revit không xuất.
+- Phạm vi: toàn model / theo assembly / theo partition / selection; lọc shape-driven; free-form 2D phẳng xuất
+  BF2D nếu tách được đoạn thẳng + cung, còn lại báo *skipped: free-form 3D*.
+- Mỗi thanh (hoặc mỗi vị trí trong set khi set biến thiên): block `BF2D` với header `H` (project, mark =
+  partition + number, Ø, số lượng `n`, tổng dài `l`, trọng lượng `w` từ `T3_WeightPerMetre` hoặc bảng mặc định),
+  geometry `G` (đoạn `l`, góc `w`, bán kính uốn `r` từ bar type) và checksum `C` theo đặc tả BVBS 2.0.
+- Dữ liệu hình: `Rebar.GetCenterlineCurves(adjustForSelfIntersection, suppressHooks, suppressBendRadius, multiplanarOption, barPositionIndex)`; đoạn thẳng → `Line`, bend → `Arc`; hook tách thành đoạn cuối + góc.
+- Bảng preview trước khi ghi: `Mark | Ø | n | l | Shape | Status`; xuất một file cho mỗi assembly hoặc một file gộp.
+- Kiểm chứng: đọc lại file bằng viewer BVBS miễn phí (hoặc `dev/test_bvbs_writer.py` so với mẫu chuẩn BF2D trong đặc tả) — không "xuất xong" khi chưa đọc lại được.
+
+### 4.5 Rebar Wizard — `RebarWizard.pushbutton` (sau cùng, xác minh 2027 trước)
 
 - Beam: thanh trên / dưới, đai 3 vùng, cover, hook · Column: thanh dọc, đai + đai phụ, vùng đai dày · Pad footing: lưới hai lớp · Wall / Slab: `AreaReinforcement`.
 - `Rebar.CreateFromCurves` / `CreateFromRebarShape` + `RebarShapeDrivenAccessor.SetLayoutAs*`; mọi thanh add vào assembly của host (A2).
@@ -160,11 +249,11 @@ Mỗi dòng: *Select* / *Isolate in view*. Nút *Fix* chỉ cho hai mục an to�
 | GĐ | Nội dung | Deliverable | Ước lượng |
 |---|---|---|---|
 | **0 · Spike** | Trên Revit 2027: xác minh G1–G8 (mục 7) bằng `dev/debug/spike_rebar_assembly.py`; đồng thời rà "What's New 2027" cho hai mục **(xác minh)** ở mục 1 | mục 7 tick ✅ / ❌; danh sách tool chốt | 2 ngày |
-| **1 · Nền** | `lib/Snippets/_assembly.py`, `_rebar.py`, `_drawing_clone.py` (+ `_compat` guard); test thuần Python; panel + icon theo chuẩn 09; trang `docs/tekla-to-revit-2027.md` từ bảng mục 2 | helper + test xanh + panel rỗng + docs | 2 ngày |
+| **1 · Nền + Bridge** | `lib/Snippets/_assembly.py`, `_rebar.py`, `_drawing_clone.py` (+ `_compat` guard); test thuần Python; panel + icon theo chuẩn 09; `lib/data/tekla_bridge.json` + `docs/tekla-to-revit-2027.md` (EN/VI) sinh từ bảng mục 2; **Tekla Bridge** (tool 0); bộ `KeyboardShortcuts_Tekla.xml` | helper + test xanh + Bridge chạy được + docs | 3 ngày |
 | **2 · Cast Unit Manager** | Tool 1 | QA Revit 2027 | 3 ngày |
 | **3 · Clone Drawing** | T1 → T2 → T3 | Tool 2, log unmatched | 6–8 ngày |
-| **4 · Rebar Check** | Tool 3 | QA Revit 2027 | 2 ngày |
-| **5 · Wizard** | Tool 4 (V1 dầm + cột chữ nhật) nếu GĐ0 xác nhận Revit 2027 chưa có | mở roadmap riêng khi tới | 6+ ngày |
+| **4 · Rebar Check + BVBS** | Tool 3, tool 4 (`dev/test_bvbs_writer.py` so với mẫu chuẩn) | QA Revit 2027 + file đọc lại được bằng viewer BVBS | 4 ngày |
+| **5 · Wizard** | Tool 5 (V1 dầm + cột chữ nhật) nếu GĐ0 xác nhận Revit 2027 chưa có | mở roadmap riêng khi tới | 6+ ngày |
 
 Mỗi GĐ kết thúc bằng: 4 gate (`audit_t3`, `audit_tools`, `audit_wiring`, `audit_revit_compat`) xanh + `audit_cpython` 0 P0 + `check_xaml_load` / `check_xaml_wpf.ps1` 0 FAILED + checklist mục 8 trên Revit 2027. Chưa QA thì ghi `NEEDS VERIFICATION`, không tick.
 
@@ -175,23 +264,32 @@ Mỗi GĐ kết thúc bằng: 4 gate (`audit_t3`, `audit_tools`, `audit_wiring`,
 ```
 T3Lab.extension/
 ├── T3Lab_Dev.tab/Rebar & Assembly.panel/
-│   ├── bundle.yaml                 # layout: CastUnit · CloneDrawing · RebarCheck · RebarWizard
+│   ├── bundle.yaml                 # layout: TeklaBridge · CastUnit · CloneDrawing · RebarCheck · BVBSExport · RebarWizard
+│   ├── TeklaBridge.pushbutton/
 │   ├── CastUnit.pushbutton/
 │   ├── CloneDrawing.pushbutton/
 │   ├── RebarCheck.pushbutton/
+│   ├── BVBSExport.pushbutton/
 │   └── RebarWizard.pushbutton/     # GĐ5
-├── lib/GUI/Tools/   CastUnit.xaml · CloneDrawing.xaml · RebarCheck.xaml · RebarWizard.xaml
-├── lib/GUI/         CastUnitDialog.py · CloneDrawingDialog.py · RebarCheckDialog.py · RebarWizardDialog.py
+├── lib/GUI/Tools/   TeklaBridge.xaml · CastUnit.xaml · CloneDrawing.xaml · RebarCheck.xaml · BVBSExport.xaml · RebarWizard.xaml
+├── lib/GUI/         TeklaBridgeDialog.py · CastUnitDialog.py · CloneDrawingDialog.py · RebarCheckDialog.py · BVBSExportDialog.py · RebarWizardDialog.py
+├── lib/data/
+│   ├── tekla_bridge.json           # bảng mục 2: tên Tekla → PostableCommand / tool T3Lab / tip (một nguồn cho tool + docs)
+│   ├── rebar_weights.json          # kg/m mặc định theo Ø (TCVN / BS) khi bar type chưa có T3_WeightPerMetre
+│   └── KeyboardShortcuts_Tekla.xml # import qua Keyboard Shortcuts của Revit
 └── lib/Snippets/
     ├── _assembly.py        # collect, validate, batch create, sync rebar, rename series, views/sheets, center/transform
-    ├── _rebar.py           # host→rebar map (cache 1 lần / lần mở tool), partition by rule, fingerprint
-    └── _drawing_clone.py   # view-set replication (T1), annotation copy (T2), reference re-create (T3)
+    ├── _rebar.py           # host→rebar map (cache 1 lần / lần mở tool), partition by rule, fingerprint, centerline → segments
+    ├── _drawing_clone.py   # view-set replication (T1), annotation copy (T2), reference re-create (T3)
+    └── _bvbs.py            # BF2D/BF3D writer thuần Python (không import Revit) — test được ngoài Revit
 dev/
 ├── debug/spike_rebar_assembly.py   # GĐ0, chạy trong pyRevit console
+├── build_tekla_docs.py             # sinh docs/tekla-to-revit-2027.md từ lib/data/tekla_bridge.json (--check)
 ├── test_assembly_rules.py          # A1–A8 trên object giả, không cần Revit
 ├── test_rebar_fingerprint.py       # khớp mẫu ↔ đích, tolerance, mirror
+├── test_bvbs_writer.py             # block BF2D + checksum so với mẫu trong đặc tả BVBS 2.0
 └── plan/rebar-tekla-toolkit-roadmap.md
-docs/tekla-to-revit-2027.md         # bảng mục 2 + lệnh Revit tương ứng cho từng thao tác Tekla
+docs/tekla-to-revit-2027.md         # sinh tự động: mỗi bước Tekla → lệnh Revit / tool T3Lab / vì sao Revit làm khác
 ```
 
 Logic Revit API nằm trọn trong `lib/Snippets/`; `script.py` chỉ nối UI ↔ helper. Phần tính toán thuần (fingerprint, rule A5, partition rule) tách khỏi API để test ngoài Revit.
@@ -210,8 +308,10 @@ Logic Revit API nằm trọn trong `lib/Snippets/`; `script.py` chỉ nối UI �
 | G6 | Revit 2027 **không** có auto-reinforcement cho dầm / cột / móng | Giữ hay cắt Rebar Wizard | ⬜ |
 | G7 | Revit 2027 **không** có clone / propagate assembly views sang assembly khác | Giữ hay cắt Clone Drawing (nếu cắt thì bộ tool chỉ còn 1 + 3) | ⬜ |
 | G8 | `AssemblyViewUtils.*` và `Viewport.Create` chạy ổn trên .NET 8 qua pythonnet (không cần overload đặc biệt) | T1 | ⬜ |
+| G9 | Revit 2027 **không** xuất BVBS (`.abs`) native | Giữ hay cắt BVBS Export | ⬜ |
+| G10 | `PostCommand` + `PostableCommand` có đủ các lệnh rebar / assembly cần cho Tekla Bridge (Create Assembly, Create Views, Reinforcement Numbering, Rebar, Rebar Set, Area/Path Reinforcement, Interference Check); lệnh thiếu thì Bridge chỉ hiện đường dẫn ribbon | Phạm vi nút *Open* của Bridge | ⬜ |
 
-Cách xác minh: model test có 2 cast unit cột giống nhau + 1 khác, mỗi cột có rebar; script ghi log ra `%APPDATA%\T3LabAI\spike_rebar.log`; G6 / G7 rà thêm trong Revit 2027 What's New.
+Cách xác minh: model test có 2 cast unit cột giống nhau + 1 khác, mỗi cột có rebar; script ghi log ra `%APPDATA%\T3LabAI\spike_rebar.log`; G6 / G7 / G9 rà thêm trong Revit 2027 What's New; G10 liệt kê `PostableCommand` bằng reflection trong cùng script.
 
 ---
 
@@ -225,6 +325,7 @@ Cách xác minh: model test có 2 cast unit cột giống nhau + 1 khác, mỗi 
 [ ] 2 assembly giống hệt → sau khi chạy vẫn cùng type (hoặc báo rõ số type bị tách)
 [ ] Ctrl+Z một lần hoàn tác toàn bộ lần bấm (TransactionGroup assimilate)
 [ ] Không có nút nào làm việc Revit đã có (so lại bảng mục 1 trước khi tick)
+[ ] Người chưa biết Revit làm xong một quy trình Tekla (mục 2) chỉ bằng Tekla Bridge + docs, không phải hỏi
 [ ] Model 2 000+ rebar: thao tác > 2 s có progress, không treo Revit
 ```
 
@@ -236,6 +337,8 @@ Cách xác minh: model test có 2 cast unit cột giống nhau + 1 khác, mỗi 
 - **Tách type assembly** là hành vi lõi Revit, chỉ phát hiện và báo (A4).
 - **Rebar Wizard** là tool lớn nhất và dễ bị Revit bắt kịp nhất — vì thế để cuối và gác bằng G6.
 - **Hiệu năng**: `GetHostId()` cho mọi thanh là O(n); cache map host→rebar một lần mỗi lần mở tool.
+- **Tekla Bridge dễ thành "Revit bọc lại"** nếu thêm nút làm việc thay lệnh Revit: Bridge chỉ được *mở lệnh và giải thích*; mọi nút khác là vi phạm N1.
+- **BVBS**: cung hook / bend radius sai một chút là máy uốn ra sai thanh — V1 chỉ shape-driven + kiểm chứng file bằng viewer, free-form 3D để sau.
 - **Ngoài phạm vi**: GA drawing, precast connections / embeds, export sang Tekla / IFC (đã có panel IFC-SG), tính toán kết cấu, mọi thứ ở cột "Revit 2027 có sẵn" của mục 1.
 
 ---
@@ -244,4 +347,6 @@ Cách xác minh: model test có 2 cast unit cột giống nhau + 1 khác, mỗi 
 
 1. Chỉ in-situ hay cả precast? (precast cần thêm embeds / lifting vào cast unit — đề xuất V1 làm chung.)
 2. Có model test Revit 2027 sẵn (cột / dầm precast có rebar, 2 cast unit giống nhau) để chạy spike GĐ0 không — chưa thì GĐ0 thêm 1 ngày dựng model test.
-3. Trang `docs/tekla-to-revit-2027.md` có viết song ngữ (EN + VI) không, hay chỉ EN như UI?
+3. Trang `docs/tekla-to-revit-2027.md`: đề xuất **song ngữ EN/VI** (docs không bị luật "UI tiếng Anh"); Tekla Bridge trong Revit chỉ EN.
+4. BVBS: xưởng uốn của anh / khách hàng nhận chuẩn nào (BVBS 2.0 BF2D là phổ biến nhất; BF3D cho thanh 3D; có nơi đòi thêm `BFMA` cho lưới)? Quyết định phạm vi V1 = BF2D.
+5. Bộ phím tắt Tekla: anh gửi danh sách phím anh hay dùng nhất (10–20 phím) để lập `KeyboardShortcuts_Tekla.xml`; không tự bịa keymap.
