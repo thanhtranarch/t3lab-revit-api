@@ -9,7 +9,7 @@ the Subtype Assigner page and the Compliance Checker page. The owner approved go
 
 Line numbers are from before the edits.
 
-Status: **Phase 1 + 2 implemented 2026-10-02** · Phase 3 pending · **NEEDS VERIFICATION in Revit**
+Status: **Phase 1 + 2 + 3 implemented 2026-10-02** · **NEEDS VERIFICATION in Revit**
 (`check_xaml_wpf.ps1` not run yet either; it needs Windows).
 
 Deviations from the plan, made while implementing Phase 1 + 2:
@@ -18,9 +18,35 @@ Deviations from the plan, made while implementing Phase 1 + 2:
 - During a run, the config combo, Save As, Delete and both Import buttons are locked as well as
   the rail. Without this, deleting the last config mid-run would leave the result header with no config.
 - A config that fails to load is cleared, so the previous one never runs under the new name.
-- Phase 3 still to do: hex colours and Unicode icons in `_render_results` / `_refresh_tree` /
-  `_make_comp_listitem` / `_style_assigner_column_headers`. The `dgTypes` columns add up to 780 px with
-  no `*` column, so they get clipped at MinWidth.
+
+Phase 3 (implemented 2026-10-02; X only changes MinWidth):
+- Every Python-built visual now takes its brush and style from `FindResource("T3.*")` through
+  `_t3()` (cached per window, never raises). In Py: 0 `ConvertFromString`, 0 hex, 0 `FontSize`,
+  0 Unicode icons; `BrushConverter` and `bc` are gone.
+- `_style_assigner_column_headers` is removed; `T3.DataGrid` styles the headers. `dgTypes` columns:
+  FAMILY 140 · TYPE `*` · QTY 70 (`T3.Cell.Number`) · IFC ENTITY 140 · SUBTYPE 140 · STATUS 150.
+- Component items: name `T3.BodyStrong`, count `T3.Mono` docked right, info line `T3.Caption`.
+- Tree: `T3.CheckBox.Cell` + 8 px gap, discipline `T3.BodyStrong`, category `T3.Body`. The containers
+  keep the implicit `T3.TreeViewItem`.
+- Results: discipline = `T3.ListHeader` strip (uppercase); category = name + tally, `T3.Meter`, %
+  (`T3.Cell.Number`, or `n/a` in `T3.Cell.Muted`), Select; row = `T3.Dot` + status word
+  (Passed / Failed / Partial / No elements) · parameter · count (`T3.Mono`) · Select. Every
+  Select is `T3.Button.Ghost` with the E7C9 Pick icon (`T3.Icon.Lead`).
+- Deviations:
+  - The tree uses `T3.CheckBox.Cell`, the label-less `T3.CheckBox`, because the name is a separate
+    TextBlock. Clicking a name still selects the row and does not toggle the checkbox.
+  - The meter stays neutral Ink, as `T3.Meter` is defined. The old green/amber/red 80/50 thresholds
+    are gone; the % and the tally carry the number.
+  - In-row Select buttons are 24 px high, so rows with a button are the same height as rows without
+    one (26).
+  - The count of a no-elements row reads "0 elements", because the status word already says
+    "No elements".
+- **Decided: window MinWidth 1000 → 1200.** At 1000 the right pane is 619 px (1000 − 2 border − 58
+  rail − 321 left pane), and the fixed `dgTypes` columns could not fit beside TYPE. The standard fixes
+  the widths: Category 140, Status 150–170, number 70. FAMILY moved 160 → 140 (Category width), giving
+  640 px fixed. At 1200, TYPE keeps about 160 px. The default size (1250 × 820) is unchanged.
+- Left as is: the Excel report's `Font.Bold` and `_rgb()` cell fills. They format the workbook
+  and are not UI.
 
 ## 1. Current state
 
@@ -79,7 +105,7 @@ FOOTER (global)    Copyright · rule · status dot · status text | progress | P
 |---|---|---|
 | **1: quick win** (XAML only) | Window radius token, MinWidth 1000, rail tooltips, per-page footer groups. Assigner: header band, multiline list items, working empty states, "No component selected". Checker: new header band (Import XML/Excel move into it), Delete becomes a ghost button with a trash icon, no permanent red filter, KPI strip on Sunken without dots, unclipped tree header, `T3.TreeView`, empty state, pane width 320/260. | Low |
 | **2: shared shell** (+ ~40 lines of Python) | Same 4-row grid on both pages. Toolbar labels above controls. Write options move into the Assigner toolbar. Filter becomes `T3.Chip` radio buttons (All is the default). Count strips. Status text remembered per page. Rail disabled during a run. Delete confirm defaults to No. Run/Export enabled only when they can work. | Low–medium |
-| **3: Python-built content** | Restyle the list items, tree items and the results area through `FindResource("T3.*")`: no hex, no Unicode icons, `T3.Dot` + status word, `T3.Meter` for the pass rate. Grid columns get `*` widths. | Medium (no gate covers it) |
+| **3: Python-built content** (done 2026-10-02) | Restyle the list items, tree items and the results area through `FindResource("T3.*")`: no hex, no Unicode icons, `T3.Dot` + status word, `T3.Meter` for the pass rate. Grid columns get `*` widths. | Medium (no gate covers it) |
 
 **Defaults chosen for the open questions** (change any of these if you want):
 1. Run Check stays the file's only Primary button; Auto Assign All is Secondary.
@@ -97,4 +123,19 @@ FOOTER (global)    Copyright · rule · status dot · status text | progress | P
 - The status text follows the page. The rail is disabled during a run; Pause/Stop work.
 - The chips show the active filter, and a re-run resets it to All.
 - The write options still drive Apply and Auto Assign. Ctrl+Z undoes one step.
-- The pane strips line up across the divider at MinWidth 1000.
+- The pane strips line up across the divider at MinWidth 1200.
+
+Phase 3:
+- `dgTypes`: the headers read FAMILY / TYPE / QTY / IFC ENTITY / SUBTYPE / STATUS in the T3 header style.
+  QTY is right-aligned in Consolas. TYPE fills the rest. Check how the grid looks at 1200 (MinWidth)
+  and 1250 px (default): TYPE is not clipped. Sorting, multi-select and Apply still work.
+- Component items: the name is 13 SemiBold, the count is Consolas on the right, and the info line is 11.5
+  muted. Selected and hover rows are not clipped.
+- Tree: the checkboxes and text are T3. Toggling a discipline or category still changes what Run Check
+  covers, and a click on a name does not toggle its checkbox.
+- Results: the discipline strips, the category meter and %, `n/a` for a no-elements category, and a
+  dot plus a status word on every row. Nothing is shown by colour alone, and there are no ✔ ✘ ⚠ ⏸ ▸ ►
+  glyphs; the Pick glyph renders (no tofu box).
+- Both Select buttons (category and row) select in Revit, and their hover state is the Ghost grey.
+  The filter chips, search and count strip are unchanged. A config with a few hundred checks renders
+  without a noticeable pause.

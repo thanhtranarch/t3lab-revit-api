@@ -4,7 +4,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="IFC-SG Suite"
         Width="1250" Height="820"
-        MinWidth="1000" MinHeight="650"
+        MinWidth="1200" MinHeight="650"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
