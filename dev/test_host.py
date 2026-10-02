@@ -171,17 +171,9 @@ def test_module_imports():
     except Exception as e:
         check('import PropertyLineDialog succeeded', False, str(e))
 
-    try:
-        from Selection import select_similar_family
-        check('import select_similar_family succeeded', True)
-    except Exception as e:
-        check('import select_similar_family succeeded', False, str(e))
-
-    try:
-        from Selection import super_select
-        check('import super_select succeeded', True)
-    except Exception as e:
-        check('import super_select succeeded', False, str(e))
+    # Selection.select_similar_family / super_select were removed with the old
+    # ManaSelect helpers (2026-10-02) — select_similar now lives in
+    # Snippets._similar.
 
 
 def test_stale_module_recovery():

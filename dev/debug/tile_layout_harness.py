@@ -2,7 +2,7 @@
 """
 Tile Layout engine harness — runs under CPython, no Revit required.
 
-    python3 "T3Lab.extension/lib/GUI/tile_layout_harness.py"
+    python3 dev/debug/tile_layout_harness.py
 
 Asserts the CORRECT hand-computed numbers, so on the pre-fix engine the
 failing tests double as the bug proof (see dev/plan/panel-2-modeling-datum.md,
@@ -17,7 +17,10 @@ import time
 
 # TileLayoutCore.py sits in the same folder (lib/GUI) as this harness
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
+REPO = os.path.dirname(os.path.dirname(HERE))
+LIB = os.path.join(REPO, 'T3Lab.extension', 'lib')
+sys.path.insert(0, os.path.join(LIB, 'GUI'))
+sys.path.insert(0, LIB)
 
 import math
 try:

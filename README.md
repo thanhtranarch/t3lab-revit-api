@@ -31,8 +31,6 @@ The tab exposes **7 panels**.
 
 | Tool | Description |
 |------|-------------|
-| **Auto Work** | Automation recorder & player — quick click at a fixed coordinate, or record and replay a full mouse sequence with timing. |
-| **UI Showcase** | Reference window for the T3Lab Lumina design standard (palette, typography, buttons, inputs). |
 
 ### Annotation & Select
 
@@ -70,8 +68,6 @@ The tab exposes **7 panels**.
 | **Mana Sched** | Schedule manager — export to Excel with formatting, import values back, duplicate schedules. |
 | **Mana Para** | Parameter manager — transfer values by rule, Text-to-Element assignment, values-to-filled-region. |
 | **Mana Contains** | Spatial containment — find elements inside Rooms/Areas/Spaces/Zones/Masses/Scope Boxes, push container values down or aggregate element data up. |
-| **BCF Reader** | Modeless BCF issue browser (IFC Delta Viewer exports) — click an issue to navigate the view. |
-| **Foundation Volume** | Write computed volume of Structural Foundations into a chosen shared parameter. |
 | **IFC-SG Suite** | Subtype Assigner (Excel mapping → IFC Export Class & Predefined Type) + Compliance Checker against CORENET X rules. |
 
 ### Standards & Settings
@@ -207,14 +203,11 @@ t3lab-revit-api/
 │   │   │   └── config/             # Learned patterns, feedback, teacher exemplars
 │   │   ├── Services/               # Exporters, MCP service, Revit context, spell checker
 │   │   ├── Selection/              # Element selection helpers
-│   │   ├── Renaming/               # Renaming engine classes
-│   │   ├── Snippets/               # 22 reusable Revit API code snippets
+│   │   ├── Snippets/               # Reusable Revit API helpers
 │   │   ├── Utils/                  # CAD/family helpers
 │   │   ├── config/                 # Settings, project store, user profile
-│   │   ├── core/                   # MCP server, ExternalEvent bridge, teaching capture, paths
-│   │   └── ui/                     # Button states, settings dialog
+│   │   └── core/                   # MCP server, ExternalEvent bridge, teaching capture, paths
 │   ├── checks/                     # Model checker script validations
-│   ├── commands/                   # Standalone command scripts
 │   ├── hooks/                      # pyRevit event hooks
 │   └── startup.py                  # Extension startup
 ├── api/                            # Cloud serverless functions (family metadata)

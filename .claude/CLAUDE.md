@@ -135,10 +135,8 @@ T3Lab.extension/
 │   │   ├── *Dialog.py  ← Python WPF dialog classes
 │   │   └── T3Lab_logo.png
 │   ├── Snippets/       ← reusable Revit API helpers
-│   ├── Renaming/       ← renaming tool library
 │   └── ...
-├── checks/             ← model checker scripts
-└── commands/           ← command scripts
+└── checks/             ← model checker scripts
 ```
 
 ## Example Workflow: New Tool
