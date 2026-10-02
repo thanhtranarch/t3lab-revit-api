@@ -1,5 +1,16 @@
 # CHANGE HISTORY — lịch sử các cycle
 
+## Icon trong cửa sổ — một bộ glyph — 2026-10-02
+
+Thêm `T3.Icon.Rail` (MDL2, cỡ 16, màu thừa kế từ tile). 52 ô rail ở 18 tool bỏ
+`<Path>` tự vẽ, dùng glyph theo bảng "Khái niệm trang" mới trong chuẩn UI. Glyph lẻ
+ngoài bảng đã về bảng; `ED1A` Hide (glyph của Segoe Fluent Icons, không có trong
+MDL2) đổi thành `F140`. Python GUI bỏ ký tự Unicode làm icon (✓ ✕ ⚠ ▶ ⏸ ● ★).
+`audit_t3.py` luật 22 thêm: rail vẽ Path (P2), glyph không có trong font (P1, theo
+`dev/icons/mdl2_codepoints.tsv`), glyph ngoài bảng (P3); soát cả `lib/GUI/**/*.py`.
+Test: `dev/test_audit_t3_icons.py`. IFCSG.xaml (2 ô rail), DWGManagement.xaml và
+T3LabAssistant.xaml chưa sync khối style. Chưa QA trong Revit.
+
 ## UI consistency review — 2026-10-01
 
 Reviewed 65 tool XAML plus Python-generated surfaces. Standardized source chips, seven fixed bars, export selection boxes/chevrons, runtime semantic colors and dynamic control styling. Fixed ManaSelect sidebar wrapper identity. Existing session changes preserved; no shared stylesheet or Revit model-processing changes. Gates and focused tests pass; Windows/Revit/DPI verification remains. See [report](REVIEW-2026-10-01-CONSISTENCY.md).

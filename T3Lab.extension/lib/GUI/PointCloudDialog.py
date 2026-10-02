@@ -144,8 +144,13 @@ def mm_to_ft(mm):
 import uuid
 from Snippets._compat import disposing
 
+# The pushbutton script importlib.reload()s this module on every click; a
+# fixed __namespace__ would define the same .NET type twice and raise
+# "Duplicate type name within an assembly" (rule S15).
+_NS_SUFFIX = uuid.uuid4().hex[:8]
+
 class PointCloudSelectionFilter(ISelectionFilter):
-    __namespace__ = "T3Lab.PointCloud"
+    __namespace__ = "T3Lab.PointCloud_" + _NS_SUFFIX
     def AllowElement(self, element):
         return isinstance(element, PointCloudInstance)
 
@@ -1295,7 +1300,7 @@ class PointCloudAnalyzer(object):
 # ── Section 6: ElementBuilder ─────────────────────────────────────────────────
 
 class WarningSwallower(IFailuresPreprocessor):
-    __namespace__ = "T3Lab.PointCloud_Warning"
+    __namespace__ = "T3Lab.PointCloud_Warning_" + _NS_SUFFIX
     """
     Suppress Revit's modal warning dialogs during batch creation.
 
@@ -1860,7 +1865,7 @@ class PointCloudModelWindow(T3WPFWindow):
                 w_m = ft_to_mm(self._custom_max_pt.X - self._custom_min_pt.X) / 1000.0
                 d_m = ft_to_mm(self._custom_max_pt.Y - self._custom_min_pt.Y) / 1000.0
                 self.lbl_region_info.Text = (
-                    u"✓ Region set: {:.1f} × {:.1f} m".format(w_m, d_m))
+                    u"Region set: {:.1f} × {:.1f} m".format(w_m, d_m))
                 self.lbl_region_info.Foreground = self._brush('#0B8A5A')
                 self.btn_pick_region.Content    = u"Re-pick Region"
             else:

@@ -121,24 +121,22 @@ class T3Dialog(_WPFWindow):
                 self.btn_cancel.Visibility = _Visibility.Collapsed
 
         # Configure Icon Glyph and Color
-        # Glyph codes from Segoe MDL2 Assets:
-        # Info:  (Info) or  (CheckMark)
-        # Warning:  (Warning)
-        # Danger/Error:  (ErrorBadge) or  (Cancel)
-        glyph = u""
+        # Segoe MDL2 glyphs from the T3 table (T3LAB_UI_STANDARD.md, section Icon):
+        # E946 Info · E7BA Warning · E783 Error
+        glyph = u"\uE946"
         fill_res = "T3.Success.Fill"
         fg_res = "T3.Success.Text"
 
         if mode == self.MODE_WARNING:
-            glyph = u""
+            glyph = u"\uE7BA"
             fill_res = "T3.Warning.Fill"
             fg_res = "T3.Warning.Text"
         elif mode == self.MODE_ERROR or danger:
-            glyph = u""
+            glyph = u"\uE783"
             fill_res = "T3.Danger.Fill"
             fg_res = "T3.Danger.Text"
         elif mode == self.MODE_CONFIRM:
-            glyph = u"" if danger else u""
+            glyph = u"\uE7BA" if danger else u"\uE946"
             fill_res = "T3.Warning.Fill" if danger else "T3.SurfaceSunken"
             fg_res = "T3.Warning.Text" if danger else "T3.Text"
 

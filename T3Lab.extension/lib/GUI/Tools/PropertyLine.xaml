@@ -222,6 +222,12 @@
                Cách dùng — icon LUÔN là <TextBlock>, không bao giờ là Content của Button:
                  <TextBlock Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
 
+               Ô rail (T3.Rail.Tile) cũng vậy — glyph T3.Icon.Rail, KHÔNG tự vẽ <Path>:
+                 <RadioButton x:Name="nav_browse" Style="{StaticResource T3.Rail.Tile}"
+                              ToolTip="Browse Parameters" ...>
+                   <TextBlock Text="&#xE8FD;" Style="{StaticResource T3.Icon.Rail}"/>
+                 </RadioButton>
+
                Bảng glyph chuẩn (dùng đúng glyph này cho đúng khái niệm, toàn dự án):
                  E721 Search      E8BB Close      E921 Minimize   E922 Maximize
                  E768 Play        E769 Pause      E71A Stop       E72C Refresh
@@ -230,13 +236,30 @@
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
                  E8A3 Zoom        E7B3 Isolate    E7C9 Pick       E7C3 Document
-                 E896 Download    EA80 Insight    ED1A Hide
+                 E896 Download/Export  EA80 Insight  F140 Hide    E923 Restore
+                 E74A ArrowUp (move to top, north)  E74B ArrowDown (move to bottom)
+                 E9A6 Fit (zoom to fit)  EA3A Open (unresolved)  E707 Map  E753 PointCloud
+
+               Khái niệm trang — glyph của ô rail chọn theo VIỆC trang đó làm:
+                 E8FD List/inventory   E9D5 Audit/checklist  E945 Automation
+                 E8B5 Import/load      E8AB Swap/transfer    E71B Link
+                 E8C8 Duplicate        E8AC Rename/renumber  E9E9 Template/preset
+                 E70F Edit/override    E81C History/log      E8A1 Preview/mockup
+                 E8F1 Families         E81E Worksets         E90F Tools/bulk edit
+                 F158 3D view          E95E Model health     E8EF Aggregate
+                 E790 Colour           E943 Code/JSON        ED5E Dimension
+                 E8D2 Text             E727 Pattern          E8EC Classify/assign
+                 E80F Room             E809 Floor            E80A Ceiling
+                 ECA5 Wall             E825 Column           E933 Beam
+                 E7B7 Grid             EF90 Line             E95F MEP run
+                 (+ E713 Settings · E896 Export · E7BA Warning · E74D Delete/purge)
 
                Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
                  1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
                     Search, nên Zoom phải là E8A3 (kính lúp có dấu +).
-                 2. Codepoint có thật trong font — glyph không tồn tại ra ô vuông tofu và
-                    audit_t3.py không bắt được, nó chỉ grep source.
+                 2. Codepoint có thật trong Segoe MDL2 Assets — glyph không tồn tại ra ô
+                    vuông tofu. audit_t3.py đối chiếu dev/icons/mdl2_codepoints.tsv
+                    (P1). ED1A Hide là glyph của Segoe Fluent Icons, KHÔNG có trong MDL2.
           -->
 
           <!-- Icon nền: cỡ Label (11), màu thừa kế từ control chứa nó. -->
@@ -271,6 +294,15 @@
             <Setter Property="FontSize"   Value="{StaticResource T3.Size.Caption}"/>
             <Setter Property="Margin"     Value="0,0,8,0"/>
             <Setter Property="VerticalAlignment" Value="Top"/>
+          </Style>
+
+          <!-- Icon của ô rail (T3.Rail.Tile, 42×42). Cỡ 16 = lưới thiết kế gốc của
+               Segoe MDL2 — nét rơi đúng pixel, sắc ở 100% lẫn 125%. Đây là cỡ ICON, không
+               thuộc thang 7 size chữ. KHÔNG set Foreground: glyph thừa kế màu từ tile
+               (T3.TextMuted → T3.Ink khi hover/checked) qua ContentPresenter. -->
+          <Style x:Key="T3.Icon.Rail" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
           </Style>
 
           <!-- ══════════════════ 6 · BUTTONS ══════════════════
@@ -1777,22 +1809,68 @@
                                                 <ColumnDefinition Width="1.8*"/>
                                             </Grid.ColumnDefinitions>
 
-                                            <!-- Col 0: Map Container -->
+                                            <!-- Col 0: Boundary map. PropertyLineDialog._render_map_preview draws
+                                                 the boundary from the polygon itself (always), then lays OSM tiles
+                                                 under it when the network allows (Snippets/_parcel_map.py).
+                                                 Layers, back to front: tiles · boundary · map furniture · notes. -->
                                             <Border Grid.Column="0" Background="{StaticResource T3.SurfaceSunken}" BorderBrush="{StaticResource T3.Border}"
                                                     BorderThickness="1" CornerRadius="4" ClipToBounds="True">
-                                                <Grid>
-                                                    <!-- Dynamic Map Image -->
-                                                    <Image x:Name="img_map_preview" Stretch="UniformToFill"/>
+                                                <Grid x:Name="grid_map_host" ClipToBounds="True" SizeChanged="grid_map_host_SizeChanged">
+                                                    <!-- Basemap tiles (Image elements added by code) -->
+                                                    <Canvas x:Name="cnv_map_tiles" IsHitTestVisible="False"/>
 
-                                                    <!-- Location Pin -->
-                                                    <TextBlock Text="&#xE707;" Style="{StaticResource T3.Icon.Lg}" Foreground="{StaticResource T3.Ink}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                                    <!-- Boundary: tinted fill, outline, vertex dots -->
+                                                    <Canvas IsHitTestVisible="False">
+                                                        <Path x:Name="path_map_fill" Fill="{StaticResource T3.Plot.4}" Opacity="0.16"/>
+                                                        <Path x:Name="path_map_boundary" Stroke="{StaticResource T3.Plot.4}"
+                                                              StrokeThickness="2" StrokeLineJoin="Round"/>
+                                                        <Path x:Name="path_map_vertices" Fill="{StaticResource T3.Surface}"
+                                                              Stroke="{StaticResource T3.Plot.4}" StrokeThickness="1.5"/>
+                                                    </Canvas>
 
-                                                    <!-- Map label badge -->
-                                                    <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
-                                                            BorderThickness="1" CornerRadius="2" Padding="8,4" Margin="8"
-                                                            HorizontalAlignment="Left" VerticalAlignment="Bottom">
-                                                        <TextBlock Text="Map Preview" Style="{StaticResource T3.Caption}"/>
+                                                    <!-- Map furniture: scale bar (top-left), north arrow (top-right) -->
+                                                    <Grid x:Name="grid_map_overlay" Visibility="Collapsed" IsHitTestVisible="False">
+                                                        <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
+                                                                BorderThickness="1" CornerRadius="2" Padding="8,4" Margin="8"
+                                                                HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                            <StackPanel>
+                                                                <TextBlock x:Name="txt_map_scale" Style="{StaticResource T3.Caption}"/>
+                                                                <Border x:Name="bar_map_scale" Height="4" Width="48" HorizontalAlignment="Left"
+                                                                        BorderBrush="{StaticResource T3.Ink}" BorderThickness="1,0,1,1"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <Border Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
+                                                                BorderThickness="1" CornerRadius="2" Padding="4" Margin="8"
+                                                                HorizontalAlignment="Right" VerticalAlignment="Top">
+                                                            <StackPanel>
+                                                                <TextBlock Text="&#xE74A;" Style="{StaticResource T3.Icon}" HorizontalAlignment="Center"/>
+                                                                <TextBlock Text="N" Style="{StaticResource T3.Caption}" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <!-- Basemap state (bottom-left, above the attribution line): loading /
+                                                         unavailable. Tooltip carries the reason. -->
+                                                    <Border x:Name="border_map_note" Background="{DynamicResource T3.Surface}" BorderBrush="{StaticResource T3.Border}"
+                                                            BorderThickness="1" CornerRadius="2" Padding="8,4" Margin="8,8,8,24"
+                                                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Visibility="Collapsed">
+                                                        <TextBlock x:Name="txt_map_note" Style="{StaticResource T3.Caption}"/>
                                                     </Border>
+
+                                                    <!-- OSM attribution, required whenever its tiles are on screen (bottom-right) -->
+                                                    <Border x:Name="border_map_attrib" Background="{DynamicResource T3.Surface}"
+                                                            Padding="4,0" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                            Visibility="Collapsed" IsHitTestVisible="False">
+                                                        <TextBlock Text="© OpenStreetMap contributors" Style="{StaticResource T3.Caption}"/>
+                                                    </Border>
+
+                                                    <!-- Empty state until a boundary is selected -->
+                                                    <StackPanel x:Name="pnl_map_empty" Margin="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                        <TextBlock Text="&#xE707;" Style="{StaticResource T3.Icon.Lg}" Foreground="{StaticResource T3.TextDisabled}"
+                                                                   HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                                        <TextBlock x:Name="txt_map_empty" Text="Search, then pick a result to preview its boundary"
+                                                                   Style="{StaticResource T3.Empty}"/>
+                                                    </StackPanel>
                                                 </Grid>
                                             </Border>
 
@@ -1807,14 +1885,19 @@
                                                                Style="{StaticResource T3.Empty}"/>
                                                 </Border>
 
-                                                <ListView x:Name="lv_parcels"
-                                                          Height="250"
-                                                          Style="{StaticResource T3.ListView}"
-                                                          VirtualizingPanel.IsVirtualizing="True"
-                                                          SelectionMode="Single"
-                                                          Visibility="Collapsed"
-                                                          SelectionChanged="lv_parcels_SelectionChanged">
-                                                    <ListView.ItemTemplate>
+                                                <!-- ListBox, not ListView: T3.ListViewItem draws a GridViewRowPresenter,
+                                                     which only renders GridView columns, so an ItemTemplate row came out
+                                                     blank. T3.ListBoxItem.Multiline presents the template and lets the
+                                                     two-line row grow past the 26px row height. -->
+                                                <ListBox x:Name="lv_parcels"
+                                                         Height="250"
+                                                         Style="{StaticResource T3.ListBox}"
+                                                         ItemContainerStyle="{StaticResource T3.ListBoxItem.Multiline}"
+                                                         VirtualizingPanel.IsVirtualizing="True"
+                                                         SelectionMode="Single"
+                                                         Visibility="Collapsed"
+                                                         SelectionChanged="lv_parcels_SelectionChanged">
+                                                    <ListBox.ItemTemplate>
                                                         <DataTemplate>
                                                             <Grid Margin="0,4">
                                                                 <Grid.ColumnDefinitions>
@@ -1837,8 +1920,8 @@
                                                                 </Border>
                                                             </Grid>
                                                         </DataTemplate>
-                                                    </ListView.ItemTemplate>
-                                                </ListView>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
 
                                             </Grid>
                                         </Grid>

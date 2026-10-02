@@ -1010,7 +1010,7 @@ class BCFManagerWindow(WPFWindow):
         else:
             thumb_grid.Children.Add(self._placeholder_thumb())
 
-        # Badge: ● Label
+        # Badge: coloured T3.Dot + label (status never by colour alone)
         badge = Border()
         badge.Background = self._brush("#FFFFFF")
         badge.BorderBrush = self._brush(COLOR_CARD_BORDER)
@@ -1022,12 +1022,17 @@ class BCFManagerWindow(WPFWindow):
         badge.VerticalAlignment = VerticalAlignment.Top
         badge_sp = StackPanel()
         badge_sp.Orientation = Orientation.Horizontal
-        dot = TextBlock()
-        dot.Text = u"\u25CF"
-        dot.Foreground = self._brush(LABEL_COLORS.get(issue.label, COLOR_OTHER))
-        dot.FontSize = 12
+        # A real dot (Ellipse, T3.Dot), not the Unicode "\u25CF" character —
+        # T3 rule 22: no Unicode characters as icons.
+        from System.Windows.Shapes import Ellipse
+        dot = Ellipse()
+        try:
+            dot.Style = self.FindResource("T3.Dot")
+        except Exception:
+            dot.Width = dot.Height = 6
+            dot.VerticalAlignment = VerticalAlignment.Center
+        dot.Fill = self._brush(LABEL_COLORS.get(issue.label, COLOR_OTHER))
         dot.Margin = Thickness(0, 0, 4, 0)
-        dot.VerticalAlignment = VerticalAlignment.Center
         badge_sp.Children.Add(dot)
         badge_tb = TextBlock()
         badge_tb.Text = issue.label.title() if issue.label != "OTHER" else "Other"

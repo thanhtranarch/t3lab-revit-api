@@ -219,6 +219,12 @@
                Cách dùng — icon LUÔN là <TextBlock>, không bao giờ là Content của Button:
                  <TextBlock Text="&#xE721;" Style="{StaticResource T3.Icon.Field}"/>
 
+               Ô rail (T3.Rail.Tile) cũng vậy — glyph T3.Icon.Rail, KHÔNG tự vẽ <Path>:
+                 <RadioButton x:Name="nav_browse" Style="{StaticResource T3.Rail.Tile}"
+                              ToolTip="Browse Parameters" ...>
+                   <TextBlock Text="&#xE8FD;" Style="{StaticResource T3.Icon.Rail}"/>
+                 </RadioButton>
+
                Bảng glyph chuẩn (dùng đúng glyph này cho đúng khái niệm, toàn dự án):
                  E721 Search      E8BB Close      E921 Minimize   E922 Maximize
                  E768 Play        E769 Pause      E71A Stop       E72C Refresh
@@ -227,13 +233,30 @@
                  E70D ChevronDown E70E ChevronUp  E76B ChevronLeft E76C ChevronRight
                  E74E Save        E8E5 OpenFile   E774 Globe      E7A7 Undo
                  E8A3 Zoom        E7B3 Isolate    E7C9 Pick       E7C3 Document
-                 E896 Download    EA80 Insight    ED1A Hide
+                 E896 Download/Export  EA80 Insight  F140 Hide    E923 Restore
+                 E74A ArrowUp (move to top, north)  E74B ArrowDown (move to bottom)
+                 E9A6 Fit (zoom to fit)  EA3A Open (unresolved)  E707 Map  E753 PointCloud
+
+               Khái niệm trang — glyph của ô rail chọn theo VIỆC trang đó làm:
+                 E8FD List/inventory   E9D5 Audit/checklist  E945 Automation
+                 E8B5 Import/load      E8AB Swap/transfer    E71B Link
+                 E8C8 Duplicate        E8AC Rename/renumber  E9E9 Template/preset
+                 E70F Edit/override    E81C History/log      E8A1 Preview/mockup
+                 E8F1 Families         E81E Worksets         E90F Tools/bulk edit
+                 F158 3D view          E95E Model health     E8EF Aggregate
+                 E790 Colour           E943 Code/JSON        ED5E Dimension
+                 E8D2 Text             E727 Pattern          E8EC Classify/assign
+                 E80F Room             E809 Floor            E80A Ceiling
+                 ECA5 Wall             E825 Column           E933 Beam
+                 E7B7 Grid             EF90 Line             E95F MEP run
+                 (+ E713 Settings · E896 Export · E7BA Warning · E74D Delete/purge)
 
                Thêm glyph mới thì kiểm hai thứ (xem mục Icon của T3LAB_UI_STANDARD.md):
                  1. Không TRÔNG GIỐNG glyph đã có — E71E cũng là kính lúp y hệt E721
                     Search, nên Zoom phải là E8A3 (kính lúp có dấu +).
-                 2. Codepoint có thật trong font — glyph không tồn tại ra ô vuông tofu và
-                    audit_t3.py không bắt được, nó chỉ grep source.
+                 2. Codepoint có thật trong Segoe MDL2 Assets — glyph không tồn tại ra ô
+                    vuông tofu. audit_t3.py đối chiếu dev/icons/mdl2_codepoints.tsv
+                    (P1). ED1A Hide là glyph của Segoe Fluent Icons, KHÔNG có trong MDL2.
           -->
 
           <!-- Icon nền: cỡ Label (11), màu thừa kế từ control chứa nó. -->
@@ -268,6 +291,15 @@
             <Setter Property="FontSize"   Value="{StaticResource T3.Size.Caption}"/>
             <Setter Property="Margin"     Value="0,0,8,0"/>
             <Setter Property="VerticalAlignment" Value="Top"/>
+          </Style>
+
+          <!-- Icon của ô rail (T3.Rail.Tile, 42×42). Cỡ 16 = lưới thiết kế gốc của
+               Segoe MDL2 — nét rơi đúng pixel, sắc ở 100% lẫn 125%. Đây là cỡ ICON, không
+               thuộc thang 7 size chữ. KHÔNG set Foreground: glyph thừa kế màu từ tile
+               (T3.TextMuted → T3.Ink khi hover/checked) qua ContentPresenter. -->
+          <Style x:Key="T3.Icon.Rail" TargetType="TextBlock" BasedOn="{StaticResource T3.Icon}">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
           </Style>
 
           <!-- ══════════════════ 6 · BUTTONS ══════════════════
@@ -1748,11 +1780,7 @@
                                   Style="{StaticResource T3.Rail.Tile}"
                                   Margin="0,0,0,8" IsChecked="True"
                                   ToolTip="Family Management" Click="nav_toggle_clicked">
-                        <Path Data="M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Text="&#xE8F1;" Style="{StaticResource T3.Icon.Rail}"/>
                     </ToggleButton>
 
                     <!-- Mode 1: Family Loader -->
@@ -1760,11 +1788,7 @@
                                   Style="{StaticResource T3.Rail.Tile}"
                                   Margin="0,0,0,8"
                                   ToolTip="Family Loader" Click="nav_toggle_clicked">
-                        <Path Data="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01l8.73-5.05 M12 22.08V12"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                              StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="18" Height="18" Stretch="Uniform"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Text="&#xE8B5;" Style="{StaticResource T3.Icon.Rail}"/>
                     </ToggleButton>
                 </Grid>
             </Border>
@@ -2056,135 +2080,252 @@
                                 <RowDefinition Height="Auto"/> <!-- Action Bar -->
                             </Grid.RowDefinitions>
 
-                            <!-- Row 0: Search & Folder Selection Strip -->
+                            <!-- Row 0: Toolbar — source folder on the left (where the
+                                 categories pane starts), search on the right (above the
+                                 cards it filters). Same 45px strip as Tab 0: 8 + 28 + 8 +
+                                 1px rule. No guidance sentence here — that lives in the
+                                 empty states below. -->
                             <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
                                     BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
                                     Padding="16,8">
-                                <Grid>
+                                <Grid Height="{StaticResource T3.H.Control}">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="320"/>
-                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="280"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Search Input -->
-                                    <TextBox x:Name="txt_search" Grid.Column="0"
-                                             Style="{StaticResource T3.Search}"
-                                             Tag="Search families…"
-                                             Height="28"/>
+                                    <!-- Folder selector -->
+                                    <Button x:Name="btn_select_folder" Grid.Column="0"
+                                            Style="{StaticResource T3.Button.Secondary}"
+                                            Height="28" Padding="12,0"
+                                            ToolTip="Choose the folder that holds your .rfa files">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8E5;" Style="{StaticResource T3.Icon.Lead}"/>
+                                            <TextBlock Text="Choose Folder" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
 
-                                    <!-- Folder Path & Selector -->
-                                    <DockPanel Grid.Column="2" VerticalAlignment="Center">
-                                        <Button x:Name="btn_select_folder" Content="Update Folder"
-                                                Style="{StaticResource T3.Button.Secondary}"
-                                                Height="28" Padding="12,0" DockPanel.Dock="Left"/>
-                                        <TextBlock x:Name="txt_current_folder" Text="No folder selected"
-                                                   Style="{StaticResource T3.Caption}"
-                                                   VerticalAlignment="Center" Margin="12,0,0,0"
-                                                   TextTrimming="CharacterEllipsis"/>
-                                    </DockPanel>
+                                    <!-- Current folder path (scan progress is appended by Python) -->
+                                    <TextBlock x:Name="txt_current_folder" Grid.Column="1"
+                                               Text="No folder selected"
+                                               Style="{StaticResource T3.Body.Secondary}"
+                                               Margin="12,0,16,0"
+                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+
+                                    <!-- Search -->
+                                    <TextBox x:Name="txt_search" Grid.Column="2"
+                                             Style="{StaticResource T3.Search}"
+                                             Tag="Search families…"/>
                                 </Grid>
                             </Border>
 
-                            <!-- Row 1: Split View: Categories Tree (Left) + Family Cards (Right) -->
+                            <!-- Row 1: Split — categories | family cards.
+                                 Left pane is 300 wide, same as the Batch Operations settings
+                                 pane, so the divider does not jump when the rail switches page.
+                                 Both header strips use the toolbar geometry (8 + 28 + 8 + 1px
+                                 rule = 45px), so they read as one row across the divider. -->
                             <Grid Grid.Row="1">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="220"/>
-                                    <ColumnDefinition Width="1"/>
+                                    <ColumnDefinition Width="300"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Left: Categories TreeView -->
-                                <Grid Grid.Column="0" Background="{StaticResource T3.Surface}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="16,8">
-                                        <TextBlock Text="CATEGORIES" Style="{StaticResource T3.Label}"/>
-                                    </Border>
-                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                                        <TreeView x:Name="tree_categories" BorderThickness="0" Background="Transparent" Padding="8"/>
-                                    </ScrollViewer>
-                                </Grid>
+                                <!-- Left: categories panel — header, tree and empty state in one
+                                     T3.Panel (rule 19). Docked flush in the window, so no radius;
+                                     its 1px right edge is the divider between the panes. -->
+                                <Border Grid.Column="0" Style="{StaticResource T3.Panel}"
+                                        Padding="0" CornerRadius="0" BorderThickness="0,0,1,0"
+                                        ClipToBounds="True">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
 
-                                <!-- Zero-Gap Divider -->
-                                <Border Grid.Column="1" Background="{StaticResource T3.Border}"/>
+                                        <!-- Header: title + folder count -->
+                                        <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
+                                                BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                                                Padding="16,8">
+                                            <Grid Height="{StaticResource T3.H.Control}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Categories"
+                                                           Style="{StaticResource T3.BodyStrong}"/>
+                                                <TextBlock x:Name="txt_category_count" Grid.Column="1" Text="0"
+                                                           Style="{StaticResource T3.Mono}"
+                                                           ToolTip="Folders found under the chosen folder"/>
+                                            </Grid>
+                                        </Border>
 
-                                <!-- Right: Family Cards Grid -->
-                                <Grid Grid.Column="2" Background="{StaticResource T3.Surface}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
+                                        <!-- Tree: T3.TreeView scrolls and virtualizes by itself —
+                                             never wrap it in a ScrollViewer. -->
+                                        <TreeView x:Name="tree_categories" Grid.Row="1"
+                                                  Style="{StaticResource T3.TreeView}"/>
 
-                                    <!-- Filter Toolbar -->
-                                    <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
-                                            BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
-                                            Padding="16,8">
-                                        <Grid>
-                                            <TextBlock x:Name="txt_result_count" Text="0 families found"
-                                                       Style="{StaticResource T3.BodyStrong}"
-                                                       VerticalAlignment="Center" HorizontalAlignment="Left"/>
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                <Button x:Name="btn_select_all_loader" Content="Select All"
-                                                        Style="{StaticResource T3.Button.Secondary}"
-                                                        Height="28" Padding="12,0" Margin="0,0,8,0"/>
-                                                <Button x:Name="btn_select_none_loader" Content="Select None"
-                                                        Style="{StaticResource T3.Button.Secondary}"
-                                                        Height="28" Padding="12,0"/>
+                                        <!-- Empty state: shown while the tree has no nodes (no
+                                             folder yet, scanning, scan stopped, no .rfa found).
+                                             ManaFamiDialog._update_loader_empty_states words it. -->
+                                        <Grid Grid.Row="1" Margin="16">
+                                            <Grid.Style>
+                                                <Style TargetType="Grid">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasItems, ElementName=tree_categories}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Grid.Style>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock x:Name="txt_categories_empty_title" Text="No categories yet"
+                                                           Style="{StaticResource T3.BodyStrong}"
+                                                           HorizontalAlignment="Center"/>
+                                                <TextBlock x:Name="txt_categories_empty_hint"
+                                                           Text="Subfolders of the chosen folder appear here."
+                                                           Style="{StaticResource T3.Empty}" Margin="0,4,0,0"/>
                                             </StackPanel>
                                         </Grid>
-                                    </Border>
+                                    </Grid>
+                                </Border>
 
-                                    <!-- Cards Scrollable Area -->
-                                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"
-                                                  VerticalScrollBarVisibility="Auto" Padding="16">
-                                        <ItemsControl x:Name="items_families">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Width="152" Margin="8">
-                                                        <Border Height="140" CornerRadius="4" Cursor="Hand"
-                                                                BorderThickness="1" BorderBrush="{StaticResource T3.Border}"
-                                                                Background="{StaticResource T3.Surface}">
-                                                            <Border.Style>
-                                                                <Style TargetType="Border">
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsChecked}" Value="True">
-                                                                            <Setter Property="BorderBrush" Value="{StaticResource T3.Ink}"/>
-                                                                            <Setter Property="BorderThickness" Value="2"/>
-                                                                            <Setter Property="Background" Value="{StaticResource T3.SurfaceSunken}"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Border.Style>
-                                                            <Grid>
-                                                                <Border Background="{StaticResource T3.SurfaceSunken}"/>
-                                                                <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="8"/>
+                                <!-- Right: families panel — header, cards and empty state in one
+                                     T3.Panel (rule 19). -->
+                                <Border Grid.Column="1" Style="{StaticResource T3.Panel}"
+                                        Padding="0" CornerRadius="0" BorderThickness="0"
+                                        ClipToBounds="True">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Header: result count + All / None (ghost, P2) -->
+                                        <Border Grid.Row="0" Background="{StaticResource T3.SurfaceSunken}"
+                                                BorderBrush="{StaticResource T3.Border}" BorderThickness="0,0,0,1"
+                                                Padding="16,8">
+                                            <Grid Height="{StaticResource T3.H.Control}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="txt_result_count" Grid.Column="0"
+                                                           Text="0 families found"
+                                                           Style="{StaticResource T3.BodyStrong}"/>
+                                                <!-- Nothing to tick while no card is shown: both
+                                                     buttons grey out with the empty state. -->
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                    <StackPanel.Style>
+                                                        <Style TargetType="StackPanel">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasItems, ElementName=items_families}" Value="False">
+                                                                    <Setter Property="IsEnabled" Value="False"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </StackPanel.Style>
+                                                    <Button x:Name="btn_select_all_loader" Content="Select All"
+                                                            Style="{StaticResource T3.Button.Ghost}"
+                                                            Height="28" Padding="12,0" Margin="0,0,4,0"
+                                                            ToolTip="Tick every family shown below"/>
+                                                    <Button x:Name="btn_select_none_loader" Content="Select None"
+                                                            Style="{StaticResource T3.Button.Ghost}"
+                                                            Height="28" Padding="12,0"
+                                                            ToolTip="Untick every family shown below"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Cards. Each card carries an 8px margin, so this padding
+                                             puts the card edges at 16 / 16 / 12 / 16 (rule 16) and
+                                             the first card lines up with the header text. -->
+                                        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"
+                                                      VerticalScrollBarVisibility="Auto" Padding="8,8,4,8">
+                                            <ItemsControl x:Name="items_families">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Width="152" Margin="8">
+                                                            <Border Height="140" CornerRadius="4" Cursor="Hand"
+                                                                    BorderThickness="1" BorderBrush="{StaticResource T3.Border}"
+                                                                    Background="{StaticResource T3.Surface}">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsChecked}" Value="True">
+                                                                                <Setter Property="BorderBrush" Value="{StaticResource T3.Ink}"/>
+                                                                                <Setter Property="BorderThickness" Value="2"/>
+                                                                                <Setter Property="Background" Value="{StaticResource T3.SurfaceSunken}"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
                                                                 <Grid>
-                                                                    <TextBlock x:Name="row_is_checked_text" Text="{Binding IsChecked}" Visibility="Collapsed"/>
-                                                                    <CheckBox IsChecked="{Binding Text, ElementName=row_is_checked_text, Mode=OneWay}"
-                                                                              VerticalAlignment="Top" HorizontalAlignment="Left"
-                                                                              Margin="8" Style="{StaticResource T3.CheckBox}"/>
+                                                                    <Border Background="{StaticResource T3.SurfaceSunken}"/>
+                                                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="8"/>
+                                                                    <Grid>
+                                                                        <TextBlock x:Name="row_is_checked_text" Text="{Binding IsChecked}" Visibility="Collapsed"/>
+                                                                        <CheckBox IsChecked="{Binding Text, ElementName=row_is_checked_text, Mode=OneWay}"
+                                                                                  VerticalAlignment="Top" HorizontalAlignment="Left"
+                                                                                  Margin="8" Style="{StaticResource T3.CheckBox}"/>
+                                                                    </Grid>
                                                                 </Grid>
-                                                            </Grid>
-                                                        </Border>
-                                                        <TextBlock Text="{Binding Name}" Style="{StaticResource T3.Caption}"
-                                                                   TextWrapping="Wrap" MaxHeight="32" Margin="0,4,0,0"
-                                                                   ToolTip="{Binding FullPath}"/>
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Name}" Style="{StaticResource T3.Caption}"
+                                                                       TextWrapping="Wrap" MaxHeight="32" Margin="0,4,0,0"
+                                                                       ToolTip="{Binding FullPath}"/>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+
+                                        <!-- Empty state: shown while no card is shown. Icon, title,
+                                             hint and whether the Choose Folder button shows are set
+                                             per scan phase by ManaFamiDialog._update_loader_empty_states
+                                             (no folder / scanning / no .rfa found / no match). -->
+                                        <Grid Grid.Row="1" Margin="24">
+                                            <Grid.Style>
+                                                <Style TargetType="Grid">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasItems, ElementName=items_families}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Grid.Style>
+                                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                        MaxWidth="360">
+                                                <TextBlock x:Name="txt_families_empty_icon" Text="&#xE8E5;"
+                                                           Style="{StaticResource T3.Icon.Lg}"
+                                                           Foreground="{StaticResource T3.TextDisabled}"
+                                                           HorizontalAlignment="Center"/>
+                                                <TextBlock x:Name="txt_families_empty_title" Text="No folder loaded"
+                                                           Style="{StaticResource T3.BodyStrong}"
+                                                           HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                                                <TextBlock x:Name="txt_families_empty_hint"
+                                                           Text="Choose a folder of .rfa files. Its subfolders become the categories on the left."
+                                                           Style="{StaticResource T3.Empty}" Margin="0,4,0,0"/>
+                                                <Button x:Name="btn_empty_select_folder"
+                                                        Style="{StaticResource T3.Button.Secondary}"
+                                                        HorizontalAlignment="Center" Margin="0,16,0,0"
+                                                        ToolTip="Choose the folder that holds your .rfa files">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="&#xE8E5;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                        <TextBlock Text="Choose Folder" VerticalAlignment="Center"/>
                                                     </StackPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </ScrollViewer>
-                                </Grid>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
                             </Grid>
 
                             <!-- Row 2: Loader Action Bar -->

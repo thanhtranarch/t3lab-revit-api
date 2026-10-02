@@ -26,12 +26,12 @@ from System.Windows import Window, Thickness, Visibility, WindowState
 from System.Windows import MessageBox as WPFMessageBox
 from System.Windows import MessageBoxButton, MessageBoxResult, MessageBoxImage
 from System.Windows.Markup import XamlReader
-from System.Windows.Media import BrushConverter, SolidColorBrush, Color
 from System.Windows.Controls import (
     DataGridTextColumn, ComboBox, TreeViewItem, StackPanel, TextBlock,
     CheckBox, Button, Grid, ColumnDefinition, RowDefinition,
-    ListBoxItem, Border, Orientation, DockPanel
+    ListBoxItem, Border, Orientation, DockPanel, ProgressBar
 )
+from System.Windows.Shapes import Ellipse
 from System.Windows.Data import Binding
 from System.Windows.Forms import OpenFileDialog, SaveFileDialog, DialogResult as WFDialogResult
 from System.Xml import XmlReader
@@ -49,8 +49,6 @@ from Snippets._compat import make_eid, eid_value
 # Dynamically find the XAML layout
 _XAML = os.path.join(os.path.dirname(__file__), 'Tools', 'IFCSG.xaml')
 col_map_xaml_path = os.path.join(os.path.dirname(__file__), 'Tools', 'SubtypeDefinerColMap.xaml')
-
-bc = BrushConverter()
 
 # Global variables for Revit session (initialized when showing the dialog)
 doc = None
@@ -1062,7 +1060,6 @@ class IFCSGSuiteWindow(T3WPFWindow):
         self.chkSetObjectType = self.FindName("chkSetObjectType")
 
         self._setup_assigner_columns()
-        self._style_assigner_column_headers()
 
         # Event Handlers for Tab 1
         self.lstComponents.SelectionChanged += self._on_comp_selected
@@ -1115,6 +1112,16 @@ class IFCSGSuiteWindow(T3WPFWindow):
         self.btnRunCheck = self.FindName("btnRunCheck")
         self.btnExportExcel = self.FindName("btnExportExcel")
 
+        # Shared page shell (IFCSG.xaml): footer status dot, count strips and the
+        # results empty state. All optional — every use below is None-guarded.
+        self.status_dot = self.FindName("status_dot")
+        self._dot_kind = "idle"
+        self.txtTypesCount = self.FindName("txtTypesCount")
+        self.dgTypes_empty = self.FindName("dgTypes_empty")
+        self.txtTreeCount = self.FindName("txtTreeCount")
+        self.txtResultsCount = self.FindName("txtResultsCount")
+        self.spResults_empty = self.FindName("spResults_empty")
+
         # Event Handlers for Tab 2
         self.btnImportXML.Click += self._on_import_xml
         self.btnImportExcel.Click += self._on_import_excel
@@ -1162,7 +1169,20 @@ class IFCSGSuiteWindow(T3WPFWindow):
                     os.makedirs(d)
                 except:
                     pass
+        # The Checker's own opening status; _on_config_changed overwrites it
+        # when a saved config loads (or fails to).
+        self.txtStatus.Text = "Import an XML or Excel config to start"
         self._load_saved_configs()
+
+        # One footer, two pages: remember each page's status line so the
+        # Checker's "Config loaded…" does not show on the Assigner at open.
+        self._current_page = 0
+        self._page_status = {
+            0: ("Load a mapping Excel to start", "idle"),
+            1: (self.txtStatus.Text, self._dot_kind),
+        }
+        self.txtStatus.Text = self._page_status[0][0]
+        self._set_status_dot(self._page_status[0][1])
 
         # Force initial tab content to render: btn_tab_assigner.IsChecked was already
         # True when the XAML was parsed, so its Checked event fired before the
@@ -1188,48 +1208,99 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
     def _on_tab_changed(self, sender, e):
         if self.btn_tab_assigner.IsChecked:
-            self.main_tab_control.SelectedIndex = 0
+            new_page = 0
         elif self.btn_tab_checker.IsChecked:
-            self.main_tab_control.SelectedIndex = 1
+            new_page = 1
+        else:
+            return
+        # Save the page we leave, restore the page we enter (status text + dot).
+        old_page = getattr(self, "_current_page", None)
+        pages = getattr(self, "_page_status", None)
+        if pages is not None and old_page is not None and old_page != new_page:
+            pages[old_page] = (self.txtStatus.Text, self._dot_kind)
+            text, kind = pages.get(new_page, ("Ready", "idle"))
+            self.txtStatus.Text = text
+            self._set_status_dot(kind)
+        self._current_page = new_page
+        self.main_tab_control.SelectedIndex = new_page
+
+    # Footer status dot: colour always sits next to the status sentence, never alone.
+    _DOT_KEYS = {
+        "idle": "T3.TextDisabled",
+        "running": "T3.Progress.Fill",
+        "ok": "T3.Success.Accent",
+        "warning": "T3.Warning.Accent",
+        "error": "T3.Danger.Accent",
+    }
+
+    def _set_status_dot(self, kind):
+        self._dot_kind = kind
+        dot = getattr(self, "status_dot", None)
+        if dot is None:
+            return
+        try:
+            dot.Fill = self.FindResource(self._DOT_KEYS.get(kind, "T3.TextDisabled"))
+        except Exception:
+            pass
+
+    # T3 resources for the visuals built in Python (component rows, category tree,
+    # results list). Colours, font sizes and weights come only from these keys,
+    # never from hex or raw numbers, so the Python-built rows match the XAML.
+    def _t3(self, key, fallback=None):
+        """`T3.*` resource by its dot-notation key (rule 21). Looked up once per
+        window and cached; a missing key returns `fallback`, never raises."""
+        cache = getattr(self, "_t3_cache", None)
+        if cache is None:
+            cache = {}
+            self._t3_cache = cache
+        if key in cache:
+            return cache[key]
+        try:
+            value = self.FindResource(key)
+        except Exception:
+            value = None
+        if value is None:
+            value = fallback
+        cache[key] = value
+        return value
+
+    def _t3_style(self, element, key):
+        """Apply the `T3.*` style `key` to `element` if the resource exists."""
+        style = self._t3(key)
+        if style is not None:
+            element.Style = style
+        return element
 
     # ==============================================================================
     # Tab 1: Subtype Assigner Logic
     # ==============================================================================
 
     def _setup_assigner_columns(self):
-        from System.Windows.Controls import DataGridLength
+        from System.Windows.Controls import DataGridLength, DataGridLengthUnitType
+        # T3 layout rule 3: one * column (TYPE) so the grid always reaches the right
+        # edge; every other column is fixed. Header look comes from T3.DataGrid.
+        # Fixed columns total 640 px; the window MinWidth (1200, IFCSG.xaml) keeps
+        # TYPE at >= ~160 px — at 1000 the pane is 619 px and TYPE collapsed.
         cols = [
-            ("Family", "Family", 190),
-            ("Type", "TypeName", 180),
-            ("Qty", "Count", 45),
-            ("Current IFC Entity", "CurEntity", 160),
-            ("Current Subtype", "CurSubtype", 140),
-            ("Status", "Status", 65),
+            ("FAMILY", "Family", 140),
+            ("TYPE", "TypeName", None),
+            ("QTY", "Count", 70),
+            ("IFC ENTITY", "CurEntity", 140),
+            ("SUBTYPE", "CurSubtype", 140),
+            ("STATUS", "Status", 150),
         ]
+        number_style = self._t3("T3.Cell.Number")  # Consolas, right-aligned
         for header, binding_path, width in cols:
             col = DataGridTextColumn()
             col.Header = header
             col.Binding = Binding(binding_path)
-            col.Width = DataGridLength(width)
+            if width is None:
+                col.Width = DataGridLength(1.0, DataGridLengthUnitType.Star)
+            else:
+                col.Width = DataGridLength(width)
+            if binding_path == "Count" and number_style is not None:
+                col.ElementStyle = number_style
             self.dgTypes.Columns.Add(col)
-
-    def _style_assigner_column_headers(self):
-        try:
-            from System.Windows import Style as WPFStyle, Setter
-            from System.Windows.Controls.Primitives import DataGridColumnHeader
-            from System.Windows.Controls import Control
-            
-            style = WPFStyle(DataGridColumnHeader)
-            style.Setters.Add(Setter(Control.BackgroundProperty, bc.ConvertFromString("#FFFFFF")))
-            style.Setters.Add(Setter(Control.ForegroundProperty, bc.ConvertFromString("#9A9AA2")))
-            style.Setters.Add(Setter(Control.FontWeightProperty, System.Windows.FontWeights.Bold))
-            style.Setters.Add(Setter(Control.FontSizeProperty, 11.0))
-            style.Setters.Add(Setter(Control.PaddingProperty, Thickness(10, 8, 10, 8)))
-            style.Setters.Add(Setter(Control.BorderBrushProperty, bc.ConvertFromString("#E2E8F0")))
-            style.Setters.Add(Setter(Control.BorderThicknessProperty, Thickness(0, 0, 0, 1)))
-            self.dgTypes.ColumnHeaderStyle = style
-        except:
-            pass
 
     def _populate_datagrid(self, rows):
         clr.AddReference("System.Data")
@@ -1255,6 +1326,21 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
         self.dgTypes.ItemsSource = dt.DefaultView
 
+        # Count strip + empty-state wording (the overlay itself follows HasItems in XAML)
+        n = len(rows)
+        if self.dgTypes_empty is not None and self.current_comp:
+            self.dgTypes_empty.Text = ("No Revit types in this model belong to "
+                                       "this component's Revit categories.")
+        if self.txtTypesCount is not None:
+            if not self.current_comp:
+                self.txtTypesCount.Text = "Ctrl+Click or Shift+Click to select several types"
+            elif not n:
+                self.txtTypesCount.Text = "0 types"
+            else:
+                assigned = len([r for r in rows if r.Status == "OK"])
+                self.txtTypesCount.Text = "{} type{} | {} assigned | Ctrl+Click or Shift+Click to select several".format(
+                    n, "" if n == 1 else "s", assigned)
+
     def _on_load_excel(self, sender, args):
         dlg = OpenFileDialog()
         dlg.Title = "Select IFC-SG Industry Mapping Excel"
@@ -1262,12 +1348,15 @@ class IFCSGSuiteWindow(T3WPFWindow):
         if dlg.ShowDialog() != WFDialogResult.OK:
             return
 
+        # txtHeader is the MAPPING line of the toolbar: on a failed load it goes
+        # back to whatever mapping is still in use ("No mapping loaded" at first).
+        prev_header = self.txtHeader.Text
         self.txtHeader.Text = "Reading Excel headers..."
         self.UpdateLayout()
 
         mapping = load_mapping_with_dialog(dlg.FileName)
         if not mapping:
-            self.txtHeader.Text = "Load Industry Mapping Excel to start"
+            self.txtHeader.Text = prev_header
             return
 
         self.mapping = mapping
@@ -1275,6 +1364,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
         fname = System.IO.Path.GetFileName(dlg.FileName)
         self.txtHeader.Text = "Loaded: {} ({} components)".format(fname, len(mapping))
         self._populate_component_list()
+        self.txtStatus.Text = "{} components loaded. Select one to list its Revit types.".format(len(mapping))
 
     def _populate_component_list(self):
         self._comp_names = []
@@ -1314,39 +1404,23 @@ class IFCSGSuiteWindow(T3WPFWindow):
             len(self.mapping), total_elems)
 
     def _make_comp_listitem(self, comp_name, count, entity_str, sub_count):
-        from System.Windows.Controls import (
-            StackPanel as WPFStackPanel, TextBlock as WPFTextBlock,
-            Border as WPFBorder, Orientation, DockPanel
-        )
-        from System.Windows import (
-            Thickness as WPFThickness, HorizontalAlignment,
-            VerticalAlignment as WPFVAlign, FontWeights
-        )
-
-        sp = WPFStackPanel()
-        sp.Margin = WPFThickness(2, 3, 2, 3)
+        """Two-line component row: name + element count, then IFC entities and
+        subtype count. lstComponents uses T3.ListBoxItem.Multiline (IFCSG.xaml),
+        so the second line is not clipped. Styles are cached by _t3()."""
+        sp = StackPanel()
+        sp.Margin = Thickness(0, 4, 0, 4)
 
         row1 = DockPanel()
 
-        badge = WPFBorder()
-        badge.Background = bc.ConvertFromString("#E2E8F0")
-        badge.CornerRadius = System.Windows.CornerRadius(4)
-        badge.Padding = WPFThickness(6, 1, 6, 1)
-        badge.Margin = WPFThickness(4, 0, 0, 0)
-        DockPanel.SetDock(badge, System.Windows.Controls.Dock.Right)
-        badge_text = WPFTextBlock()
-        badge_text.Text = str(count)
-        badge_text.FontSize = 9.5
-        badge_text.Foreground = bc.ConvertFromString("#0F172A")
-        badge_text.HorizontalAlignment = HorizontalAlignment.Center
-        badge.Child = badge_text
-        row1.Children.Add(badge)
+        # Element count: a number, so Consolas and right-aligned (T3 layout rule 5)
+        count_tb = self._t3_style(TextBlock(), "T3.Mono")
+        count_tb.Text = str(count)
+        count_tb.Margin = Thickness(8, 0, 0, 0)
+        DockPanel.SetDock(count_tb, System.Windows.Controls.Dock.Right)
+        row1.Children.Add(count_tb)
 
-        name_tb = WPFTextBlock()
+        name_tb = self._t3_style(TextBlock(), "T3.BodyStrong")  # 13 SemiBold
         name_tb.Text = comp_name
-        name_tb.FontSize = 12
-        name_tb.FontWeight = FontWeights.SemiBold
-        name_tb.Foreground = bc.ConvertFromString("#0F172A")
         name_tb.TextTrimming = System.Windows.TextTrimming.CharacterEllipsis
         row1.Children.Add(name_tb)
 
@@ -1358,11 +1432,8 @@ class IFCSGSuiteWindow(T3WPFWindow):
         if sub_count:
             info_parts.append("{} subtypes".format(sub_count))
         if info_parts:
-            info_tb = WPFTextBlock()
-            info_tb.Text = "  ".join(info_parts)
-            info_tb.FontSize = 10
-            info_tb.Foreground = bc.ConvertFromString("#64748B")
-            info_tb.Margin = WPFThickness(0, 1, 0, 0)
+            info_tb = self._t3_style(TextBlock(), "T3.Caption")  # 11.5 muted
+            info_tb.Text = " | ".join(info_parts)
             info_tb.TextTrimming = System.Windows.TextTrimming.CharacterEllipsis
             sp.Children.Add(info_tb)
 
@@ -1776,17 +1847,31 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
     def _on_config_changed(self, sender, args):
         sel = self.cmbConfig.SelectedItem
-        if sel:
-            path = os.path.join(self.configs_dir, str(sel) + ".json")
-            try:
-                self.config = ParamCheckConfig.from_json(path)
-                self._refresh_tree()
-                self._update_config_stats()
-                self.btnRunCheck.IsEnabled = True
-                self.txtStatus.Text = "Config loaded: {} ({})".format(
-                    self.config.name, self.config.source)
-            except Exception as e:
-                self.txtStatus.Text = "Error loading config: {}".format(str(e))
+        if not sel:
+            # Nothing selected (last config deleted): nothing left to run.
+            self._clear_config()
+            return
+        path = os.path.join(self.configs_dir, str(sel) + ".json")
+        try:
+            self.config = ParamCheckConfig.from_json(path)
+            self._refresh_tree()
+            self._update_config_stats()
+            self._update_action_states()
+            self.txtStatus.Text = "Config loaded: {} ({})".format(
+                self.config.name, self.config.source)
+            self._set_status_dot("idle")
+        except Exception as e:
+            # Don't keep running the previous config under this one's name.
+            self._clear_config()
+            self.txtStatus.Text = "Error loading config: {}".format(str(e))
+            self._set_status_dot("error")
+
+    def _clear_config(self):
+        """No usable config: Run Check off, tree and config KPIs empty."""
+        self.config = None
+        self._update_action_states()
+        self._refresh_tree()
+        self._update_config_stats()
 
     def _on_import_xml(self, sender, args):
         dlg = OpenFileDialog()
@@ -1851,9 +1936,12 @@ class IFCSGSuiteWindow(T3WPFWindow):
         sel = self.cmbConfig.SelectedItem
         if not sel:
             return
+        # Destructive: the safe answer (No) is the default, so Enter cancels.
         result = WPFMessageBox.Show(
-            "Delete config '{}'?".format(sel),
-            "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+            "Delete config '{}'?\n\nThis removes {}.json from the configs folder "
+            "and cannot be undone.".format(sel, sel),
+            "Delete Config", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+            MessageBoxResult.No)
         if result == MessageBoxResult.Yes:
             path = os.path.join(self.configs_dir, str(sel) + ".json")
             if os.path.exists(path):
@@ -1862,51 +1950,73 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
     def _refresh_tree(self):
         self.tvCategories.Items.Clear()
+        if self.txtTreeCount is not None:
+            if self.config:
+                d, c, _p = self.config.get_total_stats()
+                self.txtTreeCount.Text = "{} discipline{}, {} categor{}".format(
+                    d, "" if d == 1 else "s", c, "y" if c == 1 else "ies")
+            else:
+                self.txtTreeCount.Text = "0 categories"
         if not self.config:
             return
-        
+
+        # Only the header content is built here: the TreeViewItem containers get
+        # T3.TreeViewItem from the implicit style in IFCSG.xaml (tvCategories).
+        # The checkbox carries no label of its own (the TextBlock next to it is the
+        # label, so a click on the name still selects the row, not the checkbox):
+        # T3.CheckBox.Cell is the label-less T3.CheckBox, with an explicit 8px gap.
+        chk_style = self._t3("T3.CheckBox.Cell")
+        if chk_style is None:
+            chk_style = self._t3("T3.CheckBox")
+        disc_style = self._t3("T3.BodyStrong")   # 13 SemiBold
+        cat_style = self._t3("T3.Body")          # 13 Regular
+
         for disc_name, disc_data in self.config.disciplines.items():
             disc_item = TreeViewItem()
             disc_item.IsExpanded = True
-            
+
             disc_sp = StackPanel()
             disc_sp.Orientation = Orientation.Horizontal
-            
+
             chk_disc = CheckBox()
+            if chk_style is not None:
+                chk_disc.Style = chk_style
             chk_disc.IsChecked = System.Nullable[System.Boolean](bool(disc_data.get("enabled", True)))
-            chk_disc.Margin = Thickness(0, 0, 6, 0)
+            chk_disc.Margin = Thickness(0, 0, 8, 0)
             chk_disc.Tag = disc_name
             chk_disc.Checked += self._on_disc_toggled
             chk_disc.Unchecked += self._on_disc_toggled
-            
+
             lbl_disc = TextBlock()
+            if disc_style is not None:
+                lbl_disc.Style = disc_style
             lbl_disc.Text = u"{} ({} categories)".format(disc_name, len(disc_data.get("categories", {})))
-            lbl_disc.FontWeight = System.Windows.FontWeights.Bold
-            lbl_disc.FontSize = 12
-            lbl_disc.Foreground = bc.ConvertFromString("#5D4E37")
-            
+
             disc_sp.Children.Add(chk_disc)
             disc_sp.Children.Add(lbl_disc)
             disc_item.Header = disc_sp
-            
+
             for cat_name, cat_data in disc_data.get("categories", {}).items():
                 cat_item = TreeViewItem()
-                
+
                 cat_sp = StackPanel()
                 cat_sp.Orientation = Orientation.Horizontal
-                
+
                 chk_cat = CheckBox()
+                if chk_style is not None:
+                    chk_cat.Style = chk_style
                 chk_cat.IsChecked = System.Nullable[System.Boolean](bool(cat_data.get("enabled", True)))
-                chk_cat.Margin = Thickness(0, 0, 6, 0)
+                chk_cat.Margin = Thickness(0, 0, 8, 0)
                 chk_cat.Tag = "{}|{}".format(disc_name, cat_name)
                 chk_cat.Checked += self._on_cat_toggled
                 chk_cat.Unchecked += self._on_cat_toggled
-                
+
                 param_count = len(cat_data.get("params", []))
                 lbl_cat = TextBlock()
+                if cat_style is not None:
+                    lbl_cat.Style = cat_style
                 lbl_cat.Text = u"{} ({} params)".format(cat_name, param_count)
-                lbl_cat.FontSize = 11
-                
+
                 cat_sp.Children.Add(chk_cat)
                 cat_sp.Children.Add(lbl_cat)
                 cat_item.Header = cat_sp
@@ -1943,17 +2053,37 @@ class IFCSGSuiteWindow(T3WPFWindow):
             d, c, p = self.config.get_total_stats()
             self.txtTotalParams.Text = str(p)
             self.txtCategories.Text = str(c)
+        else:
+            self.txtTotalParams.Text = "0"
+            self.txtCategories.Text = "0"
+
+    def _update_action_states(self):
+        """Run Check needs a config; Export needs results and the config behind them."""
+        has_config = self.config is not None
+        if self.btnRunCheck is not None:
+            self.btnRunCheck.IsEnabled = has_config
+        if self.btnExportExcel is not None:
+            self.btnExportExcel.IsEnabled = has_config and bool(self.all_results)
 
     def _on_run_check(self, sender, args):
         if not self.config:
+            self.txtStatus.Text = "Choose or import a configuration first"
             return
+        cfg = self.config
 
         self.txtStatus.Text = "Running IFC-SG parameter checks..."
+        self._set_status_dot("running")
         self.Cursor = System.Windows.Input.Cursors.Wait
         self.UpdateLayout()
 
-        # Show progress bar + Pause/Stop; disable Run/Export while running
-        self.begin_progress(100, disable=[self.btnRunCheck, self.btnExportExcel])
+        # Show progress bar + Pause/Stop. _do_events pumps input during the run, so
+        # also lock the page rail and the config controls: switching page or config
+        # mid-run would leave the footer, tree and results out of step.
+        busy = [self.btnRunCheck, self.btnExportExcel,
+                self.btn_tab_assigner, self.btn_tab_checker,
+                self.cmbConfig, self.btnSaveConfig, self.btnDeleteConfig,
+                self.btnImportXML, self.btnImportExcel]
+        self.begin_progress(100, disable=[c for c in busy if c is not None])
 
         def progress_cb(current, total):
             pct = int(float(current) / float(total) * 100) if total > 0 else 0
@@ -1961,7 +2091,7 @@ class IFCSGSuiteWindow(T3WPFWindow):
 
         try:
             self.results = self.checker.run_check(
-                self.config,
+                cfg,
                 progress_callback=progress_cb,
                 cancel_check=lambda: self.is_cancelled)
             self.all_results = list(self.results)
@@ -1976,28 +2106,36 @@ class IFCSGSuiteWindow(T3WPFWindow):
             self.txtWarning.Text = str(warning)
             self.txtNoElem.Text = str(no_elem)
 
+            # A re-run shows everything again: reset the chip with the filter
             self._current_filter = "all"
+            if self.btnFilterAll is not None:
+                self.btnFilterAll.IsChecked = True
             self._render_results(self.results)
 
-            self.btnExportExcel.IsEnabled = True
             self.btnSelectAllFailed.IsEnabled = True
-            self.txtResultHeader.Text = "Check Results ({} checks)".format(len(self.results))
+            self.txtResultHeader.Text = "Check results: {} ({} checks)".format(
+                cfg.name, len(self.results))
 
             # Read cancel flag BEFORE end_progress() resets it
             cancelled = self.is_cancelled
             if cancelled:
                 self.txtStatus.Text = "Cancelled — partial results: {} checks".format(len(self.results))
+                self._set_status_dot("warning")
             else:
                 self.txtStatus.Text = "Done: {} passed, {} failed, {} partial, {} no elements".format(
                     passed, failed, warning, no_elem)
+                self._set_status_dot("ok")
 
         except Exception as e:
             self.txtStatus.Text = "Error: {}".format(str(e))
+            self._set_status_dot("error")
             WPFMessageBox.Show("Error:\n{}".format(traceback.format_exc()),
                                "Error", MessageBoxButton.OK, MessageBoxImage.Error)
         finally:
             self.end_progress()
             self.Cursor = System.Windows.Input.Cursors.Arrow
+            # end_progress re-enabled what it disabled; now keep only what can work
+            self._update_action_states()
 
     def _apply_filter(self, filter_type):
         self._current_filter = filter_type
@@ -2071,268 +2209,296 @@ class IFCSGSuiteWindow(T3WPFWindow):
                 s["pct"] = -1
         return stats
 
+    # Result status → (word, dot brush key, word brush key). The word always sits
+    # next to the dot: a status is never shown by colour alone.
+    _RESULT_STATUS = {
+        "pass": ("Passed", "T3.Success.Accent", "T3.Success.Text"),
+        "fail": ("Failed", "T3.Danger.Accent", "T3.Danger.Text"),
+        "warning": ("Partial", "T3.Warning.Accent", "T3.Warning.Text"),
+        "no_elements": ("No elements", "T3.TextDisabled", "T3.TextMuted"),
+    }
+
+    # Fixed widths of the results list (px). Only the name column is *, so the
+    # counts, meters and Select buttons line up from row to row.
+    _RES_STATUS_W = 96    # dot + status word
+    _RES_COUNT_W = 128    # "123/456 missing" in Consolas
+    _RES_SELECT_W = 88    # Ghost "Select" button
+    _RES_METER_W = 160    # pass-rate meter
+    _RES_PCT_W = 56       # "100%"
+
+    def _results_theme(self):
+        """Every style and brush the results list needs, looked up once per render
+        (results can run to hundreds of rows). _t3() caches across renders too."""
+        t = {}
+        for key in ("T3.ListHeader", "T3.ListHeader.Label", "T3.BodyStrong", "T3.Body",
+                    "T3.Caption", "T3.Mono", "T3.Cell.Number", "T3.Cell.Muted",
+                    "T3.Meter", "T3.Dot", "T3.Button.Ghost", "T3.Icon.Lead",
+                    "T3.Border", "T3.RowRule"):
+            t[key] = self._t3(key)
+        t["status"] = {}
+        for status, (word, dot_key, text_key) in self._RESULT_STATUS.items():
+            t["status"][status] = (word, self._t3(dot_key), self._t3(text_key))
+        t["status_other"] = (self._t3("T3.TextDisabled"), self._t3("T3.TextMuted"))
+        try:
+            t["row_h"] = float(self._t3("T3.H.Row", 26.0))
+        except Exception:
+            t["row_h"] = 26.0
+        GridLength = System.Windows.GridLength
+        t["star"] = GridLength(1, System.Windows.GridUnitType.Star)
+        t["w_status"] = GridLength(self._RES_STATUS_W)
+        t["w_count"] = GridLength(self._RES_COUNT_W)
+        t["w_select"] = GridLength(self._RES_SELECT_W)
+        t["w_meter"] = GridLength(self._RES_METER_W)
+        t["w_pct"] = GridLength(self._RES_PCT_W)
+        return t
+
+    def _res_grid(self, widths):
+        grid = Grid()
+        for w in widths:
+            cd = ColumnDefinition()
+            cd.Width = w
+            grid.ColumnDefinitions.Add(cd)
+        return grid
+
+    def _res_text(self, t, style_key, text):
+        tb = TextBlock()
+        style = t.get(style_key)
+        if style is not None:
+            tb.Style = style
+        tb.Text = text
+        return tb
+
+    def _res_select_button(self, t, ids, tooltip):
+        """Ghost "Select" button (Pick icon + label) that selects `ids` in Revit."""
+        btn = Button()
+        if t["T3.Button.Ghost"] is not None:
+            btn.Style = t["T3.Button.Ghost"]
+        # In-row size: a 30px action button would make these rows taller than the rest
+        btn.Height = 24
+        btn.MinWidth = 0
+        btn.Padding = Thickness(8, 0, 8, 0)
+        btn.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
+        btn.VerticalAlignment = System.Windows.VerticalAlignment.Center
+        btn.ToolTip = tooltip
+
+        content = StackPanel()
+        content.Orientation = Orientation.Horizontal
+        icon = self._res_text(t, "T3.Icon.Lead", u"\uE7C9")   # E7C9 Pick
+        label = TextBlock()
+        label.Text = "Select"
+        label.VerticalAlignment = System.Windows.VerticalAlignment.Center
+        content.Children.Add(icon)
+        content.Children.Add(label)
+        btn.Content = content
+
+        btn.Tag = ids
+        btn.Click += self._on_select_btn_click
+        return btn
+
+    def _res_discipline_strip(self, t, discipline, first):
+        """Discipline group header: a T3.ListHeader label strip."""
+        strip = Border()
+        if t["T3.ListHeader"] is not None:
+            strip.Style = t["T3.ListHeader"]
+        # The ScrollViewer already insets the list 16px; 8 more aligns the label
+        # with the category names and the status dots below it.
+        strip.Padding = Thickness(8, 0, 8, 0)
+        strip.Margin = Thickness(0, 0 if first else 16, 0, 0)
+        label = self._res_text(t, "T3.ListHeader.Label", (discipline or "").upper())
+        label.TextTrimming = System.Windows.TextTrimming.CharacterEllipsis
+        strip.Child = label
+        return strip
+
+    def _res_category_header(self, t, r, stat, fail_ids):
+        """Category: name + tally | pass-rate meter | % | Select (failed + partial)."""
+        pct = stat.get("pct", 0)
+        cat_pass = stat.get("pass", 0)
+        cat_fail = stat.get("fail", 0)
+        cat_warn = stat.get("warning", 0)
+        cat_no_elem = stat.get("no_elements", 0)
+
+        hdr = Border()
+        hdr.Padding = Thickness(8, 8, 8, 4)
+        hdr.BorderThickness = Thickness(0, 0, 0, 1)
+        if t["T3.Border"] is not None:
+            hdr.BorderBrush = t["T3.Border"]
+
+        grid = self._res_grid((t["star"], t["w_meter"], t["w_pct"], t["w_select"]))
+
+        info = StackPanel()
+        info.VerticalAlignment = System.Windows.VerticalAlignment.Center
+        name_tb = self._res_text(t, "T3.BodyStrong", r.category)
+        name_tb.TextTrimming = System.Windows.TextTrimming.CharacterEllipsis
+        info.Children.Add(name_tb)
+
+        sub_parts = []
+        if cat_pass > 0:
+            sub_parts.append("{} passed".format(cat_pass))
+        if cat_fail > 0:
+            sub_parts.append("{} failed".format(cat_fail))
+        if cat_warn > 0:
+            sub_parts.append("{} partial".format(cat_warn))
+        if cat_no_elem > 0:
+            sub_parts.append("{} no elements".format(cat_no_elem))
+        if sub_parts:
+            sub_tb = self._res_text(t, "T3.Caption", " | ".join(sub_parts))
+            sub_tb.TextTrimming = System.Windows.TextTrimming.CharacterEllipsis
+            info.Children.Add(sub_tb)
+        Grid.SetColumn(info, 0)
+        grid.Children.Add(info)
+
+        if pct >= 0:
+            # Static ratio, nothing is running: T3.Meter, not the orange progress bar
+            meter = ProgressBar()
+            if t["T3.Meter"] is not None:
+                meter.Style = t["T3.Meter"]
+            meter.Minimum = 0.0
+            meter.Maximum = 100.0
+            meter.Value = float(pct)
+            meter.VerticalAlignment = System.Windows.VerticalAlignment.Center
+            meter.Margin = Thickness(8, 0, 0, 0)
+            meter.ToolTip = "{}% of the checkable parameters pass".format(pct)
+            Grid.SetColumn(meter, 1)
+            grid.Children.Add(meter)
+            pct_tb = self._res_text(t, "T3.Cell.Number", "{}%".format(pct))
+        else:
+            pct_tb = self._res_text(t, "T3.Cell.Muted", "n/a")
+            pct_tb.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
+            pct_tb.ToolTip = "No elements of this category in the model"
+        Grid.SetColumn(pct_tb, 2)
+        grid.Children.Add(pct_tb)
+
+        if (cat_fail > 0 or cat_warn > 0) and fail_ids:
+            btn = self._res_select_button(
+                t, list(set(fail_ids))[:500],
+                "Select the failed and partial elements of this category in Revit")
+            Grid.SetColumn(btn, 3)
+            grid.Children.Add(btn)
+
+        hdr.Child = grid
+        return hdr
+
+    def _res_row(self, t, r):
+        """One parameter check: dot + status word | parameter | count | Select."""
+        entry = t["status"].get(r.status)
+        if entry is None:
+            word, dot_brush, word_brush = (str(r.status),) + t["status_other"]
+        else:
+            word, dot_brush, word_brush = entry
+
+        row = Border()
+        row.MinHeight = t["row_h"]
+        row.Padding = Thickness(8, 0, 8, 0)
+        row.BorderThickness = Thickness(0, 0, 0, 1)
+        if t["T3.RowRule"] is not None:
+            row.BorderBrush = t["T3.RowRule"]
+
+        grid = self._res_grid((t["w_status"], t["star"], t["w_count"], t["w_select"]))
+
+        status_sp = StackPanel()
+        status_sp.Orientation = Orientation.Horizontal
+        status_sp.VerticalAlignment = System.Windows.VerticalAlignment.Center
+        dot = Ellipse()
+        if t["T3.Dot"] is not None:
+            dot.Style = t["T3.Dot"]
+        if dot_brush is not None:
+            dot.Fill = dot_brush
+        word_tb = self._res_text(t, "T3.Caption", word)
+        if word_brush is not None:
+            word_tb.Foreground = word_brush
+        status_sp.Children.Add(dot)
+        status_sp.Children.Add(word_tb)
+        Grid.SetColumn(status_sp, 0)
+        grid.Children.Add(status_sp)
+
+        name_tb = self._res_text(t, "T3.Body", r.param_name)
+        name_tb.TextTrimming = System.Windows.TextTrimming.CharacterEllipsis
+        name_tb.ToolTip = r.param_name
+        Grid.SetColumn(name_tb, 1)
+        grid.Children.Add(name_tb)
+
+        if r.status == "no_elements":
+            count_text = "0 elements"
+        elif r.status == "pass":
+            count_text = "{} OK".format(r.total_elements)
+        else:
+            count_text = "{}/{} missing".format(r.missing_count, r.total_elements)
+        count_tb = self._res_text(t, "T3.Mono", count_text)
+        count_tb.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
+        count_tb.Margin = Thickness(8, 0, 8, 0)
+        Grid.SetColumn(count_tb, 2)
+        grid.Children.Add(count_tb)
+
+        if r.status in ("fail", "warning") and r.element_ids:
+            btn = self._res_select_button(
+                t, list(r.element_ids)[:200],
+                "Select the elements missing this parameter in Revit")
+            Grid.SetColumn(btn, 3)
+            grid.Children.Add(btn)
+
+        row.Child = grid
+        return row
+
     def _render_results(self, results):
         self.spResults.Children.Clear()
-        
-        status_bg = {
-            "pass": "#E8F5E9", "fail": "#FFEBEE",
-            "warning": "#FFF8E1", "no_elements": "#ECEFF1"
-        }
-        status_fg = {
-            "pass": "#2E7D32", "fail": "#C62828",
-            "warning": "#F57F17", "no_elements": "#78909C"
-        }
-        status_icon = {
-            "pass": u"\u2714", "fail": u"\u2718",
-            "warning": u"\u26A0", "no_elements": u"\u23F8"
-        }
-        
+
+        t = self._results_theme()
         cat_stats = self._compute_category_stats(self.all_results)
-        
+
         current_disc = ""
         current_cat = ""
-        
+
         for r in results:
             # Discipline header
             if r.discipline != current_disc:
                 current_disc = r.discipline
                 current_cat = ""
-                
-                disc_border = Border()
-                disc_border.Margin = Thickness(0, 8, 0, 2)
-                disc_border.Padding = Thickness(8, 4, 8, 4)
-                disc_border.Background = bc.ConvertFromString("#0F172A")
-                disc_border.CornerRadius = System.Windows.CornerRadius(4)
-                
-                disc_txt = TextBlock()
-                disc_txt.Text = r.discipline
-                disc_txt.FontWeight = System.Windows.FontWeights.Bold
-                disc_txt.FontSize = 13
-                disc_txt.Foreground = bc.ConvertFromString("#E5B85C")
-                disc_border.Child = disc_txt
-                self.spResults.Children.Add(disc_border)
-            
-            # Category header with progress bar
+                self.spResults.Children.Add(self._res_discipline_strip(
+                    t, r.discipline, self.spResults.Children.Count == 0))
+
+            # Category header with pass-rate meter
             if r.category != current_cat:
                 current_cat = r.category
                 stat_key = "{}|{}".format(r.discipline, r.category)
                 stat = cat_stats.get(stat_key, {})
-                pct = stat.get("pct", 0)
-                cat_pass = stat.get("pass", 0)
-                cat_total = stat.get("total", 0)
-                cat_no_elem = stat.get("no_elements", 0)
-                cat_fail = stat.get("fail", 0)
-                cat_warn = stat.get("warning", 0)
-                
-                cat_border = Border()
-                cat_border.Margin = Thickness(0, 4, 0, 2)
-                cat_border.Padding = Thickness(4, 3, 4, 3)
-                cat_border.CornerRadius = System.Windows.CornerRadius(4)
-                cat_border.Background = bc.ConvertFromString("#F9F6EE")
-                cat_border.BorderBrush = bc.ConvertFromString("#E8E0D0")
-                cat_border.BorderThickness = Thickness(1)
-                
-                cat_grid = Grid()
-                cg1 = ColumnDefinition()
-                cg1.Width = System.Windows.GridLength(1, System.Windows.GridUnitType.Star)
-                cg2 = ColumnDefinition()
-                cg2.Width = System.Windows.GridLength(200)
-                cg3 = ColumnDefinition()
-                cg3.Width = System.Windows.GridLength(80)
-                cat_grid.ColumnDefinitions.Add(cg1)
-                cat_grid.ColumnDefinitions.Add(cg2)
-                cat_grid.ColumnDefinitions.Add(cg3)
-                
-                cat_info = StackPanel()
-                cat_name_txt = TextBlock()
-                cat_name_txt.Text = u"\u25B8 {}".format(r.category)
-                cat_name_txt.FontWeight = System.Windows.FontWeights.SemiBold
-                cat_name_txt.FontSize = 11
-                cat_name_txt.Foreground = bc.ConvertFromString("#5D4E37")
-                cat_info.Children.Add(cat_name_txt)
-                
-                sub_parts = []
-                if cat_pass > 0:
-                    sub_parts.append("{} pass".format(cat_pass))
-                if cat_fail > 0:
-                    sub_parts.append("{} fail".format(cat_fail))
-                if cat_warn > 0:
-                    sub_parts.append("{} partial".format(cat_warn))
-                if cat_no_elem > 0:
-                    sub_parts.append("{} N/A".format(cat_no_elem))
-                
-                sub_txt = TextBlock()
-                sub_txt.Text = " | ".join(sub_parts)
-                sub_txt.FontSize = 9
-                sub_txt.Foreground = bc.ConvertFromString("#999999")
-                cat_info.Children.Add(sub_txt)
-                Grid.SetColumn(cat_info, 0)
-                cat_grid.Children.Add(cat_info)
-                
-                # Progress bar
-                if pct >= 0:
-                    prog_sp = StackPanel()
-                    prog_sp.VerticalAlignment = System.Windows.VerticalAlignment.Center
-                    prog_sp.Margin = Thickness(4, 0, 4, 0)
-                    
-                    bar_border = Border()
-                    bar_border.Height = 10
-                    bar_border.CornerRadius = System.Windows.CornerRadius(2)
-                    bar_border.Background = bc.ConvertFromString("#E0E0E0")
-                    
-                    bar_grid = Grid()
-                    bar_bg = Border()
-                    bar_bg.Height = 10
-                    bar_bg.CornerRadius = System.Windows.CornerRadius(2)
-                    bar_bg.Background = bc.ConvertFromString("#E0E0E0")
-                    bar_grid.Children.Add(bar_bg)
-                    
-                    bar_fill = Border()
-                    bar_fill.Height = 10
-                    bar_fill.CornerRadius = System.Windows.CornerRadius(2)
-                    bar_fill.HorizontalAlignment = System.Windows.HorizontalAlignment.Left
-                    bar_fill.Width = max(1, pct * 1.8)
-                    
-                    if pct >= 80:
-                        fill_color = "#66BB6A"
-                    elif pct >= 50:
-                        fill_color = "#FFA726"
-                    else:
-                        fill_color = "#EF5350"
-                    bar_fill.Background = bc.ConvertFromString(fill_color)
-                    bar_grid.Children.Add(bar_fill)
-                    
-                    prog_sp.Children.Add(bar_grid)
-                    Grid.SetColumn(prog_sp, 1)
-                    cat_grid.Children.Add(prog_sp)
-                
-                pct_sp = StackPanel()
-                pct_sp.VerticalAlignment = System.Windows.VerticalAlignment.Center
-                pct_sp.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
-                
-                if pct >= 0:
-                    pct_txt = TextBlock()
-                    pct_txt.Text = "{}%".format(pct)
-                    pct_txt.FontSize = 12
-                    pct_txt.FontWeight = System.Windows.FontWeights.Bold
-                    pct_txt.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
-                    if pct >= 80:
-                        pct_txt.Foreground = bc.ConvertFromString("#2E7D32")
-                    elif pct >= 50:
-                        pct_txt.Foreground = bc.ConvertFromString("#F57F17")
-                    else:
-                        pct_txt.Foreground = bc.ConvertFromString("#C62828")
-                    pct_sp.Children.Add(pct_txt)
-                else:
-                    na_txt = TextBlock()
-                    na_txt.Text = "N/A"
-                    na_txt.FontSize = 11
-                    na_txt.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
-                    na_txt.Foreground = bc.ConvertFromString("#999999")
-                    pct_sp.Children.Add(na_txt)
-                
-                # "Select" button for failed categories
-                if cat_fail > 0 or cat_warn > 0:
-                    all_fail_ids = []
+
+                all_fail_ids = []
+                if stat.get("fail", 0) > 0 or stat.get("warning", 0) > 0:
                     for ar in self.all_results:
                         if ar.discipline == r.discipline and ar.category == r.category:
                             if ar.status in ("fail", "warning"):
                                 all_fail_ids.extend(ar.element_ids)
-                    
-                    if all_fail_ids:
-                        sel_all_btn = Button()
-                        sel_all_btn.Content = "Select"
-                        sel_all_btn.FontSize = 9
-                        sel_all_btn.Padding = Thickness(4, 1, 4, 1)
-                        sel_all_btn.Margin = Thickness(0, 2, 0, 0)
-                        sel_all_btn.Cursor = System.Windows.Input.Cursors.Hand
-                        sel_all_btn.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
-                        sel_all_btn.Background = bc.ConvertFromString("#FFCDD2")
-                        sel_all_btn.Foreground = bc.ConvertFromString("#C62828")
-                        sel_all_btn.BorderBrush = bc.ConvertFromString("#EF9A9A")
-                        sel_all_btn.BorderThickness = Thickness(1)
-                        
-                        unique_ids = list(set(all_fail_ids))[:500]
-                        sel_all_btn.Tag = unique_ids
-                        sel_all_btn.Click += self._on_select_btn_click
-                        pct_sp.Children.Add(sel_all_btn)
-                
-                Grid.SetColumn(pct_sp, 2)
-                cat_grid.Children.Add(pct_sp)
-                
-                cat_border.Child = cat_grid
-                self.spResults.Children.Add(cat_border)
-            
-            # Parameter Row
-            row_border = Border()
-            row_border.Margin = Thickness(16, 1, 0, 1)
-            row_border.Padding = Thickness(8, 3, 8, 3)
-            row_border.CornerRadius = System.Windows.CornerRadius(4)
-            row_border.Background = bc.ConvertFromString(status_bg.get(r.status, "#FAFAFA"))
-            
-            row_grid = Grid()
-            c1 = ColumnDefinition()
-            c1.Width = System.Windows.GridLength(28)
-            c2 = ColumnDefinition()
-            c2.Width = System.Windows.GridLength(1, System.Windows.GridUnitType.Star)
-            c3 = ColumnDefinition()
-            c3.Width = System.Windows.GridLength(120)
-            c4 = ColumnDefinition()
-            c4.Width = System.Windows.GridLength(55)
-            row_grid.ColumnDefinitions.Add(c1)
-            row_grid.ColumnDefinitions.Add(c2)
-            row_grid.ColumnDefinitions.Add(c3)
-            row_grid.ColumnDefinitions.Add(c4)
-            
-            icon = TextBlock()
-            icon.Text = status_icon.get(r.status, "?")
-            icon.FontSize = 12
-            icon.VerticalAlignment = System.Windows.VerticalAlignment.Center
-            icon.Foreground = bc.ConvertFromString(status_fg.get(r.status, "#666666"))
-            Grid.SetColumn(icon, 0)
-            row_grid.Children.Add(icon)
-            
-            name_txt = TextBlock()
-            name_txt.Text = r.param_name
-            name_txt.FontSize = 11
-            name_txt.VerticalAlignment = System.Windows.VerticalAlignment.Center
-            Grid.SetColumn(name_txt, 1)
-            row_grid.Children.Add(name_txt)
-            
-            if r.status == "no_elements":
-                count_text = "No elements"
-            elif r.status == "pass":
-                count_text = "{} OK".format(r.total_elements)
+
+                self.spResults.Children.Add(
+                    self._res_category_header(t, r, stat, all_fail_ids))
+
+            # Parameter row
+            self.spResults.Children.Add(self._res_row(t, r))
+
+        self._update_results_state(len(results))
+
+    def _update_results_state(self, shown):
+        """Results empty state + count strip. spResults is a StackPanel (no HasItems),
+        so its overlay is toggled here rather than by a DataTrigger."""
+        total = len(self.all_results or [])
+        if self.spResults_empty is not None:
+            if shown:
+                self.spResults_empty.Visibility = Visibility.Collapsed
             else:
-                count_text = "{}/{} missing".format(r.missing_count, r.total_elements)
-            
-            count_txt = TextBlock()
-            count_txt.Text = count_text
-            count_txt.FontSize = 10
-            count_txt.VerticalAlignment = System.Windows.VerticalAlignment.Center
-            count_txt.HorizontalAlignment = System.Windows.HorizontalAlignment.Right
-            count_txt.Foreground = bc.ConvertFromString(status_fg.get(r.status, "#888888"))
-            Grid.SetColumn(count_txt, 2)
-            row_grid.Children.Add(count_txt)
-            
-            if r.status in ("fail", "warning") and r.element_ids:
-                sel_btn = Button()
-                sel_btn.Content = u"\u25BA Select"
-                sel_btn.FontSize = 9
-                sel_btn.Padding = Thickness(3, 1, 3, 1)
-                sel_btn.VerticalAlignment = System.Windows.VerticalAlignment.Center
-                sel_btn.Cursor = System.Windows.Input.Cursors.Hand
-                sel_btn.Background = bc.ConvertFromString("#FFF3E0")
-                sel_btn.Foreground = bc.ConvertFromString("#E65100")
-                sel_btn.BorderBrush = bc.ConvertFromString("#FFCC80")
-                sel_btn.BorderThickness = Thickness(1)
-                sel_btn.Tag = list(r.element_ids)[:200]
-                sel_btn.Click += self._on_select_btn_click
-                Grid.SetColumn(sel_btn, 3)
-                row_grid.Children.Add(sel_btn)
-            
-            row_border.Child = row_grid
-            self.spResults.Children.Add(row_border)
+                if self.results is None:
+                    msg = "No results yet. Choose a configuration and click Run Check."
+                elif not total:
+                    msg = ("The check returned no results.\n"
+                           "Enable at least one category in the tree, then run it again.")
+                else:
+                    msg = "No checks match this filter."
+                self.spResults_empty.Text = msg
+                self.spResults_empty.Visibility = Visibility.Visible
+        if self.txtResultsCount is not None:
+            if shown == total:
+                self.txtResultsCount.Text = "{} check{}".format(total, "" if total == 1 else "s")
+            else:
+                self.txtResultsCount.Text = "Showing {} of {} checks".format(shown, total)
 
     def _on_select_btn_click(self, sender, args):
         ids = sender.Tag

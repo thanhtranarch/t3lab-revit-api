@@ -1272,8 +1272,6 @@ class ModelAuditorWindow(T3WPFWindow):
 
             unit = m_info["unit"]
             value_display = "{}{}".format(value, " " + unit if unit else "")
-            stars = u"★" * m_info["weight"] + u"☆" * (5 - m_info["weight"])
-
             band = _threshold_bands(value, thresholds, unit)
             ticks = band["ticks"]
 
@@ -1290,8 +1288,9 @@ class ModelAuditorWindow(T3WPFWindow):
                 status=status,
                 severity=_STATUS_SEVERITY[status],
                 # Bare values: the column headers already say WEIGHT and
-                # THRESHOLDS, and each cell is one 26px line high.
-                weight_stars="{} {}/5".format(stars, m_info["weight"]),
+                # THRESHOLDS, and each cell is one 26px line high. No star
+                # characters (T3 rule 22): "3/5" already states the weight.
+                weight_stars="{}/5".format(m_info["weight"]),
                 # THRESHOLDS band bar. Every value is a STRING: the XAML picks
                 # the raised segment with DataTrigger on band_index (PythonNet
                 # does not carry ints/Brushes through a binding reliably —

@@ -13,12 +13,13 @@ Author: Tran Tien Thanh & Dang Quoc Truong
 
 __author__  = "Tran Tien Thanh & Dang Quoc Truong"
 __title__   = "Auto Dimension"
-__version__ = "2.2.1"
+__version__ = "2.2.2"
 
 # IMPORT LIBRARIES
 # ==================================================
 import os
 import sys
+import math
 import clr
 
 clr.AddReference('RevitAPI')
@@ -43,6 +44,7 @@ from Autodesk.Revit.DB import (
     Line,
     XYZ,
     Options,
+    GeometryInstance,
     HostObjectUtils,
     ShellLayerType,
     LocationCurve,
@@ -91,10 +93,15 @@ except Exception:
 # CONSTANTS
 # ==================================================
 MM_TO_FEET  = 1.0 / 304.8
-# Tolerance for deciding if a vector is predominantly horizontal vs vertical
-AXIS_TOLERANCE = 0.1
+# How far (sine of the angle, ~0.1°) a direction may stray from a world axis
+# and still count as on it. NewDimension needs every reference in a string
+# parallel to the others: one face or grid a few degrees off makes Revit
+# reject the WHOLE string with "Invalid number of references".
+PARALLEL_TOL = math.sin(math.radians(0.1))
 # Group elements within 500 mm as a structural row/column line
 GROUPING_TOL = 500.0 * MM_TO_FEET
+# Rejected string → rebuild it greedily from at most this many start refs.
+SALVAGE_SEEDS = 3
 
 
 class WarningSwallower(IFailuresPreprocessor):
@@ -147,13 +154,32 @@ def _curve_direction(curve):
     return XYZ(delta.X / length, delta.Y / length, delta.Z / length)
 
 
-def _wall_is_horizontal(wall):
-    """Return True if the wall runs primarily along the X axis."""
+def _along_axis(vec, axis):
+    """True if the (unit) vector runs along world axis 'X' or 'Y' within
+    PARALLEL_TOL, either sense."""
+    if axis == 'X':
+        across = math.hypot(vec.Y, vec.Z)
+    else:
+        across = math.hypot(vec.X, vec.Z)
+    return across <= PARALLEL_TOL
+
+
+def _wall_run_axis(wall):
+    """'X' or 'Y' when the wall is straight and runs along that world axis;
+    None for curved or angled walls — their side faces are not planes an
+    X/Y string can measure."""
     loc = wall.Location
     if not isinstance(loc, LocationCurve):
-        return False
-    d = _curve_direction(loc.Curve)
-    return abs(d.X) >= abs(d.Y)
+        return None
+    curve = loc.Curve
+    if not isinstance(curve, Line):
+        return None
+    d = curve.Direction
+    if _along_axis(d, 'X'):
+        return 'X'
+    if _along_axis(d, 'Y'):
+        return 'Y'
+    return None
 
 
 def _elem_centroid(elem, view):
@@ -423,10 +449,15 @@ def _group_elements_by_pos(elements, get_pos, tolerance):
 
 
 def _col_ref_from_geom(col, view, axis):
-    """Last-resort: extract a planar face Reference from the column's instance geometry.
-    axis='X' → face with normal predominantly in X (left/right face).
-    axis='Y' → face with normal predominantly in Y (front/back face).
+    """Last-resort: a planar face Reference from the element's geometry whose
+    normal runs along the world axis ('X' → left/right face, 'Y' → front/back).
     Tries with and without view context to maximise ref availability.
+
+    Faces inside a GeometryInstance are read with GetSymbolGeometry(): Revit
+    documents that GetInstanceGeometry() returns a copy whose references
+    cannot host a dimension — NewDimension rejects them with "Invalid number
+    of references". The symbol face normal is mapped through the instance
+    transform to test its world direction.
     """
     for use_view in (True, False):
         try:
@@ -438,25 +469,24 @@ def _col_ref_from_geom(col, view, axis):
             if geom is None:
                 continue
             for g_obj in geom:
-                try:
-                    solids = list(g_obj.GetInstanceGeometry())
-                except AttributeError:
+                if isinstance(g_obj, GeometryInstance):
+                    solids = list(g_obj.GetSymbolGeometry())
+                    tf = g_obj.Transform
+                else:
                     solids = [g_obj]
+                    tf = None
                 for solid in solids:
-                    try:
-                        for face in solid.Faces:
-                            try:
-                                n = face.FaceNormal
-                                match = (axis == 'X' and abs(n.X) > 0.7) or \
-                                        (axis == 'Y' and abs(n.Y) > 0.7)
-                                if match:
-                                    ref = face.Reference
-                                    if ref is not None:
-                                        return ref
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
+                    faces = getattr(solid, 'Faces', None)
+                    if faces is None:
+                        continue
+                    for face in faces:
+                        n = getattr(face, 'FaceNormal', None)   # PlanarFace only
+                        if n is None:
+                            continue
+                        if tf is not None:
+                            n = tf.OfVector(n)
+                        if _along_axis(n, axis) and face.Reference is not None:
+                            return face.Reference
         except Exception:
             pass
     return None
@@ -464,13 +494,21 @@ def _col_ref_from_geom(col, view, axis):
 
 def _separate_grids(grids):
     """Split grids into vertical (running Y, fixed X) and horizontal (running X, fixed Y),
-    sorted by position."""
+    sorted by position. Arc grids and grids off the world axes are left out:
+    an X/Y string cannot measure them, and one of them in a string makes
+    NewDimension reject the whole string."""
     v, h = [], []
     for g in grids:
-        d = _curve_direction(g.Curve)
-        if abs(d.Y) >= abs(d.X):
+        try:
+            curve = g.Curve
+        except Exception:
+            continue    # multi-segment grid pieces etc.
+        if not isinstance(curve, Line):
+            continue
+        d = curve.Direction
+        if _along_axis(d, 'Y'):
             v.append(g)
-        else:
+        elif _along_axis(d, 'X'):
             h.append(g)
     v.sort(key=lambda g: g.Curve.GetEndPoint(0).X)
     h.sort(key=lambda g: g.Curve.GetEndPoint(0).Y)
@@ -533,12 +571,19 @@ def _hand_matches_axis(elem, axis):
     """True if the family's hand (local width) direction runs along the world
     axis. Doors/windows in a wall running Y, or columns rotated 90°, have
     their hand along Y — their Left/Right planes then face X and are invalid
-    for an X-measuring chain."""
+    for an X-measuring chain. An instance rotated off both axes (e.g. 30°)
+    matches neither."""
     try:
         hand = elem.HandOrientation
-        return (abs(hand.X) >= abs(hand.Y)) == (axis == 'X')
     except Exception:
         return True
+    return _along_axis(hand, axis)
+
+
+def _instance_axis_aligned(elem):
+    """False for a family instance rotated off the world axes: none of its
+    reference planes can sit in an X/Y string."""
+    return _hand_matches_axis(elem, 'X') or _hand_matches_axis(elem, 'Y')
 
 
 def _axis_ref_types(elem, axis):
@@ -555,8 +600,94 @@ def _axis_ref_types(elem, axis):
             FamilyInstanceReferenceType.CenterFrontBack)
 
 
+def _first_line(ex):
+    """pythonnet's str() of a .NET exception carries the whole stack trace."""
+    text = str(ex).strip()
+    return text.splitlines()[0] if text else type(ex).__name__
+
+
+def _ref_owner(doc_ref, ref):
+    """'Structural Columns 123456' — enough to find the element by ID."""
+    try:
+        eid = ref.ElementId
+        elem = doc_ref.GetElement(eid)
+        cat = elem.Category.Name if elem is not None and elem.Category else "Element"
+        return "{} {}".format(cat, element_id_int(eid))
+    except Exception:
+        return "unknown element"
+
+
+def _new_dimension(doc_ref, view, line, refs, dim_type):
+    ra = ReferenceArray()
+    for r in refs:
+        ra.Append(r)
+    return doc_ref.Create.NewDimension(view, line, ra, dim_type)
+
+
+def _salvage_dimension(doc_ref, view, line, refs, dim_type):
+    """NewDimension rejects the whole array when a single reference cannot be
+    measured along the line ("Invalid number of references"), so one bad
+    column face used to cost the whole string. Rebuild it greedily, keeping
+    every reference Revit accepts; each accepted trial replaces the previous
+    one, so only the final string stays in the model.
+    Returns (dimension or None, rejected refs)."""
+    for seed in range(min(len(refs) - 1, SALVAGE_SEEDS)):
+        kept = [refs[seed]]
+        rejected = list(refs[:seed])
+        dim = None
+        for r in refs[seed + 1:]:
+            try:
+                trial = _new_dimension(doc_ref, view, line, kept + [r], dim_type)
+            except Exception:
+                rejected.append(r)
+                continue
+            if dim is not None:
+                try:
+                    doc_ref.Delete(dim.Id)
+                except Exception:
+                    pass
+            dim = trial
+            kept.append(r)
+        if dim is not None:
+            return dim, rejected
+    return None, list(refs)
+
+
+def _dimension_string(doc_ref, view, line, refs, dim_type, label,
+                      failures=None, reported=None):
+    """NewDimension, falling back to _salvage_dimension. Logs one line naming
+    the elements Revit refused (no stack trace); `reported` collects owners
+    already logged so a mirrored string does not repeat them."""
+    try:
+        return _new_dimension(doc_ref, view, line, refs, dim_type)
+    except Exception as ex:
+        error = _first_line(ex)
+    dim, rejected = _salvage_dimension(doc_ref, view, line, refs, dim_type)
+    owners = []
+    for r in rejected:
+        owner = _ref_owner(doc_ref, r)
+        if owner not in owners:
+            owners.append(owner)
+    fresh = [o for o in owners if reported is None or o not in reported]
+    if reported is not None:
+        reported.update(owners)
+    if dim is not None:
+        if fresh:
+            logger.warning(
+                "{}: left out {} reference(s) Revit cannot measure along this "
+                "string ({}): {}".format(label, len(rejected), error,
+                                         ", ".join(fresh[:5])))
+        return dim
+    msg = "{} — elements: {}".format(error, ", ".join(owners[:5]))
+    if fresh:
+        logger.warning("{} failed: {}".format(label, msg))
+    if failures is not None and len(failures) < 5:
+        failures.append(msg)
+    return None
+
+
 def _create_chain_dim(doc_ref, view, ref_pos_list, axis, perp, margin, dim_type, dim_z,
-                      span_lo=None, span_hi=None, failures=None):
+                      span_lo=None, span_hi=None, failures=None, reported=None):
     """
     Create a chained/string dimension.
     ref_pos_list: list of (pos_along_axis, Reference) — will be sorted and deduplicated.
@@ -564,6 +695,7 @@ def _create_chain_dim(doc_ref, view, ref_pos_list, axis, perp, margin, dim_type,
     axis='Y': vertical dim line at x=perp (measures Y distances).
     span_lo/span_hi: if provided, extend the dim line to this range (full grid extent).
     failures: optional list to accumulate error messages for diagnostics.
+    reported: optional set of element labels already logged (see _dimension_string).
     Returns the created Dimension element, or None on failure.
     """
     if len(ref_pos_list) < 2:
@@ -582,21 +714,13 @@ def _create_chain_dim(doc_ref, view, ref_pos_list, axis, perp, margin, dim_type,
     hi = span_hi if span_hi is not None else (positions[-1] + margin)
     if abs(hi - lo) < 1e-6:
         hi += margin
-    ra = ReferenceArray()
-    for _, r in deduped:
-        ra.Append(r)
     if axis == 'X':
         line = Line.CreateBound(XYZ(lo, perp, dim_z), XYZ(hi, perp, dim_z))
     else:
         line = Line.CreateBound(XYZ(perp, lo, dim_z), XYZ(perp, hi, dim_z))
-    try:
-        return doc_ref.Create.NewDimension(view, line, ra, dim_type)
-    except Exception as ex:
-        msg = str(ex)
-        logger.warning("Chain dim failed: {}".format(msg))
-        if failures is not None and len(failures) < 5:
-            failures.append(msg)
-        return None
+    return _dimension_string(doc_ref, view, line, [r for _, r in deduped],
+                             dim_type, "Chain dim ({})".format(axis),
+                             failures=failures, reported=reported)
 
 
 # WINDOW CLASS
@@ -1163,6 +1287,14 @@ class AutoDimensionWindow(T3WPFWindow):
         y_min = min(all_cy) if all_cy else 0.0
         y_max = max(all_cy) if all_cy else 0.0
 
+        # Instances rotated off the world axes still count for the extents
+        # above, but no X/Y string can measure them — one of their planes in
+        # a string made Revit reject it ("Invalid number of references").
+        all_cols = [e for e in all_cols if _instance_axis_aligned(e)]
+        windows  = [e for e in windows if _instance_axis_aligned(e)]
+        doors    = [e for e in doors if _instance_axis_aligned(e)]
+        lifts    = [e for e in lifts if _instance_axis_aligned(e)]
+
         # Full grid spans — dim lines extend to these extents for alignment
         margin = l2_feet * 0.5
         v_span_lo = (min(_grid_pos(g, 'X') for g in v_grids) - margin) if v_grids else None
@@ -1174,6 +1306,7 @@ class AutoDimensionWindow(T3WPFWindow):
         created_dims = []  # track for conflict detection
         dim_attempts = [0]   # count of _create_chain_dim calls with >= 2 refs
         dim_failures  = []   # collect first few NewDimension error messages
+        reported      = set()  # elements already named in a rejected-ref warning
 
         def _chain(ref_pos, axis, primary_perp, offset_val,
                    span_lo=None, span_hi=None, mirror_perp=None):
@@ -1188,7 +1321,7 @@ class AutoDimensionWindow(T3WPFWindow):
             d = _create_chain_dim(self.doc, view, rp_list, axis,
                                   primary_perp + offset_val, margin, dim_type, dim_z,
                                   span_lo=span_lo, span_hi=span_hi,
-                                  failures=dim_failures)
+                                  failures=dim_failures, reported=reported)
             if d:
                 made.append(d)
             if both_sides and mirror_perp is not None:
@@ -1197,7 +1330,7 @@ class AutoDimensionWindow(T3WPFWindow):
                 d2 = _create_chain_dim(self.doc, view, rp_list, axis,
                                        mirror_perp - offset_val, margin, dim_type, dim_z,
                                        span_lo=span_lo, span_hi=span_hi,
-                                       failures=dim_failures)
+                                       failures=dim_failures, reported=reported)
                 if d2:
                     made.append(d2)
             return made
@@ -1563,18 +1696,17 @@ class AutoDimensionWindow(T3WPFWindow):
             # ══ PHASE 4 (L2): Wall Chain Dimensions (wall_mode) ═════════════
             for wall in walls:
                 try:
+                    run_axis = _wall_run_axis(wall)
+                    if run_axis is None:
+                        # Curved or angled wall (even a few degrees off) —
+                        # its faces are not parallel to the grids, and
+                        # NewDimension rejects the string.
+                        continue
                     all_wall_refs = _collect_wall_core_refs(wall)
                     if not all_wall_refs:
                         continue
-                    loc = wall.Location
-                    if isinstance(loc, LocationCurve):
-                        d = _curve_direction(loc.Curve)
-                        if min(abs(d.X), abs(d.Y)) > AXIS_TOLERANCE:
-                            # Diagonal wall — an X/Y-aligned chain would land
-                            # off the wall and NewDimension usually rejects it.
-                            continue
                     cx, cy = _elem_centroid(wall, view)
-                    is_h   = _wall_is_horizontal(wall)
+                    is_h   = run_axis == 'X'
                     bb     = wall.get_BoundingBox(view)
 
                     if is_h and run_y:
@@ -1798,8 +1930,14 @@ class AutoDimensionWindow(T3WPFWindow):
                                     if r:
                                         ref_pos.append((_grid_pos(g, 'Y'), r))
 
-                    # Wall face refs
+                    # Wall face refs — only walls running ACROSS the string
+                    # (returns, corners): their side faces face the string
+                    # axis. Walls along the facade face the other way and
+                    # made NewDimension reject the whole facade string.
+                    cross_axis = 'Y' if axis == 'X' else 'X'
                     for wall in fwalls:
+                        if _wall_run_axis(wall) != cross_axis:
+                            continue
                         try:
                             wall_refs = _collect_wall_core_refs(wall)
                             if not wall_refs:
@@ -1870,7 +2008,7 @@ class AutoDimensionWindow(T3WPFWindow):
                         d = _create_chain_dim(self.doc, view, ref_pos, axis, perp, margin,
                                               dim_type, dim_z,
                                               span_lo=span_lo, span_hi=span_hi,
-                                              failures=dim_failures)
+                                              failures=dim_failures, reported=reported)
                         if d:
                             created_dims.append(d)
                             dims_created += 1
@@ -1966,9 +2104,6 @@ class AutoDimensionWindow(T3WPFWindow):
                 return None
             lo = deduped[0][0] - margin
             hi = deduped[-1][0] + margin
-            ra = ReferenceArray()
-            for _, r in deduped:
-                ra.Append(r)
             if horizontal:
                 p0 = tf.OfPoint(XYZ(lo, fixed, 0.0))
                 p1 = tf.OfPoint(XYZ(hi, fixed, 0.0))
@@ -1976,15 +2111,11 @@ class AutoDimensionWindow(T3WPFWindow):
                 p0 = tf.OfPoint(XYZ(fixed, lo, 0.0))
                 p1 = tf.OfPoint(XYZ(fixed, hi, 0.0))
             attempts[0] += 1
-            try:
-                return self.doc.Create.NewDimension(
-                    view, Line.CreateBound(p0, p1), ra, dim_type)
-            except Exception as ex:
-                msg = str(ex)
-                logger.warning("Section chain dim failed: {}".format(msg))
-                if len(failures) < 5:
-                    failures.append(msg)
-                return None
+            # A grid cut at an angle by the section is not parallel to the
+            # others; _dimension_string drops it instead of losing the string.
+            return _dimension_string(self.doc, view, Line.CreateBound(p0, p1),
+                                     [r for _, r in deduped], dim_type,
+                                     "Section chain dim", failures=failures)
 
         t = Transaction(self.doc, "T3Lab: Auto Dimension [{}]".format(view.Name))
         try:

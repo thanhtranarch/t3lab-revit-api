@@ -40,8 +40,15 @@ except Exception:
     DB = None
 
 
+import uuid
+# The pushbutton script importlib.reload()s this module on every click; a
+# fixed __namespace__ would define the same .NET type twice and raise
+# "Duplicate type name within an assembly" (rule S15).
+_NS_SUFFIX = uuid.uuid4().hex[:8]
+
+
 class LinkFilter(ISelectionFilter if DB else object):
-    __namespace__ = "T3Lab.WallCutProfile_LinkFilter"
+    __namespace__ = "T3Lab.WallCutProfile_LinkFilter_" + _NS_SUFFIX
 
     def AllowElement(self, elem):
         return isinstance(elem, RevitLinkInstance)
@@ -51,7 +58,7 @@ class LinkFilter(ISelectionFilter if DB else object):
 
 
 class WallFilter(ISelectionFilter if DB else object):
-    __namespace__ = "T3Lab.WallCutProfile_WallFilter"
+    __namespace__ = "T3Lab.WallCutProfile_WallFilter_" + _NS_SUFFIX
 
     def AllowElement(self, elem):
         if not isinstance(elem, Wall):
@@ -66,7 +73,7 @@ class WallFilter(ISelectionFilter if DB else object):
 
 
 class WarningSwallower(IFailuresPreprocessor if DB else object):
-    __namespace__ = "T3Lab.WallCutProfile_Failures"
+    __namespace__ = "T3Lab.WallCutProfile_Failures_" + _NS_SUFFIX
 
     def PreprocessFailures(self, fa):
         for f in fa.GetFailureMessages():

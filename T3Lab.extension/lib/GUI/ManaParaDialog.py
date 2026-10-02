@@ -797,7 +797,7 @@ class EditBindingDialog(Window):
         info_panel.Children.Add(info1)
         if not self.item.is_shared:
             warn = TextBlock()
-            warn.Text = u"⚠ Project parameters cannot change binding via API"
+            warn.Text = u"Project parameters cannot change binding via API"
             warn.Foreground = _hex_brush("#EF4444")
             warn.Margin = Thickness(0, 6, 0, 0)
             warn.TextWrapping = System.Windows.TextWrapping.Wrap

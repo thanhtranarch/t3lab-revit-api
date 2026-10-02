@@ -29,6 +29,11 @@ Usage:
     python3 dev/audit_t3.py --legacy        # liệt kê nợ của file legacy
     python3 dev/audit_t3.py --legacy-count  # in đúng 1 số: số file chưa migrate
     python3 dev/audit_t3.py --file <path>   # soi 1 file, luôn soi đầy đủ
+                                            # (.py → chỉ luật 22: glyph trong font/bảng)
+
+Luật 22 (icon) còn soát mọi file Python trong lib/GUI: glyph \\uXXXX phải có trong
+Segoe MDL2 Assets (dev/icons/mdl2_codepoints.tsv) và trong bảng glyph chuẩn của
+T3LAB_UI_STANDARD.md.
 """
 import os
 import re
@@ -78,6 +83,87 @@ BRIDGE_EXEMPT = {"ManaAnno.xaml"}
 #   T3LabAssistant — chat surface, màu theo theme Revit ({DynamicResource
 #                    T3Theme*}), gắn T3.Icon (brush tĩnh) sẽ hỏng dark mode
 ICON_EXEMPT = {"DWGManagement.xaml", "T3LabAssistant.xaml"}
+# Cùng lý do, phía Python: chat surface tự dựng glyph theo theme Revit.
+ICON_EXEMPT_PY = {"T3LabAssistantDialog.py"}
+
+# Glyph phải CÓ THẬT trong font — codepoint thiếu render ra ô vuông tofu, và WPF
+# không báo lỗi gì. Danh sách lấy từ tài liệu Microsoft (code<TAB>tên).
+MDL2_CODEPOINTS = os.path.join(REPO, "dev", "icons", "mdl2_codepoints.tsv")
+# "Một khái niệm, một glyph": bảng glyph chuẩn đọc THẲNG từ chuẩn UI, nên bảng
+# và gate không thể lệch nhau. Vùng bảng = từ dòng mở tới dòng đóng dưới đây.
+STANDARD_MD = os.path.join(REPO, "pyRevit UI Design System", "T3LAB_UI_STANDARD.md")
+GLYPH_TABLE_BEGIN = "Bảng glyph chuẩn"
+GLYPH_TABLE_END = "Cần glyph chưa có"
+GUI_DIR = os.path.join(REPO, "T3Lab.extension", "lib", "GUI")
+RAIL_TILE = "{StaticResource T3.Rail.Tile}"
+
+# Glyph = codepoint vùng Private Use của MDL2 (E000–F8FF): entity &#xE8FD;,
+# escape Python , hoặc ký tự dán thẳng.
+_PUA = r"(?:[Ee][0-9A-Fa-f]|[Ff][0-8])[0-9A-Fa-f]{2}"
+GLYPH_ENTITY_RE = re.compile(r"&#[xX](%s);" % _PUA)
+GLYPH_ESCAPE_RE = re.compile(r"\\u(%s)" % _PUA)
+GLYPH_LITERAL_RE = re.compile("[-]")
+
+_ICON_REFS = {}
+
+
+def icon_refs():
+    """(codepoints, table) — cả hai là dict {CODE: tên}, hoặc None nếu thiếu file.
+
+    codepoints — mọi glyph có trong Segoe MDL2 Assets (dev/icons/mdl2_codepoints.tsv)
+    table      — mọi glyph trong bảng glyph chuẩn của T3LAB_UI_STANDARD.md
+    """
+    if not _ICON_REFS:
+        cps = None
+        if os.path.exists(MDL2_CODEPOINTS):
+            cps = {}
+            with open(MDL2_CODEPOINTS, encoding="utf-8") as fh:
+                for line in fh:
+                    if line.strip() and not line.startswith("#"):
+                        code, _, name = line.rstrip("\n").partition("\t")
+                        cps[code.strip().upper()] = name.strip()
+        table = None
+        if os.path.exists(STANDARD_MD):
+            with open(STANDARD_MD, encoding="utf-8") as fh:
+                md = fh.read()
+            i = md.find(GLYPH_TABLE_BEGIN)
+            j = md.find(GLYPH_TABLE_END, i)
+            if i >= 0 and j > i:
+                table = {}
+                for row in md[i:j].splitlines():
+                    for code, name in re.findall(r"`([0-9A-Fa-f]{4})`\s*([^|`·]*)", row):
+                        table.setdefault(code.upper(), name.strip())
+        _ICON_REFS["cps"], _ICON_REFS["table"] = cps, table
+    return _ICON_REFS["cps"], _ICON_REFS["table"]
+
+
+def glyph_issues(codes):
+    """Luật 22 (b)+(c) cho một tập codepoint đã gặp trong một file."""
+    cps, table = icon_refs()
+    issues = []
+    if cps is not None:
+        tofu = sorted(c for c in codes if c not in cps)
+        if tofu:
+            issues.append(("P1", "glyph %s KHÔNG có trong Segoe MDL2 Assets — render ra ô "
+                                 "vuông tofu (đối chiếu dev/icons/mdl2_codepoints.tsv)"
+                           % ", ".join(tofu)))
+    if table is not None:
+        off = sorted(c for c in codes if c not in table and (cps is None or c in cps))
+        if off:
+            issues.append(("P3", "glyph ngoài bảng glyph chuẩn (%s) — dùng glyph đã có "
+                                 "cho cùng khái niệm, hoặc thêm vào bảng ở "
+                                 "T3LAB_UI_STANDARD.md + comment khối ICON"
+                           % ", ".join("%s %s" % (c, (cps or {}).get(c, "?")) for c in off)))
+    return issues
+
+
+def audit_py(src, base):
+    """Luật 22 cho Python dựng icon (glyph qua \\uXXXX hoặc ký tự dán thẳng)."""
+    if base in ICON_EXEMPT_PY:
+        return []
+    codes = {m.upper() for m in GLYPH_ESCAPE_RE.findall(src)}
+    codes |= {"%04X" % ord(ch) for ch in GLYPH_LITERAL_RE.findall(src)}
+    return glyph_issues(codes)
 
 # Ký tự Unicode hay bị dùng nhầm làm icon — render bằng Segoe UI nên lệch nét,
 # lệch baseline, lệch chiều cao so với glyph MDL2 đứng cạnh. Giá trị = glyph
@@ -489,6 +575,23 @@ def audit(src, base, keys):
                              "Segoe MDL2 Assets, xem bảng glyph trong T3Lab.Styles.xaml"
                        % ", ".join("%s %s" % (g, FAKE_ICON_GLYPHS[g.upper()])
                                    for g in bad_glyphs)))
+    if base not in ICON_EXEMPT:
+        # (c) Ô rail tự vẽ <Path>: mỗi tool một nét (1.5/1.6/1.8), một hệ hình
+        #     riêng — đúng thứ "một bộ icon" sinh ra để chống. Rail dùng glyph.
+        rail_paths = [
+            {local(k): v for k, v in el.attrib.items()}.get("Name", "?")
+            for el in root.iter()
+            if el.attrib.get("Style", "").strip() == RAIL_TILE
+            and any(local(c.tag) == "Path" for c in el.iter() if c is not el)]
+        if rail_paths:
+            issues.append(("P2", "%d ô T3.Rail.Tile tự vẽ <Path> (%s) — rail icon phải là "
+                                 "glyph T3.Icon.Rail: <TextBlock Text=\"&#x…;\" "
+                                 "Style=\"{StaticResource T3.Icon.Rail}\"/>"
+                           % (len(rail_paths), ", ".join(rail_paths))))
+        # (d) Glyph có thật trong font (P1) và nằm trong bảng glyph chuẩn (P3).
+        codes = {m.upper() for m in GLYPH_ENTITY_RE.findall(src)}
+        codes |= {"%04X" % ord(ch) for ch in GLYPH_LITERAL_RE.findall(src)}
+        issues.extend(glyph_issues(codes))
 
     if n_primary > 1 and base not in MULTI_WINDOW:
         issues.append(("P2", "%d nút T3.Button.Primary — chuẩn cho đúng một" % n_primary))
@@ -523,18 +626,51 @@ def main():
     if keys is None and not count_only:
         print("CẢNH BÁO: không tìm thấy %s — bỏ qua kiểm tra key." % STYLESHEET)
 
+    cps, table = icon_refs()
+    if not count_only:
+        if cps is None:
+            print("CẢNH BÁO: không thấy %s — bỏ qua kiểm tra glyph có trong font."
+                  % MDL2_CODEPOINTS)
+        if table is None:
+            print("CẢNH BÁO: không đọc được bảng glyph trong %s (vùng \"%s\" … \"%s\") "
+                  "— bỏ qua kiểm tra glyph ngoài bảng."
+                  % (STANDARD_MD, GLYPH_TABLE_BEGIN, GLYPH_TABLE_END))
+
+    py_files = []
     if "--file" in argv:
         files = [argv[argv.index("--file") + 1]]
         forced = True
+        if files[0].endswith(".py"):
+            py_files, files = files, []
     else:
         files = sorted(glob.glob(os.path.join(TOOLS, "*.xaml")))
         forced = False
+        py_files = sorted(glob.glob(os.path.join(GUI_DIR, "**", "*.py"), recursive=True))
 
-    n_t3 = n_legacy = n_locked = 0
+    n_t3 = n_legacy = n_locked = n_xaml_bad = n_py_bad = 0
     failed = False
     legacy_rows = []
     waived = []
     out = []
+
+    # Bảng glyph chuẩn không được chứa glyph tofu — nếu không, gate "ngoài bảng"
+    # sẽ hợp thức hoá chính glyph đó (ED1A Hide nằm trong bảng tới 2026-10-02).
+    if not forced and cps is not None and table is not None:
+        tofu = sorted(c for c in table if c not in cps)
+        if tofu:
+            failed = True
+            out.append((os.path.basename(STANDARD_MD),
+                        [("P1", "bảng glyph chuẩn chứa glyph KHÔNG có trong Segoe MDL2 "
+                                "Assets: %s" % ", ".join(tofu))]))
+
+    for path in py_files:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            py_issues = audit_py(fh.read(), os.path.basename(path))
+        if py_issues:
+            failed = True
+            n_py_bad += 1
+            out.append((os.path.relpath(path, GUI_DIR) if path.startswith(GUI_DIR)
+                        else os.path.basename(path), py_issues))
 
     for path in files:
         base = os.path.basename(path)
@@ -561,6 +697,7 @@ def main():
                 waived.append((base, gap, waived_here))
         if all_issues:
             failed = True
+            n_xaml_bad += 1
             out.append((base, all_issues))
 
     if count_only:
@@ -587,7 +724,10 @@ def main():
 
     print()
     print("T3 AUDIT: %d file khai T3 (%d file có vi phạm) · %d file legacy · %d UI-locked"
-          % (n_t3, len(out), n_legacy, n_locked))
+          % (n_t3, n_xaml_bad, n_legacy, n_locked))
+    if py_files:
+        print("          icon (luật 22): soát thêm %d file Python trong lib/GUI (%d có vi phạm)"
+              % (len(py_files), n_py_bad))
     if n_legacy and not show_legacy:
         print("          chạy --legacy để xem nợ migration của %d file kia" % n_legacy)
     if waived:

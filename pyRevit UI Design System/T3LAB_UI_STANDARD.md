@@ -104,7 +104,7 @@ bao giờ phải tự viết số lạ:
 
 `T3.WinCtrl` nút minimize/maximize · `T3.WinClose` nút đóng (hover đỏ) ·
 `T3.TabItem.Hidden` tab ẩn cho wizard điều khiển bằng code-behind ·
-`T3.Rail.Tile` ô rail 42×42 (ToggleButton) · `T3.Rail.Logo` ô logo 42×42 ·
+`T3.Rail.Tile` ô rail 42×42 (ToggleButton; icon là glyph `T3.Icon.Rail`) · `T3.Rail.Logo` ô logo 42×42 ·
 `T3.Pill` dải ngang 36px · `T3.ComboBox.Toggle` nút mở của combo nhỏ ·
 `T3.ScrollBar.Thumb` thumb thanh cuộn.
 
@@ -309,6 +309,11 @@ khai `FontFamily`/`FontSize` tại chỗ dùng.
 | `T3.Icon.Lead` | icon đứng trước nhãn/chữ trong nút — cách chữ 8px, màu thừa kế |
 | `T3.Icon.Lg` | icon lớn cho empty state / header — cỡ Display (19) |
 | `T3.Callout.Icon` | icon của callout — cỡ Caption, canh đỉnh dòng chữ đầu |
+| `T3.Icon.Rail` | icon của ô rail (`T3.Rail.Tile`) — cỡ 16 (lưới gốc của MDL2, sắc ở 100% và 125%), canh giữa, màu thừa kế theo trạng thái tile |
+
+**Ô rail không tự vẽ `<Path>`.** Mỗi `T3.Rail.Tile` chứa đúng một
+`<TextBlock Text="&#x…;" Style="{StaticResource T3.Icon.Rail}"/>`, glyph lấy từ bảng
+"Khái niệm trang" bên dưới. Tooltip của tile vẫn bắt buộc — nó gọi tên trang.
 
 **Cấm ký tự Unicode thường làm icon** (`✓ ✕ ⚠ ▶ ▢ − ◀ ▲ ▼`). Chúng render bằng
 Segoe UI nên lệch nét, lệch baseline và lệch chiều cao so với glyph MDL2 đứng cạnh.
@@ -324,10 +329,54 @@ Bảng glyph chuẩn — **một khái niệm, một glyph, toàn dự án**:
 | `E70D` ChevronDown | `E70E` ChevronUp | `E76B` ChevronLeft | `E76C` ChevronRight |
 | `E74E` Save | `E8E5` OpenFile | `E774` Globe | `E7A7` Undo |
 | `E8A3` Zoom | `E7B3` Isolate | `E7C9` Pick | `E7C3` Document |
-| `E896` Download | `EA80` Insight / AI | `ED1A` Hide | |
+| `E896` Download / Export file | `EA80` Insight / AI | `F140` Hide | `E923` Restore |
+| `E74A` ArrowUp — move to top, north | `E74B` ArrowDown — move to bottom | `E9A6` Fit — zoom to fit | `EA3A` Open — unresolved |
+| `E707` Map | `E753` Point cloud | | |
+
+**Khái niệm trang** — glyph của ô rail chọn theo **việc trang đó làm** (đọc từ tooltip /
+tiêu đề trang / handler), không theo đối tượng chung của cả tool: mọi tab của ManaSheets
+đều nói về sheet, cái phân biệt chúng là *inventory* với *renumber*.
+
+| Glyph | Khái niệm | Đang dùng ở |
+|---|---|---|
+| `E8FD` BulletedList | Danh sách · inventory · chọn mục | ManaPara Browse · ManaSheets Inventory · ManaViews Inventory · ManaStyles Style Manager · ExportManager(+Test) Selection · UIStandardShowcase Element Inventory |
+| `E9D5` CheckList | Audit · soát theo luật | AutoWork QA/QC, IFCSG Compliance Checker |
+| `E945` LightningBolt | Tự động hoá · macro | AutoWork Macro |
+| `E8B5` Import | Import · nạp vào model | FamiGen From CAD · ManaFami Family Loader · ManaPara Parameter Loader |
+| `E8AB` Switch | Hoán đổi · chuyển giữa hai phía | ManaPara Transfer · AutoJoin nút Switch |
+| `E71B` Link | Liên kết file ngoài | ManaSched Excel Link |
+| `E8C8` Copy | Nhân bản | ManaSched Duplicator |
+| `E8AC` Rename | Đổi tên · đánh số lại | ManaSheets Renumbering |
+| `E9E9` Equalizer | Template · bộ thiết lập lưu sẵn | ManaViews View Templates |
+| `E70F` Edit | Sửa / ghi đè giá trị · form | ManaAnno Dim Text · UIStandardShowcase Unified Studio |
+| `E81C` History | Lịch sử · log | UIStandardShowcase Monitor & Logs |
+| `E8A1` PreviewLink | Xem trước · mockup | SheetGen Layout · TileLayout Concepts |
+| `E8F1` Library | Family · thư viện | ManaFami Family Management |
+| `E81E` MapLayers | Workset · layer | ManaWorkset Worksets |
+| `E90F` Repair | Công cụ · sửa hàng loạt | ManaWorkset Bulk Tools |
+| `F158` DialShape3 | 3D view | ManaWorkset 3D Views |
+| `E95E` Health | Sức khoẻ model | ModelAuditor Health |
+| `E8EF` Calculator | Tổng hợp · tính toán | ManaContains Elements to Rooms |
+| `E790` Color | Màu · ghi đè đồ hoạ | ManaStyles Color Splasher |
+| `E943` Code | Code · JSON | FamiGen AI / JSON |
+| `ED5E` Ruler | Dimension · đo | ManaAnno Dimensions |
+| `E8D2` Font | Text | ManaAnno Text Notes |
+| `E727` InPrivate | Pattern · mẫu lát / hatch | TileLayout Pattern |
+| `E8EC` Tag | Phân loại · gán type | IFCSG Subtype Assigner |
+| `E80F` Home | Room · space | CADToElements Rooms · ManaContains Rooms to Elements · SheetGen Room List |
+| `E809` TiltUp | Floor | CADToElements Floors · TileLayout Boundaries |
+| `E80A` TiltDown | Ceiling (lưới trần) | CADToElements Ceilings |
+| `ECA5` Tiles | Wall (lớp gạch) | CADToElements Walls |
+| `E825` Bank | Column | CADToElements Columns |
+| `E933` IBeam | Beam (tiết diện I) | CADToElements Beams |
+| `E7B7` MapPin2 | Grid (đầu trục) | CADToElements Grids |
+| `EF90` Flow | Line (đoạn có hai đầu mút) | CADToElements Lines |
+| `E95F` Wire | MEP run | CADToElements MEP Runs |
+| `E713` · `E896` · `E7BA` · `E74D` | Settings · Export · Warning · Delete/purge (bảng trên) | ExportManager Format, Queue & Export · UIStandardShowcase Preferences · ModelAuditor Warning, Purge |
 
 Cần glyph chưa có trong bảng → thêm vào bảng này **và** vào comment đầu khối ICON
-trong `T3Lab.Styles.xaml`, đừng dùng lẻ.
+trong `T3Lab.Styles.xaml`, đừng dùng lẻ. `audit_t3.py` đọc thẳng hai bảng trên (từ
+dòng "Bảng glyph chuẩn" tới đây) — glyph ngoài bảng là P3.
 
 **Hai cái bẫy khi chọn glyph mới** (học được lúc thêm Zoom/Isolate/Pick, 2026-09-12):
 
@@ -335,9 +384,11 @@ trong `T3Lab.Styles.xaml`, đừng dùng lẻ.
    gần như y hệt `E721` Search — đặt Zoom bằng `E71E` là hai khái niệm khác nhau
    cùng một hình. Zoom dùng `E8A3` (kính lúp có dấu +) để phân biệt được.
 2. **Kiểm tra codepoint CÓ THẬT trong font.** Glyph không tồn tại render ra ô vuông
-   tofu, và `audit_t3.py` không bắt được — nó chỉ grep chuỗi trong source. `E7AE` và
-   `E92B` chẳng hạn là KHÔNG có trong Segoe MDL2 Assets. Cách kiểm nhanh, không cần
-   mở Revit:
+   tofu. `E7AE` và `E92B` chẳng hạn là KHÔNG có trong Segoe MDL2 Assets; `ED1A` Hide
+   cũng vậy — nó là glyph của **Segoe Fluent Icons** (font của Windows 11), từng nằm
+   trong bảng này cho tới 2026-10-02, nay Hide là `F140`. `audit_t3.py` đối chiếu mọi
+   glyph với `dev/icons/mdl2_codepoints.tsv` (danh sách lấy từ tài liệu Microsoft) và
+   báo P1. Kiểm trên máy Windows, không cần mở Revit:
 
    ```powershell
    $tf = New-Object Windows.Media.Typeface('Segoe MDL2 Assets'); $gt = $null
@@ -345,15 +396,24 @@ trong `T3Lab.Styles.xaml`, đừng dùng lẻ.
    $gt.CharacterToGlyphMap.ContainsKey([Convert]::ToInt32('E8A3', 16))   # True = có thật
    ```
 
-> **Nợ hiện có:** 14 glyph lẻ ngoài bảng vẫn còn trong `T3LabAssistant.xaml` (`E81C`
-> `E723` `E8BD` `E74C` `ED25` `E8B7`), `ParameterSelector.xaml` (`E74A` `E74B`),
-> `AutoJoin.xaml` (`E8AB`), `BCFReader.xaml` (`EA3A`), `ManaGroup.xaml` (`E9A6`),
-> `PointCloud.xaml` (`E753`), `PropertyLine.xaml` (`E707`). Chưa khai vào bảng vì
-> chưa rõ khái niệm chủ ý của từng cái — ai sửa tool đó thì khai luôn.
+> **Nợ hiện có:** chỉ còn chat surface được miễn trừ — `T3LabAssistant.xaml` (`E723`
+> `E8BD` `E74C` `ED25` `E8B7`) và `T3LabAssistantDialog.py` (`E723` `E838` `E895` `E8D4`)
+> dùng glyph ngoài bảng. Mọi tool khác đã về bảng (2026-10-02).
 
-Gate: `python3 dev/audit_t3.py` bắt cả hai vi phạm (FontFamily inline · ký tự Unicode).
-Miễn trừ: `DWGManagement.xaml` (thiết kế riêng đã chốt) và `T3LabAssistant.xaml`
-(chat surface theo theme Revit — brush tĩnh của `T3.Icon` sẽ hỏng dark mode).
+Gate: `python3 dev/audit_t3.py` bắt:
+
+| Vi phạm | Mức |
+|---|---|
+| `FontFamily="Segoe MDL2 Assets"` khai tại chỗ dùng | P2 |
+| Ký tự Unicode thường làm icon | P2 |
+| `T3.Rail.Tile` tự vẽ `<Path>` thay vì glyph `T3.Icon.Rail` | P2 |
+| Glyph `&#xE…;`/`&#xF…;` không có trong `dev/icons/mdl2_codepoints.tsv` — ra tofu | **P1** |
+| Glyph không có trong hai bảng ở trên | P3 |
+| Escape `\uE…` trong `lib/GUI/**/*.py` không có trong font (P1) hoặc ngoài bảng (P3) | P1 / P3 |
+
+Miễn trừ: `DWGManagement.xaml` (thiết kế riêng đã chốt), `T3LabAssistant.xaml` và
+`T3LabAssistantDialog.py` (chat surface theo theme Revit — brush tĩnh của `T3.Icon` sẽ
+hỏng dark mode).
 
 ## AI Mode — khi nào có, trông ra sao
 

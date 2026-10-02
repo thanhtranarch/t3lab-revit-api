@@ -78,9 +78,11 @@ class ProgressPauseMixin(object):
     PP_STOP   = "btn_stop"
     PP_STATUS = "status_text"
 
-    # Labels / messages — override per tool if needed
-    PP_PAUSE_LABEL  = u"⏸  Pause"
-    PP_RESUME_LABEL = u"▶  Resume"
+    # Labels / messages — override per tool if needed. PP_*_LABEL is the
+    # fallback Button.Content label; _pp_button_content() puts the MDL2 glyph
+    # in front (T3 rule 22: no Unicode pause/play characters as icons).
+    PP_PAUSE_LABEL  = u"Pause"
+    PP_RESUME_LABEL = u"Resume"
     PP_STOP_MSG     = u"Stopping… finishing current item"
     PP_PAUSED_MSG   = u"Paused — click Resume to continue"
 
@@ -115,8 +117,8 @@ class ProgressPauseMixin(object):
         """Reflect pause state on the Pause/Resume button.
 
         Prefers named icon/label TextBlocks (PP_PAUSE_ICON / PP_PAUSE_TEXT,
-        Segoe MDL2 glyph pattern); falls back to swapping Button.Content
-        strings for windows without them (FamiGen pattern).
+        Segoe MDL2 glyph pattern); falls back to rebuilding Button.Content as
+        glyph + label for windows without them (_pp_button_content).
         """
         try:
             icon  = self._pp_el(self.PP_PAUSE_ICON)
@@ -129,9 +131,42 @@ class ProgressPauseMixin(object):
             else:
                 btn = self._pp_el(self.PP_PAUSE)
                 if btn is not None:
-                    btn.Content = self.PP_RESUME_LABEL if paused else self.PP_PAUSE_LABEL
+                    btn.Content = self._pp_button_content(
+                        self.PP_RESUME_GLYPH if paused else self.PP_PAUSE_GLYPH,
+                        self.PP_RESUME_LABEL if paused else self.PP_PAUSE_LABEL)
         except Exception:
             pass
+
+    def _pp_button_content(self, glyph, text):
+        """MDL2 glyph + label for a Pause/Resume button with no named TextBlocks.
+
+        T3 rule 22: the icon is a TextBlock styled T3.Icon.Lead, never a Unicode
+        character inside Button.Content. Falls back to the plain label when WPF
+        is unavailable.
+        """
+        try:
+            from System.Windows import VerticalAlignment
+            from System.Windows.Controls import Orientation, StackPanel, TextBlock
+            icon = TextBlock()
+            icon.Text = glyph
+            try:
+                icon.Style = self.FindResource("T3.Icon.Lead")
+            except Exception:
+                from System.Windows import Thickness
+                from System.Windows.Media import FontFamily
+                icon.FontFamily = FontFamily("Segoe MDL2 Assets")
+                icon.Margin = Thickness(0, 0, 8, 0)
+                icon.VerticalAlignment = VerticalAlignment.Center
+            label = TextBlock()
+            label.Text = text
+            label.VerticalAlignment = VerticalAlignment.Center
+            panel = StackPanel()
+            panel.Orientation = Orientation.Horizontal
+            panel.Children.Add(icon)
+            panel.Children.Add(label)
+            return panel
+        except Exception:
+            return text
 
     def _pp_set_status(self, text):
         """Write to the window's status area.
