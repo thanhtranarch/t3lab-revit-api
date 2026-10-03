@@ -32,8 +32,8 @@ clr.AddReference('PresentationCore')
 clr.AddReference('PresentationFramework')
 clr.AddReference('WindowsBase')
 
-from System.Windows import Clipboard, Orientation, RoutedEventHandler, Visibility
-from System.Windows.Controls import CheckBox, StackPanel, TextBlock
+from System.Windows import Clipboard, RoutedEventHandler, Visibility
+from System.Windows.Controls import CheckBox, Orientation, StackPanel, TextBlock
 
 from GUI.WPF_Base import T3WPFWindow
 from GUI.T3Dialog import confirm, show_error
