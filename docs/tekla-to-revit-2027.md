@@ -2,9 +2,9 @@
 
 # Tekla to Revit 2027 — command map / Từ Tekla sang Revit 2027 — bản đồ lệnh
 
-> **EN** — This guide and the **Tekla Bridge** pushbutton (T3Lab › Rebar & Assembly) are generated from one data file, `T3Lab.extension/lib/data/tekla_bridge.json`: 36 Tekla commands in 6 groups. Search the same list inside Revit by typing a Tekla name in Tekla Bridge.
+> **EN** — This guide and the **Tekla Bridge** pushbutton (T3Lab Model › Rebar & Assembly) are generated from one data file, `T3Lab.extension/lib/data/tekla_bridge.json`: 36 Tekla commands in 6 groups. Search the same list inside Revit by typing a Tekla name in Tekla Bridge.
 >
-> **VI** — Tài liệu này và nút **Tekla Bridge** (T3Lab › Rebar & Assembly) được sinh từ cùng một file dữ liệu, `T3Lab.extension/lib/data/tekla_bridge.json`: 36 lệnh Tekla trong 6 nhóm. Tìm cùng danh sách đó ngay trong Revit bằng cách gõ tên Tekla vào Tekla Bridge.
+> **VI** — Tài liệu này và nút **Tekla Bridge** (T3Lab Model › Rebar & Assembly) được sinh từ cùng một file dữ liệu, `T3Lab.extension/lib/data/tekla_bridge.json`: 36 lệnh Tekla trong 6 nhóm. Tìm cùng danh sách đó ngay trong Revit bằng cách gõ tên Tekla vào Tekla Bridge.
 
 Contents / Mục lục: [1 Three layers](#1--three-layers--ba-lớp) · [2 Command map](#2--command-map--bản-đồ-lệnh) · [3 Weight schedule](#3--weight-schedule-template--mẫu-bảng-khối-lượng) · [4 Shortcuts](#4--shortcuts--phím-tắt) · [5 Assembly rules](#5--assembly-rules--luật-assembly) · [6 Known limits](#6--known-limits--giới-hạn-đã-biết) · [7 Verification status](#7--verification-status--tình-trạng-xác-minh)
 

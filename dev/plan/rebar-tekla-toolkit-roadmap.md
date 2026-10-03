@@ -4,7 +4,7 @@
 > **(1) không tool nào trùng / lặp chức năng Revit đã có sẵn; (2) Revit đang dùng là 2027;**
 > **(3) người Tekla sang không bị bỡ ngỡ và có đủ chức năng họ cần — hoặc một cách làm tối ưu hơn nhưng gần gũi.**
 > Trạng thái: **ĐỀ XUẤT — chưa có dòng code nào**
-> Panel mới: `T3Lab.extension/T3Lab_Dev.tab/Rebar & Assembly.panel/`
+> Panel mới: `T3Lab.extension/T3Lab Model.tab/Rebar & Assembly.panel/`
 > Mục tiêu: người quen Tekla Structures mở Revit là làm việc được ngay với từ vựng và thao tác quen,
 > và mọi tool hoạt động đúng cả khi phần tử nằm trong Assembly (cast unit của Revit).
 
@@ -263,7 +263,7 @@ Mỗi GĐ kết thúc bằng: 4 gate (`audit_t3`, `audit_tools`, `audit_wiring`,
 
 ```
 T3Lab.extension/
-├── T3Lab_Dev.tab/Rebar & Assembly.panel/
+├── T3Lab Model.tab/Rebar & Assembly.panel/
 │   ├── bundle.yaml                 # layout: TeklaBridge · CastUnit · CloneDrawing · RebarCheck · BVBSExport · RebarWizard
 │   ├── TeklaBridge.pushbutton/
 │   ├── CastUnit.pushbutton/

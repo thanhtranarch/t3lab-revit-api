@@ -2,9 +2,7 @@ title: "Support"
 background:
   title: "#46E07B00"
 layout:
-  - CloudLinks
-  - UI
-  - Assistant Tools
   - T3LabAssistant
-  - PDF import
-
+  - CloudLinks
+  - Assistant Tools
+  - UI

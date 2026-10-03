@@ -1,6 +1,6 @@
 # Phương án tách tab ribbon — giữ panel đồng nhất
 
-> Mở 2026-10-03 · Trạng thái: **đề xuất, chờ chốt quyết định ở §7** · Chưa đụng code.
+> Mở 2026-10-03 · Trạng thái: **GĐ0–GĐ2 xong (code + gate), GĐ3 chờ QA trong Revit** · D1–D4 chốt 2026-10-03: "yes" cho cả bốn mặc định.
 > Phạm vi: `T3Lab.extension/T3Lab_Dev.tab/` (7 panel, 53 nút) → **2 tab** (sửa 2026-10-03: user thấy 4 tab là nhiều).
 
 ---
@@ -168,17 +168,24 @@ mà chưa sửa thì lặp lại đúng lỗi đó.
 
 ### GĐ2 — Dời folder (một commit, `git mv` để giữ lịch sử)
 
-- [ ] Tạo `T3Lab Model.tab` và `T3Lab Docs.tab`, mỗi tab một `bundle.yaml` có `layout:` các panel.
-- [ ] Thêm `T3Lab.extension/bundle.yaml` với `layout:` Model trước Docs (kiểm chứng trong Revit
+- [x] Tạo `T3Lab Model.tab` và `T3Lab Docs.tab`, mỗi tab một `bundle.yaml` có `layout:` các panel.
+- [x] Thêm `T3Lab.extension/bundle.yaml` với `layout:` Model trước Docs (kiểm chứng trong Revit
       rằng pyRevit theo thứ tự này; nếu bị bỏ qua, pyRevit xếp theo ABC thành Docs → Model — chấp nhận, hoặc đổi tên).
-- [ ] M1–M6 ở §3; xoá `T3Lab_Dev.tab/`.
-- [ ] Icon: `python3 dev/build_icons.py --check`, soát tier A cho CAD to BIM và Cloud Links (P9;
+- [x] M1–M6 ở §3; xoá `T3Lab_Dev.tab/`.
+- [x] Icon: `python3 dev/build_icons.py --check`, soát tier A cho CAD to BIM và Cloud Links (P9;
       Cloud Links dùng lại `icon.svg` sẵn có của stack, 3 logo hãng bên trong vẫn miễn trừ).
-- [ ] Docs nhắc `T3Lab_Dev.tab`: `.claude/CLAUDE.md` (Folder Layout), `.claude/rules/new-tool-standard.md` §1,
+- [x] Docs nhắc `T3Lab_Dev.tab`: `.claude/CLAUDE.md` (Folder Layout), `.claude/rules/new-tool-standard.md` §1,
       `docs/cad-to-elements.md`, `rebar-tekla-toolkit-roadmap.md` §6, `rebar-tekla-implementation-spec.md`;
       thêm `docs/ui-governance/09-ribbon-icon-standard.md` (phạm vi "ribbon `T3Lab.tab`"),
       dòng "T3Lab › Rebar & Assembly" của `docs/tekla-to-revit-2027.md` (sửa ở `dev/build_tekla_docs.py`, đừng sửa file sinh).
-- [ ] Mọi gate xanh (cả `audit_ribbon` = 0) với cùng số script/icon như GĐ0.
+- [x] Mọi gate xanh (cả `audit_ribbon` = 0) với cùng số script/icon như GĐ0.
+      **Kết quả 2026-10-03:** `audit_ribbon` 0 vi phạm — `T3Lab Model` ≈ 1 159 px / 17 slot, `T3Lab Docs` ≈ 1 211 px / 15 slot.
+      50 script (28 + 22), icon 52/52 (thêm `CloudLinks.pulldown`, vẽ lại theo chuẩn; PNG render bằng resvg,
+      kiểm tra trước rằng bản Linux ra đúng từng byte như PNG đã commit). 113 file test: y hệt `main`, thêm
+      `test_audit_ribbon`; `test_checkbox_bridge` vẫn đỏ sẵn từ `main`.
+      Kiểm chứng trong source pyRevit (master): extension đọc `layout:` của `bundle.yaml` → thứ tự tab; bundle
+      thiếu trong layout của cha thì **không được dựng**; tab trùng tên được dùng lại (`update_if_exists=True`);
+      `URLButton` là `GenericUICommand` nên nằm được trong pulldown; ID lệnh ghép từ tên extension/tab/panel/nút.
 
 ### GĐ3 — QA trong Revit (user chạy; không tick từ gate tĩnh)
 

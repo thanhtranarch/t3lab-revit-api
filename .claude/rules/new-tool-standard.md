@@ -32,7 +32,11 @@ Không có pattern nào vừa → dừng lại, ghi `DESIGN SYSTEM GAP` vào
 
 ```
 T3Lab.extension/
-├── T3Lab_Dev.tab/<Panel>.panel/<Tool>.pushbutton/   ← tên thư mục tab đổi được: code dùng core.extension_paths.tab_dir()
+├── <Tab>.tab/<Panel>.panel/<Tool>.pushbutton/   ← 2 tab: `T3Lab Model.tab` · `T3Lab Docs.tab`. Code KHÔNG ghép
+│   │                                               đường dẫn tab/panel: tìm nút theo tên thư mục —
+│   │                                               core.extension_paths.bundle_path('<Tool>.pushbutton', …)
+│   │                                               Thêm nút = thêm tên nó vào `layout:` của panel (thiếu là
+│   │                                               pyRevit không dựng). Luật panel: dev/plan/ribbon-tab-split.md §4
 │   ├── script.py          ← entry point, KHÔNG chứa logic Revit nặng
 │   ├── icon.svg           ← NGUỒN DUY NHẤT, viewBox "0 0 32 32"
 │   ├── icon.dark.svg      ← sinh tự động, KHÔNG sửa tay

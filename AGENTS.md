@@ -69,7 +69,12 @@ Agent definitions: `.Codex/agents/`
 
 ```
 T3Lab.extension/
-├── T3Lab.tab/          ← ribbon panels and pushbutton scripts
+├── bundle.yaml       ← `layout:` = the ribbon tabs, in order. pyRevit builds ONLY the tabs listed here
+├── T3Lab Model.tab/   ← Standards & Settings · Model & Datum · Families · Rebar & Assembly
+├── T3Lab Docs.tab/    ← Views & Sheets · Annotation & Select · Data & IFC-SG · Support
+│                        (folder name = tab title. Never join a tab or panel path in code: find a
+│                        button by its folder name — core.extension_paths.find_bundle / bundle_path,
+│                        dev/tabdir.py in dev tools. Panel rules: dev/plan/ribbon-tab-split.md §4)
 ├── lib/
 │   ├── GUI/
 │   │   ├── Tools/      ← ALL .xaml files live here
