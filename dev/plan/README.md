@@ -113,6 +113,6 @@ Cột QA chỉ được tick theo phản hồi của user sau khi chạy trong R
 
 ## Tách tab ribbon — giữ panel đồng nhất (mở 2026-10-03)
 
-- Phương án: `dev/plan/ribbon-tab-split.md` — 1 tab `T3Lab_Dev` (31 slot, 4/7 stack mất chữ) → 4 tab
-  Model · Rebar · Docs · Manage, cùng một bộ luật panel P1–P10.
-- Trạng thái: ⬜ chờ chốt D1–D3 (§7 của file phương án) rồi mới vào GĐ0.
+- Phương án: `dev/plan/ribbon-tab-split.md` — 1 tab `T3Lab_Dev` (31 slot, 4/7 stack mất chữ) → 2 tab
+  Model · Docs (≈ 1 160 / 1 210 px), cùng một bộ luật panel P1–P10.
+- Trạng thái: ⬜ chờ chốt D1–D4 (§7 của file phương án) rồi mới vào GĐ0.
