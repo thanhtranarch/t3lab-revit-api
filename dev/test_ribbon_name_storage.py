@@ -7,9 +7,9 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from tabdir import TAB  # the tab folder name changes
+from tabdir import bundle_path  # the tab folder name changes
 
-SOURCE = Path(TAB) / 'Support.panel/UI.stack/Ribbon Names.pushbutton/script.py'
+SOURCE = Path(bundle_path('Ribbon Names.pushbutton', 'script.py'))
 
 
 class RibbonStorageTests(unittest.TestCase):

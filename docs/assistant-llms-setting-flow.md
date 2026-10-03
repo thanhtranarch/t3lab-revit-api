@@ -4,8 +4,8 @@ Hai pushbutton tách rời trên ribbon (`Support.panel`), nhưng dùng chung đ
 
 | Thành phần | Đường dẫn |
 |------------|-----------|
-| T3Lab Assistant | `T3Lab.extension/T3Lab.tab/Support.panel/T3LabAssistant.pushbutton/script.py` |
-| LLMs Setting | `T3Lab.extension/T3Lab.tab/Support.panel/Assistant Tools.stack/LLMsSetting.pushbutton/script.py` → `lib/GUI/LLMSettingDialog.py` |
+| T3Lab Assistant | `T3Lab.extension/T3Lab Docs.tab/Support.panel/T3LabAssistant.pushbutton/script.py` |
+| LLMs Setting | `T3Lab.extension/T3Lab Docs.tab/Support.panel/Assistant Tools.stack/LLMsSetting.pushbutton/script.py` → `lib/GUI/LLMSettingDialog.py` |
 | Router (singleton) | `T3Lab.extension/lib/Intelligence/llm_router.py` |
 | Cấu hình bền vững | `T3Lab.extension/lib/config/settings.py` → `%APPDATA%\T3LabAI\settings.json` |
 

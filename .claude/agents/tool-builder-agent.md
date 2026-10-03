@@ -14,10 +14,12 @@ description: End-to-end pyRevit pushbutton builder for T3Lab. Use this agent whe
 
 ## Workflow for a New Tool
 
-1. **Clarify requirements** — tool name, panel, stack (yes/no), what it does
+1. **Clarify requirements** — tool name, tab + panel, stack (yes/no), what it does. Two tabs: `T3Lab Model` (Standards & Settings · Model & Datum · Families · Rebar & Assembly) and `T3Lab Docs` (Views & Sheets · Annotation & Select · Data & IFC-SG · Support). Panel rules: `dev/plan/ribbon-tab-split.md` §4
 2. **Create pushbutton folder**:
-   - Non-stacked: `T3Lab.extension/T3Lab.tab/[Panel].panel/[ToolName].pushbutton/`
-   - Stacked: `T3Lab.extension/T3Lab.tab/[Panel].panel/[Stack].stack/[ToolName].pushbutton/`
+   - Non-stacked: `T3Lab.extension/[Tab].tab/[Panel].panel/[ToolName].pushbutton/`
+   - Stacked: `T3Lab.extension/[Tab].tab/[Panel].panel/[Stack].stack/[ToolName].pushbutton/`
+   - Add the folder name (without `.pushbutton`) to the parent's `layout:` in `bundle.yaml` — pyRevit does not build a bundle missing from it
+   - Folder names are unique across the extension; code finds a button with `core.extension_paths.bundle_path('<Tool>.pushbutton', ...)`, never by joining a tab or panel path
 3. **Create XAML** → `lib/GUI/Tools/[ToolName].xaml` (follow ui-agent rules)
 4. **Write script.py** with correct EXT_DIR depth:
    - Non-stacked (3 levels below extension): `EXT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR)))`
@@ -90,7 +92,8 @@ if __name__ == '__main__':
 ## File Placement & Verification Checklist
 - [ ] Shebang `#! python3` present at line 1
 - [ ] `lib/GUI/Tools/ToolName.xaml` created and follows T3 standard
-- [ ] `T3Lab.tab/.../ToolName.pushbutton/script.py` created
+- [ ] `<Tab>.tab/.../ToolName.pushbutton/script.py` created and listed in the parent's `layout:`
+- [ ] `python3 dev/audit_ribbon.py --quiet` green
 - [ ] EXT_DIR depth correct for stack vs non-stack
 - [ ] Path setup `sys.path.insert(0, LIB_DIR)` included
 - [ ] `_load_logo()` sets `self.Icon = bitmap`

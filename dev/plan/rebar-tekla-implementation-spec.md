@@ -27,7 +27,7 @@ Reference implementations to copy structure from (do not copy logic):
 
 | Need | Copy from |
 |---|---|
-| `script.py` frame, bootstrap, `resolve_doc` | `T3Lab.extension/T3Lab_Dev.tab/Standards & Settings.panel/ManaGroup.pushbutton/script.py` |
+| `script.py` frame, bootstrap, `resolve_doc` | `T3Lab.extension/T3Lab Model.tab/Standards & Settings.panel/ManaGroup.pushbutton/script.py` |
 | Dialog class / Snippets split, row classes, `AddHandler(CheckBox.ClickEvent, …)`, `_select_in_revit` | `lib/GUI/ManaGroupDialog.py` + `lib/Snippets/_group_ops.py` |
 | Window chrome: outer Border, title bar, rail tiles, hidden TabControl, footer | `lib/GUI/Tools/ManaWorkset.xaml` lines 1715–1830 and 2118–2136; rail handler `ManaWorksetDialog.nav_toggle_clicked` |
 | Footer progress (`progress_panel` / `pb_run` / `status_text`) | `lib/GUI/Tools/CADToElements.xaml` lines 2468–2495; API `T3WPFWindow.begin_progress / step_progress / end_progress / is_cancelled` (`lib/GUI/WPF_Base.py` 1294–1503) |
@@ -700,7 +700,7 @@ Then coordinator runs `python3 dev/build_icons.py`.
 
 ## 5 · Tools
 
-Panel: `T3Lab.extension/T3Lab_Dev.tab/Rebar & Assembly.panel/bundle.yaml` (coordinator):
+Panel: `T3Lab.extension/T3Lab Model.tab/Rebar & Assembly.panel/bundle.yaml` (coordinator):
 
 ```yaml
 title: "Rebar & Assembly"
@@ -717,6 +717,8 @@ layout:
 
 and `T3Lab.extension/T3Lab_Dev.tab/bundle.yaml` gains `  - Rebar & Assembly` after `Modeling & Datum`. Never hardcode the tab
 folder name: tests use `dev/tabdir.py`, runtime uses `core.extension_paths.tab_dir()`.
+*(Done. Since 2026-10-03 the panel sits in `T3Lab Model.tab`, listed in `T3Lab Model.tab/bundle.yaml`; code finds a
+button with `core.extension_paths.find_bundle()` / `bundle_path()` — see `dev/plan/ribbon-tab-split.md`.)*
 
 Common QA checklist (append to each tool's own list; copy roadmap §8):
 
@@ -732,7 +734,7 @@ Common QA checklist (append to each tool's own list; copy roadmap §8):
 
 ### 5.1 Tekla Bridge — `TeklaBridge.pushbutton` (WP2, Sonnet)
 
-- Folder: `T3Lab.extension/T3Lab_Dev.tab/Rebar & Assembly.panel/TeklaBridge.pushbutton/` — `script.py`, `bundle.yaml`, `icon.svg`.
+- Folder: `T3Lab.extension/T3Lab Model.tab/Rebar & Assembly.panel/TeklaBridge.pushbutton/` — `script.py`, `bundle.yaml`, `icon.svg`.
 - bundle.yaml: `title: "Tekla\nBridge"` · `tooltip: "Find any Revit command or T3Lab tool by its Tekla name, with a one-line note on what is different (Tekla: Quick Launch)"` · description bullets: *Search by Tekla term, grouped as the Tekla workflow* · *Open the Revit command (PostCommand) or the T3Lab tool* · *Shows the ribbon path when Revit has no postable command* · *Works without an open model*.
 - Icon concept: a bridge arch — surface rectangle deck `x=2.5 y=19.5 w=27 h=5` (line + surface), two piers (`detail`, x=7 and x=23, w=3, h=7 below deck), an amber arrow glyph above the deck (`accent.amber` polygon pointing right, 4 points), total 5 shapes.
 - Pattern **P2**, size **M 560×420** (D10), `MinWidth=560 MinHeight=420`.
@@ -881,7 +883,8 @@ Order: WP1 first (merge when its tests + compat gate pass). Then WP2–WP7 in pa
 ### 7.0 Coordinator tasks (exact edits)
 
 1. `T3Lab.extension/T3Lab_Dev.tab/bundle.yaml`: add `  - Rebar & Assembly` to `layout` after `Modeling & Datum`.
-2. Create `T3Lab.extension/T3Lab_Dev.tab/Rebar & Assembly.panel/bundle.yaml` (§5 header).
+   *(Done; now `T3Lab Model.tab/bundle.yaml` since the 2026-10-03 tab split.)*
+2. Create `T3Lab.extension/T3Lab Model.tab/Rebar & Assembly.panel/bundle.yaml` (§5 header).
 3. `dev/audit_revit_compat.py` `RULES` — append:
    ```python
    dict(name="RebarHookOrientation", kind="type", removed=2027, fix="Snippets._compat.create_rebar_from_curves()"),

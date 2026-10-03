@@ -101,7 +101,7 @@ D. HAI CÁI BẪY LÀM CHẾT TOOL NGAY LÚC PARSE — kiểm mỗi lần sửa 
 PHẠM VI
 ════════════════════════════════════════════════════════════════
   XAML       : T3Lab.extension/lib/GUI/Tools/*.xaml
-  Script     : T3Lab.extension/T3Lab.tab/*.panel/**/script.py
+  Script     : T3Lab.extension/*.tab/*.panel/**/script.py
   Dialog     : T3Lab.extension/lib/GUI/*.py
   Helper     : T3Lab.extension/lib/Snippets/
 

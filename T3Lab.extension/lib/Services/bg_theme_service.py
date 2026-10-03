@@ -9,7 +9,7 @@ try:
 except Exception:
     DB = None
 
-from core.extension_paths import tab_path
+from core.extension_paths import bundle_path
 from core.paths import user_data_path
 
 LIB_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,7 +18,7 @@ EXT_DIR = os.path.dirname(LIB_DIR)
 # folder, where they were committed with the repo. The old files are carried
 # over once.
 CONFIG_PATH = user_data_path('bg_theme', 'bg_theme_config.json', legacy=(
-    tab_path('Support.panel', 'UI.stack', 'BG Theme.pushbutton', 'dqt_bg_config.json'),
+    bundle_path('BG Theme.pushbutton', 'dqt_bg_config.json'),
     os.path.join(LIB_DIR, 'dqt_bg_config.json'),
 ))
 

@@ -6,7 +6,7 @@
 > `agent_loop.py`, `agents/dispatcher.py`, `skills_engine.py`,
 > `nlu_engine.py`, `core/server.py`, `Services/revit_context.py`,
 > `Intelligence/skill_installer.py`,
-> `T3Lab.tab/Support.panel/T3LabAssistant.pushbutton/script.py`,
+> `T3Lab Docs.tab/Support.panel/T3LabAssistant.pushbutton/script.py`,
 > `dev/test_assistant_perf.py`, `dev/test_assistant_routing.py`,
 > `dev/test_skill_installer.py`, `dev/bench_assistant.py`.
 

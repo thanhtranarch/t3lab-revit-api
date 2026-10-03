@@ -30,13 +30,12 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from tabdir import TAB  # noqa: E402  (the tab folder name changes)
+from tabdir import bundle_path  # noqa: E402  (the tab folder name changes)
 EXT = os.path.join(REPO, 'T3Lab.extension')
 XAML = os.path.join(EXT, 'lib', 'GUI', 'Tools', 'T3LabAssistant.xaml')
 THEME = os.path.join(EXT, 'lib', 'GUI', 'RevitTheme.py')
 _dialog_path = os.path.join(EXT, 'lib', 'GUI', 'T3LabAssistantDialog.py')
-SCRIPT = _dialog_path if os.path.exists(_dialog_path) else os.path.join(
-    TAB, 'Support.panel', 'T3LabAssistant.pushbutton', 'script.py')
+SCRIPT = _dialog_path if os.path.exists(_dialog_path) else bundle_path('T3LabAssistant.pushbutton', 'script.py')
 
 FAILURES = []
 

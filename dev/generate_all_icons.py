@@ -15,8 +15,7 @@ from PIL import Image, ImageDraw, ImageFilter
 # Configuration
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from tabdir import tab_path  # noqa: E402
-SUPPORT_PANEL_DIR = tab_path("Support.panel")
+from tabdir import find_bundle  # noqa: E402  (bundles are found by name, in any tab)
 PREVIEW_DIR = r"C:\Users\tran_tienthanh\.gemini\antigravity\brain\fc9a3b7f-ab70-4e15-861b-b2d3e68112b6"
 
 # Color constants
@@ -361,9 +360,12 @@ def main():
         # Render the icon image
         icon_img = render_icon(cfg["shape"], cfg["highlights"], name)
         
-        # Save path
-        dest_folder = os.path.join(SUPPORT_PANEL_DIR, cfg["dest_rel_path"])
-        os.makedirs(dest_folder, exist_ok=True)
+        # Save path: the bundle is found by its folder name, wherever it sits
+        # now; a bundle that no longer exists is skipped, never re-created.
+        dest_folder = find_bundle(os.path.basename(cfg["dest_rel_path"]))
+        if not dest_folder:
+            print(f"Skipped: no bundle named {os.path.basename(cfg['dest_rel_path'])}")
+            continue
         
         # 1. Save new icon.png (64x64) as transparent RGBA
         png_path = os.path.join(dest_folder, "icon.png")

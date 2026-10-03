@@ -2,7 +2,7 @@ title: "Standards & Settings"
 background:
   title: "#46E07B00"
 layout:
-  - Standards
   - ManaLoca
   - ManaGroup
   - BatchLink
+  - Standards

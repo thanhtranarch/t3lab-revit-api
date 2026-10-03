@@ -75,5 +75,5 @@ with DB.Transaction(doc, "T3Lab: Do Something") as t:
 
 ## File Placement
 - Library helpers → `T3Lab.extension/lib/`
-- Pushbutton logic → `T3Lab.extension/T3Lab.tab/.../script.py`
+- Pushbutton logic → `T3Lab.extension/<Tab>.tab/.../script.py` (`T3Lab Model.tab` or `T3Lab Docs.tab`)
 - Keep UI imports at the top, Revit logic below

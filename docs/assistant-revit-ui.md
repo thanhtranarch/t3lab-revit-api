@@ -4,7 +4,7 @@
 > `T3Lab.extension/lib/GUI/RevitTheme.py` ·
 > `T3Lab.extension/lib/GUI/Tools/T3LabAssistant.xaml` ·
 > `T3Lab.extension/lib/GUI/AssistantPaneControl.py` ·
-> `T3Lab.extension/T3Lab.tab/Support.panel/T3LabAssistant.pushbutton/script.py`
+> `T3Lab.extension/T3Lab Docs.tab/Support.panel/T3LabAssistant.pushbutton/script.py`
 
 Mục tiêu: Assistant không còn là một cửa sổ lạ dán đè lên Revit, mà đọc như
 **một panel của chính Revit**.

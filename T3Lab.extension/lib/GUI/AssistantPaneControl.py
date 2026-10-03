@@ -142,10 +142,8 @@ class AssistantPaneProvider(IDockablePaneProvider):
                 win = T3LabAssistantWindow(is_docked=True)
             except Exception as ex_import:
                 _log_pane(u"Direct import failed, attempting script fallback: {}".format(ex_import))
-                from core.extension_paths import tab_dir
-                script_path = os.path.join(
-                    tab_dir(_EXT_DIR), 'Support.panel', 'T3LabAssistant.pushbutton', 'script.py'
-                )
+                from core.extension_paths import bundle_path
+                script_path = bundle_path('T3LabAssistant.pushbutton', 'script.py')
                 if os.path.isfile(script_path):
                     try:
                         import importlib.util

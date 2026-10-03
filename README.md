@@ -18,76 +18,98 @@ Three layers form a self-sustaining ecosystem for architectural intelligence:
 | Layer | Description |
 |-------|-------------|
 | **Intelligence** | T3Lab Assistant — bilingual VI/EN language analysis, graph-based agent orchestration, RAG over project + Revit API knowledge, and multi-provider LLM routing (Ollama, LM Studio, Claude, OpenAI, DeepSeek). **Local-first**: a new install defaults to Qwen on Ollama, with an optional self-study loop that distils the office's own successful commands back into the local model. |
-| **Execution** | 42 ribbon-integrated tools organized by discipline across 7 panels |
+| **Execution** | 50 ribbon tools (plus 3 cloud links) in 2 tabs and 8 panels |
 | **Data Fabric** | MCP server bridge for external agents (Claude Desktop, ChatGPT/Codex and Antigravity can drive Revit); Vercel cloud API for family metadata; hybrid local/cloud storage |
 
 ---
 
-## Ribbon: T3Lab Tab
+## Ribbon: two tabs
 
-The tab exposes **7 panels**.
+The ribbon has **two tabs** with **8 panels** (2026-10-03; it was one `T3Lab_Dev` tab that
+Revit had to squeeze until stack labels disappeared — see `dev/plan/ribbon-tab-split.md`).
+Every panel follows one rule set: 2–6 items, large buttons before stacks, stacks always
+labelled, each tab ≤ 1250 px so it fits a 1366 px laptop. Gate: `dev/audit_ribbon.py`.
 
-### Standard
+| Tab | Panels | Purpose |
+|-----|--------|---------|
+| **T3Lab Model** | Standards & Settings · Model & Datum · Families · Rebar & Assembly | build the model, left to right in working order |
+| **T3Lab Docs** | Views & Sheets · Annotation & Select · Data & IFC-SG · Support | get information out of the model; Support last |
+
+### T3Lab Model
+
+#### Standards & Settings
 
 | Tool | Description |
 |------|-------------|
+| **Mana Loca** | Modeless element location editor — read and edit XYZ in a grid, commit in one transaction. |
+| **Mana Group** | Rename model and detail groups, set their workset, purge unused types, see where every instance sits. |
+| **Batch Link** | Manage Revit links, link new models, set each link's workset, control per-view link display. |
+| **Model Auditor** · **Mana Styles** · **Mana Workset** (stack) | Model health check (warnings, in-place models, materials) · fill patterns, line styles, line patterns and colour splashing · worksharing, worksets and workset view filters. |
 
-### Annotation & Select
+#### Model & Datum
+
+| Tool | Description |
+|------|-------------|
+| **CAD to BIM** (pulldown) | **CAD to Elements** (DWG layers → walls, floors, ceilings, rooms, columns, beams, grids, lines, MEP runs), **Point Cloud to Model** (Scan-to-BIM wizard), **Room To Floor**, **Door Threshold**, **Image to Drafting**, **Text to Element**. |
+| **Element Adjust** (pulldown) | **Auto Join** (rule-based joining, Shift+Click for defaults), **Split Elements** at levels, **Wall Cut Profile** from linked-model intersections, **Auto Adj Base Offset**. |
+| **Datum Sync** | Copy 2D extents, bubble visibility and leaders of grids and levels from the active view to other views. |
+| **Property Line** · **Tile Layout** (stack) | Draw a property boundary from any address worldwide (OpenStreetMap; LightBox parcels for US addresses) · 3-step tile layout wizard per floor. |
+
+#### Families
+
+| Tool | Description |
+|------|-------------|
+| **Mana Fami** | Family manager — batch rename families and types, load families from disk. |
+| **Family Transfer** | Copy families (all types or some) from a Revit link or another open project; links are read without opening them. |
+| **FamiGen** | Family generator — from CAD blocks (DWG → .rfa), from a JSON schema, or from built-in batch presets. |
+
+#### Rebar & Assembly
+
+| Tool | Description |
+|------|-------------|
+| **Tekla Bridge** | Find any Revit command or T3Lab tool by its Tekla name, with a note on what is different. |
+| **Cast Unit Manager** | Batch-create assemblies with their rebar, sync rebar, rename marks as a series, set partitions by rule. |
+| **Clone Drawing** | Copy the finished drawing of one assembly — views, sheet, annotations, tags, dimensions — to similar assemblies. |
+| **Rebar Check** | Data checks Revit does not run: rebar without host, missing from its assembly, duplicate numbers, bars outside the host. |
+| **BVBS Export** | Write BVBS BF2D `.abs` files for bending machines, checksums verified after writing. |
+| **Rebar Wizard** | Reinforce rectangular beams, columns and pad footings from a preset, added to the host's assembly. |
+
+### T3Lab Docs
+
+#### Views & Sheets
+
+| Tool | Description |
+|------|-------------|
+| **Mana Views** | View manager — rename views, batch rename, apply and update view templates. |
+| **Mana Sheets** | Sheet manager — Excel sync, view placement, sheet sets, re-numbering. |
+| **SheetGen** | Generate floor-plan views from a room list via a WPF selection interface. |
+| **Crop Sync** | Synchronise view crop region shape, size and annotation crop. |
+| **BatchOut** | Batch export sheets to PDF, DWG, NWD and IFC with revision tracking and advanced options. |
+| **PDF Import** | Import PDF pages into selected Revit views sequentially. |
+
+#### Annotation & Select
 
 | Tool | Description |
 |------|-------------|
 | **Mana Anno** | Unified Find / Remove / Rename manager for Dimensions and Text Notes. |
-| **Auto Dimension** | Automatic dimension chains for walls, columns, doors, lifts and grids in the active or a chosen view. |
-| **Mana DWG** | CAD import and CAD link manager — list, rename and delete DWG imports/links. |
-| **Mana Select** | Consolidated selection manager: Quick Select by parameter/text, Select Similar by type/family/category, and linked-element selection. |
+| **Make Pattern** | Draw model and drafting hatch patterns on a vector canvas, preview them tiled, create them in Revit or export `.pat`. |
+| **Mana DWG** · **Auto Dimension** · **Mana Select** (stack) | CAD import and link manager · dimension chains for walls, columns, doors, lifts and grids · counted element tree to select, isolate, export or delete. |
 
-### Modeling & Datum
-
-| Tool | Description |
-|------|-------------|
-| **CAD to BIM** (pulldown) | **CAD to Elements** (map DWG layers → Walls / Floors / Beams), **Point Cloud to Model** (Scan-to-BIM wizard detecting walls, floors, ceilings, doors, windows, columns, stairs, roofs), **Room To Floor**, **Door Threshold**, **Image to Drafting**, **Text to Element**. |
-| **Property Line** | Type any address worldwide and draw its property boundary: OpenStreetMap everywhere (no API key), LightBox cadastral parcels for US addresses. |
-| **Tile Layout** | 3-step wizard: extract floor boundaries, pick a tile pattern per floor, generate and place a tiled layout. |
-| **Element Adjust** (pulldown) | **Auto Join** (rule-based joining, Shift+Click for defaults), **Split Elements** at levels, **Wall Cut Profile** from linked-model intersections, **Auto Adj Base Offset**. |
-| **FamiGen** | Family generator — from CAD blocks (DWG → .rfa), from a JSON schema, or from built-in batch presets. |
-| **Mana Fami** | Family manager — browse by category, search/filter, and load families from disk. |
-
-### Views & Sheets
+#### Data & IFC-SG
 
 | Tool | Description |
 |------|-------------|
-| **BatchOut** | Batch export sheets to PDF, DWG, NWD and IFC with revision tracking and advanced options. |
-| **Mana Views** | View manager — rename views, batch rename, apply and update view templates. |
-| **Mana Sheets** | Sheet manager — Excel sync, view placement, sheet sets, re-numbering. |
-| **SheetGen** | Generate floor-plan views from a room list via a WPF selection interface. |
-
-### Data & IFC-SG
-
-| Tool | Description |
-|------|-------------|
-| **Mana Sched** | Schedule manager — export to Excel with formatting, import values back, duplicate schedules. |
-| **Mana Para** | Parameter manager — transfer values by rule, Text-to-Element assignment, values-to-filled-region. |
-| **Mana Contains** | Spatial containment — find elements inside Rooms/Areas/Spaces/Zones/Masses/Scope Boxes, push container values down or aggregate element data up. |
 | **IFC-SG Suite** | Subtype Assigner (Excel mapping → IFC Export Class & Predefined Type) + Compliance Checker against CORENET X rules. |
+| **Mana Sched** · **Mana Para** · **Mana Contains** (stack) | Schedules to/from Excel · parameter transfer, Text-to-Element, values-to-filled-region · elements inside Rooms/Areas/Spaces/Zones/Masses/Scope Boxes. |
 
-### Standards & Settings
-
-| Tool | Description |
-|------|-------------|
-| **Mana Styles** | Fill patterns, line styles, line patterns and visual colour-splashing in one window. |
-| **Mana Workset** | Enable worksharing, create/delete/purge worksets, generate workset view filters. |
-| **Mana Loca** | Modeless element location editor — read and edit XYZ in a grid, commit in one transaction. |
-| **Model Auditor** | Consolidated model health check, warnings, in-place models and material audit. |
-
-### Support
+#### Support
 
 | Tool | Description |
 |------|-------------|
 | **T3Lab Assistant** | Natural-language AI assistant — drive T3Lab tools via Vietnamese/English chat. |
-| **PDF Import** | Import PDF pages into selected Revit views sequentially. |
-| **Assistant Tools** (stack) | **MCP Control** (start/stop the MCP server, connection settings, one-click auto-configure for Claude Desktop / ChatGPT (Codex) / Antigravity), **LLMs Setting** (provider, model, API key), **Feedback**. |
-| **UI Theme & Tabs** (stack) | **BG Theme** (HSV picker with eyedropper, gradient 3D backgrounds, Light/Dark UI for Revit 2024+), **Mana Tabs** (hide/show ribbon tabs), **Ribbon Names** (shorten/restore tab names). |
-| **Cloud Links** (stack) | Autodesk Forma, Autodesk Health, Bluebeam Status. |
+| **Cloud Links** (pulldown) | Autodesk Forma, Autodesk Health, Bluebeam Status. |
+| **Assistant Tools** (stack) | **Feedback**, **MCP Control** (start/stop the MCP server, connection settings, one-click auto-configure for Claude Desktop / ChatGPT (Codex) / Antigravity), **LLMs Setting** (provider, model, API key). |
+| **UI Theme & Tabs** (stack) | **Mana Tabs** (hide/show ribbon tabs), **Ribbon Names** (shorten/restore tab names), **BG Theme** (HSV picker with eyedropper, gradient 3D backgrounds, Light/Dark UI for Revit 2024+). |
 
 ---
 
@@ -105,7 +127,7 @@ A fresh install seeds `active_provider = ollama` and auto-picks a tool-capable
 Qwen tier (`qwen3:14b → 8b → 4b`), so the Assistant works with no API key and no
 data leaving the machine. A saved choice always wins on restore, and the cloud
 fallback chain (Claude / OpenAI / DeepSeek / LM Studio) is unchanged — switch
-under **Support → Assistant Tools → LLMs Setting**
+under **T3Lab Docs → Support → Assistant Tools → LLMs Setting**
 ([setting flow](docs/assistant-llms-setting-flow.md)).
 
 ### Language layer — `lib/Intelligence/language/`
@@ -181,13 +203,16 @@ do not re-apply Lumina to `T3LabAssistant.xaml`.
 ```
 t3lab-revit-api/
 ├── T3Lab.extension/
-│   ├── T3Lab.tab/
-│   │   ├── Standard.panel/
-│   │   ├── Annotation & Select.panel/
-│   │   ├── Modeling & Datum.panel/
-│   │   ├── Views & Sheets.panel/
-│   │   ├── Data & IFC-SG.panel/
+│   ├── bundle.yaml             # tab order; pyRevit builds only the tabs listed here
+│   ├── T3Lab Model.tab/
 │   │   ├── Standards & Settings.panel/
+│   │   ├── Model & Datum.panel/
+│   │   ├── Families.panel/
+│   │   └── Rebar & Assembly.panel/
+│   ├── T3Lab Docs.tab/
+│   │   ├── Views & Sheets.panel/
+│   │   ├── Annotation & Select.panel/
+│   │   ├── Data & IFC-SG.panel/
 │   │   └── Support.panel/
 │   ├── lib/
 │   │   ├── GUI/                    # WPF dialogs (XAML + Python classes)
@@ -279,15 +304,15 @@ Short version:
    It needs **pyRevit with a CPython engine** (`bin\cengines\CPY3*`); it reports
    FAIL and explains the fix when that is missing. Use `-CheckOnly` to inspect a
    machine without changing it.
-3. Start Revit, then **pyRevit → Reload** (required once) — the **T3Lab** tab
-   appears in the ribbon.
+3. Start Revit, then **pyRevit → Reload** (required once) — the **T3Lab Model**
+   and **T3Lab Docs** tabs appear in the ribbon.
 4. *(Assistant, optional)* Install [Ollama](https://ollama.com) and pull the
    recommended local model — no API key needed, nothing leaves the machine:
    ```
    ollama pull qwen3:14b
    ```
    For a cloud provider instead, set the provider and API key under
-   **Support → Assistant Tools → LLMs Setting**.
+   **T3Lab Docs → Support → Assistant Tools → LLMs Setting**.
 
 ---
 

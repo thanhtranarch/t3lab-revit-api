@@ -108,3 +108,12 @@ Cột QA chỉ được tick theo phản hồi của user sau khi chạy trong R
 |----|----------|---------|
 | G1–G16 | xem spec §3.11 | ⬜ chưa chạy |
 
+
+---
+
+## Tách tab ribbon — giữ panel đồng nhất (mở 2026-10-03)
+
+- Phương án: `dev/plan/ribbon-tab-split.md` — 1 tab `T3Lab_Dev` (31 slot, 4/7 stack mất chữ) → 2 tab
+  Model · Docs (≈ 1 160 / 1 210 px), cùng một bộ luật panel P1–P10.
+- Trạng thái: 🔄 GĐ0 hạ tầng nhiều tab ✅ · GĐ1 gate `dev/audit_ribbon.py` ✅ · GĐ2 dời thư mục ✅ ·
+  GĐ3 QA trong Revit ⬜ (checklist §5 GĐ3 của file phương án — chỉ tick theo phản hồi của user).

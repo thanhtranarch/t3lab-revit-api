@@ -1,6 +1,6 @@
 # 09 · Ribbon Icon Standard — đồng nhất với Revit
 
-> Phạm vi: **toàn bộ 45 icon trên ribbon `T3Lab.tab`.**
+> Phạm vi: **toàn bộ icon trên ribbon — mọi `*.tab`** (`T3Lab Model.tab`, `T3Lab Docs.tab` từ 2026-10-03; 52 bundle + 4 miễn trừ).
 > Miễn trừ đúng 4 bundle — 3 logo hãng khác + mascot T3LabAssistant (xem §7).
 > Ngày: 2026-09-11.
 
@@ -247,7 +247,7 @@ Vẽ chi tiết 1px cho nhóm này là vẽ thừa — nó nhoè hết.
   `#F3F3F3`, mà `#F3F3F3` lại là `surface` ở bản light — thay tuần tự sẽ đổi hai
   lần và làm hỏng màu.
 - `dev/icons/render.js` — resvg, deterministic.
-- `dev/build_icons.py` — quét `T3Lab.tab`, bỏ qua `Support.panel`; với mỗi
+- `dev/build_icons.py` — quét **mọi** `*.tab` (qua `dev/tabdir.py`), bỏ qua 4 bundle miễn trừ; với mỗi
   `icon.svg`: sinh `icon.dark.svg` bằng bảng token, render cả hai ra PNG 64×64.
   Icon chưa migrate thì **bỏ qua**, không sinh dark bằng bảng màu không phủ được.
   Thay cho `dev/svg_to_png.py`, `dev/svg_to_png.js`, `dev/gen_dark_icons.js`
@@ -335,9 +335,14 @@ lý do cụ thể:
 
 | Bundle | Vì sao |
 |--------|--------|
-| `CloudLinks.stack/Autodesk Forma.urlbutton` | Logo của hãng khác |
-| `CloudLinks.stack/Autodesk Health.urlbutton` | Logo của hãng khác |
-| `CloudLinks.stack/Bluebeam Status.urlbutton` | Logo của hãng khác |
+| `Autodesk Forma.urlbutton` | Logo của hãng khác |
+| `Autodesk Health.urlbutton` | Logo của hãng khác |
+| `Bluebeam Status.urlbutton` | Logo của hãng khác |
+
+Khoá theo **tên** thư mục bundle (duy nhất trong cả extension), không theo đường dẫn
+panel: nút đổi tab / panel / stack thì miễn trừ vẫn đi theo. Ba logo nằm trong pulldown
+`CloudLinks.pulldown` (Support, tab `T3Lab Docs`, từ 2026-10-03); bản thân nút pulldown
+**không** miễn trừ — nó có `icon.svg` riêng theo hệ chung (đám mây bậc thang + mũi tên hổ phách).
 | `T3LabAssistant.pushbutton` | Mascot sản phẩm |
 
 Ba logo hãng: vẽ lại thành line-art của mình là **vừa mất nhận diện vừa đụng vào

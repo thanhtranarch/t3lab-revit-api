@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- dam may bac thang + huy hieu mui ten mo link (goc duoi-phai) -->
+  <polygon points="2.5,19.5 2.5,13.5 6.5,13.5 6.5,9.5 11.5,9.5 11.5,4.5 20.5,4.5 20.5,9.5 25.5,9.5 25.5,13.5 29.5,13.5 29.5,19.5" fill="#F3F3F3" stroke="#000000" stroke-width="1"/>
+  <rect x="20" y="24" width="5" height="2" fill="#E07B00"/>
+  <polygon points="25,21 30,25 25,29" fill="#E07B00"/>
+</svg>

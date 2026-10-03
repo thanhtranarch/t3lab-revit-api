@@ -1,7 +1,7 @@
 # CAD to Elements — modes, layout and research note
 
-Tool: ribbon **Modeling & Datum › Create › Create Elements › CAD to Elements**
-(`T3Lab.extension/T3Lab_Dev.tab/Modeling & Datum.panel/Create.stack/Create Elements.pulldown/CADToElements.pushbutton/`).
+Tool: ribbon **T3Lab Model › Model & Datum › CAD to BIM › CAD to Elements**
+(`T3Lab.extension/T3Lab Model.tab/Model & Datum.panel/Create Elements.pulldown/CADToElements.pushbutton/`).
 
 | Part | File |
 |------|------|

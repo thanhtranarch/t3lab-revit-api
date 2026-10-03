@@ -32,6 +32,7 @@ if LIB not in sys.path:
     sys.path.insert(0, LIB)
 
 from core.paths import user_data_path   # noqa: E402  (pure Python)
+from core.extension_paths import find_bundle   # noqa: E402  (pure Python)
 
 MANALOCA = os.path.join(GUI, "ManaLocaDialog.py")
 MANAFAMI = os.path.join(GUI, "ManaFamiDialog.py")
@@ -101,7 +102,7 @@ class _TempHome(unittest.TestCase):
 class ManaLocaSession(_TempHome):
     def _settings(self, ext_dir):
         scope = {"os": os, "user_data_path": user_data_path, "EXT_DIR": ext_dir,
-                 "tab_dir": lambda ext: os.path.join(ext, "Whatever.tab"),
+                 "find_bundle": find_bundle,   # the real lookup, on a temp extension
                  "__file__": os.path.join(ext_dir, "lib", "GUI", "ManaLocaDialog.py")}
         return _lift(MANALOCA, ["_legacy_settings_files", "SETTINGS_FILE"], scope)
 

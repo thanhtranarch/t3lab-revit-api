@@ -32,7 +32,11 @@ Không có pattern nào vừa → dừng lại, ghi `DESIGN SYSTEM GAP` vào
 
 ```
 T3Lab.extension/
-├── T3Lab_Dev.tab/<Panel>.panel/<Tool>.pushbutton/   ← tên thư mục tab đổi được: code dùng core.extension_paths.tab_dir()
+├── <Tab>.tab/<Panel>.panel/<Tool>.pushbutton/   ← 2 tab: `T3Lab Model.tab` · `T3Lab Docs.tab`. Code KHÔNG ghép
+│   │                                               đường dẫn tab/panel: tìm nút theo tên thư mục —
+│   │                                               core.extension_paths.bundle_path('<Tool>.pushbutton', …)
+│   │                                               Thêm nút = thêm tên nó vào `layout:` của panel (thiếu là
+│   │                                               pyRevit không dựng). Luật panel: dev/plan/ribbon-tab-split.md §4
 │   ├── script.py          ← entry point, KHÔNG chứa logic Revit nặng
 │   ├── icon.svg           ← NGUỒN DUY NHẤT, viewBox "0 0 32 32"
 │   ├── icon.dark.svg      ← sinh tự động, KHÔNG sửa tay
@@ -213,6 +217,7 @@ if __name__ == '__main__':
 [ ] python3 dev/audit_cpython.py --quiet → 0 P0 (bẫy migration CPython)
 [ ] python3 dev/build_icons.py --check   → không lệch (icon đã build)
 [ ] python3 dev/audit_icons.py --quiet   → xanh (0 lỗi)
+[ ] python3 dev/audit_ribbon.py --quiet  → xanh (nút có trong `layout:`, panel 2–6 slot, tab ≤ 1250 px)
 [ ] python3 dev/check_xaml_load.py --out %TEMP%\t3xaml  → 0 hỏng sau sanitise
 [ ] powershell -STA -File dev/check_xaml_wpf.ps1 -Dir %TEMP%\t3xaml → 0 FAILED
 [ ] Pattern P1–P5 rõ ràng, size class đúng S/M/L

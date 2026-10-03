@@ -136,10 +136,10 @@ def build_markdown(bridge, rows):
     add("")
     add("# Tekla to Revit 2027 \u2014 command map / T\u1eeb Tekla sang Revit 2027 \u2014 b\u1ea3n \u0111\u1ed3 l\u1ec7nh")
     add("")
-    add("> **EN** \u2014 This guide and the **Tekla Bridge** pushbutton (T3Lab \u203a Rebar & Assembly) are generated from one data file, "
+    add("> **EN** \u2014 This guide and the **Tekla Bridge** pushbutton (T3Lab Model \u203a Rebar & Assembly) are generated from one data file, "
         "`%s`: %d Tekla commands in %d groups. Search the same list inside Revit by typing a Tekla name in Tekla Bridge." % (JSON_REL, n_rows, n_groups))
     add(">")
-    add("> **VI** \u2014 T\u00e0i li\u1ec7u n\u00e0y v\u00e0 n\u00fat **Tekla Bridge** (T3Lab \u203a Rebar & Assembly) \u0111\u01b0\u1ee3c sinh t\u1eeb c\u00f9ng m\u1ed9t file d\u1eef li\u1ec7u, "
+    add("> **VI** \u2014 T\u00e0i li\u1ec7u n\u00e0y v\u00e0 n\u00fat **Tekla Bridge** (T3Lab Model \u203a Rebar & Assembly) \u0111\u01b0\u1ee3c sinh t\u1eeb c\u00f9ng m\u1ed9t file d\u1eef li\u1ec7u, "
         "`%s`: %d l\u1ec7nh Tekla trong %d nh\u00f3m. T\u00ecm c\u00f9ng danh s\u00e1ch \u0111\u00f3 ngay trong Revit b\u1eb1ng c\u00e1ch g\u00f5 t\u00ean Tekla v\u00e0o Tekla Bridge." % (JSON_REL, n_rows, n_groups))
     add("")
     add("Contents / M\u1ee5c l\u1ee5c: [1 Three layers](#1--three-layers--ba-l\u1edbp) \u00b7 [2 Command map](#2--command-map--b\u1ea3n-\u0111\u1ed3-l\u1ec7nh) \u00b7 "

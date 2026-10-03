@@ -1,0 +1,6 @@
+# Ribbon tabs, in order. pyRevit builds ONLY the tabs listed here: a new
+# *.tab folder must be added to this list or it never appears on the ribbon.
+# Panel rules for every tab: dev/plan/ribbon-tab-split.md §4 (gate: dev/audit_ribbon.py).
+layout:
+  - T3Lab Model
+  - T3Lab Docs

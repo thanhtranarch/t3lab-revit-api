@@ -9,7 +9,7 @@ Không đánh giá, không sửa ở bước này.
 
 | Loại | Vị trí | Ghi chú |
 |------|--------|---------|
-| Tool / pushbutton | `T3Lab.extension/T3Lab.tab/*.panel/**/script.py` | 42 script, 7 panel |
+| Tool / pushbutton | `T3Lab.extension/*.tab/*.panel/**/script.py` | 50 script, 2 tab, 8 panel (2026-10-03) |
 | UI window (XAML) | `T3Lab.extension/lib/GUI/Tools/*.xaml` | 54 file |
 | Python dialog class | `T3Lab.extension/lib/GUI/*.py` | `*Dialog.py`, `WPF_Base.py`, `forms.py` |
 | Shared UI component | `pyRevit UI Design System/T3Lab.Styles.xaml` | 82 key `T3.*` — nguồn duy nhất |
