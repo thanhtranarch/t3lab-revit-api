@@ -1,10 +1,15 @@
 #! python3
 # -*- coding: utf-8 -*-
-"""Clone Drawing — copy the finished drawing of one assembly to similar assemblies."""
+"""Clone Drawing — copy the finished drawing of one assembly to similar assemblies (Tekla: clone drawing).
+
+Design: dev/plan/clone-drawing-v2-design.md. UI in lib/GUI/CloneDrawingDialog.py,
+Revit work in lib/Snippets/_drawing_clone.py; this file only resolves the
+document, shows the modal dialog and opens the sheet it asked for afterwards.
+"""
 
 __title__   = "Clone\nDrawing"
 __author__  = "Tran Tien Thanh"
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 # ── IMPORTS & BOOTSTRAP ──────────────────────────────────────────────────────
 import os
@@ -84,6 +89,11 @@ if __name__ == '__main__':
             details="Open the project that contains the assemblies, then run it again.")
     else:
         from GUI.CloneDrawingDialog import show_clone_drawing
-        sheet_to_open = show_clone_drawing(doc)
+        from Snippets._host import resolve_uidoc
+        try:
+            uidoc = resolve_uidoc()            # None = From selection / Pick in model say so
+        except Exception:
+            uidoc = None
+        sheet_to_open = show_clone_drawing(doc, uidoc)
         if sheet_to_open:
             _open_sheet(doc, sheet_to_open)

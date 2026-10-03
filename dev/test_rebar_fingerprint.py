@@ -224,24 +224,23 @@ class TestPlanClone(unittest.TestCase):
                 _spec(dc, 6, "section", skip=u"orientation unknown")]
 
     def test_plan_clone_target_without_views_creates_all(self):
-        to_create, skipped = self.dc.plan_clone(self._source(), [], add_missing_only=False)
-        self.assertEqual([s.src_view_id for s in to_create], [1, 2, 3, 4, 5])
-        self.assertEqual([(s.src_view_id, r) for s, r in skipped], [(6, u"orientation unknown")])
+        plan = self.dc.plan_for_target(self._source(), [], self.dc.CloneSettings())
+        self.assertEqual([s.src_view_id for s in plan.to_create], [1, 2, 3, 4, 5])
+        self.assertEqual([(s.src_view_id, r) for s, r in plan.skipped], [(6, u"orientation unknown")])
+        self.assertEqual(plan.skip_reason, u"")
 
     def test_plan_clone_skip_existing_vs_add_missing(self):
         dc = self.dc
         existing = [_spec(dc, 101, "3d"), _spec(dc, 102, "elevation", "ElevationFront")]
 
-        to_create, skipped = dc.plan_clone(self._source(), existing, add_missing_only=False)
-        self.assertEqual(to_create, [])
-        reasons = dict((s.src_view_id, r) for s, r in skipped)
-        self.assertEqual(reasons[1], u"has drawing")
-        self.assertEqual(reasons[5], u"has drawing")
-        self.assertEqual(reasons[6], u"orientation unknown")
+        plan = dc.plan_for_target(self._source(), existing, dc.CloneSettings(existing=dc.EXISTING_SKIP))
+        self.assertEqual(plan.to_create, [])
+        self.assertEqual(plan.skip_reason, u"has drawing")
 
-        to_create, skipped = dc.plan_clone(self._source(), existing, add_missing_only=True)
-        self.assertEqual([s.src_view_id for s in to_create], [3, 4, 5])
-        reasons = dict((s.src_view_id, r) for s, r in skipped)
+        plan = dc.plan_for_target(self._source(), existing, dc.CloneSettings(existing=dc.EXISTING_ADD))
+        self.assertEqual([s.src_view_id for s in plan.to_create], [3, 4, 5])
+        self.assertEqual(plan.paired, {1: 101, 2: 102})
+        reasons = dict((s.src_view_id, r) for s, r in plan.skipped)
         self.assertEqual(reasons, {1: u"exists", 2: u"exists", 6: u"orientation unknown"})
 
     def test_pair_existing_counts_duplicates(self):
@@ -271,11 +270,15 @@ class TestPlanClone(unittest.TestCase):
         self.assertEqual(dc.summarize_specs([]), u"No assembly views")
 
     def test_target_status(self):
-        ts = self.dc.target_status
-        self.assertEqual(ts(False, False, False), (u"Ready", "Success", True))
-        self.assertEqual(ts(False, True, False)[2], False)
-        self.assertEqual(ts(False, True, True)[2], True)
-        self.assertEqual(ts(True, False, True)[2], self.dc.SAME_TYPE_POLICY != "skip")
+        dc = self.dc
+        ts = dc.target_status
+        self.assertEqual(ts(False, True, False, dc.EXISTING_SKIP), (u"Ready", "Success", True))
+        self.assertEqual(ts(False, True, True, dc.EXISTING_SKIP)[2], False)
+        self.assertEqual(ts(False, True, True, dc.EXISTING_ADD)[2], True)
+        self.assertEqual(ts(False, True, True, dc.EXISTING_NEW)[2], True)
+        self.assertEqual(ts(False, True, True, dc.EXISTING_REPLACE)[1], "Danger")
+        self.assertEqual(ts(False, False, False, dc.EXISTING_SKIP)[2], False)   # Tekla K4
+        self.assertEqual(ts(True, True, False, dc.EXISTING_ADD)[2], dc.SAME_TYPE_POLICY != "skip")
 
 
 class TestFaceMatching(unittest.TestCase):
@@ -366,13 +369,17 @@ class TestTallyAndOutcome(unittest.TestCase):
         a = self.dc.Tally()
         a.tag(True)
         a.tag(False, 5, self.dc.R_REBAR_POSITION)
-        a.dim(False, 6, self.dc.R_SPOT)
+        a.dim(False, 6, self.dc.R_DIM_REBAR)
         b = self.dc.Tally()
         b.dim(True)
         b.other(7, u"annotation: " + self.dc.R_MRA)
+        b.spot(False, 8, self.dc.R_SPOT_KIND % "coordinate")
+        b.spot(True)
+        b.tags_created = 2
         a.merge(b)
         self.assertEqual((a.tags_ok, a.tags_total, a.dims_ok, a.dims_total), (1, 2, 1, 2))
-        self.assertEqual([i for i, _ in a.unmatched], [5, 6, 7])
+        self.assertEqual((a.spots_ok, a.spots_total, a.tags_created), (1, 2, 2))
+        self.assertEqual([i for i, _ in a.unmatched], [5, 6, 7, 8])
         self.assertTrue(all(reason for _, reason in a.unmatched))
 
     def test_outcome_summary_and_failures(self):
