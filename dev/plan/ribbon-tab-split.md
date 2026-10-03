@@ -158,11 +158,13 @@ mà chưa sửa thì lặp lại đúng lỗi đó.
 
 ### GĐ1 — Gate ribbon `dev/audit_ribbon.py`
 
-- [ ] Đọc `bundle.yaml` của mọi tab/panel/stack, kiểm P1–P4, P6, P7, P10; ước lượng độ rộng tab
+- [x] Đọc `bundle.yaml` của mọi tab/panel/stack, kiểm P1–P4, P6, P7, P10; ước lượng độ rộng tab
       bằng hằng số đo ở §1.
-- [ ] Chạy trên cây hiện tại phải **ĐỎ** (tab ≈ 2 400 px > 1 250, 4 panel stack-trước, PDF Import trong Support) —
-      đó là bằng chứng luật bắt đúng.
-- [ ] Thêm vào "Essential Commands" của `CLAUDE.md` và checklist §5 của `.claude/rules/new-tool-standard.md`.
+- [x] Chạy trên cây hiện tại phải **ĐỎ** (tab ≈ 2 400 px > 1 250, 4 panel stack-trước, PDF Import trong Support) —
+      đó là bằng chứng luật bắt đúng. **Kết quả 2026-10-03:** ĐỎ 5 vi phạm — P4 `T3Lab_Dev.tab` ≈ 2 396 px,
+      P2 ở Data & IFC-SG, Modeling & Datum, Standards & Settings, Support. `dev/test_audit_ribbon.py` (12 test)
+      kiểm từng luật trên một cây ribbon giả.
+- [x] Thêm vào "Essential Commands" của `CLAUDE.md` và checklist §5 của `.claude/rules/new-tool-standard.md`.
 
 ### GĐ2 — Dời folder (một commit, `git mv` để giữ lịch sử)
 

@@ -22,6 +22,9 @@ python dev/audit_wiring.py --quiet
 # Revit API Compatibility Gate (Revit 2022–2027: no removed/new-only API without a fallback):
 python dev/audit_revit_compat.py --quiet
 
+# Ribbon Gate (every tab/panel: 2–6 slots, large before stacks, stacks of 2–3, tab ≤ 1250 px, layout complete):
+python dev/audit_ribbon.py --quiet
+
 # Run test suites:
 python dev/test_batch_link.py
 python dev/test_group_manager.py
@@ -29,6 +32,8 @@ python dev/test_grid_pending_edits.py
 python dev/test_family_transfer.py
 python dev/test_pyrevit_patches.py
 python dev/test_compat_disposing.py
+python dev/test_extension_paths.py
+python dev/test_audit_ribbon.py
 ```
 
 ## Core Architecture & Rules

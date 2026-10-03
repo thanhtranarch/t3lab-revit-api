@@ -213,6 +213,7 @@ if __name__ == '__main__':
 [ ] python3 dev/audit_cpython.py --quiet → 0 P0 (bẫy migration CPython)
 [ ] python3 dev/build_icons.py --check   → không lệch (icon đã build)
 [ ] python3 dev/audit_icons.py --quiet   → xanh (0 lỗi)
+[ ] python3 dev/audit_ribbon.py --quiet  → xanh (nút có trong `layout:`, panel 2–6 slot, tab ≤ 1250 px)
 [ ] python3 dev/check_xaml_load.py --out %TEMP%\t3xaml  → 0 hỏng sau sanitise
 [ ] powershell -STA -File dev/check_xaml_wpf.ps1 -Dir %TEMP%\t3xaml → 0 FAILED
 [ ] Pattern P1–P5 rõ ràng, size class đúng S/M/L
