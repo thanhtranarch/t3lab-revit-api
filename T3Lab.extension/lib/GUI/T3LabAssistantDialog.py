@@ -479,18 +479,17 @@ except Exception as e:
 # Each function opens the corresponding T3Lab tool.
 
 def _get_tool_script_dir(*parts):
-    """Return the path to a pushbutton script.py given path parts relative to the tab.
+    """Return the path to a pushbutton's script.py. Only the LAST part counts:
+    the button is found by its folder name in whichever tab and panel it sits.
 
     Usage:
-        _get_tool_script_dir('Export.panel', 'BatchOut.pushbutton')
-        _get_tool_script_dir('Annotation & Select.panel', 'Text.stack', 'DimText.pushbutton')
+        _get_tool_script_dir('BatchOut.pushbutton')
     """
-    # __file__ = .../T3Lab_Lite.tab/AI Connection.panel/T3LabAssistant.pushbutton/script.py
-    # dirname x1 = T3LabAssistant.pushbutton/
-    # dirname x2 = AI Connection.panel/
-    # dirname x3 = T3Lab_Lite.tab/
-    tab_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    return os.path.join(tab_dir, *parts + ('script.py',))
+    # It used to climb three folders from __file__, which was right while this
+    # code lived in the pushbutton script; from lib/GUI/ it landed on
+    # T3Lab.extension/ and the BatchOut fallback pointed at a missing file.
+    from core.extension_paths import bundle_path
+    return bundle_path(parts[-1], 'script.py')
 
 
 def _load_script(name, script_path):
@@ -518,7 +517,7 @@ def _load_batchout_mod():
         return BatchOutDialog
     except Exception:
         pass
-    script_path = _get_tool_script_dir('Views & Sheets.panel', 'BatchOut.pushbutton')
+    script_path = _get_tool_script_dir('BatchOut.pushbutton')
     mod = _load_script('batchout_script', script_path)
     if mod is None:
         raise RuntimeError("Could not load BatchOut module from: {}".format(script_path))

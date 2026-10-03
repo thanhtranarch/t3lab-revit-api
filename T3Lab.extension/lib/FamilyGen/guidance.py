@@ -22,9 +22,9 @@ def category_slug(category):
 
 
 def prompts_dir():
-    from core.extension_paths import tab_dir      # tab folder name is configurable
-    return os.path.join(tab_dir(_extension_dir()), 'Modeling & Datum.panel',
-                        'FamiGen.pushbutton', 'prompts')
+    from core.extension_paths import find_bundle  # found by name, in any tab
+    folder = find_bundle('FamiGen.pushbutton', _extension_dir())
+    return os.path.join(folder or _extension_dir(), 'prompts')
 
 
 def overlay_path(category):

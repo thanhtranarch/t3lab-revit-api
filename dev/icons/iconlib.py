@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 if os.path.dirname(HERE) not in sys.path:
     sys.path.insert(0, os.path.dirname(HERE))
-from tabdir import TAB as TAB_DIR  # noqa: E402  (the tab folder name changes)
+from tabdir import TABS  # noqa: E402  (every ribbon tab; folder names change)
 TOKENS_FILE = os.path.join(HERE, "tokens.json")
 RENDER_JS = os.path.join(HERE, "render.js")
 
@@ -26,15 +26,17 @@ RENDER_JS = os.path.join(HERE, "render.js")
 # 2026-09-11: Support panel KHONG con duoc mien tru ca panel nua. Moi tool do
 # T3Lab lam deu di theo he chung. Chi con mien tru dung 4 bundle, moi cai co
 # ly do rieng - xem muc 7 cua chuan.
+# Khoa theo TEN thu muc bundle (duy nhat trong ca extension), khong theo duong
+# dan panel: nut doi tab / panel / stack thi mien tru van di theo.
 EXEMPT_BUNDLES = {
     # Logo cua hang khac. Ve lai thanh line-art cua minh la vua mat nhan dien
     # vua dung vao nhan hieu cua ho.
-    "Support.panel/CloudLinks.stack/Autodesk Forma.urlbutton",
-    "Support.panel/CloudLinks.stack/Autodesk Health.urlbutton",
-    "Support.panel/CloudLinks.stack/Bluebeam Status.urlbutton",
+    "Autodesk Forma.urlbutton",
+    "Autodesk Health.urlbutton",
+    "Bluebeam Status.urlbutton",
     # Mascot san pham. Cung ly do `T3LabAssistant.xaml` dang bi khoa UI:
     # day la be mat tro chuyen, khong phai mot cong cu Revit.
-    "Support.panel/T3LabAssistant.pushbutton",
+    "T3LabAssistant.pushbutton",
 }
 
 EXEMPT_REASON = ("3 logo hang khac (Forma / Health / Bluebeam) + mascot "
@@ -95,9 +97,10 @@ def to_dark(svg_text, light_to_dark):
 class Bundle(object):
     """Mot nut tren ribbon co (hoac can co) icon."""
 
-    def __init__(self, path):
+    def __init__(self, path, tab_dir):
         self.path = path
-        self.rel = os.path.relpath(path, TAB_DIR).replace("\\", "/")
+        self.tab = os.path.basename(tab_dir)
+        self.rel = os.path.relpath(path, tab_dir).replace("\\", "/")
         self.name = os.path.basename(path)
         parts = self.rel.split("/")
         self.panel = parts[0]
@@ -121,17 +124,17 @@ class Bundle(object):
 
 
 def find_bundles(include_exempt=False):
-    """Moi bundle duoi thu muc tab, tru cac bundle duoc mien tru."""
+    """Moi bundle duoi MOI thu muc tab, tru cac bundle duoc mien tru."""
     out = []
-    for root, dirs, _files in os.walk(TAB_DIR):
-        dirs.sort()
-        base = os.path.basename(root)
-        if not base.endswith(BUNDLE_SUFFIXES):
-            continue
-        rel = os.path.relpath(root, TAB_DIR).replace("\\", "/")
-        if not include_exempt and rel in EXEMPT_BUNDLES:
-            continue
-        out.append(Bundle(root))
+    for tab_dir in TABS:
+        for root, dirs, _files in os.walk(tab_dir):
+            dirs.sort()
+            base = os.path.basename(root)
+            if not base.endswith(BUNDLE_SUFFIXES):
+                continue
+            if not include_exempt and base in EXEMPT_BUNDLES:
+                continue
+            out.append(Bundle(root, tab_dir))
     out.sort(key=lambda b: b.rel)
     return out
 

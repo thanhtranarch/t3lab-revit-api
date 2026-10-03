@@ -37,7 +37,7 @@ except Exception:
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXT = os.path.join(REPO, "T3Lab.extension")
-from tabdir import TAB  # noqa: E402  (the tab folder name changes)
+from tabdir import TABS, tab_of  # noqa: E402  (every ribbon tab; folder names change)
 LIB = os.path.join(EXT, "lib")
 TOOLS = os.path.join(LIB, "GUI", "Tools")
 
@@ -83,7 +83,7 @@ def rel(p):
 
 # ── Nạp toàn bộ file ──────────────────────────────────────────────────────
 PY = {}
-for base in (LIB, TAB):
+for base in [LIB] + TABS:
     for d, _, fs in os.walk(base):
         for f in fs:
             if f.endswith(".py"):
@@ -192,7 +192,7 @@ def group_of(script_path):
 # ── Map tool → file Python liên quan (script + GUI import 2 cấp) ──────────
 TOOLS_MAP = defaultdict(dict)   # panel -> tool -> set(py paths)
 for p, src in PY.items():
-    if p.startswith(TAB) and p.endswith("script.py"):
+    if tab_of(p) and p.endswith("script.py"):
         panel, tool = group_of(p)
         files = {p} | gui_imports(src)
         for q in list(files):
@@ -310,7 +310,7 @@ def allowed(f, code, msg):
 # Gán mỗi file cho tool import nó TRỰC TIẾP (script + GUI cấp 1) trước.
 DIRECT = {}
 for p, src in PY.items():
-    if p.startswith(TAB) and p.endswith("script.py"):
+    if tab_of(p) and p.endswith("script.py"):
         for q in {p} | gui_imports(src):
             DIRECT.setdefault(q, group_of(p))
 

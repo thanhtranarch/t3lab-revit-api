@@ -26,7 +26,7 @@ import glob
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT = os.path.join(REPO, "T3Lab.extension")
-from tabdir import TAB  # noqa: E402  (the tab folder name changes)
+from tabdir import TABS  # noqa: E402  (every ribbon tab; folder names change)
 LIB = os.path.join(ROOT, "lib")
 GUI_TOOLS = os.path.join(LIB, "GUI", "Tools")
 
@@ -49,15 +49,28 @@ def read(path):
 
 def find_scripts():
     out = []
-    for dirpath, _, filenames in os.walk(TAB):
-        if dirpath.endswith(".pushbutton") and "script.py" in filenames:
-            out.append(os.path.join(dirpath, "script.py"))
+    for tab in TABS:
+        for dirpath, _, filenames in os.walk(tab):
+            if dirpath.endswith(".pushbutton") and "script.py" in filenames:
+                out.append(os.path.join(dirpath, "script.py"))
     return sorted(out)
+
+
+def check_every_tab_scanned(scripts):
+    """A tab the gate walks without finding a script is a gate reporting GREEN
+    over nothing (2026-09-26: a renamed tab folder did exactly that)."""
+    for tab in TABS:
+        n = sum(1 for s in scripts if s.startswith(tab + os.sep))
+        if n == 0:
+            report("[TAB] %s: 0 pushbutton script found - gate is not scanning this tab"
+                   % os.path.relpath(tab, REPO), violation=True)
+        elif not QUIET:
+            report("%s: %d scripts" % (os.path.relpath(tab, REPO), n))
 
 
 def all_py_files():
     out = []
-    for base in (LIB, TAB):
+    for base in [LIB] + TABS:
         for dirpath, _, files in os.walk(base):
             out.extend(os.path.join(dirpath, f) for f in files if f.endswith(".py"))
     return out
@@ -106,6 +119,7 @@ def main():
     py_files = all_py_files()
     py_src = {p: read(p) for p in py_files}
     pushbutton_scripts = find_scripts()
+    check_every_tab_scanned(pushbutton_scripts)
 
     # ── 1. CPython 3 Shebang & Syntax check ──
     if not QUIET:

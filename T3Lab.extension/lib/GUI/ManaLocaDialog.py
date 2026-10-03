@@ -8,7 +8,7 @@ import json
 from pyrevit import forms, revit, script
 from GUI.WPF_Base import T3WPFWindow, to_items_source
 from Snippets._compat import eid_value
-from core.extension_paths import tab_dir
+from core.extension_paths import find_bundle
 from core.paths import user_data_path
 
 import clr
@@ -59,9 +59,9 @@ def _legacy_settings_files():
     script, or next to this module when that folder was missing."""
     legacy = []
     try:
-        legacy.append(os.path.join(
-            tab_dir(EXT_DIR), 'Standards & Settings.panel', 'ManaLoca.pushbutton',
-            'session.json'))
+        folder = find_bundle('ManaLoca.pushbutton', EXT_DIR)
+        if folder:
+            legacy.append(os.path.join(folder, 'session.json'))
     except Exception:
         pass
     legacy.append(os.path.join(os.path.dirname(__file__), 'ManaLoca_session.json'))

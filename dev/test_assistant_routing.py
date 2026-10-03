@@ -31,7 +31,7 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXT = os.path.join(REPO, 'T3Lab.extension')
 LIB = os.path.join(EXT, 'lib')
-from tabdir import TAB  # noqa: E402
+from tabdir import bundle_path  # noqa: E402
 sys.path.insert(0, LIB)
 
 # Sandbox %APPDATA% BEFORE any config/settings import, so settings.json lands
@@ -222,8 +222,7 @@ def test_tools_are_launched_through_the_api_context():
     import re as _re
     path = os.path.join(LIB, 'GUI', 'T3LabAssistantDialog.py')
     if not os.path.exists(path):
-        path = os.path.join(TAB, 'Support.panel', 'T3LabAssistant.pushbutton',
-                            'script.py')
+        path = bundle_path('T3LabAssistant.pushbutton', 'script.py')
     with io.open(path, encoding='utf-8') as f:
         src = f.read()
 
@@ -313,11 +312,9 @@ def test_builtin_tools_are_installed():
     check('_BUILTIN_TOOLS is only the special launchers',
           intents == set(['open_batchout', 'open_loadfamily']), sorted(intents))
     check('BatchOut ships',
-          os.path.exists(os.path.join(TAB, 'Views & Sheets.panel',
-                                      'BatchOut.pushbutton', 'script.py')))
+          os.path.exists(bundle_path('BatchOut.pushbutton', 'script.py')))
     check('Family Manager ships',
-          os.path.exists(os.path.join(TAB, 'Modeling & Datum.panel',
-                                      'ManaFami.pushbutton', 'script.py')))
+          os.path.exists(bundle_path('ManaFami.pushbutton', 'script.py')))
 
 
 def test_renamed_tools_resolve_to_real_tools():
@@ -368,8 +365,7 @@ def test_skipped_buttons_are_pruned_from_an_old_registry():
     skipped = sorted(td._SKIP_BUTTONS)[0]
     reg['tools'][skipped] = {
         'button': skipped, 'intent': 'open_stale', 'title': 'Stale',
-        'script_path': os.path.join(TAB, 'Views & Sheets.panel',
-                                    'BatchOut.pushbutton', 'script.py'),
+        'script_path': bundle_path('BatchOut.pushbutton', 'script.py'),
     }
     td.save_registry(reg)
     td.discover_new_tools()
@@ -1641,9 +1637,7 @@ def test_slash_boilerplate_has_three_distinct_modes():
     import io as _io
     _t3_path = os.path.join(LIB, 'GUI', 'T3LabAssistantDialog.py')
     if not os.path.exists(_t3_path):
-        _t3_path = os.path.join(
-            TAB, 'Support.panel',
-            'T3LabAssistant.pushbutton', 'script.py')
+        _t3_path = bundle_path('T3LabAssistant.pushbutton', 'script.py')
     with _io.open(_t3_path, encoding='utf-8') as f:
         src = f.read()
     check('reference mode still exists', 'is_reference_skill(_sid)' in src)

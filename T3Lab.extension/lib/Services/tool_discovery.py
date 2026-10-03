@@ -19,13 +19,12 @@ import re
 import io
 import json
 
-from core.extension_paths import tab_dir
+from core.extension_paths import tab_dirs
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 _SERVICES_DIR = os.path.dirname(os.path.abspath(__file__))
 _LIB_DIR      = os.path.dirname(_SERVICES_DIR)
 _EXT_DIR      = os.path.dirname(_LIB_DIR)
-_TAB_DIR      = tab_dir(_EXT_DIR)
 # The registry is a machine-local cache rebuilt from the ribbon scan, so it
 # lives in %APPDATA%/T3LabAI/assistant, never in the extension folder (the
 # old lib/config/tool_registry.json leaked machine paths into the repo).
@@ -42,7 +41,7 @@ def _registry_file():
 # Bump when the entry schema changes — a mismatched on-disk registry is
 # rebuilt from scratch so every entry carries the new fields (doc, xaml,
 # aliases, url, kind).
-REGISTRY_VERSION = 4
+REGISTRY_VERSION = 5   # 5: entries carry 'tab' (the ribbon has several tabs)
 
 # Button folder suffixes that carry a launchable tool. `.urlbutton` entries
 # (Autodesk Forma / Health, Bluebeam Status) have no script.py at all — they
@@ -77,23 +76,29 @@ _SKIP_BUTTONS = {
 
 def scan_all_buttons():
     """
-    Walk the ribbon tab folder and return a list of dicts for every launchable ribbon
+    Walk every ribbon tab folder and return a list of dicts for every launchable ribbon
     button, at any nesting depth (panel/button, panel/stack/button,
     panel/pulldown/stack/button, etc.).
 
     A button qualifies when it has a script.py (pushbutton / smartbutton) or
     a bundle.yaml `hyperlink` (urlbutton).
 
-    Each dict: {button, panel, script_path, url, kind, title, doc, xamls,
+    Each dict: {button, tab, panel, script_path, url, kind, title, doc, xamls,
                 aliases}
     """
     results = []
-    if not os.path.isdir(_TAB_DIR):
-        return results
-    for panel in sorted(os.listdir(_TAB_DIR)):
+    for tab_dir in tab_dirs(_EXT_DIR):
+        results.extend(_scan_tab(tab_dir))
+    return results
+
+
+def _scan_tab(tab_dir):
+    results = []
+    tab = os.path.basename(tab_dir)
+    for panel in sorted(os.listdir(tab_dir)):
         if not panel.endswith('.panel'):
             continue
-        panel_dir = os.path.join(_TAB_DIR, panel)
+        panel_dir = os.path.join(tab_dir, panel)
         if not os.path.isdir(panel_dir):
             continue
         for root, dirs, files in os.walk(panel_dir):
@@ -114,6 +119,7 @@ def scan_all_buttons():
             title = title or b_title or _strip_suffix(btn)
             results.append({
                 'button':      btn,
+                'tab':         tab,
                 'panel':       panel,
                 'path':        root,
                 'script_path': script if has_script else '',
@@ -364,6 +370,7 @@ def discover_new_tools():
         intent = _button_to_intent(btn)
         entry = {
             'button':      btn,
+            'tab':         tool['tab'],
             'panel':       tool['panel'],
             'script_path': tool['script_path'],
             'url':         tool.get('url', ''),

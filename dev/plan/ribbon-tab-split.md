@@ -129,10 +129,10 @@ Bài học 2026-09-26 (commit `5c108ad`): đổi tên `T3Lab.tab` → `T3Lab_Dev
 Hiện `tab_dir()` chỉ trả **một** tab, và 6 chỗ còn ghép cứng tên panel sau nó — tách tab
 mà chưa sửa thì lặp lại đúng lỗi đó.
 
-- [ ] `lib/core/extension_paths.py`: thêm `tab_dirs()` (mọi `*.tab`, theo `layout:` của extension),
+- [x] `lib/core/extension_paths.py`: thêm `tab_dirs()` (mọi `*.tab`, theo `layout:` của extension),
       `find_bundle(name)` (tìm folder theo tên trên mọi tab, có cache), `bundle_path(name, *parts)`.
       Giữ `tab_dir()` để tương thích, không thêm chỗ gọi mới.
-- [ ] Thay các chỗ ghép cứng panel:
+- [x] Thay các chỗ ghép cứng panel:
 
 | File | Hiện tại | Sau |
 |------|----------|-----|
@@ -144,14 +144,17 @@ mà chưa sửa thì lặp lại đúng lỗi đó.
 | `lib/GUI/T3LabAssistantDialog.py:481` | `_get_tool_script_dir()` | `find_bundle(parts[-1])` — **sửa luôn lỗi có sẵn**: hàm đang lùi 3 cấp từ `lib/GUI/` nên ra `T3Lab.extension/` (thiếu thư mục tab); đường fallback nạp BatchOut ở dòng 521 đang trỏ sai |
 | `lib/Services/tool_discovery.py:28` | quét một `_TAB_DIR` | quét `tab_dirs()`, thêm field `tab`; `REGISTRY_VERSION` 4 → 5 (cache ở `%APPDATA%` chứa đường dẫn cũ) |
 
-- [ ] `dev/tabdir.py`: thêm `TABS` + `bundle_path`. Cho `audit_tools`, `audit_wiring`,
+- [x] `dev/tabdir.py`: thêm `TABS` + `bundle_path`. Cho `audit_tools`, `audit_wiring`,
       `dev/icons/iconlib.py` (→ `build_icons`, `audit_icons`), `generate_all_icons` và các test
       `test_assistant_*`, `test_tool_registry`, `test_batchout_executor`, `test_ribbon_name_storage`
       quét `TABS`. `EXEMPT_BUNDLES` trong `iconlib.py` đổi sang khoá theo tên bundle.
-- [ ] Lưới an toàn: gate in số script / icon **theo từng tab** và FAIL nếu tab nào 0 file;
+- [x] Lưới an toàn: gate in số script / icon **theo từng tab** và FAIL nếu tab nào 0 file;
       test tên bundle duy nhất (P7); `test_extension_paths` cấm `lib/` và `dev/` ghép cứng `"<X>.panel"`.
-- [ ] Tiêu chí xong: mọi gate xanh với **đúng số hiện tại** — 50 `script.py`, audit_icons 51/51,
+- [x] Tiêu chí xong: mọi gate xanh với **đúng số hiện tại** — 50 `script.py`, audit_icons 51/51,
       audit_tools clean, wiring W1/W2/W3/D1 = 0, D3 = 0.
+      **Kết quả 2026-10-03:** đúng các số trên (D2 giữ 36 sau khi xoá `tab_path()` — API cũ, không còn ai gọi,
+      và chính nó dẫn tới lối ghép đường dẫn panel). 112 file test: kết quả y hệt `main`;
+      `test_extension_paths` 4 → 11 test. `test_checkbox_bridge` đỏ sẵn trên `main` (2 lỗi XAML, ngoài phạm vi).
 
 ### GĐ1 — Gate ribbon `dev/audit_ribbon.py`
 
