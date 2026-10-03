@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- tier B (Standards.stack) - bang kiem + huy hieu canh bao -->
+  <rect x="3.5" y="3.5" width="15" height="24" fill="#F3F3F3" stroke="#000000" stroke-width="1"/>
+  <rect x="6" y="9" width="10" height="2" fill="#858585"/>
+  <polygon points="25,18 31,30 19,30" fill="#E07B00"/>
+  <rect x="24" y="22" width="2" height="5" fill="#F3F3F3"/>
+</svg>
