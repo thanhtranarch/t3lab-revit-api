@@ -1,0 +1,9 @@
+title: "Tekla\nBridge"
+tooltip: "Find any Revit command or T3Lab tool by its Tekla name, with a one-line note on what is different (Tekla: Quick Launch)"
+description: |
+  Search by Tekla term, grouped as the Tekla workflow
+  Open the Revit command (PostCommand) or the T3Lab tool
+  Shows the ribbon path when Revit has no postable command
+  Works without an open model
+author: "Tran Tien Thanh"
+version: "1.0.0"

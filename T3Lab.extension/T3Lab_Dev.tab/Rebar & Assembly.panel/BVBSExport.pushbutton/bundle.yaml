@@ -1,0 +1,9 @@
+title: "BVBS\nExport"
+tooltip: "Write .abs files (BVBS BF2D) for bending machines from shape-driven rebar, with checksum — one file per assembly or one for all (Tekla: BVBS export)"
+description: |
+  Preview every mark with the outer legs that will be written, so they can be compared with the bending schedule
+  Writes BVBS BF2D blocks; free-form 3D bars and curved legs are listed as skipped, never exported
+  Scope: whole model, selection, one assembly or one partition; one file per assembly if wanted
+  Each file is read back and its checksums verified before it is reported as written
+author: "Tran Tien Thanh"
+version: "1.0.0"

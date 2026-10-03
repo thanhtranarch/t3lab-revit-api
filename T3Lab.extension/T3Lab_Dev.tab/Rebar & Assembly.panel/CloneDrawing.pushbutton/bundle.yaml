@@ -1,0 +1,10 @@
+title: "Clone\nDrawing"
+tooltip: "Copy the finished drawing of one assembly — views, sheet, annotations — to similar assemblies (Tekla: clone drawing)"
+description: |
+  Pick a source assembly whose views and sheet are finished, then tick similar target assemblies (scored by category, size and rebar count)
+  T1 creates the same assembly views and sheet: template, scale, crop, viewport positions
+  T2 copies free annotations: text, detail lines, detail items, filled regions
+  T3 re-creates tags and dimensions on matched elements; everything it cannot match is listed as unmatched with the reason
+  One undo step for the whole run; nothing is ever deleted
+author: "Tran Tien Thanh"
+version: "1.0.0"

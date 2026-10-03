@@ -392,7 +392,7 @@ tiêu đề trang / handler), không theo đối tượng chung của cả tool:
 
 | Glyph | Khái niệm | Đang dùng ở |
 |---|---|---|
-| `E8FD` BulletedList | Danh sách · inventory · chọn mục | ManaPara Browse · ManaSheets Inventory · ManaViews Inventory · ManaStyles Style Manager · ExportManager(+Test) Selection · UIStandardShowcase Element Inventory |
+| `E8FD` BulletedList | Danh sách · inventory · chọn mục | ManaPara Browse · ManaSheets Inventory · ManaViews Inventory · ManaStyles Style Manager · ExportManager(+Test) Selection · UIStandardShowcase Element Inventory · CastUnit Manage |
 | `E9D5` CheckList | Audit · soát theo luật | AutoWork QA/QC, IFCSG Compliance Checker, ModelAuditor Health |
 | `E945` LightningBolt | Tự động hoá · macro | AutoWork Macro |
 | `E8B5` Import | Import · nạp vào model | FamiGen From CAD · ManaFami Family Loader · ManaPara Parameter Loader |
@@ -414,7 +414,7 @@ tiêu đề trang / handler), không theo đối tượng chung của cả tool:
 | `ED5E` Ruler | Dimension · đo | ManaAnno Dimensions |
 | `E8D2` Font | Text | ManaAnno Text Notes |
 | `E727` InPrivate | Pattern · mẫu lát / hatch | TileLayout Pattern |
-| `E8EC` Tag | Phân loại · gán type | IFCSG Subtype Assigner |
+| `E8EC` Tag | Phân loại · gán type | IFCSG Subtype Assigner · CastUnit Partition by rule |
 | `E80F` Home | Room · space | CADToElements Rooms · ManaContains Rooms to Elements · SheetGen Room List |
 | `E809` TiltUp | Floor | CADToElements Floors · TileLayout Boundaries |
 | `E80A` TiltDown | Ceiling (lưới trần) | CADToElements Ceilings |
@@ -424,6 +424,7 @@ tiêu đề trang / handler), không theo đối tượng chung của cả tool:
 | `E7B7` MapPin2 | Grid (đầu trục) | CADToElements Grids |
 | `EF90` Flow | Line (đoạn có hai đầu mút) | CADToElements Lines |
 | `E95F` Wire | MEP run | CADToElements MEP Runs |
+| `E710` Add | Tạo mới hàng loạt | CastUnit Batch create |
 | `E713` · `E896` · `E7BA` · `E74D` | Settings · Export · Warning · Delete/purge (bảng trên) | ExportManager Format, Queue & Export · UIStandardShowcase Preferences · ModelAuditor Warning, Purge |
 
 Cần glyph chưa có trong bảng → thêm vào bảng này **và** vào comment đầu khối ICON

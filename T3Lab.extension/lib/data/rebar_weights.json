@@ -1,0 +1,13 @@
+{
+  "_comment": [
+    "kg per metre of bar by nominal diameter (mm). Used by BVBS Export and",
+    "Rebar Check when a Rebar Bar Type carries no T3_WeightPerMetre parameter.",
+    "Values follow TCVN 1651 / BS 4449 nominal mass (0.006165 * d^2)."
+  ],
+  "standard": "TCVN 1651 / BS 4449 nominal mass",
+  "kg_per_m": {
+    "6": 0.222, "8": 0.395, "10": 0.617, "12": 0.888, "14": 1.208,
+    "16": 1.578, "18": 1.998, "20": 2.466, "22": 2.984, "25": 3.853,
+    "28": 4.834, "32": 6.313, "36": 7.990, "40": 9.864
+  }
+}
