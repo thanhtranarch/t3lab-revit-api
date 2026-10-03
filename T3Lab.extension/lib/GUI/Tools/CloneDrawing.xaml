@@ -1710,7 +1710,9 @@
         </ResourceDictionary>
     </Window.Resources>
 
+
     <!-- Pattern P2 + P3 + P5 · size L 1000x620 · chip tab strip (spec D11).
+         Design: dev/plan/clone-drawing-v2-design.md section 7.
          Every handler lives in lib/GUI/CloneDrawingDialog.py; nothing in a DataTemplate. -->
     <Border BorderBrush="{StaticResource T3.BorderStrong}" BorderThickness="1"
             CornerRadius="{StaticResource T3.R.Window}" ClipToBounds="True"
@@ -1737,7 +1739,7 @@
                                RenderOptions.BitmapScalingMode="HighQuality"/>
                         <StackPanel Orientation="Vertical" VerticalAlignment="Center">
                             <TextBlock Text="Clone Drawing" Style="{StaticResource T3.Title}"/>
-                            <TextBlock Text="Copy the finished drawing of one assembly to similar assemblies"
+                            <TextBlock Text="Copy the finished drawing of one assembly to similar assemblies (Tekla: clone drawing)"
                                        Style="{StaticResource T3.Subtitle}"/>
                         </StackPanel>
                     </StackPanel>
@@ -1767,7 +1769,7 @@
                     <RadioButton x:Name="chip_tab_select" Content="Source &amp; targets" GroupName="cd_tabs"
                                  Style="{StaticResource T3.Chip}" IsChecked="True"
                                  Checked="tab_chip_checked" Tag="0"/>
-                    <RadioButton x:Name="chip_tab_options" Content="Options" GroupName="cd_tabs"
+                    <RadioButton x:Name="chip_tab_options" Content="Clone settings" GroupName="cd_tabs"
                                  Style="{StaticResource T3.Chip}"
                                  Checked="tab_chip_checked" Tag="1"/>
                     <RadioButton x:Name="chip_tab_results" Content="Results" GroupName="cd_tabs"
@@ -1787,142 +1789,430 @@
                 <TabItem x:Name="tab_item_select" IsSelected="True">
                     <Grid Margin="16">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="320"/>
+                            <ColumnDefinition Width="360"/>
                             <ColumnDefinition Width="16"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
+                        <!-- Left: source assembly (Tekla: cloning template) + its views -->
                         <Border Grid.Column="0" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                          Padding="16,16,12,16">
-                                <StackPanel>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <StackPanel Grid.Row="0" Margin="16,16,16,8">
                                     <TextBlock Text="SOURCE ASSEMBLY" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
                                     <Separator Style="{StaticResource T3.Rule}" Margin="0,0,0,12"/>
                                     <ComboBox x:Name="cb_source" Style="{StaticResource T3.ComboBox}"
                                               ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
                                               SelectionChanged="source_changed"
-                                              ToolTip="Assembly (Tekla: cast unit) whose finished drawing is copied"/>
+                                              ToolTip="Assembly (Tekla: cast unit) whose finished drawing is the cloning template"/>
                                     <TextBlock x:Name="txt_source_summary" Style="{StaticResource T3.Caption}"
                                                TextWrapping="Wrap" Margin="0,8,0,0"
                                                Text="Pick the assembly whose drawing is finished."/>
-
-                                    <TextBlock Text="TARGETS" Style="{StaticResource T3.Label}" Margin="0,24,0,4"/>
-                                    <Separator Style="{StaticResource T3.Rule}" Margin="0,0,0,12"/>
-                                    <StackPanel Orientation="Horizontal">
-                                        <RadioButton x:Name="chip_tgt_similar" Content="Similar" GroupName="cd_tgt"
-                                                     Style="{StaticResource T3.Chip}" IsChecked="True"
-                                                     Checked="targets_chip_checked"
-                                                     ToolTip="Same category, same size within 5 %, same rebar count"/>
-                                        <RadioButton x:Name="chip_tgt_sametype" Content="Same category" GroupName="cd_tgt"
-                                                     Style="{StaticResource T3.Chip}"
-                                                     Checked="targets_chip_checked"
-                                                     ToolTip="Assemblies named by the same category as the source"/>
-                                        <RadioButton x:Name="chip_tgt_all" Content="All" GroupName="cd_tgt"
-                                                     Style="{StaticResource T3.Chip}"
-                                                     Checked="targets_chip_checked"
-                                                     ToolTip="Every other assembly in the model"/>
-                                    </StackPanel>
-                                    <TextBox x:Name="tb_target_search" Style="{StaticResource T3.Search}"
-                                             Margin="0,8,0,0" Tag="Search marks..."
-                                             TextChanged="target_search_changed"/>
-                                    <TextBlock Style="{StaticResource T3.Caption}" TextWrapping="Wrap" Margin="0,12,0,0"
-                                               Text="Similarity: 100 % = same category, same size within 5 % and the same rebar count. Similar shows 70 % and above."/>
+                                    <TextBlock Text="SOURCE VIEWS" Style="{StaticResource T3.Label}" Margin="0,16,0,4"/>
+                                    <Separator Style="{StaticResource T3.Rule}"/>
                                 </StackPanel>
-                            </ScrollViewer>
+                                <Grid Grid.Row="1">
+                                    <DataGrid x:Name="grid_source_views"
+                                              Style="{StaticResource T3.DataGrid}"
+                                              BorderThickness="0"
+                                              AutoGenerateColumns="False"
+                                              IsReadOnly="True"
+                                              SelectionMode="Single"
+                                              SelectionUnit="FullRow"
+                                              ToolTip="Tick Dims to clone the dimensions of that view (Tekla: dimension creation method in this view)">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Width="48" CanUserResize="False" CanUserSort="False"
+                                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                    CellStyle="{StaticResource T3.DataGridCell.Check}">
+                                                <DataGridTemplateColumn.Header>
+                                                    <CheckBox x:Name="chk_all_grid_source_views"
+                                                              Style="{StaticResource T3.CheckBox.Cell}"
+                                                              Click="select_all_grid_source_views_clicked"
+                                                              ToolTip="Select all rows"/>
+                                                </DataGridTemplateColumn.Header>
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Grid>
+                                                            <TextBlock x:Name="row_clone_dims_text" Text="{Binding clone_dims}"
+                                                                       Visibility="Collapsed"/>
+                                                            <CheckBox IsChecked="{Binding Text, ElementName=row_clone_dims_text, Mode=OneWay}"
+                                                                      Style="{StaticResource T3.CheckBox.Cell}"
+                                                                      ToolTip="Clone the dimensions of this view"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="VIEW" Width="*" Binding="{Binding Name}"/>
+                                            <DataGridTextColumn Header="KIND" Width="120" Binding="{Binding Kind}"
+                                                                ElementStyle="{StaticResource T3.Cell.Muted}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <TextBlock x:Name="grid_source_views_empty" Style="{StaticResource T3.Empty}"
+                                               Text="No source views.&#x0a;Select an assembly, run Modify &gt; Assembly &gt; Create Views, finish its drawing, then open Clone Drawing again."/>
+                                </Grid>
+                                <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
+                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
+                                        Padding="12,4">
+                                    <TextBlock x:Name="txt_source_views_count" Style="{StaticResource T3.Tally}"
+                                               TextTrimming="CharacterEllipsis" Text="0 views"/>
+                                </Border>
+                            </Grid>
                         </Border>
 
+                        <!-- Right: targets (Tekla: parts selected in the model) -->
                         <Border Grid.Column="2" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
                             <Grid>
-                                <DataGrid x:Name="grid_targets"
-                                          Style="{StaticResource T3.DataGrid}"
-                                          BorderThickness="0"
-                                          AutoGenerateColumns="False"
-                                          IsReadOnly="True"
-                                          SelectionMode="Extended"
-                                          SelectionUnit="FullRow">
-                                    <DataGrid.Columns>
-                                        <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
-                                                                HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
-                                                                CellStyle="{StaticResource T3.DataGridCell.Check}">
-                                            <DataGridTemplateColumn.Header>
-                                                <CheckBox x:Name="chk_all_grid_targets"
-                                                          Style="{StaticResource T3.CheckBox.Cell}"
-                                                          Click="select_all_grid_targets_clicked"
-                                                          ToolTip="Select all rows"/>
-                                            </DataGridTemplateColumn.Header>
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Grid>
-                                                        <TextBlock x:Name="row_is_selected_text" Text="{Binding is_selected}"
-                                                                   Visibility="Collapsed"/>
-                                                        <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
-                                                                  Style="{StaticResource T3.CheckBox.Cell}"/>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="MARK" Width="*" Binding="{Binding Mark}"/>
-                                        <DataGridTextColumn Header="SIMILARITY" Width="90" Binding="{Binding Similarity}"
-                                                            ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                        <DataGridTextColumn Header="WHY" Width="220" Binding="{Binding Why}">
-                                            <DataGridTextColumn.ElementStyle>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Mono}">
-                                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                                    <Setter Property="ToolTip" Value="{Binding Why}"/>
-                                                    <Style.Triggers>
-                                                        <Trigger Property="Text" Value="— none —">
-                                                            <Setter Property="Foreground" Value="{StaticResource T3.TextDisabled}"/>
-                                                        </Trigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </DataGridTextColumn.ElementStyle>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Header="VIEWS" Width="70" Binding="{Binding Views}"
-                                                            ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                        <DataGridTextColumn Header="SHEETS" Width="70" Binding="{Binding Sheets}"
-                                                            ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                        <DataGridTemplateColumn Header="STATUS" Width="170"
-                                                                CellTemplate="{StaticResource T3.StatusPill}"/>
-                                    </DataGrid.Columns>
-                                </DataGrid>
-                                <TextBlock x:Name="grid_targets_empty" Style="{StaticResource T3.Empty}"
-                                           Visibility="Collapsed"
-                                           Text="No other assemblies in the model.&#x0a;Create the target assemblies first (Cast Unit Manager or Create Assembly)."/>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="0" Style="{StaticResource T3.ListHeader}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="TARGETS" Style="{StaticResource T3.ListHeader.Label}" Margin="0,0,12,0"/>
+                                            <RadioButton x:Name="chip_tgt_similar" Content="Similar" GroupName="cd_tgt"
+                                                         Style="{StaticResource T3.Chip}" IsChecked="True"
+                                                         Checked="targets_chip_checked"
+                                                         ToolTip="Same category, same size within 5 %, same rebar count (70 % and above)"/>
+                                            <RadioButton x:Name="chip_tgt_sametype" Content="Same category" GroupName="cd_tgt"
+                                                         Style="{StaticResource T3.Chip}"
+                                                         Checked="targets_chip_checked"
+                                                         ToolTip="Assemblies named by the same category as the source (Tekla: same main part type)"/>
+                                            <RadioButton x:Name="chip_tgt_all" Content="All" GroupName="cd_tgt"
+                                                         Style="{StaticResource T3.Chip}"
+                                                         Checked="targets_chip_checked"
+                                                         ToolTip="Every other assembly in the model, with the reason it will be skipped"/>
+                                        </StackPanel>
+                                        <TextBox x:Name="tb_target_search" Grid.Column="1" Style="{StaticResource T3.Search}"
+                                                 Margin="12,0" MaxWidth="240" HorizontalAlignment="Left"
+                                                 Tag="Search marks..." TextChanged="target_search_changed"/>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button x:Name="btn_from_selection" Style="{StaticResource T3.Button.Ghost}"
+                                                    Margin="0,0,8,0" Click="from_selection_clicked"
+                                                    ToolTip="Tick the assemblies currently selected in Revit (members count too)">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE73E;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                    <TextBlock Text="From selection" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="btn_pick" Style="{StaticResource T3.Button.Ghost}"
+                                                    Click="pick_in_model_clicked"
+                                                    ToolTip="Hide this window, pick target assemblies in the model, press Finish">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE7C9;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                    <TextBlock Text="Pick in model" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Grid Grid.Row="1">
+                                    <DataGrid x:Name="grid_targets"
+                                              Style="{StaticResource T3.DataGrid}"
+                                              BorderThickness="0"
+                                              AutoGenerateColumns="False"
+                                              IsReadOnly="True"
+                                              SelectionMode="Extended"
+                                              SelectionUnit="FullRow">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False"
+                                                                    HeaderStyle="{StaticResource T3.DataGridColumnHeader.Check}"
+                                                                    CellStyle="{StaticResource T3.DataGridCell.Check}">
+                                                <DataGridTemplateColumn.Header>
+                                                    <CheckBox x:Name="chk_all_grid_targets"
+                                                              Style="{StaticResource T3.CheckBox.Cell}"
+                                                              Click="select_all_grid_targets_clicked"
+                                                              ToolTip="Select all rows"/>
+                                                </DataGridTemplateColumn.Header>
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <Grid>
+                                                            <TextBlock x:Name="row_is_selected_text" Text="{Binding is_selected}"
+                                                                       Visibility="Collapsed"/>
+                                                            <CheckBox IsChecked="{Binding Text, ElementName=row_is_selected_text, Mode=OneWay}"
+                                                                      Style="{StaticResource T3.CheckBox.Cell}"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="MARK" Width="*" Binding="{Binding Mark}"/>
+                                            <DataGridTextColumn Header="SIMILARITY" Width="90" Binding="{Binding Similarity}"
+                                                                ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                            <DataGridTextColumn Header="WHY" Width="180" Binding="{Binding Why}">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource T3.Cell.Mono}">
+                                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                        <Setter Property="ToolTip" Value="{Binding Why}"/>
+                                                        <Style.Triggers>
+                                                            <Trigger Property="Text" Value="— none —">
+                                                                <Setter Property="Foreground" Value="{StaticResource T3.TextDisabled}"/>
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="MEMBERS" Width="80" Binding="{Binding Members}"
+                                                                ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                            <DataGridTextColumn Header="VIEWS" Width="64" Binding="{Binding Views}"
+                                                                ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                            <DataGridTextColumn Header="SHEETS" Width="64" Binding="{Binding Sheets}"
+                                                                ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                            <DataGridTemplateColumn Header="STATUS" Width="190"
+                                                                    CellTemplate="{StaticResource T3.StatusPill}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <TextBlock x:Name="grid_targets_empty" Style="{StaticResource T3.Empty}"
+                                               Visibility="Collapsed"
+                                               Text="No other assemblies in the model.&#x0a;Create the target assemblies first (Cast Unit Manager or Create Assembly)."/>
+                                </Grid>
+                                <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
+                                        BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
+                                        Padding="12,4">
+                                    <TextBlock x:Name="txt_targets_count" Style="{StaticResource T3.Tally}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Text="0 assemblies · 0 ticked"/>
+                                </Border>
                             </Grid>
                         </Border>
                     </Grid>
                 </TabItem>
 
-                <!-- ────────────────── PAGE 2: OPTIONS ────────────────── -->
+                <!-- ────────────────── PAGE 2: CLONE SETTINGS ────────────────── -->
                 <TabItem x:Name="tab_item_options">
                     <Grid Margin="16">
-                        <Border Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True"
-                                Width="560" HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="320"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Tekla "Clone drawing" dialog: one row per object type -->
+                        <Border Grid.Column="0" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
                             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                                           Padding="16,16,12,16">
                                 <StackPanel>
-                                    <TextBlock Text="LAYERS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="PRESET (TEKLA: CLONING TEMPLATE SETTINGS)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
                                     <Separator Style="{StaticResource T3.Rule}" Margin="0,0,0,12"/>
-                                    <CheckBox x:Name="chk_t1" Style="{StaticResource T3.CheckBox}" IsChecked="True"
-                                              Margin="0,0,0,8" Click="options_changed"
-                                              Content="T1 — Views and sheet (same kind, template, scale, crop)"/>
-                                    <CheckBox x:Name="chk_t2" Style="{StaticResource T3.CheckBox}" IsChecked="True"
-                                              Margin="0,0,0,8" Click="options_changed"
-                                              Content="T2 — Free annotations (text, detail lines, detail items, filled regions)"/>
-                                    <CheckBox x:Name="chk_t3" Style="{StaticResource T3.CheckBox}" IsChecked="True"
-                                              Click="options_changed"
-                                              Content="T3 — Re-create tags and dimensions on matched elements"/>
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="cb_preset" Grid.Column="0" Style="{StaticResource T3.ComboBox}"
+                                                  ItemContainerStyle="{StaticResource T3.ComboBoxItem}"
+                                                  SelectionChanged="preset_changed"
+                                                  ToolTip="Saved clone settings; built-in presets cannot be deleted"/>
+                                        <TextBox x:Name="tb_preset_name" Grid.Column="2" Style="{StaticResource T3.TextBox}"
+                                                 ToolTip="Name for Save: a new preset, or an existing user preset to overwrite"/>
+                                        <Button x:Name="btn_preset_save" Grid.Column="4" Style="{StaticResource T3.Button.Secondary}"
+                                                Click="preset_save_clicked"
+                                                ToolTip="Save the rows below under the name on the left">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE74E;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="Save" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="btn_preset_delete" Grid.Column="6" Style="{StaticResource T3.Button.Ghost}"
+                                                Click="preset_delete_clicked"
+                                                ToolTip="Delete the selected user preset">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE74D;" Style="{StaticResource T3.Icon.Lead}"/>
+                                                <TextBlock Text="Delete" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
 
-                                    <TextBlock Text="EXISTING DRAWINGS" Style="{StaticResource T3.Label}" Margin="0,24,0,4"/>
+                                    <TextBlock Text="OBJECT TYPES (TEKLA: CLONE / CREATE / IGNORE)" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
                                     <Separator Style="{StaticResource T3.Rule}" Margin="0,0,0,12"/>
-                                    <RadioButton x:Name="rb_skip_existing" GroupName="cd_existing" IsChecked="True"
+                                    <Grid x:Name="grid_settings_rows">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="220"/>
+                                            <ColumnDefinition Width="220"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Views and sheet" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_views" Grid.Row="0" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Assembly views, schedules and the sheet with its viewports"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Crop box" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_crop" Grid.Row="1" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Copy from source" Tag="source"/>
+                                            <ComboBoxItem Content="Fit to target" Tag="fit"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Source: the source crop moved into the target. Fit: Revit's own crop around the target"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Manual sections and callouts" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_manual_views" Grid.Row="2" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="2" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Sections and callouts drawn inside the source views, re-created from the parent view"/>
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Dimensions" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_dimensions" Grid.Row="3" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="3" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Re-created between matched host faces. Create (auto-dimension) is impossible in Revit"/>
+
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Spot elevations (level marks)" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_spot" Grid.Row="4" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="4" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Re-created on matched host faces; spot coordinates and slopes are reported"/>
+
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Tags (marks)" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_tags" Grid.Row="5" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Clone + create for unmatched" Tag="clone_create"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="5" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Clone: tags on matched elements. Clone + create: also a new tag of the same type on every unmatched target member"/>
+
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Multi-rebar annotations" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_mra" Grid.Row="6" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8" IsEnabled="False">
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="6" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Not supported - the MultiReferenceAnnotation options API is unverified; listed as unmatched"/>
+
+                                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Text notes" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_texts" Grid.Row="7" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="7" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Copied view to view at the same place relative to the assembly"/>
+
+                                        <TextBlock Grid.Row="8" Grid.Column="0" Text="Symbols (generic annotations)" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_symbols" Grid.Row="8" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="8" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Annotation symbol families placed in the view"/>
+
+                                        <TextBlock Grid.Row="9" Grid.Column="0" Text="Detail lines, regions, items, groups" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_shapes" Grid.Row="9" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="9" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Detail lines, filled and masking regions, detail components, insulation, detail groups"/>
+
+                                        <TextBlock Grid.Row="10" Grid.Column="0" Text="Imported DWG/DXF (view-specific)" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_imports" Grid.Row="10" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="10" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="CAD imported into the view; linked CAD is model-wide and needs nothing"/>
+
+                                        <TextBlock Grid.Row="11" Grid.Column="0" Text="Images" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_images" Grid.Row="11" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="11" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Raster images placed in the view"/>
+
+                                        <TextBlock Grid.Row="12" Grid.Column="0" Text="Revision clouds" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_revisions" Grid.Row="12" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="12" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Off by default: a copied cloud adds its revision to the new sheet"/>
+
+                                        <TextBlock Grid.Row="13" Grid.Column="0" Text="Graphic overrides" Style="{StaticResource T3.Body}" VerticalAlignment="Center" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="cb_set_overrides" Grid.Row="13" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="13" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,8"
+                                                   Text="Per-element overrides of the source view re-applied to copied and matched elements"/>
+
+                                        <TextBlock Grid.Row="14" Grid.Column="0" Text="Sheet parameters" Style="{StaticResource T3.Body}" VerticalAlignment="Center"/>
+                                        <ComboBox x:Name="cb_set_sheet_params" Grid.Row="14" Grid.Column="1" Style="{StaticResource T3.ComboBox}" ItemContainerStyle="{StaticResource T3.ComboBoxItem}" SelectionChanged="settings_changed">
+                                            <ComboBoxItem Content="Clone" Tag="clone"/>
+                                            <ComboBoxItem Content="Skip" Tag="skip"/>
+                                        </ComboBox>
+                                        <TextBlock Grid.Row="14" Grid.Column="2" Style="{StaticResource T3.Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                   Text="Drawn By, Checked By and every other text parameter of the sheet"/>
+                                    </Grid>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- Right: existing drawings, matching, limits -->
+                        <Border Grid.Column="2" Style="{StaticResource T3.Panel}" Padding="0" ClipToBounds="True">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                          Padding="16,16,12,16">
+                                <StackPanel>
+                                    <TextBlock Text="EXISTING DRAWINGS" Style="{StaticResource T3.Label}" Margin="0,0,0,4"/>
+                                    <Separator Style="{StaticResource T3.Rule}" Margin="0,0,0,12"/>
+                                    <RadioButton x:Name="rb_existing_skip" GroupName="cd_existing" IsChecked="True"
                                                  Style="{StaticResource T3.RadioButton}" Margin="0,0,0,8"
                                                  Checked="options_changed"
                                                  Content="Skip assemblies that already have views"/>
-                                    <RadioButton x:Name="rb_add_missing" GroupName="cd_existing"
+                                    <RadioButton x:Name="rb_existing_add" GroupName="cd_existing"
+                                                 Style="{StaticResource T3.RadioButton}" Margin="0,0,0,8"
+                                                 Checked="options_changed"
+                                                 Content="Add missing views and annotations"
+                                                 ToolTip="Nothing is deleted; tags and dimensions already on the target are kept (Tekla: refresh associativity)"/>
+                                    <RadioButton x:Name="rb_existing_new" GroupName="cd_existing"
+                                                 Style="{StaticResource T3.RadioButton}" Margin="0,0,0,8"
+                                                 Checked="options_changed"
+                                                 Content="Create a new set of views next to the existing ones"
+                                                 ToolTip="Tekla: cloning again creates a new drawing"/>
+                                    <RadioButton x:Name="rb_existing_replace" GroupName="cd_existing"
                                                  Style="{StaticResource T3.RadioButton}"
                                                  Checked="options_changed"
-                                                 Content="Add only the missing views and sheet"/>
+                                                 Content="Replace annotations (deletes them first)"
+                                                 ToolTip="Deletes tags, dimensions, text and detail items of the target views after a confirmation; views, sheets and model elements are never deleted"/>
 
                                     <TextBlock Text="MATCHING" Style="{StaticResource T3.Label}" Margin="0,24,0,4"/>
                                     <Separator Style="{StaticResource T3.Rule}" Margin="0,0,0,12"/>
@@ -1935,7 +2225,8 @@
                                     </StackPanel>
                                     <CheckBox x:Name="chk_mirror" Style="{StaticResource T3.CheckBox}" IsChecked="True"
                                               Margin="0,0,0,12" Click="options_changed"
-                                              Content="Allow mirrored matches"/>
+                                              Content="Allow mirrored matches"
+                                              ToolTip="Members and faces also match through an x or y mirror; a tie is never guessed"/>
                                     <StackPanel Margin="0,0,0,12">
                                         <TextBlock Text="Sheet number" Style="{StaticResource T3.Caption}" Margin="0,0,0,4"/>
                                         <TextBox x:Name="tb_sheet_pattern" Style="{StaticResource T3.TextBox}"
@@ -1957,7 +2248,7 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="&#xE946;" Style="{StaticResource T3.Callout.Icon}"/>
                                             <TextBlock Grid.Column="1" Style="{StaticResource T3.Body}" TextWrapping="Wrap"
-                                                       Text="Tags and dimensions are re-created only where the target has a matching element; the rest is listed under Unmatched so you can add them by hand."/>
+                                                       Text="Limits: Revit cannot auto-dimension (Tekla Create), so unmatched dimensions are listed for you to add by hand. Mirrored assemblies get un-mirrored text, as in Tekla. Presets travel between machines; drawings do not travel between models."/>
                                         </Grid>
                                     </Border>
                                 </StackPanel>
@@ -1973,6 +2264,7 @@
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="160"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
@@ -1994,13 +2286,15 @@
                                                                 ElementStyle="{StaticResource T3.Cell.Mono}"/>
                                             <DataGridTextColumn Header="COPIED" Width="70" Binding="{Binding Copied}"
                                                                 ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                            <DataGridTextColumn Header="TAGS" Width="90" Binding="{Binding Tags}"
+                                            <DataGridTextColumn Header="TAGS" Width="100" Binding="{Binding Tags}"
                                                                 ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                            <DataGridTextColumn Header="DIMS" Width="90" Binding="{Binding Dims}"
+                                            <DataGridTextColumn Header="DIMS" Width="80" Binding="{Binding Dims}"
+                                                                ElementStyle="{StaticResource T3.Cell.Number}"/>
+                                            <DataGridTextColumn Header="SPOTS" Width="80" Binding="{Binding Spots}"
                                                                 ElementStyle="{StaticResource T3.Cell.Number}"/>
                                             <DataGridTextColumn Header="UNMATCHED" Width="90" Binding="{Binding Unmatched}"
                                                                 ElementStyle="{StaticResource T3.Cell.Number}"/>
-                                            <DataGridTemplateColumn Header="STATUS" Width="150"
+                                            <DataGridTemplateColumn Header="STATUS" Width="170"
                                                                     CellTemplate="{StaticResource T3.StatusPill}"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
@@ -2008,7 +2302,23 @@
                                                Text="Nothing cloned yet.&#x0a;Pick a source and targets, then press Clone."/>
                                 </Grid>
 
-                                <Border Grid.Row="1" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0">
+                                <Border Grid.Row="1" Style="{StaticResource T3.ListHeader}">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="LOG" Style="{StaticResource T3.ListHeader.Label}" Margin="0,0,12,0"/>
+                                        <RadioButton x:Name="chip_log_all" Content="All" GroupName="cd_log"
+                                                     Style="{StaticResource T3.Chip}" IsChecked="True"
+                                                     Checked="log_filter_checked"/>
+                                        <RadioButton x:Name="chip_log_unmatched" Content="Unmatched" GroupName="cd_log"
+                                                     Style="{StaticResource T3.Chip}"
+                                                     Checked="log_filter_checked"
+                                                     ToolTip="Only the elements that were not cloned, with the reason"/>
+                                        <RadioButton x:Name="chip_log_failed" Content="Failed" GroupName="cd_log"
+                                                     Style="{StaticResource T3.Chip}"
+                                                     Checked="log_filter_checked"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Row="2" BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0">
                                     <Grid>
                                         <ListBox x:Name="lst_log" Style="{StaticResource T3.LogBox}" BorderThickness="0"/>
                                         <TextBlock x:Name="lst_log_empty" Style="{StaticResource T3.Empty}"
@@ -2016,7 +2326,7 @@
                                     </Grid>
                                 </Border>
 
-                                <Border Grid.Row="2" Background="{StaticResource T3.SurfaceSunken}"
+                                <Border Grid.Row="3" Background="{StaticResource T3.SurfaceSunken}"
                                         BorderBrush="{StaticResource T3.Border}" BorderThickness="0,1,0,0"
                                         Padding="12,4">
                                     <TextBlock x:Name="txt_tally" Style="{StaticResource T3.Tally}"
@@ -2077,7 +2387,7 @@
                         </Button>
                         <Button x:Name="btn_clone" Style="{StaticResource T3.Button.Primary}"
                                 IsDefault="True" Click="clone_clicked"
-                                ToolTip="Review the count, then clone the drawing">
+                                ToolTip="Review the counts, then clone the drawing">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE8C8;" Style="{StaticResource T3.Icon.Lead}"/>
                                 <TextBlock x:Name="txt_clone_label" Text="Clone" VerticalAlignment="Center"/>

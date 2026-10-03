@@ -2,9 +2,7 @@ title: "Standards & Settings"
 background:
   title: "#46E07B00"
 layout:
-  - ModelAuditor
+  - Standards
   - ManaLoca
-  - ManaStyles
-  - ManaWorkset
   - ManaGroup
   - BatchLink

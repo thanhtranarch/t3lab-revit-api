@@ -1,11 +1,10 @@
 #! python3
 # -*- coding: utf-8 -*-
-__title__ = "Visual &\nStyles"
+__title__ = "Model\nAuditor"
 __author__ = "T3Lab"
-__doc__ = "Visual & Style Manager — Manage fill patterns, line styles, line patterns, color splasher overrides, and coordinate locations."
+__doc__ = "Model Auditor — Model check, warnings, in-place models, and material lists."
 
-import os
-import sys
+import os, sys
 # ─── CPython 3 & lib bootstrap ────────────────────────────────────────────────
 # CPython engine paths come from lib/_cpython_bootstrap.py below - it finds
 # the engine whatever the pyRevit clone is named or wherever it is installed.
@@ -27,12 +26,13 @@ except Exception:
     pass
 # ──────────────────────────────────────────────────────────────────────────────
 
-_ext_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# script -> pushbutton -> Standards.stack -> panel -> tab -> extension
+_ext_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 _lib = os.path.join(_ext_dir, 'lib')
 if _lib not in sys.path:
     sys.path.insert(0, _lib)
 
-from GUI.ManaStylesDialog import show_visual_settings
+from GUI.ModelAuditorDialog import show_model_auditor
 
 if __name__ == '__main__':
-    show_visual_settings(os.path.dirname(__file__), __revit__)
+    show_model_auditor(os.path.dirname(__file__), __revit__)

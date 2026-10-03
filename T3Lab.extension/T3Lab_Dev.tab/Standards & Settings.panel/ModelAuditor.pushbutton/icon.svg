@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- bang kiem + huy hieu canh bao (goc duoi-phai) -->
-  <rect x="3.5" y="3.5" width="15" height="24" fill="#F3F3F3" stroke="#000000" stroke-width="1"/>
-  <rect x="6" y="8" width="10" height="1" fill="#858585"/>
-  <rect x="6" y="12" width="8" height="1" fill="#858585"/>
-  <polygon points="25,20 30,30 20,30" fill="#E07B00"/>
-  <rect x="24" y="23" width="2" height="4" fill="#F3F3F3"/>
-</svg>
